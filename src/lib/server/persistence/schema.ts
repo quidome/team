@@ -1,4 +1,25 @@
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  date,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+export const players = pgTable(
+  'players',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    associationId: text('association_id').notNull(),
+    birthDate: date('birth_date', { mode: 'string' }).notNull(),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('players_association_id_unique').on(table.associationId)],
+);
 
 export const teams = pgTable(
   'teams',
