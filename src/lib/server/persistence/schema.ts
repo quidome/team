@@ -35,6 +35,8 @@ export const membershipRelationship = pgEnum('membership_relationship', ['primar
 export const membershipStatus = pgEnum('membership_status', ['active', 'inactive']);
 export const participationType = pgEnum('participation_type', ['trains_and_plays', 'trains_only']);
 
+export const gameOccurrenceStatus = pgEnum('game_occurrence_status', ['cancelled', 'scheduled']);
+
 export const seasons = pgTable(
   'seasons',
   {
@@ -117,3 +119,30 @@ export const trainingOccurrences = pgTable(
     uniqueIndex('training_occurrences_series_date_unique').on(table.seriesId, table.date),
   ],
 );
+
+export const gameFixtures = pgTable('game_fixtures', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  awayTeamId: uuid('away_team_id')
+    .notNull()
+    .references(() => teams.id),
+  homeTeamId: uuid('home_team_id')
+    .notNull()
+    .references(() => teams.id),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+});
+
+export const gameOccurrences = pgTable('game_occurrences', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  arrivalBufferMinutes: integer('arrival_buffer_minutes').notNull(),
+  date: date('date', { mode: 'string' }).notNull(),
+  fixtureId: uuid('fixture_id')
+    .notNull()
+    .references(() => gameFixtures.id, { onDelete: 'cascade' }),
+  locationId: uuid('location_id')
+    .notNull()
+    .references(() => locations.id),
+  startTime: text('start_time').notNull(),
+  status: gameOccurrenceStatus('status').notNull(),
+  travelMinutes: integer('travel_minutes').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+});
