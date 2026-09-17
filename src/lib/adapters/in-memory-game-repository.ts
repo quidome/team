@@ -5,6 +5,7 @@ import type {
   GameRepository,
   StoredGameFixture,
   StoredGameOccurrence,
+  StoredGameProgramOccurrence,
 } from '../application/games/game-repository';
 
 export class InMemoryGameRepository implements GameRepository {
@@ -12,6 +13,19 @@ export class InMemoryGameRepository implements GameRepository {
   private nextOccurrenceId = 1;
   private readonly fixtures = new Map<string, StoredGameFixture>();
   private readonly occurrences = new Map<string, StoredGameOccurrence[]>();
+
+  async findAllOccurrences(): Promise<StoredGameProgramOccurrence[]> {
+    return [...this.occurrences.entries()].flatMap(([fixtureId, occurrences]) => {
+      const fixture = this.fixtures.get(fixtureId);
+
+      return fixture
+        ? occurrences.map((occurrence) => ({
+            ...occurrence,
+            ...fixture.fixture,
+          }))
+        : [];
+    });
+  }
 
   async findFixtureById(id: string): Promise<StoredGameFixture | undefined> {
     return this.fixtures.get(id);

@@ -7,6 +7,7 @@ export interface StoredTrainingSeries {
 }
 
 export interface TrainingSeriesRepository {
+  findAll(): Promise<StoredTrainingSeries[]>;
   findById(id: string): Promise<StoredTrainingSeries | undefined>;
   save(series: TrainingSeries, occurrences: TrainingOccurrence[]): Promise<StoredTrainingSeries>;
 }

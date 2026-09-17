@@ -8,6 +8,10 @@ export class InMemoryTrainingSeriesRepository implements TrainingSeriesRepositor
   private nextId = 1;
   private readonly series = new Map<string, StoredTrainingSeries>();
 
+  async findAll(): Promise<StoredTrainingSeries[]> {
+    return [...this.series.values()];
+  }
+
   async findById(id: string): Promise<StoredTrainingSeries | undefined> {
     return this.series.get(id);
   }

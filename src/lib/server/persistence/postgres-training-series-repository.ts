@@ -21,6 +21,14 @@ const readWeekday = (value: number): Weekday => {
 export const createPostgresTrainingSeriesRepository = (
   database: Database,
 ): TrainingSeriesRepository => ({
+  async findAll(): Promise<StoredTrainingSeries[]> {
+    const seriesRows = await database.select({ id: trainingSeries.id }).from(trainingSeries);
+
+    return (await Promise.all(seriesRows.map((series) => this.findById(series.id)))).filter(
+      (series): series is StoredTrainingSeries => series !== undefined,
+    );
+  },
+
   async findById(id: string): Promise<StoredTrainingSeries | undefined> {
     const [storedSeries] = await database
       .select({

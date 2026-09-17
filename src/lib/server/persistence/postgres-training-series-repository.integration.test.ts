@@ -62,6 +62,7 @@ if (!databaseUrl) {
       seriesId = stored.id;
 
       await expect(repository.findById(stored.id)).resolves.toEqual(stored);
+      await expect(repository.findAll()).resolves.toEqual([stored]);
     });
   });
 }

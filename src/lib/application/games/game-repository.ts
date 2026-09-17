@@ -22,6 +22,11 @@ export interface StoredGameFixture {
   id: string;
 }
 
+export interface StoredGameProgramOccurrence extends StoredGameOccurrence {
+  awayTeamName: string;
+  homeTeamName: string;
+}
+
 export interface StoredGameOccurrence extends GameOccurrence {
   fixtureId: string;
   id: string;
@@ -30,6 +35,7 @@ export interface StoredGameOccurrence extends GameOccurrence {
 }
 
 export interface GameRepository {
+  findAllOccurrences(): Promise<StoredGameProgramOccurrence[]>;
   findFixtureById(id: string): Promise<StoredGameFixture | undefined>;
   findOccurrenceById(id: string): Promise<StoredGameOccurrence | undefined>;
   findOccurrences(fixtureId: string): Promise<StoredGameOccurrence[]>;

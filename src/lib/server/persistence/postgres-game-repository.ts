@@ -8,6 +8,7 @@ import type {
   GameRepository,
   StoredGameFixture,
   StoredGameOccurrence,
+  StoredGameProgramOccurrence,
 } from '../../application/games/game-repository';
 import { createDatabase } from './database';
 import { gameFixtures, gameOccurrences, locations, teams } from './schema';
@@ -17,15 +18,29 @@ type Database = ReturnType<typeof createDatabase>;
 const homeTeams = alias(teams, 'home_teams');
 const awayTeams = alias(teams, 'away_teams');
 
+const withoutFixtureNames = (occurrence: StoredGameProgramOccurrence): StoredGameOccurrence => ({
+  arrivalBufferMinutes: occurrence.arrivalBufferMinutes,
+  date: occurrence.date,
+  fixtureId: occurrence.fixtureId,
+  id: occurrence.id,
+  locationName: occurrence.locationName,
+  startTime: occurrence.startTime,
+  status: occurrence.status,
+  suggestedDepartureTime: occurrence.suggestedDepartureTime,
+  travelMinutes: occurrence.travelMinutes,
+});
+
 const findStoredOccurrence = async (
   database: Database,
   id: string,
-): Promise<StoredGameOccurrence | undefined> => {
+): Promise<StoredGameProgramOccurrence | undefined> => {
   const [occurrence] = await database
     .select({
       arrivalBufferMinutes: gameOccurrences.arrivalBufferMinutes,
+      awayTeamName: awayTeams.name,
       date: gameOccurrences.date,
       fixtureId: gameOccurrences.fixtureId,
+      homeTeamName: homeTeams.name,
       id: gameOccurrences.id,
       locationName: locations.name,
       startTime: gameOccurrences.startTime,
@@ -33,6 +48,9 @@ const findStoredOccurrence = async (
       travelMinutes: gameOccurrences.travelMinutes,
     })
     .from(gameOccurrences)
+    .innerJoin(gameFixtures, eq(gameOccurrences.fixtureId, gameFixtures.id))
+    .innerJoin(homeTeams, eq(gameFixtures.homeTeamId, homeTeams.id))
+    .innerJoin(awayTeams, eq(gameFixtures.awayTeamId, awayTeams.id))
     .innerJoin(locations, eq(gameOccurrences.locationId, locations.id))
     .where(eq(gameOccurrences.id, id))
     .limit(1);
@@ -50,6 +68,16 @@ const findStoredOccurrence = async (
 };
 
 export const createPostgresGameRepository = (database: Database): GameRepository => ({
+  async findAllOccurrences(): Promise<StoredGameProgramOccurrence[]> {
+    const occurrenceRows = await database.select({ id: gameOccurrences.id }).from(gameOccurrences);
+
+    return (
+      await Promise.all(
+        occurrenceRows.map((occurrence) => findStoredOccurrence(database, occurrence.id)),
+      )
+    ).filter((occurrence): occurrence is StoredGameProgramOccurrence => occurrence !== undefined);
+  },
+
   async findFixtureById(id: string): Promise<StoredGameFixture | undefined> {
     const [fixture] = await database
       .select({
@@ -66,7 +94,13 @@ export const createPostgresGameRepository = (database: Database): GameRepository
   },
 
   async findOccurrenceById(id: string): Promise<StoredGameOccurrence | undefined> {
-    return findStoredOccurrence(database, id);
+    const occurrence = await findStoredOccurrence(database, id);
+
+    if (!occurrence) {
+      return undefined;
+    }
+
+    return withoutFixtureNames(occurrence);
   },
 
   async findOccurrences(fixtureId: string): Promise<StoredGameOccurrence[]> {
@@ -79,7 +113,9 @@ export const createPostgresGameRepository = (database: Database): GameRepository
       await Promise.all(
         occurrenceRows.map((occurrence) => findStoredOccurrence(database, occurrence.id)),
       )
-    ).filter((occurrence): occurrence is StoredGameOccurrence => occurrence !== undefined);
+    )
+      .filter((occurrence): occurrence is StoredGameProgramOccurrence => occurrence !== undefined)
+      .map(withoutFixtureNames);
   },
 
   async saveFixture(fixture: GameFixture): Promise<StoredGameFixture> {
@@ -177,7 +213,7 @@ export const createPostgresGameRepository = (database: Database): GameRepository
       throw new Error(`Game occurrence ${id} does not exist`);
     }
 
-    const occurrence = await findStoredOccurrence(database, updatedOccurrence.id);
+    const occurrence = await this.findOccurrenceById(updatedOccurrence.id);
 
     if (!occurrence) {
       throw new Error(`Game occurrence ${id} could not be loaded after update`);
