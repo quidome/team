@@ -31,6 +31,10 @@ export const teams = pgTable(
   (table) => [uniqueIndex('teams_name_unique').on(table.name)],
 );
 
+export const membershipRelationship = pgEnum('membership_relationship', ['primary', 'secondary']);
+export const membershipStatus = pgEnum('membership_status', ['active', 'inactive']);
+export const participationType = pgEnum('participation_type', ['trains_and_plays', 'trains_only']);
+
 export const seasons = pgTable(
   'seasons',
   {
@@ -40,4 +44,32 @@ export const seasons = pgTable(
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex('seasons_starting_year_unique').on(table.startingYear)],
+);
+
+export const memberships = pgTable(
+  'memberships',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    jerseyNumber: integer('jersey_number'),
+    participationType: participationType('participation_type').notNull(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    relationship: membershipRelationship('relationship').notNull(),
+    seasonId: uuid('season_id')
+      .notNull()
+      .references(() => seasons.id, { onDelete: 'cascade' }),
+    status: membershipStatus('status').notNull(),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('memberships_player_team_season_unique').on(
+      table.playerId,
+      table.teamId,
+      table.seasonId,
+    ),
+  ],
 );
