@@ -37,6 +37,13 @@ export const participationType = pgEnum('participation_type', ['trains_and_plays
 
 export const gameOccurrenceStatus = pgEnum('game_occurrence_status', ['cancelled', 'scheduled']);
 
+export const absenceReason = pgEnum('absence_reason', ['illness', 'injury', 'other']);
+export const participationOccurrenceType = pgEnum('participation_occurrence_type', [
+  'game',
+  'training',
+]);
+export const participationStatus = pgEnum('participation_status', ['absent', 'present']);
+
 export const seasons = pgTable(
   'seasons',
   {
@@ -146,3 +153,27 @@ export const gameOccurrences = pgTable('game_occurrences', {
   travelMinutes: integer('travel_minutes').notNull(),
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 });
+
+export const participationRecords = pgTable(
+  'participation_records',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    absenceReason: absenceReason('absence_reason'),
+    occurrenceId: uuid('occurrence_id').notNull(),
+    occurrenceType: participationOccurrenceType('occurrence_type').notNull(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    status: participationStatus('status').notNull(),
+    recordedAt: timestamp('recorded_at', { mode: 'date', withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('participation_records_occurrence_player_unique').on(
+      table.occurrenceId,
+      table.occurrenceType,
+      table.playerId,
+    ),
+  ],
+);

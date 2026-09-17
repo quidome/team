@@ -5,6 +5,7 @@ import type { MembershipRepository } from '../application/memberships/membership
 import type { LocationRepository } from '../application/locations/location-repository';
 import type { TrainingSeriesRepository } from '../application/training/training-series-repository';
 import type { GameRepository } from '../application/games/game-repository';
+import type { ParticipationRepository } from '../application/participation/participation-repository';
 import type { SeasonRepository } from '../application/seasons/season-repository';
 import type { TeamRepository } from '../application/teams/team-repository';
 import { createDatabase } from './persistence/database';
@@ -14,6 +15,7 @@ import { createPostgresMembershipRepository } from './persistence/postgres-membe
 import { createPostgresLocationRepository } from './persistence/postgres-location-repository';
 import { createPostgresTrainingSeriesRepository } from './persistence/postgres-training-series-repository';
 import { createPostgresGameRepository } from './persistence/postgres-game-repository';
+import { createPostgresParticipationRepository } from './persistence/postgres-participation-repository';
 import { createPostgresSeasonRepository } from './persistence/postgres-season-repository';
 import { createPostgresTeamRepository } from './persistence/postgres-team-repository';
 
@@ -25,6 +27,7 @@ let memberships: MembershipRepository | undefined;
 let locations: LocationRepository | undefined;
 let trainingSeries: TrainingSeriesRepository | undefined;
 let games: GameRepository | undefined;
+let participation: ParticipationRepository | undefined;
 let seasons: SeasonRepository | undefined;
 let teams: TeamRepository | undefined;
 
@@ -62,6 +65,12 @@ export const currentGameRepository = (): GameRepository => {
   games ??= createPostgresGameRepository(currentDatabase());
 
   return games;
+};
+
+export const currentParticipationRepository = (): ParticipationRepository => {
+  participation ??= createPostgresParticipationRepository(currentDatabase());
+
+  return participation;
 };
 
 export const currentSeasonRepository = (): SeasonRepository => {
