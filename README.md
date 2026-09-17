@@ -22,6 +22,13 @@ Run the quality checks:
 just check
 ```
 
+For local persistence work, copy `.env.example` to `.env`, set `DATABASE_URL` to a running PostgreSQL instance, then apply migrations:
+
+```sh
+cp .env.example .env
+just db-migrate
+```
+
 Start the development server:
 
 ```sh

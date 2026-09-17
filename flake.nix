@@ -23,6 +23,7 @@
             packages = with pkgs; [
               nodejs_22
               just
+              postgresql
               git
               jq
             ];

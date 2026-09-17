@@ -12,6 +12,14 @@ build:
 serve: build
     npm run start
 
+# Generate PostgreSQL migrations from the Drizzle schema.
+db-generate:
+    npm run db:generate
+
+# Apply generated PostgreSQL migrations using DATABASE_URL.
+db-migrate:
+    npm run db:migrate
+
 # Run all local quality checks.
 check: format-check lint typecheck test
 
