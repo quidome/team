@@ -73,3 +73,47 @@ export const memberships = pgTable(
     ),
   ],
 );
+
+export const locations = pgTable(
+  'locations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    travelMinutes: integer('travel_minutes').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('locations_name_unique').on(table.name)],
+);
+
+export const trainingSeries = pgTable('training_series', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  durationMinutes: integer('duration_minutes').notNull(),
+  endDate: date('end_date', { mode: 'string' }).notNull(),
+  locationId: uuid('location_id')
+    .notNull()
+    .references(() => locations.id),
+  startDate: date('start_date', { mode: 'string' }).notNull(),
+  startTime: text('start_time').notNull(),
+  weekday: integer('weekday').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+});
+
+export const trainingOccurrences = pgTable(
+  'training_occurrences',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    date: date('date', { mode: 'string' }).notNull(),
+    durationMinutes: integer('duration_minutes').notNull(),
+    locationId: uuid('location_id')
+      .notNull()
+      .references(() => locations.id),
+    seriesId: uuid('series_id')
+      .notNull()
+      .references(() => trainingSeries.id, { onDelete: 'cascade' }),
+    startTime: text('start_time').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('training_occurrences_series_date_unique').on(table.seriesId, table.date),
+  ],
+);
