@@ -1,4 +1,6 @@
 <script>
+  import { resolve } from '$app/paths';
+
   /** @typedef {import('./$types').PageData} PageData */
   /** @type {PageData} */
   export let data;
@@ -35,7 +37,9 @@
 </svelte:head>
 
 <section class="intro">
-  <p class="eyebrow">Current season · recorded activity</p>
+  <p class="eyebrow">
+    Current season · {data.denominator === 'scheduled' ? 'scheduled activity' : 'recorded activity'}
+  </p>
   <h1>History</h1>
   <p class="lede">Participation percentages and completed duties for the active team roster.</p>
 </section>
@@ -46,6 +50,21 @@
       <p class="eyebrow">Team balance</p>
       <h2 id="summary-heading">Player summary</h2>
     </div>
+    <nav class="denominator-nav" aria-label="Percentage denominator">
+      <span>Percentages:</span>
+      <a
+        class:active={data.denominator === 'recorded'}
+        href={resolve('/history?denominator=recorded')}
+      >
+        Recorded
+      </a>
+      <a
+        class:active={data.denominator === 'scheduled'}
+        href={resolve('/history?denominator=scheduled')}
+      >
+        Scheduled
+      </a>
+    </nav>
   </div>
 
   {#if data.players.length === 0}
@@ -70,11 +89,11 @@
               <th scope="row">{player.name}</th>
               <td
                 >{percentage(player.games)}
-                <span>{player.games.present}/{player.games.recorded}</span></td
+                <span>{player.games.present}/{player.games.denominator}</span></td
               >
               <td
                 >{percentage(player.trainings)}
-                <span>{player.trainings.present}/{player.trainings.recorded}</span></td
+                <span>{player.trainings.present}/{player.trainings.denominator}</span></td
               >
               <td>{player.dutiesCompleted}</td>
             </tr>
@@ -82,7 +101,15 @@
         </tbody>
       </table>
     </div>
-    <p class="hint">Percentages use recorded participation as the denominator.</p>
+    <p class="hint">
+      {#if data.denominator === 'scheduled'}
+        Percentages use scheduled, eligible occurrences as the denominator. Unrecorded occurrences
+        count as not present.
+      {:else}
+        Percentages use recorded participation as the denominator; unrecorded occurrences are not
+        included.
+      {/if}
+    </p>
   {/if}
 </section>
 
@@ -151,6 +178,33 @@
 </section>
 
 <style>
+  .denominator-nav {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .denominator-nav span {
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .denominator-nav a {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    padding: 0.35rem 0.65rem;
+    text-decoration: none;
+  }
+
+  .denominator-nav a:hover,
+  .denominator-nav a.active {
+    border-color: var(--accent);
+    color: var(--accent-dark);
+  }
+
   .table-wrap {
     overflow-x: auto;
   }

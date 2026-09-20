@@ -3,7 +3,10 @@ import type { ParticipationRecord } from '../participation/participation-reposit
 import type { ProgramEvent } from '../program/read-program';
 import type { TeamPlayer } from '../team/read-team';
 
+export type HistoryDenominator = 'recorded' | 'scheduled';
+
 export interface HistoryMetric {
+  denominator: number;
   percentage?: number;
   present: number;
   recorded: number;
@@ -27,16 +30,23 @@ export interface HistoryParticipationEntry {
 }
 
 export interface HistoryReport {
+  denominator: HistoryDenominator;
   entries: HistoryParticipationEntry[];
   players: HistoryPlayerSummary[];
 }
 
-const metric = (records: ParticipationRecord[]): HistoryMetric => {
+const metric = (
+  records: ParticipationRecord[],
+  denominator: HistoryDenominator,
+  scheduledCount: number,
+): HistoryMetric => {
   const present = records.filter((record) => record.status === 'present').length;
   const recorded = records.length;
+  const denominatorCount = denominator === 'scheduled' ? scheduledCount : recorded;
 
   return {
-    ...(recorded > 0 ? { percentage: Math.round((present / recorded) * 100) } : {}),
+    denominator: denominatorCount,
+    ...(denominatorCount > 0 ? { percentage: Math.round((present / denominatorCount) * 100) } : {}),
     present,
     recorded,
   };
@@ -54,6 +64,7 @@ export const readHistory = (
   fairness: DutyFairness[],
   events: ProgramEvent[],
   teamName = 'U16-1',
+  denominator: HistoryDenominator = 'recorded',
 ): HistoryReport => {
   const teamPlayerIds = new Set(
     players
@@ -63,7 +74,16 @@ export const readHistory = (
       )
       .map((player) => player.associationId),
   );
-  const eventsById = new Map(events.map((event) => [eventId(event), event]));
+  const eventsById = new Map(
+    events.map((event) => [`${event.type}:${eventId(event)}`, event] as const),
+  );
+  const scheduledEvents = events.filter(
+    (event) =>
+      (event.type === 'training' ||
+        event.homeTeamName === teamName ||
+        event.awayTeamName === teamName) &&
+      event.status === 'scheduled',
+  );
   const teamRecords = records.filter((record) => teamPlayerIds.has(record.playerAssociationId));
   const fairnessByPlayer = new Map(
     fairness.map((entry) => [entry.playerAssociationId, entry.completedCount]),
@@ -76,18 +96,42 @@ export const readHistory = (
         (record) => record.playerAssociationId === player.associationId,
       );
 
+      const playerRecordsFor = (occurrenceType: ParticipationRecord['occurrenceType']) =>
+        playerRecords.filter((record) => {
+          if (record.occurrenceType !== occurrenceType) {
+            return false;
+          }
+
+          return denominator === 'recorded'
+            ? true
+            : scheduledEvents.some(
+                (event) =>
+                  `${event.type}:${eventId(event)}` ===
+                  `${record.occurrenceType}:${record.occurrenceId}`,
+              );
+        });
+      const scheduledCountFor = (occurrenceType: ParticipationRecord['occurrenceType']) =>
+        scheduledEvents.filter(
+          (event) =>
+            event.type === occurrenceType &&
+            (occurrenceType === 'training' ||
+              player.membership?.participationType === 'trains_and_plays'),
+        ).length;
+      const gameRecords = playerRecordsFor('game');
+      const trainingRecords = playerRecordsFor('training');
+
       return {
         associationId: player.associationId,
         dutiesCompleted: fairnessByPlayer.get(player.associationId) ?? 0,
-        games: metric(playerRecords.filter((record) => record.occurrenceType === 'game')),
+        games: metric(gameRecords, denominator, scheduledCountFor('game')),
         name: player.name,
-        trainings: metric(playerRecords.filter((record) => record.occurrenceType === 'training')),
+        trainings: metric(trainingRecords, denominator, scheduledCountFor('training')),
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
   const entries = teamRecords
     .map((record) => {
-      const event = eventsById.get(record.occurrenceId);
+      const event = eventsById.get(`${record.occurrenceType}:${record.occurrenceId}`);
 
       return {
         ...(event ? { date: event.date } : {}),
@@ -101,6 +145,7 @@ export const readHistory = (
     .sort((left, right) => (right.date ?? '').localeCompare(left.date ?? ''));
 
   return {
+    denominator,
     entries: entries.filter((entry) => playersById.has(entry.playerAssociationId)),
     players: summaries,
   };
