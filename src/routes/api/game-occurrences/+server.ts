@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { scheduleGameOccurrence } from '$lib/application/games/configure-game';
 import type { GameOccurrence } from '$lib/application/games/game-repository';
-import { currentGameRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentGameRepository } from '$lib/server/composition-root';
 
 const isCalendarDate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -76,7 +76,22 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_game_occurrence' }, { status: 400 });
   }
 
-  return json(
-    await scheduleGameOccurrence(currentGameRepository(), input.fixtureId, input.occurrence),
+  const storedOccurrence = await scheduleGameOccurrence(
+    currentGameRepository(),
+    input.fixtureId,
+    input.occurrence,
   );
+
+  await currentAuditRepository().record({
+    action: 'game_occurrence_created',
+    entityId: storedOccurrence.id,
+    entityType: 'game_occurrence',
+    metadata: {
+      date: storedOccurrence.date,
+      fixtureId: storedOccurrence.fixtureId,
+      locationName: storedOccurrence.locationName,
+    },
+  });
+
+  return json(storedOccurrence);
 };

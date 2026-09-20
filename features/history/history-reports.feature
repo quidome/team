@@ -17,3 +17,8 @@ Feature: Review participation and duty history
     Given a manual reminder is created and completed
     When the coordinator opens History
     Then the task creation and status change are visible in the audit list
+
+  Scenario: Inspecting game lifecycle changes
+    Given a game is scheduled, rescheduled, and cancelled
+    When the coordinator opens History
+    Then the game lifecycle actions are visible in the audit list

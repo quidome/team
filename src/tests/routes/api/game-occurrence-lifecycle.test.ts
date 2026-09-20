@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  audit: {
+    record: vi.fn(),
+  },
   games: {
     findFixtureById: vi.fn(),
     findOccurrenceById: vi.fn(),
@@ -12,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
+  currentAuditRepository: () => mocks.audit,
   currentGameRepository: () => mocks.games,
 }));
 
@@ -54,6 +58,9 @@ describe('game occurrence lifecycle', () => {
       'game-occurrence-1',
       'cancelled',
     );
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'game_occurrence_cancelled' }),
+    );
   });
 
   it('creates a replacement and cancels the original when rescheduling', async () => {
@@ -80,6 +87,12 @@ describe('game occurrence lifecycle', () => {
     expect(mocks.games.updateOccurrenceStatus).toHaveBeenCalledWith(
       'game-occurrence-1',
       'cancelled',
+    );
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'game_occurrence_rescheduled',
+        entityId: 'game-occurrence-2',
+      }),
     );
   });
 });

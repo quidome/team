@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  audit: {
+    record: vi.fn(),
+  },
   games: {
     findFixtureById: vi.fn(),
     findOccurrences: vi.fn(),
@@ -10,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
+  currentAuditRepository: () => mocks.audit,
   currentGameRepository: () => mocks.games,
 }));
 
@@ -43,6 +47,9 @@ describe('POST /api/game-occurrences', () => {
     } as never);
 
     expect(response.status).toBe(200);
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'game_occurrence_created', entityId: 'game-occurrence-1' }),
+    );
     await expect(response.json()).resolves.toMatchObject({
       date: '2026-09-05',
       fixtureId: 'game-fixture-1',
