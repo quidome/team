@@ -1,5 +1,26 @@
 <script>
+  import { page } from '$app/stores';
   import { resolve } from '$app/paths';
+  import NavIcon from '$lib/components/NavIcon.svelte';
+
+  /** @type {Array<{href: '/' | '/program' | '/team' | '/duties' | '/messages' | '/history' | '/settings', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[]}>} */
+  const navItems = [
+    { activePaths: ['/'], href: '/', icon: 'home', label: 'Home' },
+    { activePaths: ['/program'], href: '/program', icon: 'calendar', label: 'Program' },
+    { activePaths: ['/team', '/events'], href: '/team', icon: 'users', label: 'Team' },
+    { activePaths: ['/duties'], href: '/duties', icon: 'clipboard', label: 'Duties' },
+    { activePaths: ['/messages'], href: '/messages', icon: 'chat', label: 'Messages' },
+    { activePaths: ['/history'], href: '/history', icon: 'history', label: 'History' },
+    { activePaths: ['/settings'], href: '/settings', icon: 'settings', label: 'Settings' },
+  ];
+
+  $: pathname = $page.url.pathname;
+
+  /** @param {{ activePaths: string[] }} item */
+  const isActive = (item) =>
+    item.activePaths.some(
+      (path) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)),
+    );
 </script>
 
 <svelte:head>
@@ -9,13 +30,17 @@
 <header class="site-header">
   <a class="brand" href={resolve('/')}>Team <span>U16-1</span></a>
   <nav aria-label="Primary navigation">
-    <a href={resolve('/')}>Home</a>
-    <a href={resolve('/program')}>Program</a>
-    <a href={resolve('/team')}>Team</a>
-    <a href={resolve('/duties')}>Duties</a>
-    <a href={resolve('/messages')}>Messages</a>
-    <a href={resolve('/history')}>History</a>
-    <a href={resolve('/settings')}>Settings</a>
+    {#each navItems as item (item.href)}
+      <a
+        aria-current={isActive(item) ? 'page' : undefined}
+        class:active={isActive(item)}
+        href={resolve(item.href)}
+        title={item.label}
+      >
+        <NavIcon name={item.icon} />
+        <span class="nav-label">{item.label}</span>
+      </a>
+    {/each}
   </nav>
   <a class="login-link" href={resolve('/auth/login')}>Coordinator login</a>
 </header>
@@ -74,9 +99,11 @@
   }
 
   nav {
+    align-items: center;
     display: flex;
     flex: 1;
-    gap: 1.25rem;
+    gap: 0.45rem;
+    justify-content: center;
   }
 
   nav a,
@@ -84,6 +111,33 @@
     color: var(--muted);
     font-size: 0.9rem;
     text-decoration: none;
+  }
+
+  nav a {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: 0.65rem;
+    display: inline-flex;
+    justify-content: center;
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    padding: 0.55rem;
+  }
+
+  nav a.active {
+    background: #fff4ef;
+    border-color: #e2b8aa;
+    color: var(--accent-dark);
+  }
+
+  .nav-label {
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    position: absolute;
+    width: 1px;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   nav a:hover,
@@ -192,6 +246,10 @@
     gap: 1rem;
     grid-template-columns: minmax(7rem, 0.25fr) 1fr;
     padding: 1rem;
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease,
+      transform 120ms ease;
   }
 
   :global(.event-date) {
@@ -235,10 +293,18 @@
     }
 
     nav {
+      display: grid;
       flex-basis: 100%;
+      gap: 0.35rem;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       order: 3;
-      overflow-x: auto;
-      padding-bottom: 0.25rem;
+      overflow: visible;
+      padding-bottom: 0;
+    }
+
+    nav a {
+      padding: 0.4rem 0.2rem;
+      width: 100%;
     }
 
     .page-shell {
@@ -249,27 +315,71 @@
   @media (max-width: 36rem) {
     .site-header,
     .page-shell {
-      padding-left: 1rem;
-      padding-right: 1rem;
+      padding-left: max(1rem, env(safe-area-inset-left));
+      padding-right: max(1rem, env(safe-area-inset-right));
     }
 
-    :global(.event-card) {
-      align-items: start;
-      grid-template-columns: 1fr;
+    .site-header {
+      gap: 0.75rem;
+      padding-bottom: 0.9rem;
+      padding-top: 0.9rem;
     }
 
-    :global(.event-date) {
-      border-bottom: 1px solid var(--line);
-      border-right: 0;
-      padding-bottom: 0.75rem;
-      padding-right: 0;
-      width: 100%;
+    nav a,
+    .login-link {
+      font-size: 0.8rem;
+    }
+
+    .login-link {
+      padding: 0.5rem 0.7rem;
+    }
+
+    .page-shell {
+      padding-bottom: max(3rem, env(safe-area-inset-bottom));
+      padding-top: 1.75rem;
+    }
+
+    :global(.intro) {
+      margin-bottom: 1.5rem;
+    }
+
+    :global(.lede) {
+      font-size: 1rem;
+    }
+
+    :global(.panel) {
+      border-radius: 1rem;
+      padding: 1rem;
     }
 
     :global(.panel-heading) {
       align-items: start;
       flex-direction: column;
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+    }
+
+    :global(.event-card) {
+      align-items: start;
       gap: 0.75rem;
+      grid-template-columns: 6.25rem minmax(0, 1fr);
+      padding: 0.85rem;
+    }
+
+    :global(.event-date) {
+      border-bottom: 0;
+      border-right: 1px solid var(--line);
+      padding-bottom: 0;
+      padding-right: 0.75rem;
+      width: auto;
+    }
+
+    :global(.event-date strong) {
+      font-size: 1.1rem;
+    }
+
+    :global(.event-details h3) {
+      font-size: 1rem;
     }
   }
 </style>
