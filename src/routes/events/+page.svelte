@@ -17,14 +17,19 @@
 
   let gameForm = {
     arrivalBufferMinutes: '30',
-    awayTeamName: '',
     date: '',
-    homeTeamName: 'U16-1',
+    isHome: 'home',
     locationName: '',
+    opponentAddress: '',
+    opponentName: '',
+    seasonHalf: 'H1',
     startTime: '',
     travelMinutes: '0',
   };
   let savingGame = false;
+  let showGameModal = false;
+  let showTrainingModal = false;
+  let showOneOffTrainingModal = false;
   let gameMessage = '';
   let gameError = '';
   let lifecycleAction = '';
@@ -87,17 +92,58 @@
     return body;
   };
 
+  const updateGameTravelTime = () => {
+    const location = data.locations.find((candidate) => candidate.name === gameForm.locationName);
+
+    if (location) {
+      gameForm = { ...gameForm, travelMinutes: String(location.travelMinutes) };
+    }
+  };
+
+  const updateRescheduleTravelTime = () => {
+    const location = data.locations.find(
+      (candidate) => candidate.name === rescheduleForm.locationName,
+    );
+
+    if (location) {
+      rescheduleForm = { ...rescheduleForm, travelMinutes: String(location.travelMinutes) };
+    }
+  };
+
   const saveGame = async () => {
     savingGame = true;
     gameMessage = '';
     gameError = '';
 
     try {
+      const knownLocation = data.locations.find(
+        (location) => location.name === gameForm.locationName,
+      );
+
+      if (!knownLocation) {
+        await postJson(
+          '/api/locations',
+          {
+            name: gameForm.locationName,
+            travelMinutes: Number(gameForm.travelMinutes),
+          },
+          'The venue could not be stored.',
+        );
+      }
+
+      const isHome = gameForm.isHome === 'home';
       const fixture = await postJson(
         '/api/games/fixtures',
         {
-          awayTeamName: gameForm.awayTeamName,
-          homeTeamName: gameForm.homeTeamName,
+          awayTeamName: isHome ? gameForm.opponentName : data.teamName,
+          homeTeamName: isHome ? data.teamName : gameForm.opponentName,
+          isHome,
+          opponentAddress: gameForm.opponentAddress,
+          opponentName: gameForm.opponentName,
+          opponentTravelMinutes: Number(gameForm.travelMinutes),
+          ourTeamName: data.teamName,
+          seasonHalf: gameForm.seasonHalf,
+          seasonStartingYear: data.season.startingYear,
         },
         'The game could not be stored.',
       );
@@ -113,8 +159,9 @@
         },
         'The game could not be stored.',
       );
-      gameMessage = 'Game added to the program.';
-      gameForm = { ...gameForm, awayTeamName: '', date: '', startTime: '' };
+      gameMessage = 'Game added to the events.';
+      gameForm = { ...gameForm, date: '', opponentAddress: '', opponentName: '', startTime: '' };
+      showGameModal = false;
       await invalidateAll();
     } catch (error) {
       gameError = error instanceof Error ? error.message : 'The game could not be stored.';
@@ -278,8 +325,9 @@
         },
         'The training occurrence could not be stored.',
       );
-      oneOffTrainingMessage = 'One-off training added to the program.';
+      oneOffTrainingMessage = 'One-off training added to the events.';
       oneOffTrainingForm = { ...oneOffTrainingForm, date: '' };
+      showOneOffTrainingModal = false;
       await invalidateAll();
     } catch (error) {
       oneOffTrainingError =
@@ -307,8 +355,9 @@
         },
         'The training series could not be stored.',
       );
-      trainingMessage = 'Training series added to the program.';
+      trainingMessage = 'Training series added to the events.';
       trainingForm = { ...trainingForm, endDate: '', startDate: '' };
+      showTrainingModal = false;
       await invalidateAll();
     } catch (error) {
       trainingError =
@@ -320,28 +369,35 @@
 </script>
 
 <svelte:head>
-  <title>Program · Team</title>
-  <meta name="description" content="Games and training sessions for the team program" />
+  <title>Events · Team</title>
+  <meta name="description" content="Games, training, and duties for the team" />
 </svelte:head>
 
 <section class="intro">
-  <p class="eyebrow">Shared schedule</p>
-  <h1>Program</h1>
+  <p class="eyebrow">Shared timeline</p>
+  <h1>Events</h1>
   <p class="lede">Games and training occurrences in chronological order.</p>
 </section>
 
-<section class="panel" aria-labelledby="program-heading">
+<section class="panel" aria-labelledby="events-heading">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">{data.events.length} events</p>
-      <h2 id="program-heading">All events</h2>
+      <h2 id="events-heading">All events</h2>
+    </div>
+    <div class="action-row">
+      <button type="button" on:click={() => (showGameModal = true)}>Add game</button>
+      <button type="button" on:click={() => (showTrainingModal = true)}>Add training series</button>
+      <button type="button" on:click={() => (showOneOffTrainingModal = true)}>
+        Add training
+      </button>
     </div>
   </div>
 
   {#if data.events.length === 0}
     <div class="empty-state">
       <h3>No events configured yet</h3>
-      <p>Use the program configuration APIs to add the first game or training series.</p>
+      <p>Add a game or training event to start the timeline.</p>
     </div>
   {:else}
     <div class="program-list">
@@ -353,7 +409,10 @@
           </div>
           <div class="program-event">
             {#if event.type === 'game'}
-              <p class="event-kind">Game · {event.status}</p>
+              <p class="event-kind">
+                Game · {event.status}{#if event.seasonHalf}
+                  · {event.seasonHalf}{/if}
+              </p>
               <h2>{event.homeTeamName} <span aria-hidden="true">vs</span> {event.awayTeamName}</h2>
               <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
               {#if event.status === 'scheduled'}
@@ -379,7 +438,11 @@
                     </label>
                     <label>
                       Location
-                      <select bind:value={rescheduleForm.locationName} required>
+                      <select
+                        bind:value={rescheduleForm.locationName}
+                        on:change={updateRescheduleTravelTime}
+                        required
+                      >
                         <option disabled value="">Choose a location</option>
                         {#each data.locations as location (location.name)}
                           <option value={location.name}>{location.name}</option>
@@ -478,172 +541,298 @@
   {/if}
 </section>
 
-<section class="panel manual-game-panel" aria-labelledby="manual-game-heading">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Coordinator entry</p>
-      <h2 id="manual-game-heading">Add a game</h2>
+{#if showGameModal}
+  <div class="modal-backdrop" role="presentation">
+    <div class="panel modal" aria-labelledby="manual-game-heading" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">New event</p>
+          <h2 id="manual-game-heading">Add a game</h2>
+        </div>
+        <button class="close-button" type="button" on:click={() => (showGameModal = false)}>
+          Close
+        </button>
+      </div>
+
+      <form class="game-form" on:submit|preventDefault={saveGame}>
+        <label>
+          Venue
+          <select bind:value={gameForm.isHome}>
+            <option value="home">Home game</option>
+            <option value="away">Away game</option>
+          </select>
+        </label>
+        <label>
+          Opponent
+          <input
+            bind:value={gameForm.opponentName}
+            placeholder="e.g. Haarlem Ballers U15-4"
+            required
+          />
+        </label>
+        <label>
+          Season half
+          <select bind:value={gameForm.seasonHalf}>
+            <option value="H1">First half (H1)</option>
+            <option value="H2">Second half (H2)</option>
+          </select>
+        </label>
+        <label>
+          Opponent venue/address <span class="optional">optional</span>
+          <input bind:value={gameForm.opponentAddress} placeholder="Away venue address" />
+        </label>
+        <label>
+          Date
+          <input bind:value={gameForm.date} required type="date" />
+        </label>
+        <label>
+          Start time
+          <input bind:value={gameForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
+        </label>
+        <label>
+          Venue
+          <input
+            bind:value={gameForm.locationName}
+            list="event-locations"
+            on:change={updateGameTravelTime}
+            placeholder="Select or add a venue"
+            required
+          />
+          <datalist id="event-locations">
+            {#each data.locations as location (location.name)}
+              <option value={location.name}>{location.travelMinutes} minutes travel</option>
+            {/each}
+          </datalist>
+        </label>
+        <label>
+          Travel minutes
+          <input bind:value={gameForm.travelMinutes} min="0" required type="number" />
+        </label>
+        <label>
+          Arrival buffer
+          <input bind:value={gameForm.arrivalBufferMinutes} min="0" required type="number" />
+        </label>
+        <button disabled={savingGame} type="submit">{savingGame ? 'Saving…' : 'Add game'}</button>
+      </form>
+      <p class="form-hint">
+        {#if data.locations.length === 0}
+          Add a location in <a href={resolve('/admin')}>Admin</a> before adding events.
+        {:else}
+          Departure is calculated from travel time and arrival buffer.
+        {/if}
+      </p>
+      {#if gameMessage}<p class="form-message" role="status">{gameMessage}</p>{/if}
+      {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
+      {#if lifecycleMessage}<p class="form-message" role="status">{lifecycleMessage}</p>{/if}
+      {#if lifecycleError}<p class="form-error" role="alert">{lifecycleError}</p>{/if}
     </div>
   </div>
+{/if}
 
-  <form class="game-form" on:submit|preventDefault={saveGame}>
-    <label>
-      Home team
-      <input bind:value={gameForm.homeTeamName} required />
-    </label>
-    <label>
-      Away team
-      <input bind:value={gameForm.awayTeamName} required />
-    </label>
-    <label>
-      Date
-      <input bind:value={gameForm.date} required type="date" />
-    </label>
-    <label>
-      Start time
-      <input bind:value={gameForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
-    </label>
-    <label>
-      Location
-      <select bind:value={gameForm.locationName} required>
-        <option disabled value="">Choose a location</option>
-        {#each data.locations as location (location.name)}
-          <option value={location.name}>{location.name}</option>
-        {/each}
-      </select>
-    </label>
-    <label>
-      Travel minutes
-      <input bind:value={gameForm.travelMinutes} min="0" required type="number" />
-    </label>
-    <label>
-      Arrival buffer
-      <input bind:value={gameForm.arrivalBufferMinutes} min="0" required type="number" />
-    </label>
-    <button disabled={savingGame} type="submit">{savingGame ? 'Saving…' : 'Add game'}</button>
-  </form>
-  <p class="form-hint">
-    {#if data.locations.length === 0}
-      Add a location in <a href={resolve('/settings')}>Settings</a> before adding events.
-    {:else}
-      Departure is calculated from travel time and arrival buffer.
-    {/if}
-  </p>
-  {#if gameMessage}<p class="form-message" role="status">{gameMessage}</p>{/if}
-  {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
-  {#if lifecycleMessage}<p class="form-message" role="status">{lifecycleMessage}</p>{/if}
-  {#if lifecycleError}<p class="form-error" role="alert">{lifecycleError}</p>{/if}
-</section>
+{#if showTrainingModal}
+  <div class="modal-backdrop" role="presentation">
+    <div
+      class="panel modal"
+      aria-labelledby="training-series-heading"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Recurring event</p>
+          <h2 id="training-series-heading">Add a training series</h2>
+        </div>
+        <button class="close-button" type="button" on:click={() => (showTrainingModal = false)}>
+          Close
+        </button>
+      </div>
 
-<section class="panel manual-game-panel" aria-labelledby="training-series-heading">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Recurring event</p>
-      <h2 id="training-series-heading">Add a training series</h2>
+      <form class="game-form" on:submit|preventDefault={saveTraining}>
+        <label>
+          Weekday
+          <select bind:value={trainingForm.weekday}>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+            <option value="7">Sunday</option>
+          </select>
+        </label>
+        <label>
+          Start date
+          <input bind:value={trainingForm.startDate} required type="date" />
+        </label>
+        <label>
+          End date
+          <input bind:value={trainingForm.endDate} required type="date" />
+        </label>
+        <label>
+          Start time
+          <input bind:value={trainingForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
+        </label>
+        <label>
+          Duration minutes
+          <input bind:value={trainingForm.durationMinutes} min="1" required type="number" />
+        </label>
+        <label>
+          Location
+          <select bind:value={trainingForm.locationName} required>
+            <option disabled value="">Choose a location</option>
+            {#each data.locations as location (location.name)}
+              <option value={location.name}>{location.name}</option>
+            {/each}
+          </select>
+        </label>
+        <button disabled={savingTraining} type="submit">
+          {savingTraining ? 'Saving…' : 'Add training series'}
+        </button>
+      </form>
+      <p class="form-hint">
+        {#if data.locations.length === 0}
+          Add a location in <a href={resolve('/admin')}>Admin</a> before adding training.
+        {:else}
+          Locations are managed in <a href={resolve('/admin')}>Admin</a>.
+        {/if}
+      </p>
+      {#if trainingMessage}<p class="form-message" role="status">{trainingMessage}</p>{/if}
+      {#if trainingError}<p class="form-error" role="alert">{trainingError}</p>{/if}
     </div>
   </div>
+{/if}
 
-  <form class="game-form" on:submit|preventDefault={saveTraining}>
-    <label>
-      Weekday
-      <select bind:value={trainingForm.weekday}>
-        <option value="1">Monday</option>
-        <option value="2">Tuesday</option>
-        <option value="3">Wednesday</option>
-        <option value="4">Thursday</option>
-        <option value="5">Friday</option>
-        <option value="6">Saturday</option>
-        <option value="7">Sunday</option>
-      </select>
-    </label>
-    <label>
-      Start date
-      <input bind:value={trainingForm.startDate} required type="date" />
-    </label>
-    <label>
-      End date
-      <input bind:value={trainingForm.endDate} required type="date" />
-    </label>
-    <label>
-      Start time
-      <input bind:value={trainingForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
-    </label>
-    <label>
-      Duration minutes
-      <input bind:value={trainingForm.durationMinutes} min="1" required type="number" />
-    </label>
-    <label>
-      Location
-      <select bind:value={trainingForm.locationName} required>
-        <option disabled value="">Choose a location</option>
-        {#each data.locations as location (location.name)}
-          <option value={location.name}>{location.name}</option>
-        {/each}
-      </select>
-    </label>
-    <button disabled={savingTraining} type="submit">
-      {savingTraining ? 'Saving…' : 'Add training series'}
-    </button>
-  </form>
-  <p class="form-hint">
-    {#if data.locations.length === 0}
-      Add a location in <a href={resolve('/settings')}>Settings</a> before adding training.
-    {:else}
-      Locations are managed in <a href={resolve('/settings')}>Settings</a>.
-    {/if}
-  </p>
-  {#if trainingMessage}<p class="form-message" role="status">{trainingMessage}</p>{/if}
-  {#if trainingError}<p class="form-error" role="alert">{trainingError}</p>{/if}
-</section>
+{#if showOneOffTrainingModal}
+  <div class="modal-backdrop" role="presentation">
+    <div
+      class="panel modal"
+      aria-labelledby="one-off-training-heading"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Single occurrence</p>
+          <h2 id="one-off-training-heading">Add one-off training</h2>
+        </div>
+        <button
+          class="close-button"
+          type="button"
+          on:click={() => (showOneOffTrainingModal = false)}
+        >
+          Close
+        </button>
+      </div>
 
-<section class="panel manual-game-panel" aria-labelledby="one-off-training-heading">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Single occurrence</p>
-      <h2 id="one-off-training-heading">Add one-off training</h2>
+      <form class="game-form" on:submit|preventDefault={saveOneOffTraining}>
+        <label>
+          Date
+          <input bind:value={oneOffTrainingForm.date} required type="date" />
+        </label>
+        <label>
+          Start time
+          <input
+            bind:value={oneOffTrainingForm.startTime}
+            pattern="\d{2}:\d{2}"
+            required
+            type="time"
+          />
+        </label>
+        <label>
+          Duration minutes
+          <input bind:value={oneOffTrainingForm.durationMinutes} min="1" required type="number" />
+        </label>
+        <label>
+          Location
+          <select bind:value={oneOffTrainingForm.locationName} required>
+            <option disabled value="">Choose a location</option>
+            {#each data.locations as location (location.name)}
+              <option value={location.name}>{location.name}</option>
+            {/each}
+          </select>
+        </label>
+        <button disabled={savingOneOffTraining} type="submit">
+          {savingOneOffTraining ? 'Saving…' : 'Add one-off training'}
+        </button>
+      </form>
+      <p class="form-hint">
+        {#if data.locations.length === 0}
+          Add a location in <a href={resolve('/admin')}>Admin</a> before adding training.
+        {:else}
+          Locations are managed in <a href={resolve('/admin')}>Admin</a>.
+        {/if}
+      </p>
+      {#if oneOffTrainingMessage}<p class="form-message" role="status">
+          {oneOffTrainingMessage}
+        </p>{/if}
+      {#if oneOffTrainingError}<p class="form-error" role="alert">{oneOffTrainingError}</p>{/if}
     </div>
   </div>
-
-  <form class="game-form" on:submit|preventDefault={saveOneOffTraining}>
-    <label>
-      Date
-      <input bind:value={oneOffTrainingForm.date} required type="date" />
-    </label>
-    <label>
-      Start time
-      <input bind:value={oneOffTrainingForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
-    </label>
-    <label>
-      Duration minutes
-      <input bind:value={oneOffTrainingForm.durationMinutes} min="1" required type="number" />
-    </label>
-    <label>
-      Location
-      <select bind:value={oneOffTrainingForm.locationName} required>
-        <option disabled value="">Choose a location</option>
-        {#each data.locations as location (location.name)}
-          <option value={location.name}>{location.name}</option>
-        {/each}
-      </select>
-    </label>
-    <button disabled={savingOneOffTraining} type="submit">
-      {savingOneOffTraining ? 'Saving…' : 'Add one-off training'}
-    </button>
-  </form>
-  <p class="form-hint">
-    {#if data.locations.length === 0}
-      Add a location in <a href={resolve('/settings')}>Settings</a> before adding training.
-    {:else}
-      Locations are managed in <a href={resolve('/settings')}>Settings</a>.
-    {/if}
-  </p>
-  {#if oneOffTrainingMessage}<p class="form-message" role="status">{oneOffTrainingMessage}</p>{/if}
-  {#if oneOffTrainingError}<p class="form-error" role="alert">{oneOffTrainingError}</p>{/if}
-</section>
+{/if}
 
 <style>
-  .manual-game-panel {
-    margin-top: 1rem;
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .action-row button,
+  .close-button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 0.55rem;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
+    min-height: 2.4rem;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .action-row button:hover,
+  .close-button:hover {
+    background: var(--accent-dark);
+  }
+
+  .modal-backdrop {
+    align-items: start;
+    background: rgba(36, 34, 31, 0.42);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    overflow: auto;
+    padding: 2rem 1rem;
+    position: fixed;
+    z-index: 10;
+  }
+
+  .modal {
+    margin: auto;
+    max-width: 48rem;
+    width: 100%;
+  }
+
+  .modal-header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-header h2 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    letter-spacing: -0.05em;
+    margin: 0;
+  }
+
+  .optional {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .game-form {
