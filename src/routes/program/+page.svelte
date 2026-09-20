@@ -1,6 +1,9 @@
 <script>
+  import { invalidateAll } from '$app/navigation';
+
   export let data;
 
+  /** @param {string} date */
   /** @param {string} date */
   const formatDate = (date) =>
     new Intl.DateTimeFormat('en', {
@@ -10,6 +13,63 @@
       weekday: 'short',
       year: 'numeric',
     }).format(new Date(`${date}T00:00:00.000Z`));
+
+  let gameForm = {
+    arrivalBufferMinutes: '30',
+    awayTeamName: '',
+    date: '',
+    homeTeamName: 'U16-1',
+    locationName: '',
+    startTime: '',
+    travelMinutes: '0',
+  };
+  let savingGame = false;
+  let gameMessage = '';
+  let gameError = '';
+
+  /** @param {string} path @param {unknown} payload */
+  const postJson = async (path, payload) => {
+    const response = await fetch(path, {
+      body: JSON.stringify(payload),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(body.error ?? 'The game could not be stored.');
+    }
+
+    return body;
+  };
+
+  const saveGame = async () => {
+    savingGame = true;
+    gameMessage = '';
+    gameError = '';
+
+    try {
+      const fixture = await postJson('/api/games/fixtures', {
+        awayTeamName: gameForm.awayTeamName,
+        homeTeamName: gameForm.homeTeamName,
+      });
+      await postJson('/api/game-occurrences', {
+        arrivalBufferMinutes: Number(gameForm.arrivalBufferMinutes),
+        date: gameForm.date,
+        fixtureId: fixture.id,
+        locationName: gameForm.locationName,
+        startTime: gameForm.startTime,
+        travelMinutes: Number(gameForm.travelMinutes),
+      });
+      gameMessage = 'Game added to the program.';
+      gameForm = { ...gameForm, awayTeamName: '', date: '', startTime: '' };
+      await invalidateAll();
+    } catch (error) {
+      gameError = error instanceof Error ? error.message : 'The game could not be stored.';
+    } finally {
+      savingGame = false;
+    }
+  };
 </script>
 
 <svelte:head>
@@ -61,7 +121,128 @@
   {/if}
 </section>
 
+<section class="panel manual-game-panel" aria-labelledby="manual-game-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Coordinator entry</p>
+      <h2 id="manual-game-heading">Add a game</h2>
+    </div>
+  </div>
+
+  <form class="game-form" on:submit|preventDefault={saveGame}>
+    <label>
+      Home team
+      <input bind:value={gameForm.homeTeamName} required />
+    </label>
+    <label>
+      Away team
+      <input bind:value={gameForm.awayTeamName} required />
+    </label>
+    <label>
+      Date
+      <input bind:value={gameForm.date} required type="date" />
+    </label>
+    <label>
+      Start time
+      <input bind:value={gameForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
+    </label>
+    <label>
+      Location
+      <input bind:value={gameForm.locationName} required />
+    </label>
+    <label>
+      Travel minutes
+      <input bind:value={gameForm.travelMinutes} min="0" required type="number" />
+    </label>
+    <label>
+      Arrival buffer
+      <input bind:value={gameForm.arrivalBufferMinutes} min="0" required type="number" />
+    </label>
+    <button disabled={savingGame} type="submit">{savingGame ? 'Saving…' : 'Add game'}</button>
+  </form>
+  <p class="form-hint">
+    The location must already exist in Settings. Departure is calculated from travel time and
+    arrival buffer.
+  </p>
+  {#if gameMessage}<p class="form-message" role="status">{gameMessage}</p>{/if}
+  {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
+</section>
+
 <style>
+  .manual-game-panel {
+    margin-top: 1rem;
+  }
+
+  .game-form {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .game-form label {
+    color: var(--muted);
+    display: grid;
+    font-size: 0.78rem;
+    font-weight: 800;
+    gap: 0.35rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .game-form input {
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 0.55rem;
+    box-sizing: border-box;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    min-height: 2.7rem;
+    padding: 0.55rem 0.65rem;
+    width: 100%;
+  }
+
+  .game-form button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 0.55rem;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    min-height: 2.7rem;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .game-form button:hover:not(:disabled) {
+    background: var(--accent-dark);
+  }
+
+  .game-form button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .form-hint,
+  .form-message,
+  .form-error {
+    font-size: 0.88rem;
+    margin: 1rem 0 0;
+  }
+
+  .form-hint {
+    color: var(--muted);
+  }
+
+  .form-message {
+    color: #397044;
+  }
+
+  .form-error {
+    color: var(--accent-dark);
+  }
+
   .program-list {
     display: grid;
     gap: 0.75rem;
@@ -101,7 +282,17 @@
     margin: 0;
   }
 
+  @media (max-width: 48rem) {
+    .game-form {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (max-width: 36rem) {
+    .game-form {
+      grid-template-columns: 1fr;
+    }
+
     .program-row {
       grid-template-columns: 1fr;
       gap: 0.5rem;
