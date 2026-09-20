@@ -10,6 +10,7 @@ import type { DutyRepository } from '../application/duties/duty-repository';
 import type { TaskRepository } from '../application/tasks/task-repository';
 import type { SeasonRepository } from '../application/seasons/season-repository';
 import type { TeamRepository } from '../application/teams/team-repository';
+import type { GameImportRepository } from '../application/imports/game-import-repository';
 import { createDatabase } from './persistence/database';
 import { readDatabaseUrl } from './persistence/database-configuration';
 import { createPostgresPlayerRepository } from './persistence/postgres-player-repository';
@@ -22,6 +23,7 @@ import { createPostgresDutyRepository } from './persistence/postgres-duty-reposi
 import { createPostgresTaskRepository } from './persistence/postgres-task-repository';
 import { createPostgresSeasonRepository } from './persistence/postgres-season-repository';
 import { createPostgresTeamRepository } from './persistence/postgres-team-repository';
+import { createPostgresGameImportRepository } from './persistence/postgres-game-import-repository';
 
 type Database = ReturnType<typeof createDatabase>;
 
@@ -36,6 +38,7 @@ let duties: DutyRepository | undefined;
 let tasks: TaskRepository | undefined;
 let seasons: SeasonRepository | undefined;
 let teams: TeamRepository | undefined;
+let gameImports: GameImportRepository | undefined;
 
 const currentDatabase = (): Database => {
   database ??= createDatabase(readDatabaseUrl(env));
@@ -101,4 +104,10 @@ export const currentTeamRepository = (): TeamRepository => {
   teams ??= createPostgresTeamRepository(currentDatabase());
 
   return teams;
+};
+
+export const currentGameImportRepository = (): GameImportRepository => {
+  gameImports ??= createPostgresGameImportRepository(currentDatabase());
+
+  return gameImports;
 };

@@ -20,7 +20,10 @@
   /** @type {GameImportPreview | undefined} */
   let preview = undefined;
   let loading = false;
+  let importing = false;
   let error = '';
+  let importMessage = '';
+  let primaryTeamName = 'U16-1';
 
   /** @param {string} value */
   const readHeaders = (value) => {
@@ -91,6 +94,7 @@
     mapping = guessMapping(headers);
     preview = undefined;
     error = '';
+    importMessage = '';
   };
 
   const previewImport = async () => {
@@ -117,6 +121,31 @@
       loading = false;
     }
   };
+
+  const importValidGames = async () => {
+    importing = true;
+    error = '';
+    importMessage = '';
+
+    try {
+      const response = await fetch('/api/imports/games', {
+        body: JSON.stringify({ content, mapping, primaryTeamName, sourceName: fileName }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The games could not be imported.');
+      }
+
+      importMessage = `${body.imported.length} games imported; ${body.duplicates.length} duplicates skipped.`;
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : 'The games could not be imported.';
+    } finally {
+      importing = false;
+    }
+  };
 </script>
 
 <svelte:head>
@@ -133,7 +162,7 @@
 <section class="panel" aria-labelledby="import-heading">
   <div class="panel-heading">
     <div>
-      <p class="eyebrow">CSV preview · no writes</p>
+      <p class="eyebrow">CSV mapping · preview · import</p>
       <h2 id="import-heading">Import program data</h2>
     </div>
   </div>
@@ -145,6 +174,10 @@
 
   {#if fileName}
     <p class="file-name">Selected: <strong>{fileName}</strong></p>
+    <label class="primary-team">
+      Primary team
+      <input bind:value={primaryTeamName} required />
+    </label>
     <div class="mapping-grid">
       {#each fields as field (field.key)}
         <label>
@@ -159,9 +192,21 @@
         </label>
       {/each}
     </div>
-    <button disabled={loading} type="button" on:click={previewImport}>
-      {loading ? 'Previewing…' : 'Preview mapped games'}
-    </button>
+    <div class="action-row">
+      <button disabled={loading} type="button" on:click={previewImport}>
+        {loading ? 'Previewing…' : 'Preview mapped games'}
+      </button>
+      {#if preview && preview.issues.length === 0 && preview.records.length > 0}
+        <button
+          class="secondary-button"
+          disabled={importing}
+          type="button"
+          on:click={importValidGames}
+        >
+          {importing ? 'Importing…' : 'Import valid games'}
+        </button>
+      {/if}
+    </div>
   {:else}
     <div class="empty-state compact">
       <h3>Select a CSV export</h3>
@@ -170,6 +215,7 @@
   {/if}
 
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  {#if importMessage}<p class="form-message" role="status">{importMessage}</p>{/if}
 
   {#if preview}
     <div class="preview-summary" role="status">
@@ -222,6 +268,7 @@
 
 <style>
   .file-picker,
+  .primary-team,
   .mapping-grid label {
     color: var(--muted);
     display: grid;
@@ -271,6 +318,7 @@
 
   .file-name,
   .form-hint,
+  .form-message,
   .form-error {
     font-size: 0.88rem;
     margin: 1rem 0 0;
@@ -281,8 +329,28 @@
     color: var(--muted);
   }
 
+  .form-message {
+    color: #397044;
+  }
+
   .form-error {
     color: var(--accent-dark);
+  }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+
+  .secondary-button {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent-dark);
+  }
+
+  .secondary-button:hover:not(:disabled) {
+    background: #fff4ef;
   }
 
   .mapping-grid {

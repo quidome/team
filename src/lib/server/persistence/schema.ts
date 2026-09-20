@@ -176,6 +176,21 @@ export const gameOccurrences = pgTable('game_occurrences', {
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 });
 
+export const gameImportProvenance = pgTable(
+  'game_import_provenance',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    importedAt: timestamp('imported_at', { mode: 'date', withTimezone: true }).notNull(),
+    occurrenceId: uuid('occurrence_id')
+      .notNull()
+      .references(() => gameOccurrences.id, { onDelete: 'cascade' }),
+    sourceName: text('source_name').notNull(),
+    sourceRow: integer('source_row').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('game_import_provenance_occurrence_unique').on(table.occurrenceId)],
+);
+
 export const dutyRequirements = pgTable(
   'duty_requirements',
   {
