@@ -7,9 +7,14 @@ import type {
 export class InMemoryTrainingSeriesRepository implements TrainingSeriesRepository {
   private nextId = 1;
   private readonly series = new Map<string, StoredTrainingSeries>();
+  private readonly standaloneOccurrences: TrainingOccurrence[] = [];
 
   async findAll(): Promise<StoredTrainingSeries[]> {
     return [...this.series.values()];
+  }
+
+  async findAllOccurrences(): Promise<TrainingOccurrence[]> {
+    return [...this.standaloneOccurrences];
   }
 
   async findById(id: string): Promise<StoredTrainingSeries | undefined> {
@@ -23,6 +28,14 @@ export class InMemoryTrainingSeriesRepository implements TrainingSeriesRepositor
     const stored = { id: `training-series-${this.nextId++}`, occurrences, series };
 
     this.series.set(stored.id, stored);
+
+    return stored;
+  }
+
+  async saveOccurrence(occurrence: TrainingOccurrence): Promise<TrainingOccurrence> {
+    const stored = { ...occurrence, id: `training-occurrence-${this.nextId++}` };
+
+    this.standaloneOccurrences.push(stored);
 
     return stored;
   }

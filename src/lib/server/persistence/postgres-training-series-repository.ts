@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 
 import type { TrainingOccurrence, TrainingSeries, Weekday } from '../../domain/training-series';
 import type {
@@ -27,6 +27,20 @@ export const createPostgresTrainingSeriesRepository = (
     return (await Promise.all(seriesRows.map((series) => this.findById(series.id)))).filter(
       (series): series is StoredTrainingSeries => series !== undefined,
     );
+  },
+
+  async findAllOccurrences(): Promise<TrainingOccurrence[]> {
+    return database
+      .select({
+        date: trainingOccurrences.date,
+        id: trainingOccurrences.id,
+        durationMinutes: trainingOccurrences.durationMinutes,
+        locationName: locations.name,
+        startTime: trainingOccurrences.startTime,
+      })
+      .from(trainingOccurrences)
+      .innerJoin(locations, eq(trainingOccurrences.locationId, locations.id))
+      .where(isNull(trainingOccurrences.seriesId));
   },
 
   async findById(id: string): Promise<StoredTrainingSeries | undefined> {
@@ -117,5 +131,34 @@ export const createPostgresTrainingSeriesRepository = (
     }
 
     return { id: storedSeries.id, occurrences, series };
+  },
+
+  async saveOccurrence(occurrence: TrainingOccurrence): Promise<TrainingOccurrence> {
+    const [location] = await database
+      .select({ id: locations.id })
+      .from(locations)
+      .where(eq(locations.name, occurrence.locationName))
+      .limit(1);
+
+    if (!location) {
+      throw new Error(`Location ${occurrence.locationName} does not exist`);
+    }
+
+    const [storedOccurrence] = await database
+      .insert(trainingOccurrences)
+      .values({
+        date: occurrence.date,
+        durationMinutes: occurrence.durationMinutes,
+        locationId: location.id,
+        seriesId: null,
+        startTime: occurrence.startTime,
+      })
+      .returning({ id: trainingOccurrences.id });
+
+    if (!storedOccurrence) {
+      throw new Error('PostgreSQL did not return the stored training occurrence');
+    }
+
+    return { ...occurrence, id: storedOccurrence.id };
   },
 });

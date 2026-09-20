@@ -8,6 +8,8 @@ export interface StoredTrainingSeries {
 
 export interface TrainingSeriesRepository {
   findAll(): Promise<StoredTrainingSeries[]>;
+  findAllOccurrences(): Promise<TrainingOccurrence[]>;
   findById(id: string): Promise<StoredTrainingSeries | undefined>;
   save(series: TrainingSeries, occurrences: TrainingOccurrence[]): Promise<StoredTrainingSeries>;
+  saveOccurrence(occurrence: TrainingOccurrence): Promise<TrainingOccurrence>;
 }

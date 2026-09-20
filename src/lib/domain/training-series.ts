@@ -12,6 +12,7 @@ export interface TrainingSeries {
 export interface TrainingOccurrence {
   date: string;
   id?: string;
+  seriesId?: string;
   durationMinutes: number;
   locationName: string;
   startTime: string;

@@ -30,9 +30,16 @@ describe('read program', () => {
       startTime: '18:30',
       weekday: 2,
     });
+    await trainingSeries.saveOccurrence({
+      date: '2026-08-20',
+      durationMinutes: 60,
+      locationName: 'Away court',
+      startTime: '17:00',
+    });
 
     await expect(readProgram(games, trainingSeries)).resolves.toEqual([
       expect.objectContaining({ date: '2026-08-18', type: 'training' }),
+      expect.objectContaining({ date: '2026-08-20', startTime: '17:00', type: 'training' }),
       expect.objectContaining({ date: '2026-08-25', startTime: '18:30', type: 'training' }),
       expect.objectContaining({ date: '2026-08-25', startTime: '19:00', type: 'game' }),
       expect.objectContaining({ date: '2026-09-01', type: 'training' }),

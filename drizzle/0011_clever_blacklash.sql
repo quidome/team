@@ -1,0 +1,1 @@
+ALTER TABLE "training_occurrences" ALTER COLUMN "series_id" DROP NOT NULL;

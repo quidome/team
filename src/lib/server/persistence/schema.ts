@@ -139,9 +139,7 @@ export const trainingOccurrences = pgTable(
     locationId: uuid('location_id')
       .notNull()
       .references(() => locations.id),
-    seriesId: uuid('series_id')
-      .notNull()
-      .references(() => trainingSeries.id, { onDelete: 'cascade' }),
+    seriesId: uuid('series_id').references(() => trainingSeries.id, { onDelete: 'cascade' }),
     startTime: text('start_time').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },

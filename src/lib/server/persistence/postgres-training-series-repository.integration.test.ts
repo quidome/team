@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { TrainingSeriesRepository } from '../../application/training/training-series-repository';
 import { createDatabase } from './database';
 import { createPostgresTrainingSeriesRepository } from './postgres-training-series-repository';
-import { locations, trainingSeries } from './schema';
+import { locations, trainingOccurrences, trainingSeries } from './schema';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -43,6 +43,7 @@ if (!databaseUrl) {
     const database = createDatabase(databaseUrl);
     const repository: TrainingSeriesRepository = createPostgresTrainingSeriesRepository(database);
     let seriesId: string | undefined;
+    let standaloneOccurrenceId: string | undefined;
 
     beforeAll(async () => {
       await database.delete(locations).where(eq(locations.name, series.locationName));
@@ -50,6 +51,11 @@ if (!databaseUrl) {
     });
 
     afterAll(async () => {
+      if (standaloneOccurrenceId) {
+        await database
+          .delete(trainingOccurrences)
+          .where(eq(trainingOccurrences.id, standaloneOccurrenceId));
+      }
       if (seriesId) {
         await database.delete(trainingSeries).where(eq(trainingSeries.id, seriesId));
       }
@@ -76,6 +82,28 @@ if (!databaseUrl) {
       const allSeries = await repository.findAll();
 
       expect(allSeries.some((candidate) => candidate.id === stored.id)).toBe(true);
+    });
+
+    it('persists and retrieves a standalone occurrence', async () => {
+      const stored = await repository.saveOccurrence({
+        date: '2096-08-20',
+        durationMinutes: 60,
+        locationName: series.locationName,
+        startTime: '17:00',
+      });
+      standaloneOccurrenceId = stored.id;
+
+      const standaloneOccurrences = await repository.findAllOccurrences();
+
+      expect(standaloneOccurrences).toContainEqual(
+        expect.objectContaining({
+          date: '2096-08-20',
+          durationMinutes: 60,
+          id: stored.id,
+          locationName: series.locationName,
+          startTime: '17:00',
+        }),
+      );
     });
   });
 }

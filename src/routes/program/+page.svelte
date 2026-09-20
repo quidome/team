@@ -39,6 +39,16 @@
   let trainingMessage = '';
   let trainingError = '';
 
+  let oneOffTrainingForm = {
+    date: '',
+    durationMinutes: '90',
+    locationName: '',
+    startTime: '18:00',
+  };
+  let savingOneOffTraining = false;
+  let oneOffTrainingMessage = '';
+  let oneOffTrainingError = '';
+
   /** @param {string} path @param {unknown} payload @param {string} fallbackMessage */
   const postJson = async (path, payload, fallbackMessage) => {
     const response = await fetch(path, {
@@ -88,6 +98,33 @@
       gameError = error instanceof Error ? error.message : 'The game could not be stored.';
     } finally {
       savingGame = false;
+    }
+  };
+
+  const saveOneOffTraining = async () => {
+    savingOneOffTraining = true;
+    oneOffTrainingMessage = '';
+    oneOffTrainingError = '';
+
+    try {
+      await postJson(
+        '/api/training-occurrences',
+        {
+          date: oneOffTrainingForm.date,
+          durationMinutes: Number(oneOffTrainingForm.durationMinutes),
+          locationName: oneOffTrainingForm.locationName,
+          startTime: oneOffTrainingForm.startTime,
+        },
+        'The training occurrence could not be stored.',
+      );
+      oneOffTrainingMessage = 'One-off training added to the program.';
+      oneOffTrainingForm = { ...oneOffTrainingForm, date: '' };
+      await invalidateAll();
+    } catch (error) {
+      oneOffTrainingError =
+        error instanceof Error ? error.message : 'The training occurrence could not be stored.';
+    } finally {
+      savingOneOffTraining = false;
     }
   };
 
@@ -265,6 +302,40 @@
   <p class="form-hint">The location must already exist in Settings.</p>
   {#if trainingMessage}<p class="form-message" role="status">{trainingMessage}</p>{/if}
   {#if trainingError}<p class="form-error" role="alert">{trainingError}</p>{/if}
+</section>
+
+<section class="panel manual-game-panel" aria-labelledby="one-off-training-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Single occurrence</p>
+      <h2 id="one-off-training-heading">Add one-off training</h2>
+    </div>
+  </div>
+
+  <form class="game-form" on:submit|preventDefault={saveOneOffTraining}>
+    <label>
+      Date
+      <input bind:value={oneOffTrainingForm.date} required type="date" />
+    </label>
+    <label>
+      Start time
+      <input bind:value={oneOffTrainingForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
+    </label>
+    <label>
+      Duration minutes
+      <input bind:value={oneOffTrainingForm.durationMinutes} min="1" required type="number" />
+    </label>
+    <label>
+      Location
+      <input bind:value={oneOffTrainingForm.locationName} required />
+    </label>
+    <button disabled={savingOneOffTraining} type="submit">
+      {savingOneOffTraining ? 'Saving…' : 'Add one-off training'}
+    </button>
+  </form>
+  <p class="form-hint">The location must already exist in Settings.</p>
+  {#if oneOffTrainingMessage}<p class="form-message" role="status">{oneOffTrainingMessage}</p>{/if}
+  {#if oneOffTrainingError}<p class="form-error" role="alert">{oneOffTrainingError}</p>{/if}
 </section>
 
 <style>
