@@ -26,6 +26,17 @@
   let savingGame = false;
   let gameMessage = '';
   let gameError = '';
+  let lifecycleAction = '';
+  let lifecycleMessage = '';
+  let lifecycleError = '';
+  let rescheduleEventId = '';
+  let rescheduleForm = {
+    arrivalBufferMinutes: '30',
+    date: '',
+    locationName: '',
+    startTime: '',
+    travelMinutes: '0',
+  };
 
   let trainingForm = {
     durationMinutes: '90',
@@ -98,6 +109,71 @@
       gameError = error instanceof Error ? error.message : 'The game could not be stored.';
     } finally {
       savingGame = false;
+    }
+  };
+
+  /** @param {string} eventId */
+  const cancelGame = async (eventId) => {
+    lifecycleAction = eventId;
+    lifecycleMessage = '';
+    lifecycleError = '';
+
+    try {
+      await postJson(
+        `/api/game-occurrences/${eventId}/cancel`,
+        {},
+        'The game could not be cancelled.',
+      );
+      lifecycleMessage = 'Game cancelled.';
+      await invalidateAll();
+    } catch (error) {
+      lifecycleError = error instanceof Error ? error.message : 'The game could not be cancelled.';
+    } finally {
+      lifecycleAction = '';
+    }
+  };
+
+  /**
+   * @param {{ id: string; arrivalBufferMinutes: number; date: string; locationName: string; startTime: string; travelMinutes: number }} event
+   */
+  const openReschedule = (event) => {
+    rescheduleEventId = event.id;
+    rescheduleForm = {
+      arrivalBufferMinutes: String(event.arrivalBufferMinutes),
+      date: event.date,
+      locationName: event.locationName,
+      startTime: event.startTime,
+      travelMinutes: String(event.travelMinutes),
+    };
+    lifecycleMessage = '';
+    lifecycleError = '';
+  };
+
+  const rescheduleGame = async () => {
+    lifecycleAction = rescheduleEventId;
+    lifecycleMessage = '';
+    lifecycleError = '';
+
+    try {
+      await postJson(
+        `/api/game-occurrences/${rescheduleEventId}/reschedule`,
+        {
+          arrivalBufferMinutes: Number(rescheduleForm.arrivalBufferMinutes),
+          date: rescheduleForm.date,
+          locationName: rescheduleForm.locationName,
+          startTime: rescheduleForm.startTime,
+          travelMinutes: Number(rescheduleForm.travelMinutes),
+        },
+        'The game could not be rescheduled.',
+      );
+      rescheduleEventId = '';
+      lifecycleMessage = 'Game rescheduled.';
+      await invalidateAll();
+    } catch (error) {
+      lifecycleError =
+        error instanceof Error ? error.message : 'The game could not be rescheduled.';
+    } finally {
+      lifecycleAction = '';
     }
   };
 
@@ -195,6 +271,55 @@
               <p class="event-kind">Game · {event.status}</p>
               <h2>{event.homeTeamName} <span aria-hidden="true">vs</span> {event.awayTeamName}</h2>
               <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
+              {#if event.status === 'scheduled'}
+                <div class="event-actions">
+                  <button
+                    disabled={lifecycleAction === event.id}
+                    on:click={() => cancelGame(event.id)}
+                    type="button"
+                  >
+                    {lifecycleAction === event.id ? 'Saving…' : 'Cancel game'}
+                  </button>
+                  <button on:click={() => openReschedule(event)} type="button">Reschedule</button>
+                </div>
+                {#if rescheduleEventId === event.id}
+                  <form class="game-form lifecycle-form" on:submit|preventDefault={rescheduleGame}>
+                    <label>
+                      Date
+                      <input bind:value={rescheduleForm.date} required type="date" />
+                    </label>
+                    <label>
+                      Start time
+                      <input bind:value={rescheduleForm.startTime} required type="time" />
+                    </label>
+                    <label>
+                      Location
+                      <input bind:value={rescheduleForm.locationName} required />
+                    </label>
+                    <label>
+                      Travel minutes
+                      <input
+                        bind:value={rescheduleForm.travelMinutes}
+                        min="0"
+                        required
+                        type="number"
+                      />
+                    </label>
+                    <label>
+                      Arrival buffer
+                      <input
+                        bind:value={rescheduleForm.arrivalBufferMinutes}
+                        min="0"
+                        required
+                        type="number"
+                      />
+                    </label>
+                    <button disabled={lifecycleAction === event.id} type="submit">
+                      {lifecycleAction === event.id ? 'Saving…' : 'Save reschedule'}
+                    </button>
+                  </form>
+                {/if}
+              {/if}
             {:else}
               <p class="event-kind">Training</p>
               <h2>Team training</h2>
@@ -252,6 +377,8 @@
   </p>
   {#if gameMessage}<p class="form-message" role="status">{gameMessage}</p>{/if}
   {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
+  {#if lifecycleMessage}<p class="form-message" role="status">{lifecycleMessage}</p>{/if}
+  {#if lifecycleError}<p class="form-error" role="alert">{lifecycleError}</p>{/if}
 </section>
 
 <section class="panel manual-game-panel" aria-labelledby="training-series-heading">
@@ -455,6 +582,38 @@
   .program-event p:last-child {
     color: var(--muted);
     margin: 0;
+  }
+
+  .event-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .event-actions button {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0.45rem;
+    color: var(--ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .event-actions button:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent-dark);
+  }
+
+  .event-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .lifecycle-form {
+    margin-top: 0.75rem;
   }
 
   @media (max-width: 48rem) {
