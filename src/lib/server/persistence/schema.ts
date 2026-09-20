@@ -37,6 +37,10 @@ export const membershipStatus = pgEnum('membership_status', ['active', 'inactive
 export const participationType = pgEnum('participation_type', ['trains_and_plays', 'trains_only']);
 
 export const gameOccurrenceStatus = pgEnum('game_occurrence_status', ['cancelled', 'scheduled']);
+export const trainingOccurrenceStatus = pgEnum('training_occurrence_status', [
+  'cancelled',
+  'scheduled',
+]);
 
 export const absenceReason = pgEnum('absence_reason', ['illness', 'injury', 'other']);
 export const participationOccurrenceType = pgEnum('participation_occurrence_type', [
@@ -141,6 +145,7 @@ export const trainingOccurrences = pgTable(
       .references(() => locations.id),
     seriesId: uuid('series_id').references(() => trainingSeries.id, { onDelete: 'cascade' }),
     startTime: text('start_time').notNull(),
+    status: trainingOccurrenceStatus('status').notNull().default('scheduled'),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

@@ -1,4 +1,5 @@
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type TrainingOccurrenceStatus = 'cancelled' | 'scheduled';
 
 export interface TrainingSeries {
   durationMinutes: number;
@@ -16,6 +17,7 @@ export interface TrainingOccurrence {
   durationMinutes: number;
   locationName: string;
   startTime: string;
+  status?: TrainingOccurrenceStatus;
 }
 
 const parseDate = (value: string) => {

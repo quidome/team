@@ -46,7 +46,22 @@ if (!databaseUrl) {
     let standaloneOccurrenceId: string | undefined;
 
     beforeAll(async () => {
-      await database.delete(locations).where(eq(locations.name, series.locationName));
+      const [existingLocation] = await database
+        .select({ id: locations.id })
+        .from(locations)
+        .where(eq(locations.name, series.locationName))
+        .limit(1);
+
+      if (existingLocation) {
+        await database
+          .delete(trainingOccurrences)
+          .where(eq(trainingOccurrences.locationId, existingLocation.id));
+        await database
+          .delete(trainingSeries)
+          .where(eq(trainingSeries.locationId, existingLocation.id));
+        await database.delete(locations).where(eq(locations.id, existingLocation.id));
+      }
+
       await database.insert(locations).values({ name: series.locationName, travelMinutes: 20 });
     });
 
@@ -76,8 +91,21 @@ if (!databaseUrl) {
         return occurrence;
       });
 
-      expect(normalizedOccurrences).toEqual(expect.arrayContaining(occurrences));
+      expect(normalizedOccurrences).toEqual(
+        expect.arrayContaining(
+          occurrences.map((occurrence) => ({ ...occurrence, status: 'scheduled' })),
+        ),
+      );
       expect(persisted?.occurrences).toHaveLength(occurrences.length);
+
+      const firstOccurrenceId = persisted?.occurrences[0]?.id;
+      expect(firstOccurrenceId).toBeTruthy();
+      await expect(repository.findOccurrenceById(firstOccurrenceId ?? '')).resolves.toMatchObject({
+        status: 'scheduled',
+      });
+      await expect(
+        repository.updateOccurrenceStatus(firstOccurrenceId ?? '', 'cancelled'),
+      ).resolves.toMatchObject({ status: 'cancelled' });
 
       const allSeries = await repository.findAll();
 

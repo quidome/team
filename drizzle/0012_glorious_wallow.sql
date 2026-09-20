@@ -1,0 +1,2 @@
+CREATE TYPE "public"."training_occurrence_status" AS ENUM('cancelled', 'scheduled');--> statement-breakpoint
+ALTER TABLE "training_occurrences" ADD COLUMN "status" "training_occurrence_status" DEFAULT 'scheduled' NOT NULL;

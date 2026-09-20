@@ -37,6 +37,16 @@
     startTime: '',
     travelMinutes: '0',
   };
+  let trainingLifecycleAction = '';
+  let trainingLifecycleMessage = '';
+  let trainingLifecycleError = '';
+  let trainingRescheduleEventId = '';
+  let trainingRescheduleForm = {
+    date: '',
+    durationMinutes: '90',
+    locationName: '',
+    startTime: '',
+  };
 
   let trainingForm = {
     durationMinutes: '90',
@@ -174,6 +184,80 @@
         error instanceof Error ? error.message : 'The game could not be rescheduled.';
     } finally {
       lifecycleAction = '';
+    }
+  };
+
+  /** @param {string | undefined} occurrenceId */
+  const cancelTraining = async (occurrenceId) => {
+    if (!occurrenceId) {
+      return;
+    }
+
+    trainingLifecycleAction = occurrenceId;
+    trainingLifecycleMessage = '';
+    trainingLifecycleError = '';
+
+    try {
+      await postJson(
+        `/api/training-occurrences/${occurrenceId}/cancel`,
+        {},
+        'The training occurrence could not be cancelled.',
+      );
+      trainingLifecycleMessage = 'Training occurrence cancelled.';
+      await invalidateAll();
+    } catch (error) {
+      trainingLifecycleError =
+        error instanceof Error ? error.message : 'The training occurrence could not be cancelled.';
+    } finally {
+      trainingLifecycleAction = '';
+    }
+  };
+
+  /**
+   * @param {{ occurrenceId?: string; date: string; durationMinutes: number; locationName: string; startTime: string }} event
+   */
+  const openTrainingReschedule = (event) => {
+    if (!event.occurrenceId) {
+      return;
+    }
+
+    trainingRescheduleEventId = event.occurrenceId;
+    trainingRescheduleForm = {
+      date: event.date,
+      durationMinutes: String(event.durationMinutes),
+      locationName: event.locationName,
+      startTime: event.startTime,
+    };
+    trainingLifecycleMessage = '';
+    trainingLifecycleError = '';
+  };
+
+  const rescheduleTraining = async () => {
+    trainingLifecycleAction = trainingRescheduleEventId;
+    trainingLifecycleMessage = '';
+    trainingLifecycleError = '';
+
+    try {
+      await postJson(
+        `/api/training-occurrences/${trainingRescheduleEventId}/reschedule`,
+        {
+          date: trainingRescheduleForm.date,
+          durationMinutes: Number(trainingRescheduleForm.durationMinutes),
+          locationName: trainingRescheduleForm.locationName,
+          startTime: trainingRescheduleForm.startTime,
+        },
+        'The training occurrence could not be rescheduled.',
+      );
+      trainingRescheduleEventId = '';
+      trainingLifecycleMessage = 'Training occurrence rescheduled.';
+      await invalidateAll();
+    } catch (error) {
+      trainingLifecycleError =
+        error instanceof Error
+          ? error.message
+          : 'The training occurrence could not be rescheduled.';
+    } finally {
+      trainingLifecycleAction = '';
     }
   };
 
@@ -321,14 +405,65 @@
                 {/if}
               {/if}
             {:else}
-              <p class="event-kind">Training</p>
+              <p class="event-kind">Training · {event.status}</p>
               <h2>Team training</h2>
               <p>{event.locationName} · {event.durationMinutes} minutes</p>
+              {#if event.status === 'scheduled' && event.occurrenceId}
+                <div class="event-actions">
+                  <button
+                    disabled={trainingLifecycleAction === event.occurrenceId}
+                    on:click={() => cancelTraining(event.occurrenceId)}
+                    type="button"
+                  >
+                    {trainingLifecycleAction === event.occurrenceId ? 'Saving…' : 'Cancel training'}
+                  </button>
+                  <button on:click={() => openTrainingReschedule(event)} type="button">
+                    Reschedule
+                  </button>
+                </div>
+                {#if trainingRescheduleEventId === event.occurrenceId}
+                  <form
+                    class="game-form lifecycle-form"
+                    on:submit|preventDefault={rescheduleTraining}
+                  >
+                    <label>
+                      Date
+                      <input bind:value={trainingRescheduleForm.date} required type="date" />
+                    </label>
+                    <label>
+                      Start time
+                      <input bind:value={trainingRescheduleForm.startTime} required type="time" />
+                    </label>
+                    <label>
+                      Duration minutes
+                      <input
+                        bind:value={trainingRescheduleForm.durationMinutes}
+                        min="1"
+                        required
+                        type="number"
+                      />
+                    </label>
+                    <label>
+                      Location
+                      <input bind:value={trainingRescheduleForm.locationName} required />
+                    </label>
+                    <button disabled={trainingLifecycleAction === event.occurrenceId} type="submit">
+                      {trainingLifecycleAction === event.occurrenceId
+                        ? 'Saving…'
+                        : 'Save reschedule'}
+                    </button>
+                  </form>
+                {/if}
+              {/if}
             {/if}
           </div>
         </article>
       {/each}
     </div>
+    {#if trainingLifecycleMessage}<p class="form-message" role="status">
+        {trainingLifecycleMessage}
+      </p>{/if}
+    {#if trainingLifecycleError}<p class="form-error" role="alert">{trainingLifecycleError}</p>{/if}
   {/if}
 </section>
 

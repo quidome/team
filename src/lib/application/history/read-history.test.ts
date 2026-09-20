@@ -81,6 +81,7 @@ describe('readHistory', () => {
           startTime: '18:00',
           type: 'training',
           occurrenceId: 't-1',
+          status: 'scheduled',
         },
       ],
     );

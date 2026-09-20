@@ -10,6 +10,11 @@ export interface TrainingSeriesRepository {
   findAll(): Promise<StoredTrainingSeries[]>;
   findAllOccurrences(): Promise<TrainingOccurrence[]>;
   findById(id: string): Promise<StoredTrainingSeries | undefined>;
+  findOccurrenceById(id: string): Promise<TrainingOccurrence | undefined>;
   save(series: TrainingSeries, occurrences: TrainingOccurrence[]): Promise<StoredTrainingSeries>;
   saveOccurrence(occurrence: TrainingOccurrence): Promise<TrainingOccurrence>;
+  updateOccurrenceStatus(
+    id: string,
+    status: 'cancelled' | 'scheduled',
+  ): Promise<TrainingOccurrence>;
 }

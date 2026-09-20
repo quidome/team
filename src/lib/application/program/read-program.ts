@@ -3,6 +3,7 @@ import type {
   StoredTrainingSeries,
   TrainingSeriesRepository,
 } from '../training/training-series-repository';
+import type { TrainingOccurrenceStatus } from '../../domain/training-series';
 
 export interface ProgramGameEvent extends StoredGameProgramOccurrence {
   type: 'game';
@@ -16,6 +17,7 @@ export interface ProgramTrainingEvent {
   occurrenceId?: string;
   seriesId?: string;
   startTime: string;
+  status: TrainingOccurrenceStatus;
   type: 'training';
 }
 
@@ -35,6 +37,7 @@ const trainingEvent = (
   ...(occurrence.id ? { occurrenceId: occurrence.id } : {}),
   ...(seriesId ? { seriesId } : {}),
   startTime: occurrence.startTime,
+  status: occurrence.status ?? 'scheduled',
   type: 'training' as const,
 });
 

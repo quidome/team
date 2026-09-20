@@ -1,6 +1,11 @@
 import { eq, isNull } from 'drizzle-orm';
 
-import type { TrainingOccurrence, TrainingSeries, Weekday } from '../../domain/training-series';
+import type {
+  TrainingOccurrence,
+  TrainingOccurrenceStatus,
+  TrainingSeries,
+  Weekday,
+} from '../../domain/training-series';
 import type {
   StoredTrainingSeries,
   TrainingSeriesRepository,
@@ -37,6 +42,7 @@ export const createPostgresTrainingSeriesRepository = (
         durationMinutes: trainingOccurrences.durationMinutes,
         locationName: locations.name,
         startTime: trainingOccurrences.startTime,
+        status: trainingOccurrences.status,
       })
       .from(trainingOccurrences)
       .innerJoin(locations, eq(trainingOccurrences.locationId, locations.id))
@@ -69,6 +75,7 @@ export const createPostgresTrainingSeriesRepository = (
         durationMinutes: trainingOccurrences.durationMinutes,
         locationName: locations.name,
         startTime: trainingOccurrences.startTime,
+        status: trainingOccurrences.status,
       })
       .from(trainingOccurrences)
       .innerJoin(locations, eq(trainingOccurrences.locationId, locations.id))
@@ -86,6 +93,35 @@ export const createPostgresTrainingSeriesRepository = (
         weekday: readWeekday(storedSeries.weekday),
       },
     };
+  },
+
+  async findOccurrenceById(id: string): Promise<TrainingOccurrence | undefined> {
+    const [occurrence] = await database
+      .select({
+        date: trainingOccurrences.date,
+        id: trainingOccurrences.id,
+        durationMinutes: trainingOccurrences.durationMinutes,
+        locationName: locations.name,
+        seriesId: trainingOccurrences.seriesId,
+        startTime: trainingOccurrences.startTime,
+        status: trainingOccurrences.status,
+      })
+      .from(trainingOccurrences)
+      .innerJoin(locations, eq(trainingOccurrences.locationId, locations.id))
+      .where(eq(trainingOccurrences.id, id))
+      .limit(1);
+
+    return occurrence
+      ? {
+          date: occurrence.date,
+          durationMinutes: occurrence.durationMinutes,
+          id: occurrence.id,
+          locationName: occurrence.locationName,
+          seriesId: occurrence.seriesId ?? undefined,
+          startTime: occurrence.startTime,
+          status: occurrence.status,
+        }
+      : undefined;
   },
 
   async save(
@@ -118,19 +154,32 @@ export const createPostgresTrainingSeriesRepository = (
       throw new Error('PostgreSQL did not return the stored training series');
     }
 
+    let storedOccurrences: TrainingOccurrence[] = [];
+
     if (occurrences.length > 0) {
-      await database.insert(trainingOccurrences).values(
-        occurrences.map((occurrence) => ({
-          date: occurrence.date,
-          durationMinutes: occurrence.durationMinutes,
-          locationId: location.id,
-          seriesId: storedSeries.id,
-          startTime: occurrence.startTime,
-        })),
-      );
+      const insertedOccurrences = await database
+        .insert(trainingOccurrences)
+        .values(
+          occurrences.map((occurrence) => ({
+            date: occurrence.date,
+            durationMinutes: occurrence.durationMinutes,
+            locationId: location.id,
+            seriesId: storedSeries.id,
+            startTime: occurrence.startTime,
+            status: occurrence.status ?? 'scheduled',
+          })),
+        )
+        .returning({ id: trainingOccurrences.id, status: trainingOccurrences.status });
+
+      storedOccurrences = occurrences.map((occurrence, index) => ({
+        ...occurrence,
+        id: insertedOccurrences[index]?.id,
+        seriesId: storedSeries.id,
+        status: insertedOccurrences[index]?.status ?? 'scheduled',
+      }));
     }
 
-    return { id: storedSeries.id, occurrences, series };
+    return { id: storedSeries.id, occurrences: storedOccurrences, series };
   },
 
   async saveOccurrence(occurrence: TrainingOccurrence): Promise<TrainingOccurrence> {
@@ -159,6 +208,24 @@ export const createPostgresTrainingSeriesRepository = (
       throw new Error('PostgreSQL did not return the stored training occurrence');
     }
 
-    return { ...occurrence, id: storedOccurrence.id };
+    return { ...occurrence, id: storedOccurrence.id, status: occurrence.status ?? 'scheduled' };
+  },
+
+  async updateOccurrenceStatus(
+    id: string,
+    status: TrainingOccurrenceStatus,
+  ): Promise<TrainingOccurrence> {
+    await database
+      .update(trainingOccurrences)
+      .set({ status })
+      .where(eq(trainingOccurrences.id, id));
+
+    const occurrence = await this.findOccurrenceById(id);
+
+    if (!occurrence) {
+      throw new Error(`Training occurrence ${id} does not exist`);
+    }
+
+    return occurrence;
   },
 });
