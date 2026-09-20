@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  audit: {
+    record: vi.fn(),
+  },
   games: {
     findAllOccurrences: vi.fn(),
     saveFixture: vi.fn(),
@@ -13,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
+  currentAuditRepository: () => mocks.audit,
   currentGameImportRepository: () => mocks.imports,
   currentGameRepository: () => mocks.games,
 }));
@@ -92,6 +96,9 @@ describe('POST /api/imports/games', () => {
     });
     expect(mocks.imports.save).toHaveBeenCalledWith(
       expect.objectContaining({ occurrenceId: 'occurrence-1', sourceName: 'schedule.csv' }),
+    );
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'games_imported', entityId: 'schedule.csv' }),
     );
   });
 

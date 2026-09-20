@@ -1,6 +1,7 @@
 import {
   date,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -263,6 +264,15 @@ export const dutyAssignmentHistory = pgTable('duty_assignment_history', {
     .notNull()
     .references(() => dutySlots.id, { onDelete: 'cascade' }),
   status: dutyHistoryStatus('status').notNull(),
+});
+
+export const auditEntries = pgTable('audit_entries', {
+  action: text('action').notNull(),
+  entityId: text('entity_id').notNull(),
+  entityType: text('entity_type').notNull(),
+  id: uuid('id').defaultRandom().primaryKey(),
+  metadata: jsonb('metadata').$type<Record<string, boolean | number | string>>().notNull(),
+  occurredAt: timestamp('occurred_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 });
 
 export const tasks = pgTable('tasks', {

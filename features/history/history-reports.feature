@@ -7,3 +7,8 @@ Feature: Review participation and duty history
     Then game and training percentages are shown per player
     And completed duty counts are shown per player
     And recorded participation entries are listed
+
+  Scenario: Inspecting audit history
+    Given a coordinator import has completed
+    When the coordinator opens History
+    Then the import action, source, and result counts are visible in the audit list

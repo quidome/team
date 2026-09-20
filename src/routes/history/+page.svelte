@@ -20,6 +20,13 @@
           year: 'numeric',
         }).format(new Date(`${date}T00:00:00.000Z`))
       : '—';
+
+  /** @param {Date | string} timestamp */
+  const formatTimestamp = (timestamp) =>
+    new Intl.DateTimeFormat('en', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(timestamp));
 </script>
 
 <svelte:head>
@@ -111,6 +118,38 @@
   {/if}
 </section>
 
+<section class="panel" aria-labelledby="audit-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Traceability</p>
+      <h2 id="audit-heading">Recent audit entries</h2>
+    </div>
+  </div>
+
+  {#if data.auditEntries.length === 0}
+    <div class="empty-state compact">
+      <h3>No audit entries</h3>
+      <p>Import and coordinator changes will be recorded here.</p>
+    </div>
+  {:else}
+    <div class="entry-list">
+      {#each data.auditEntries as entry (entry.id)}
+        <article class="entry-row audit-row">
+          <div>
+            <strong>{entry.action}</strong>
+            <span>{formatTimestamp(entry.occurredAt)}</span>
+          </div>
+          <div>
+            <strong>{entry.entityType}</strong>
+            <span>{entry.entityId}</span>
+          </div>
+          <span class="audit-details">{JSON.stringify(entry.metadata)}</span>
+        </article>
+      {/each}
+    </div>
+  {/if}
+</section>
+
 <style>
   .table-wrap {
     overflow-x: auto;
@@ -187,6 +226,13 @@
 
   .entry-row > strong.absent {
     color: var(--accent-dark);
+  }
+
+  .audit-details {
+    color: var(--muted);
+    font-size: 0.76rem;
+    max-width: 18rem;
+    overflow-wrap: anywhere;
   }
 
   .compact {
