@@ -69,11 +69,21 @@ export const POST = async ({ params, request }) => {
     return json({ error: 'invalid_game_occurrence' }, { status: 400 });
   }
 
-  const replacement = await rescheduleGameOccurrence(
-    currentGameRepository(),
-    params.occurrenceId,
-    occurrence,
-  );
+  let replacement: Awaited<ReturnType<typeof rescheduleGameOccurrence>>;
+
+  try {
+    replacement = await rescheduleGameOccurrence(
+      currentGameRepository(),
+      params.occurrenceId,
+      occurrence,
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('does not exist')) {
+      return json({ error: 'game_occurrence_not_found' }, { status: 400 });
+    }
+
+    throw error;
+  }
 
   await currentAuditRepository().record({
     action: 'game_occurrence_rescheduled',

@@ -63,6 +63,16 @@ describe('game occurrence lifecycle', () => {
     );
   });
 
+  it('returns a validation error when cancelling a missing occurrence', async () => {
+    mocks.games.findOccurrenceById.mockResolvedValue(undefined);
+
+    const response = await cancel({ params: { occurrenceId: 'missing-occurrence' } } as never);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'game_occurrence_not_found' });
+    expect(mocks.audit.record).not.toHaveBeenCalled();
+  });
+
   it('creates a replacement and cancels the original when rescheduling', async () => {
     const response = await reschedule({
       params: { occurrenceId: 'game-occurrence-1' },
@@ -94,5 +104,28 @@ describe('game occurrence lifecycle', () => {
         entityId: 'game-occurrence-2',
       }),
     );
+  });
+
+  it('returns a validation error when rescheduling a missing occurrence', async () => {
+    mocks.games.findOccurrenceById.mockResolvedValue(undefined);
+
+    const response = await reschedule({
+      params: { occurrenceId: 'missing-occurrence' },
+      request: new Request('http://localhost/api/game-occurrences/missing-occurrence/reschedule', {
+        body: JSON.stringify({
+          arrivalBufferMinutes: 30,
+          date: '2026-09-12',
+          locationName: 'Home court',
+          startTime: '15:00',
+          travelMinutes: 0,
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+    } as never);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'game_occurrence_not_found' });
+    expect(mocks.audit.record).not.toHaveBeenCalled();
   });
 });

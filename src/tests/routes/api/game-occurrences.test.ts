@@ -57,6 +57,31 @@ describe('POST /api/game-occurrences', () => {
     });
   });
 
+  it('returns a validation error when the fixture or location is missing', async () => {
+    mocks.games.saveOccurrence.mockRejectedValue(new Error('Location Home court does not exist'));
+
+    const response = await POST({
+      request: new Request('http://localhost/api/game-occurrences', {
+        body: JSON.stringify({
+          arrivalBufferMinutes: 30,
+          date: '2026-09-05',
+          fixtureId: 'game-fixture-1',
+          locationName: 'Home court',
+          startTime: '14:30',
+          travelMinutes: 0,
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+    } as never);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'game_occurrence_target_not_found',
+    });
+    expect(mocks.audit.record).not.toHaveBeenCalled();
+  });
+
   it('rejects an invalid game time', async () => {
     const response = await POST({
       request: new Request('http://localhost/api/game-occurrences', {
