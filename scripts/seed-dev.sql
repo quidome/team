@@ -123,6 +123,86 @@ BEGIN
       arrival_buffer_minutes, date, fixture_id, location_id, start_time, status, travel_minutes
     ) VALUES (30, '2026-09-05', fixture_id_value, north_location_id, '11:00', 'scheduled', 35);
   END IF;
+
+  SELECT id INTO opponent_team_id FROM teams WHERE name = 'U18-1';
+  fixture_id_value := NULL;
+  SELECT gf.id INTO fixture_id_value
+  FROM game_fixtures gf
+  WHERE gf.home_team_id = u16_team_id AND gf.away_team_id = opponent_team_id
+  LIMIT 1;
+  IF fixture_id_value IS NULL THEN
+    INSERT INTO game_fixtures (home_team_id, away_team_id)
+    VALUES (u16_team_id, opponent_team_id)
+    RETURNING id INTO fixture_id_value;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM game_occurrences go
+    WHERE go.fixture_id = fixture_id_value AND go.date = '2027-01-09'
+  ) THEN
+    INSERT INTO game_occurrences (
+      arrival_buffer_minutes, date, fixture_id, location_id, start_time, status, travel_minutes
+    ) VALUES (30, '2027-01-09', fixture_id_value, home_location_id, '14:00', 'scheduled', 0);
+  END IF;
+
+  SELECT id INTO opponent_team_id FROM teams WHERE name = 'U18-2';
+  fixture_id_value := NULL;
+  SELECT gf.id INTO fixture_id_value
+  FROM game_fixtures gf
+  WHERE gf.home_team_id = opponent_team_id AND gf.away_team_id = u16_team_id
+  LIMIT 1;
+  IF fixture_id_value IS NULL THEN
+    INSERT INTO game_fixtures (home_team_id, away_team_id)
+    VALUES (opponent_team_id, u16_team_id)
+    RETURNING id INTO fixture_id_value;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM game_occurrences go
+    WHERE go.fixture_id = fixture_id_value AND go.date = '2027-01-16'
+  ) THEN
+    INSERT INTO game_occurrences (
+      arrival_buffer_minutes, date, fixture_id, location_id, start_time, status, travel_minutes
+    ) VALUES (30, '2027-01-16', fixture_id_value, away_location_id, '16:00', 'scheduled', 25);
+  END IF;
+
+  SELECT id INTO opponent_team_id FROM teams WHERE name = 'U20-1';
+  fixture_id_value := NULL;
+  SELECT gf.id INTO fixture_id_value
+  FROM game_fixtures gf
+  WHERE gf.home_team_id = u16_team_id AND gf.away_team_id = opponent_team_id
+  LIMIT 1;
+  IF fixture_id_value IS NULL THEN
+    INSERT INTO game_fixtures (home_team_id, away_team_id)
+    VALUES (u16_team_id, opponent_team_id)
+    RETURNING id INTO fixture_id_value;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM game_occurrences go
+    WHERE go.fixture_id = fixture_id_value AND go.date = '2027-01-30'
+  ) THEN
+    INSERT INTO game_occurrences (
+      arrival_buffer_minutes, date, fixture_id, location_id, start_time, status, travel_minutes
+    ) VALUES (30, '2027-01-30', fixture_id_value, north_location_id, '11:30', 'scheduled', 35);
+  END IF;
+
+  SELECT id INTO opponent_team_id FROM teams WHERE name = 'U18-2';
+  fixture_id_value := NULL;
+  SELECT gf.id INTO fixture_id_value
+  FROM game_fixtures gf
+  WHERE gf.home_team_id = u16_team_id AND gf.away_team_id = opponent_team_id
+  LIMIT 1;
+  IF fixture_id_value IS NULL THEN
+    INSERT INTO game_fixtures (home_team_id, away_team_id)
+    VALUES (u16_team_id, opponent_team_id)
+    RETURNING id INTO fixture_id_value;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM game_occurrences go
+    WHERE go.fixture_id = fixture_id_value AND go.date = '2027-02-13'
+  ) THEN
+    INSERT INTO game_occurrences (
+      arrival_buffer_minutes, date, fixture_id, location_id, start_time, status, travel_minutes
+    ) VALUES (30, '2027-02-13', fixture_id_value, home_location_id, '15:00', 'scheduled', 0);
+  END IF;
 END $$;
 
 COMMIT;
