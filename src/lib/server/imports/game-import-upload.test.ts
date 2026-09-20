@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 
 import { maxGameImportColumns, maxGameImportRows } from '$lib/application/imports/game-import';
 
-import { readGameImportFile } from './game-import-upload';
+import { listGameImportWorksheets, readGameImportFile } from './game-import-upload';
 
 describe('readGameImportFile', () => {
   it('converts the first XLSX worksheet to the CSV import format', () => {
@@ -19,6 +19,44 @@ describe('readGameImportFile', () => {
     expect(
       readGameImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
     ).toContain('U16-1,U18-1,2026-08-15');
+  });
+
+  it('lists worksheets and reads a selected worksheet', () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['home'], ['wrong-sheet']]),
+      'Notes',
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['home', 'away', 'date'],
+        ['U16-1', 'U18-1', '2026-08-15'],
+      ]),
+      'Games',
+    );
+    const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+
+    expect(
+      listGameImportWorksheets({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
+    ).toEqual(['Notes', 'Games']);
+    expect(
+      readGameImportFile({
+        content,
+        encoding: 'base64',
+        fileName: 'schedule.xlsx',
+        sheetName: 'Games',
+      }),
+    ).toContain('U16-1,U18-1,2026-08-15');
+    expect(() =>
+      readGameImportFile({
+        content,
+        encoding: 'base64',
+        fileName: 'schedule.xlsx',
+        sheetName: 'Missing',
+      }),
+    ).toThrow('worksheet named "Missing"');
   });
 
   it('rejects unsupported file extensions', () => {

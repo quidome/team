@@ -6,6 +6,7 @@ import {
   type GameImportMapping,
 } from '$lib/application/imports/game-import';
 import {
+  listGameImportWorksheets,
   readGameImportFile,
   type GameImportFileEncoding,
   type GameImportUpload,
@@ -21,7 +22,7 @@ const readRequest = async (
       return undefined;
     }
 
-    const { content, encoding, fileName, mapping } = payload as Record<string, unknown>;
+    const { content, encoding, fileName, mapping, sheetName } = payload as Record<string, unknown>;
 
     if (
       typeof content !== 'string' ||
@@ -29,6 +30,7 @@ const readRequest = async (
       (encoding !== 'base64' && encoding !== 'text') ||
       typeof fileName !== 'string' ||
       !fileName.trim() ||
+      (sheetName !== undefined && (typeof sheetName !== 'string' || !sheetName.trim())) ||
       typeof mapping !== 'object' ||
       mapping === null
     ) {
@@ -56,6 +58,7 @@ const readRequest = async (
         content,
         encoding: encoding as GameImportFileEncoding,
         fileName: fileName.trim(),
+        ...(typeof sheetName === 'string' ? { sheetName: sheetName.trim() } : {}),
       },
     };
   } catch {
@@ -71,13 +74,20 @@ export const POST = async ({ request }) => {
   }
 
   try {
+    const worksheets = listGameImportWorksheets(input.upload);
     const preview = previewGameImport(readGameImportFile(input.upload), input.mapping);
 
     if (Object.keys(input.mapping).length === 0) {
-      return json({ headers: preview.headers, issues: [], records: [], validRowCount: 0 });
+      return json({
+        headers: preview.headers,
+        issues: [],
+        records: [],
+        validRowCount: 0,
+        worksheets,
+      });
     }
 
-    return json(preview);
+    return json({ ...preview, worksheets });
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },

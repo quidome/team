@@ -84,8 +84,16 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       return undefined;
     }
 
-    const { content, encoding, fileName, mapping, primaryTeamName, resolutions, sourceName } =
-      payload as Record<string, unknown>;
+    const {
+      content,
+      encoding,
+      fileName,
+      mapping,
+      primaryTeamName,
+      resolutions,
+      sheetName,
+      sourceName,
+    } = payload as Record<string, unknown>;
     const parsedResolutions = readResolutions(resolutions);
 
     if (
@@ -94,6 +102,7 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       (encoding !== 'base64' && encoding !== 'text') ||
       typeof fileName !== 'string' ||
       !fileName.trim() ||
+      (sheetName !== undefined && (typeof sheetName !== 'string' || !sheetName.trim())) ||
       typeof mapping !== 'object' ||
       mapping === null ||
       typeof primaryTeamName !== 'string' ||
@@ -114,6 +123,7 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
         content,
         encoding: encoding as GameImportFileEncoding,
         fileName: fileName.trim(),
+        ...(typeof sheetName === 'string' ? { sheetName: sheetName.trim() } : {}),
       },
     };
   } catch {

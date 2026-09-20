@@ -16,6 +16,9 @@
   let encoding = 'text';
   /** @type {string[]} */
   let headers = [];
+  /** @type {string[]} */
+  let worksheets = [];
+  let sheetName = '';
   /** @type {Record<string, string>} */
   let mapping = {};
   /** @type {GameImportPreview | undefined} */
@@ -88,7 +91,13 @@
 
   const loadHeaders = async () => {
     const response = await fetch('/api/imports/games/preview', {
-      body: JSON.stringify({ content, encoding, fileName, mapping: {} }),
+      body: JSON.stringify({
+        content,
+        encoding,
+        fileName,
+        mapping: {},
+        ...(sheetName ? { sheetName } : {}),
+      }),
       headers: { 'content-type': 'application/json' },
       method: 'POST',
     });
@@ -99,7 +108,24 @@
     }
 
     headers = body.headers;
+    worksheets = body.worksheets ?? [];
+    if (worksheets.length > 0 && !worksheets.includes(sheetName)) {
+      sheetName = worksheets[0];
+    }
     mapping = guessMapping(headers);
+  };
+
+  const handleWorksheetChange = async () => {
+    headers = [];
+    mapping = {};
+    preview = undefined;
+    error = '';
+
+    try {
+      await loadHeaders();
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : 'The worksheet could not be read.';
+    }
   };
 
   /** @param {Event} event */
@@ -110,6 +136,9 @@
     if (!file) return;
 
     fileName = file.name;
+    worksheets = [];
+    sheetName = '';
+    error = '';
     if (/\.csv$/i.test(file.name)) {
       encoding = 'text';
       content = await file.text();
@@ -134,7 +163,6 @@
       }
     }
     preview = undefined;
-    error = '';
     importMessage = '';
     conflicts = [];
     conflictChoices = {};
@@ -146,7 +174,13 @@
 
     try {
       const response = await fetch('/api/imports/games/preview', {
-        body: JSON.stringify({ content, encoding, fileName, mapping }),
+        body: JSON.stringify({
+          content,
+          encoding,
+          fileName,
+          mapping,
+          ...(sheetName ? { sheetName } : {}),
+        }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       });
@@ -182,6 +216,7 @@
           encoding,
           fileName,
           mapping,
+          ...(sheetName ? { sheetName } : {}),
           primaryTeamName,
           resolutions: conflicts.map((conflict) => ({
             fields: conflictChoices[conflict.sourceRow],
@@ -249,6 +284,17 @@
 
   {#if fileName}
     <p class="file-name">Selected: <strong>{fileName}</strong></p>
+    {#if worksheets.length > 1}
+      <label class="primary-team">
+        Worksheet
+        <select bind:value={sheetName} on:change={handleWorksheetChange}>
+          {#each worksheets as worksheet (worksheet)}
+            <option value={worksheet}>{worksheet}</option>
+          {/each}
+        </select>
+      </label>
+      <p class="form-hint">Choose which worksheet contains the schedule data.</p>
+    {/if}
     <label class="primary-team">
       Primary team
       <input bind:value={primaryTeamName} required />
