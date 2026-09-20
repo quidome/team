@@ -27,8 +27,20 @@
   let gameMessage = '';
   let gameError = '';
 
-  /** @param {string} path @param {unknown} payload */
-  const postJson = async (path, payload) => {
+  let trainingForm = {
+    durationMinutes: '90',
+    endDate: '',
+    locationName: '',
+    startDate: '',
+    startTime: '18:00',
+    weekday: '2',
+  };
+  let savingTraining = false;
+  let trainingMessage = '';
+  let trainingError = '';
+
+  /** @param {string} path @param {unknown} payload @param {string} fallbackMessage */
+  const postJson = async (path, payload, fallbackMessage) => {
     const response = await fetch(path, {
       body: JSON.stringify(payload),
       headers: { 'content-type': 'application/json' },
@@ -37,7 +49,7 @@
     const body = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      throw new Error(body.error ?? 'The game could not be stored.');
+      throw new Error(body.error ?? fallbackMessage);
     }
 
     return body;
@@ -49,18 +61,26 @@
     gameError = '';
 
     try {
-      const fixture = await postJson('/api/games/fixtures', {
-        awayTeamName: gameForm.awayTeamName,
-        homeTeamName: gameForm.homeTeamName,
-      });
-      await postJson('/api/game-occurrences', {
-        arrivalBufferMinutes: Number(gameForm.arrivalBufferMinutes),
-        date: gameForm.date,
-        fixtureId: fixture.id,
-        locationName: gameForm.locationName,
-        startTime: gameForm.startTime,
-        travelMinutes: Number(gameForm.travelMinutes),
-      });
+      const fixture = await postJson(
+        '/api/games/fixtures',
+        {
+          awayTeamName: gameForm.awayTeamName,
+          homeTeamName: gameForm.homeTeamName,
+        },
+        'The game could not be stored.',
+      );
+      await postJson(
+        '/api/game-occurrences',
+        {
+          arrivalBufferMinutes: Number(gameForm.arrivalBufferMinutes),
+          date: gameForm.date,
+          fixtureId: fixture.id,
+          locationName: gameForm.locationName,
+          startTime: gameForm.startTime,
+          travelMinutes: Number(gameForm.travelMinutes),
+        },
+        'The game could not be stored.',
+      );
       gameMessage = 'Game added to the program.';
       gameForm = { ...gameForm, awayTeamName: '', date: '', startTime: '' };
       await invalidateAll();
@@ -68,6 +88,35 @@
       gameError = error instanceof Error ? error.message : 'The game could not be stored.';
     } finally {
       savingGame = false;
+    }
+  };
+
+  const saveTraining = async () => {
+    savingTraining = true;
+    trainingMessage = '';
+    trainingError = '';
+
+    try {
+      await postJson(
+        '/api/training-series',
+        {
+          durationMinutes: Number(trainingForm.durationMinutes),
+          endDate: trainingForm.endDate,
+          locationName: trainingForm.locationName,
+          startDate: trainingForm.startDate,
+          startTime: trainingForm.startTime,
+          weekday: Number(trainingForm.weekday),
+        },
+        'The training series could not be stored.',
+      );
+      trainingMessage = 'Training series added to the program.';
+      trainingForm = { ...trainingForm, endDate: '', startDate: '' };
+      await invalidateAll();
+    } catch (error) {
+      trainingError =
+        error instanceof Error ? error.message : 'The training series could not be stored.';
+    } finally {
+      savingTraining = false;
     }
   };
 </script>
@@ -168,6 +217,56 @@
   {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
 </section>
 
+<section class="panel manual-game-panel" aria-labelledby="training-series-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Recurring event</p>
+      <h2 id="training-series-heading">Add a training series</h2>
+    </div>
+  </div>
+
+  <form class="game-form" on:submit|preventDefault={saveTraining}>
+    <label>
+      Weekday
+      <select bind:value={trainingForm.weekday}>
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5">Friday</option>
+        <option value="6">Saturday</option>
+        <option value="7">Sunday</option>
+      </select>
+    </label>
+    <label>
+      Start date
+      <input bind:value={trainingForm.startDate} required type="date" />
+    </label>
+    <label>
+      End date
+      <input bind:value={trainingForm.endDate} required type="date" />
+    </label>
+    <label>
+      Start time
+      <input bind:value={trainingForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
+    </label>
+    <label>
+      Duration minutes
+      <input bind:value={trainingForm.durationMinutes} min="1" required type="number" />
+    </label>
+    <label>
+      Location
+      <input bind:value={trainingForm.locationName} required />
+    </label>
+    <button disabled={savingTraining} type="submit">
+      {savingTraining ? 'Saving…' : 'Add training series'}
+    </button>
+  </form>
+  <p class="form-hint">The location must already exist in Settings.</p>
+  {#if trainingMessage}<p class="form-message" role="status">{trainingMessage}</p>{/if}
+  {#if trainingError}<p class="form-error" role="alert">{trainingError}</p>{/if}
+</section>
+
 <style>
   .manual-game-panel {
     margin-top: 1rem;
@@ -189,7 +288,8 @@
     text-transform: uppercase;
   }
 
-  .game-form input {
+  .game-form input,
+  .game-form select {
     background: #fffdf8;
     border: 1px solid var(--line);
     border-radius: 0.55rem;
@@ -201,6 +301,10 @@
     min-height: 2.7rem;
     padding: 0.55rem 0.65rem;
     width: 100%;
+  }
+
+  .game-form select {
+    appearance: none;
   }
 
   .game-form button {
