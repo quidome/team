@@ -10,6 +10,8 @@ export interface GameImportUpload {
 
 const supportedExtensions = new Set(['.csv', '.ods', '.xls', '.xlsx']);
 
+export const maxGameImportBytes = 10 * 1024 * 1024;
+
 const extensionOf = (fileName: string) => {
   const dot = fileName.lastIndexOf('.');
 
@@ -21,6 +23,15 @@ export const readGameImportFile = (upload: GameImportUpload): string => {
 
   if (!supportedExtensions.has(extension)) {
     throw new Error('Supported schedule files are CSV, XLS, XLSX, and ODS.');
+  }
+
+  const byteLength =
+    upload.encoding === 'base64'
+      ? Buffer.from(upload.content, 'base64').byteLength
+      : Buffer.byteLength(upload.content, 'utf8');
+
+  if (byteLength > maxGameImportBytes) {
+    throw new Error('Schedule files must not exceed 10 MiB.');
   }
 
   if (extension === '.csv') {

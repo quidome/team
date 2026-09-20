@@ -24,4 +24,14 @@ describe('readGameImportFile', () => {
       readGameImportFile({ content: 'anything', encoding: 'text', fileName: 'schedule.pdf' }),
     ).toThrow('Supported schedule files');
   });
+
+  it('rejects schedule files larger than 10 MiB', () => {
+    expect(() =>
+      readGameImportFile({
+        content: 'x'.repeat(10 * 1024 * 1024 + 1),
+        encoding: 'text',
+        fileName: 'schedule.csv',
+      }),
+    ).toThrow('must not exceed 10 MiB');
+  });
 });
