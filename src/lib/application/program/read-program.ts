@@ -9,13 +9,14 @@ export interface ProgramGameEvent extends StoredGameProgramOccurrence {
 }
 
 export interface ProgramTrainingEvent {
+  date: string;
   durationMinutes: number;
   id: string;
   locationName: string;
+  occurrenceId?: string;
   seriesId: string;
   startTime: string;
   type: 'training';
-  date: string;
 }
 
 export type ProgramEvent = ProgramGameEvent | ProgramTrainingEvent;
@@ -25,9 +26,13 @@ const byDateAndTime = (left: ProgramEvent, right: ProgramEvent) =>
 
 const trainingEvents = (series: StoredTrainingSeries): ProgramTrainingEvent[] =>
   series.occurrences.map((occurrence) => ({
-    ...occurrence,
-    id: `${series.id}:${occurrence.date}`,
+    date: occurrence.date,
+    durationMinutes: occurrence.durationMinutes,
+    id: occurrence.id ?? `${series.id}:${occurrence.date}`,
+    locationName: occurrence.locationName,
+    ...(occurrence.id ? { occurrenceId: occurrence.id } : {}),
     seriesId: series.id,
+    startTime: occurrence.startTime,
     type: 'training' as const,
   }));
 

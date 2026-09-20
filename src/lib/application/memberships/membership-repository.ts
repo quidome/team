@@ -13,6 +13,7 @@ export interface Membership {
 }
 
 export interface MembershipRepository {
+  findAll(): Promise<Membership[]>;
   find(membership: Membership): Promise<Membership | undefined>;
   save(membership: Membership): Promise<Membership>;
 }

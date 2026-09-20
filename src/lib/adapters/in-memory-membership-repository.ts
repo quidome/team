@@ -15,6 +15,10 @@ export class InMemoryMembershipRepository implements MembershipRepository {
     }
   }
 
+  async findAll(): Promise<Membership[]> {
+    return [...this.memberships.values()];
+  }
+
   async find(membership: Membership): Promise<Membership | undefined> {
     return this.memberships.get(membershipKey(membership));
   }

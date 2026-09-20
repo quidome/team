@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 import type {
   Membership,
@@ -10,6 +10,31 @@ import { memberships, players, seasons, teams } from './schema';
 type Database = ReturnType<typeof createDatabase>;
 
 export const createPostgresMembershipRepository = (database: Database): MembershipRepository => ({
+  async findAll(): Promise<Membership[]> {
+    const storedMemberships = await database
+      .select({
+        jerseyNumber: memberships.jerseyNumber,
+        participationType: memberships.participationType,
+        playerAssociationId: players.associationId,
+        relationship: memberships.relationship,
+        seasonStartingYear: seasons.startingYear,
+        status: memberships.status,
+        teamName: teams.name,
+      })
+      .from(memberships)
+      .innerJoin(players, eq(memberships.playerId, players.id))
+      .innerJoin(teams, eq(memberships.teamId, teams.id))
+      .innerJoin(seasons, eq(memberships.seasonId, seasons.id))
+      .orderBy(asc(players.name));
+
+    return storedMemberships.map((storedMembership) => ({
+      ...storedMembership,
+      ...(storedMembership.jerseyNumber === null
+        ? { jerseyNumber: undefined }
+        : { jerseyNumber: storedMembership.jerseyNumber }),
+    }));
+  },
+
   async find(membership: Membership): Promise<Membership | undefined> {
     const [storedMembership] = await database
       .select({

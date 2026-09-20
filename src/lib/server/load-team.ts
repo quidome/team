@@ -1,0 +1,48 @@
+import { env } from '$env/dynamic/private';
+
+import { readTeam, type TeamPlayer } from '$lib/application/team/read-team';
+import { loadProgram } from '$lib/server/load-program';
+import { currentMembershipRepository, currentPlayerRepository } from '$lib/server/composition-root';
+import type { ProgramEvent } from '$lib/application/program/read-program';
+
+export const currentSeasonStartingYear = 2026;
+export const currentTeamName = 'U16-1';
+
+export interface TeamPageData {
+  events: ProgramEvent[];
+  players: TeamPlayer[];
+  season: {
+    endingYear: number;
+    startingYear: number;
+  };
+  teamName: string;
+}
+
+export const loadTeam = async (): Promise<TeamPageData> => {
+  if (!env.DATABASE_URL?.trim()) {
+    return {
+      events: [],
+      players: [],
+      season: {
+        endingYear: currentSeasonStartingYear + 1,
+        startingYear: currentSeasonStartingYear,
+      },
+      teamName: currentTeamName,
+    };
+  }
+
+  const [players, program] = await Promise.all([
+    readTeam(currentPlayerRepository(), currentMembershipRepository(), {
+      seasonStartingYear: currentSeasonStartingYear,
+      teamName: currentTeamName,
+    }),
+    loadProgram(),
+  ]);
+
+  return {
+    events: program.events,
+    players,
+    season: { endingYear: currentSeasonStartingYear + 1, startingYear: currentSeasonStartingYear },
+    teamName: currentTeamName,
+  };
+};

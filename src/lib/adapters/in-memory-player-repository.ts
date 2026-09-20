@@ -9,6 +9,10 @@ export class InMemoryPlayerRepository implements PlayerRepository {
     }
   }
 
+  async findAll(): Promise<Player[]> {
+    return [...this.players.values()];
+  }
+
   async findByAssociationId(associationId: string): Promise<Player | undefined> {
     return this.players.get(associationId);
   }

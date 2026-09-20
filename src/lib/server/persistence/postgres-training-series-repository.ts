@@ -51,6 +51,7 @@ export const createPostgresTrainingSeriesRepository = (
     const storedOccurrences = await database
       .select({
         date: trainingOccurrences.date,
+        id: trainingOccurrences.id,
         durationMinutes: trainingOccurrences.durationMinutes,
         locationName: locations.name,
         startTime: trainingOccurrences.startTime,
