@@ -69,7 +69,8 @@ Before starting the production server:
 
 1. Provide `DATABASE_URL`, `ORIGIN`, the Pocket ID OIDC settings, and a random `SESSION_SECRET` of at least 32 characters.
 2. Keep `DEV_AUTH_BYPASS=false` or unset; the bypass is ignored outside Vite development mode.
-3. Apply migrations with `just db-migrate`.
-4. Build and start with `just serve`.
-5. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
-6. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.
+3. Confirm production dependencies with `just audit-production`.
+4. Apply migrations with `just db-migrate`.
+5. Build and start with `just serve`.
+6. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
+7. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.

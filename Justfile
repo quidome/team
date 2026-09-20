@@ -66,6 +66,10 @@ lint:
 audit-high:
     npm run audit:high
 
+# Fail when a production dependency has a moderate or higher advisory.
+audit-production:
+    npm run audit:production
+
 # Run Svelte and TypeScript checks.
 typecheck:
     npm run check
