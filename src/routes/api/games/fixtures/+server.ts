@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { configureGameFixture } from '$lib/application/games/configure-game';
 import type { GameFixture } from '$lib/application/games/game-repository';
-import { currentGameRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentGameRepository } from '$lib/server/composition-root';
 
 const readFixture = async (request: Request): Promise<GameFixture | undefined> => {
   try {
@@ -35,5 +35,17 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_game_fixture' }, { status: 400 });
   }
 
-  return json(await configureGameFixture(currentGameRepository(), fixture));
+  const configuredFixture = await configureGameFixture(currentGameRepository(), fixture);
+
+  await currentAuditRepository().record({
+    action: 'game_fixture_configured',
+    entityId: configuredFixture.id,
+    entityType: 'game_fixture',
+    metadata: {
+      awayTeamName: configuredFixture.fixture.awayTeamName,
+      homeTeamName: configuredFixture.fixture.homeTeamName,
+    },
+  });
+
+  return json(configuredFixture);
 };

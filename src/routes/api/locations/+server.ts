@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { configureLocation } from '$lib/application/locations/configure-location';
 import type { Location } from '$lib/application/locations/location-repository';
-import { currentLocationRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentLocationRepository } from '$lib/server/composition-root';
 
 const readLocation = async (request: Request): Promise<Location | undefined> => {
   try {
@@ -35,5 +35,14 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_location' }, { status: 400 });
   }
 
-  return json(await configureLocation(currentLocationRepository(), location));
+  const configuredLocation = await configureLocation(currentLocationRepository(), location);
+
+  await currentAuditRepository().record({
+    action: 'location_configured',
+    entityId: configuredLocation.name,
+    entityType: 'location',
+    metadata: { name: configuredLocation.name, travelMinutes: configuredLocation.travelMinutes },
+  });
+
+  return json(configuredLocation);
 };

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { configurePlayer } from '$lib/application/players/configure-player';
 import type { Player } from '$lib/application/players/player-repository';
-import { currentPlayerRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentPlayerRepository } from '$lib/server/composition-root';
 
 const isCalendarDate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -50,5 +50,14 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_player' }, { status: 400 });
   }
 
-  return json(await configurePlayer(currentPlayerRepository(), player));
+  const configuredPlayer = await configurePlayer(currentPlayerRepository(), player);
+
+  await currentAuditRepository().record({
+    action: 'player_configured',
+    entityId: configuredPlayer.associationId,
+    entityType: 'player',
+    metadata: { birthDate: configuredPlayer.birthDate, name: configuredPlayer.name },
+  });
+
+  return json(configuredPlayer);
 };

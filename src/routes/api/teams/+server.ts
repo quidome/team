@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 
 import { configureTeam } from '$lib/application/teams/configure-team';
-import { currentTeamRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentTeamRepository } from '$lib/server/composition-root';
 
 const readName = async (request: Request): Promise<string | undefined> => {
   try {
@@ -29,6 +29,13 @@ export const POST = async ({ request }) => {
   }
 
   const team = await configureTeam(currentTeamRepository(), name);
+
+  await currentAuditRepository().record({
+    action: 'team_configured',
+    entityId: team.name,
+    entityType: 'team',
+    metadata: { name: team.name },
+  });
 
   return json(team);
 };

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { configureMembership } from '$lib/application/memberships/configure-membership';
 import type { Membership } from '$lib/application/memberships/membership-repository';
-import { currentMembershipRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentMembershipRepository } from '$lib/server/composition-root';
 
 const readMembership = async (request: Request): Promise<Membership | undefined> => {
   try {
@@ -59,5 +59,18 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_membership' }, { status: 400 });
   }
 
-  return json(await configureMembership(currentMembershipRepository(), membership));
+  const configuredMembership = await configureMembership(currentMembershipRepository(), membership);
+
+  await currentAuditRepository().record({
+    action: 'membership_configured',
+    entityId: `${configuredMembership.playerAssociationId}:${configuredMembership.seasonStartingYear}:${configuredMembership.teamName}:${configuredMembership.relationship}`,
+    entityType: 'membership',
+    metadata: {
+      participationType: configuredMembership.participationType,
+      status: configuredMembership.status,
+      teamName: configuredMembership.teamName,
+    },
+  });
+
+  return json(configuredMembership);
 };

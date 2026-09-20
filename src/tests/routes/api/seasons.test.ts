@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  audit: {
+    record: vi.fn(),
+  },
   seasons: {
     findByStartingYear: vi.fn(),
     save: vi.fn(),
@@ -8,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
+  currentAuditRepository: () => mocks.audit,
   currentSeasonRepository: () => mocks.seasons,
 }));
 
@@ -30,6 +34,9 @@ describe('POST /api/seasons', () => {
     } as never);
 
     expect(response.status).toBe(200);
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'season_configured', entityId: '2026' }),
+    );
     await expect(response.json()).resolves.toEqual({ endingYear: 2027, startingYear: 2026 });
     expect(mocks.seasons.save).toHaveBeenCalledWith({ endingYear: 2027, startingYear: 2026 });
   });

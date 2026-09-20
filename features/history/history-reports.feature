@@ -32,3 +32,8 @@ Feature: Review participation and duty history
     Given duty requirements, assignments, signups, and statuses are changed
     When the coordinator opens History
     Then the duty coordination actions are visible in the audit list
+
+  Scenario: Inspecting roster and configuration changes
+    Given players, teams, locations, memberships, seasons, and training are configured
+    When the coordinator opens History
+    Then the configuration actions are visible in the audit list

@@ -2,7 +2,10 @@ import { json } from '@sveltejs/kit';
 
 import { configureTrainingSeries } from '$lib/application/training/configure-training-series';
 import type { TrainingSeries } from '$lib/domain/training-series';
-import { currentTrainingSeriesRepository } from '$lib/server/composition-root';
+import {
+  currentAuditRepository,
+  currentTrainingSeriesRepository,
+} from '$lib/server/composition-root';
 
 const isCalendarDate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -73,5 +76,19 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_training_series' }, { status: 400 });
   }
 
-  return json(await configureTrainingSeries(currentTrainingSeriesRepository(), series));
+  const configuredSeries = await configureTrainingSeries(currentTrainingSeriesRepository(), series);
+
+  await currentAuditRepository().record({
+    action: 'training_series_configured',
+    entityId: configuredSeries.id,
+    entityType: 'training_series',
+    metadata: {
+      endDate: configuredSeries.series.endDate,
+      locationName: configuredSeries.series.locationName,
+      startDate: configuredSeries.series.startDate,
+      occurrences: configuredSeries.occurrences.length,
+    },
+  });
+
+  return json(configuredSeries);
 };
