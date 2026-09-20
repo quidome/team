@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: team
+      POSTGRES_PASSWORD: team
+      POSTGRES_USER: team
+    healthcheck:
+      interval: 5s
+      retries: 10
+      test: ['CMD-SHELL', 'pg_isready -U team -d team']
+      timeout: 5s
+    ports:
+      - '5432:5432'
+    volumes:
+      - team-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  team-postgres-data:

@@ -12,6 +12,14 @@ build:
 serve: build
     npm run start
 
+# Start the local PostgreSQL container.
+db-up:
+    docker compose up -d postgres
+
+# Stop the local PostgreSQL container.
+db-down:
+    docker compose down
+
 # Generate PostgreSQL migrations from the Drizzle schema.
 db-generate:
     npm run db:generate

@@ -22,12 +22,15 @@ Run the quality checks:
 just check
 ```
 
-For local persistence work, copy `.env.example` to `.env`, set `DATABASE_URL` to a running PostgreSQL instance, then apply migrations:
+For local persistence work, start the bundled PostgreSQL container, copy `.env.example` to `.env`, then apply migrations:
 
 ```sh
+just db-up
 cp .env.example .env
 just db-migrate
 ```
+
+Stop the container when finished with `just db-down`. The database data is kept in the `team-postgres-data` Docker volume.
 
 For UI-only local development without OIDC, set this in `.env`:
 
