@@ -11,6 +11,7 @@ export const currentTeamName = 'U16-1';
 export interface TeamPageData {
   events: ProgramEvent[];
   players: TeamPlayer[];
+  selectedEventId?: string;
   season: {
     endingYear: number;
     startingYear: number;
@@ -18,11 +19,12 @@ export interface TeamPageData {
   teamName: string;
 }
 
-export const loadTeam = async (): Promise<TeamPageData> => {
+export const loadTeam = async (selectedEventId?: string): Promise<TeamPageData> => {
   if (!env.DATABASE_URL?.trim()) {
     return {
       events: [],
       players: [],
+      selectedEventId,
       season: {
         endingYear: currentSeasonStartingYear + 1,
         startingYear: currentSeasonStartingYear,
@@ -42,6 +44,7 @@ export const loadTeam = async (): Promise<TeamPageData> => {
   return {
     events: program.events,
     players,
+    selectedEventId,
     season: { endingYear: currentSeasonStartingYear + 1, startingYear: currentSeasonStartingYear },
     teamName: currentTeamName,
   };
