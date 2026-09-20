@@ -21,13 +21,18 @@
   };
   let playerSaving = false;
   let membershipSaving = false;
+  let showPlayerModal = false;
+  let showMembershipModal = false;
+  let selectedPlayerAssociationId = '';
   let playerMessage = '';
-  let membershipMessage = '';
   let playerError = '';
   let membershipError = '';
 
   $: currentTeamPlayers = data.players.filter(
     (player) => player.membership?.teamName === data.teamName,
+  );
+  $: selectedPlayer = data.players.find(
+    (player) => player.associationId === selectedPlayerAssociationId,
   );
 
   /** @param {string} path @param {unknown} payload */
@@ -47,6 +52,41 @@
     return body;
   };
 
+  /** @param {import('$lib/application/team/read-team').TeamPlayer} player */
+  const openMembershipEditor = (player) => {
+    selectedPlayerAssociationId = player.associationId;
+    membershipForm = {
+      jerseyNumber: player.membership?.jerseyNumber?.toString() ?? '',
+      participationType: player.membership?.participationType ?? 'trains_and_plays',
+      playerAssociationId: player.associationId,
+      relationship: player.membership?.relationship ?? 'primary',
+      status: player.membership?.status ?? 'active',
+    };
+    membershipError = '';
+    showMembershipModal = true;
+  };
+
+  const deletePlayer = async () => {
+    if (!selectedPlayer || !window.confirm(`Delete ${selectedPlayer.name}?`)) return;
+
+    try {
+      const response = await fetch(
+        `/api/players?associationId=${encodeURIComponent(selectedPlayer.associationId)}`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Player could not be deleted.');
+      }
+
+      showMembershipModal = false;
+      await invalidateAll();
+    } catch (error) {
+      membershipError = error instanceof Error ? error.message : 'Player could not be deleted.';
+    }
+  };
+
   const registerPlayer = async () => {
     playerSaving = true;
     playerMessage = '';
@@ -54,9 +94,17 @@
 
     try {
       await postJson('/api/players', playerForm);
-      membershipForm = { ...membershipForm, playerAssociationId: playerForm.associationId };
+      await postJson('/api/memberships', {
+        participationType: 'trains_and_plays',
+        playerAssociationId: playerForm.associationId.trim(),
+        relationship: 'primary',
+        seasonStartingYear: data.season.startingYear,
+        status: 'active',
+        teamName: data.teamName,
+      });
       playerForm = { associationId: '', birthDate: '', name: '' };
-      playerMessage = 'Player registered.';
+      playerMessage = `Player added to ${data.season.startingYear}–${data.season.endingYear} · ${data.teamName}.`;
+      showPlayerModal = false;
       await invalidateAll();
     } catch (error) {
       playerError = error instanceof Error ? error.message : 'Player could not be registered.';
@@ -67,7 +115,6 @@
 
   const saveMembership = async () => {
     membershipSaving = true;
-    membershipMessage = '';
     membershipError = '';
 
     try {
@@ -82,7 +129,7 @@
         status: membershipForm.status,
         teamName: data.teamName,
       });
-      membershipMessage = `Membership saved for the ${data.season.startingYear}–${data.season.endingYear} season.`;
+      showMembershipModal = false;
       await invalidateAll();
     } catch (error) {
       membershipError = error instanceof Error ? error.message : 'Membership could not be saved.';
@@ -109,18 +156,22 @@
       <p class="eyebrow">{currentTeamPlayers.length} team memberships</p>
       <h2 id="players-heading">Players</h2>
     </div>
-    <a class="text-link" href="#attendance">Record attendance <span aria-hidden="true">↓</span></a>
+    <div class="panel-actions">
+      <button type="button" on:click={() => (showPlayerModal = true)}>Add player</button>
+      <a class="text-link" href="#attendance">Record attendance <span aria-hidden="true">↓</span></a
+      >
+    </div>
   </div>
 
   {#if data.players.length === 0}
     <div class="empty-state">
       <h3>No players registered yet</h3>
-      <p>Register the players below, then add their current-season membership.</p>
+      <p>Add a player below and they will be added to this team-season automatically.</p>
     </div>
   {:else}
     <div class="player-list">
       {#each data.players as player (player.associationId)}
-        <article class="player-card">
+        <button class="player-card" type="button" on:click={() => openMembershipEditor(player)}>
           <div>
             <p class="player-name">{player.name}</p>
             <p class="player-meta">
@@ -145,66 +196,68 @@
           {:else}
             <span class="unassigned">No {data.teamName} membership</span>
           {/if}
-        </article>
+        </button>
       {/each}
     </div>
   {/if}
+  {#if playerMessage}<p class="form-message" role="status">{playerMessage}</p>{/if}
 </section>
 
-<div class="two-column">
-  <section class="panel" aria-labelledby="register-player-heading">
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Player details</p>
-        <h2 id="register-player-heading">Register a player</h2>
+{#if showPlayerModal}
+  <div class="modal-backdrop" role="presentation">
+    <div
+      class="panel modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="register-player-heading"
+    >
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Player details</p>
+          <h2 id="register-player-heading">Add a player</h2>
+        </div>
+        <button class="close-button" type="button" on:click={() => (showPlayerModal = false)}>
+          Close
+        </button>
       </div>
-    </div>
-
-    <form class="form-grid" on:submit|preventDefault={registerPlayer}>
-      <label>
-        Name
-        <input bind:value={playerForm.name} required autocomplete="name" />
-      </label>
-      <label>
-        Birthday
-        <input bind:value={playerForm.birthDate} required type="date" />
-      </label>
-      <label>
-        Association ID
-        <input bind:value={playerForm.associationId} required autocomplete="off" />
-      </label>
-      <button disabled={playerSaving} type="submit">
-        {playerSaving ? 'Saving…' : 'Register player'}
-      </button>
-    </form>
-    {#if playerMessage}<p class="form-message" role="status">{playerMessage}</p>{/if}
-    {#if playerError}<p class="form-error" role="alert">{playerError}</p>{/if}
-  </section>
-
-  <section class="panel" aria-labelledby="membership-heading">
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">{data.teamName} · {data.season.startingYear}–{data.season.endingYear}</p>
-        <h2 id="membership-heading">Team membership</h2>
-      </div>
-    </div>
-
-    {#if data.players.length === 0}
-      <div class="empty-state compact">
-        <h3>Register a player first</h3>
-        <p>The new player will appear here for membership setup.</p>
-      </div>
-    {:else}
-      <form class="form-grid" on:submit|preventDefault={saveMembership}>
+      <form class="form-grid" on:submit|preventDefault={registerPlayer}>
         <label>
-          Player
-          <select bind:value={membershipForm.playerAssociationId} required>
-            <option disabled value="">Choose a player</option>
-            {#each data.players as player (player.associationId)}
-              <option value={player.associationId}>{player.name}</option>
-            {/each}
-          </select>
+          Name
+          <input bind:value={playerForm.name} required autocomplete="name" />
         </label>
+        <label>
+          Birthday
+          <input bind:value={playerForm.birthDate} required type="date" />
+        </label>
+        <label>
+          Association ID
+          <input bind:value={playerForm.associationId} required autocomplete="off" />
+        </label>
+        <button disabled={playerSaving} type="submit">
+          {playerSaving ? 'Saving…' : 'Add player'}
+        </button>
+      </form>
+      {#if playerError}<p class="form-error" role="alert">{playerError}</p>{/if}
+    </div>
+  </div>
+{/if}
+
+{#if showMembershipModal && selectedPlayer}
+  <div class="modal-backdrop" role="presentation">
+    <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="membership-heading">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">
+            {data.teamName} · {data.season.startingYear}–{data.season.endingYear}
+          </p>
+          <h2 id="membership-heading">{selectedPlayer.name}</h2>
+        </div>
+        <button class="close-button" type="button" on:click={() => (showMembershipModal = false)}>
+          Close
+        </button>
+      </div>
+      <p class="modal-context">Membership for the active team-season context.</p>
+      <form class="form-grid" on:submit|preventDefault={saveMembership}>
         <label>
           Participation
           <select bind:value={membershipForm.participationType}>
@@ -230,15 +283,17 @@
           Jersey number <span class="optional">optional</span>
           <input bind:value={membershipForm.jerseyNumber} min="1" type="number" />
         </label>
-        <button disabled={membershipSaving} type="submit">
-          {membershipSaving ? 'Saving…' : 'Save membership'}
-        </button>
+        <div class="modal-actions">
+          <button disabled={membershipSaving} type="submit">
+            {membershipSaving ? 'Saving…' : 'Save membership'}
+          </button>
+          <button class="delete-button" type="button" on:click={deletePlayer}>Delete player</button>
+        </div>
       </form>
-      {#if membershipMessage}<p class="form-message" role="status">{membershipMessage}</p>{/if}
       {#if membershipError}<p class="form-error" role="alert">{membershipError}</p>{/if}
-    {/if}
-  </section>
-</div>
+    </div>
+  </div>
+{/if}
 
 <AttendancePanel
   events={data.events}
@@ -258,10 +313,87 @@
     background: #faf7f0;
     border: 1px solid #ebe4d8;
     border-radius: 0.9rem;
+    color: var(--ink);
     display: flex;
     gap: 1rem;
     justify-content: space-between;
     padding: 1rem;
+    text-align: left;
+    width: 100%;
+  }
+
+  .player-card:hover {
+    background: #fff4ef;
+    border-color: #e2b8aa;
+  }
+
+  .panel-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: end;
+  }
+
+  .modal-backdrop {
+    align-items: start;
+    background: rgba(36, 34, 31, 0.42);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    overflow: auto;
+    padding: 2rem 1rem;
+    position: fixed;
+    z-index: 10;
+  }
+
+  .modal {
+    margin: auto;
+    max-width: 32rem;
+    width: 100%;
+  }
+
+  .modal-header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .modal-header h2 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    letter-spacing: -0.05em;
+    margin: 0;
+  }
+
+  .close-button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    flex: 0 0 auto;
+  }
+
+  .modal-context {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: -0.5rem 0 1.25rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  .delete-button {
+    background: transparent;
+    border: 1px solid #e2b8aa;
+    color: var(--accent-dark);
+  }
+
+  .delete-button:hover {
+    background: #fff4ef;
   }
 
   .player-name {
@@ -287,13 +419,6 @@
 
   .membership-details strong {
     color: var(--ink);
-  }
-
-  .two-column {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 1rem;
   }
 
   .form-grid {
@@ -375,12 +500,6 @@
 
   .form-error {
     color: var(--accent-dark);
-  }
-
-  @media (max-width: 48rem) {
-    .two-column {
-      grid-template-columns: 1fr;
-    }
   }
 
   @media (max-width: 36rem) {

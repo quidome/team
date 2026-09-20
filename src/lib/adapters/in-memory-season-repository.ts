@@ -9,6 +9,10 @@ export class InMemorySeasonRepository implements SeasonRepository {
     }
   }
 
+  async findAll(): Promise<Season[]> {
+    return [...this.seasons.values()].sort((left, right) => right.startingYear - left.startingYear);
+  }
+
   async findByStartingYear(startingYear: number): Promise<Season | undefined> {
     return this.seasons.get(startingYear);
   }
@@ -17,5 +21,23 @@ export class InMemorySeasonRepository implements SeasonRepository {
     this.seasons.set(season.startingYear, season);
 
     return season;
+  }
+
+  async updateStartingYear(currentStartingYear: number, startingYear: number): Promise<Season> {
+    const existing = this.seasons.get(currentStartingYear);
+
+    if (!existing) {
+      throw new Error('Season does not exist');
+    }
+
+    const updated = { endingYear: startingYear + 1, startingYear };
+    this.seasons.delete(currentStartingYear);
+    this.seasons.set(startingYear, updated);
+
+    return updated;
+  }
+
+  async deleteByStartingYear(startingYear: number): Promise<void> {
+    this.seasons.delete(startingYear);
   }
 }

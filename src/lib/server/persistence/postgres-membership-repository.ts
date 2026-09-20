@@ -112,4 +112,49 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
 
     return membership;
   },
+
+  async update(membership: Membership): Promise<Membership> {
+    const [player] = await database
+      .select({ id: players.id })
+      .from(players)
+      .where(eq(players.associationId, membership.playerAssociationId))
+      .limit(1);
+    const [season] = await database
+      .select({ id: seasons.id })
+      .from(seasons)
+      .where(eq(seasons.startingYear, membership.seasonStartingYear))
+      .limit(1);
+    const [team] = await database
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.name, membership.teamName))
+      .limit(1);
+
+    if (!player || !season || !team) {
+      throw new Error('Membership context does not exist');
+    }
+
+    const [updatedMembership] = await database
+      .update(memberships)
+      .set({
+        jerseyNumber: membership.jerseyNumber,
+        participationType: membership.participationType,
+        relationship: membership.relationship,
+        status: membership.status,
+      })
+      .where(
+        and(
+          eq(memberships.playerId, player.id),
+          eq(memberships.seasonId, season.id),
+          eq(memberships.teamId, team.id),
+        ),
+      )
+      .returning({ id: memberships.id });
+
+    if (!updatedMembership) {
+      throw new Error('Membership does not exist');
+    }
+
+    return membership;
+  },
 });

@@ -45,4 +45,8 @@ export const createPostgresPlayerRepository = (database: Database): PlayerReposi
 
     return storedPlayer;
   },
+
+  async deleteByAssociationId(associationId: string): Promise<void> {
+    await database.delete(players).where(eq(players.associationId, associationId));
+  },
 });

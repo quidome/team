@@ -36,4 +36,22 @@ export const createPostgresLocationRepository = (database: Database): LocationRe
 
     return storedLocation;
   },
+
+  async updateName(currentName: string, location: Location): Promise<Location> {
+    const [updatedLocation] = await database
+      .update(locations)
+      .set(location)
+      .where(eq(locations.name, currentName))
+      .returning({ name: locations.name, travelMinutes: locations.travelMinutes });
+
+    if (!updatedLocation) {
+      throw new Error('Location does not exist');
+    }
+
+    return updatedLocation;
+  },
+
+  async deleteByName(name: string): Promise<void> {
+    await database.delete(locations).where(eq(locations.name, name));
+  },
 });

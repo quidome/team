@@ -1,3 +1,5 @@
-import { loadSettings } from '$lib/server/load-settings';
+import { redirect } from '@sveltejs/kit';
 
-export const load = async () => loadSettings();
+export const load = async () => {
+  redirect(308, '/admin');
+};

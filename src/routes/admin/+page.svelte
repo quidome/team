@@ -34,6 +34,14 @@
   let conflicts = [];
   /** @type {Record<string, Record<string, string>>} */
   let conflictChoices = {};
+  let seasonForm = { startingYear: '' };
+  let savingSeason = false;
+  let seasonMessage = '';
+  let seasonError = '';
+  let teamForm = { name: '' };
+  let savingTeam = false;
+  let teamMessage = '';
+  let teamError = '';
   let locationForm = {
     name: '',
     travelMinutes: '0',
@@ -41,6 +49,97 @@
   let savingLocation = false;
   let locationMessage = '';
   let locationError = '';
+  let adminMessage = '';
+  let adminError = '';
+  /** @type {{ type: 'season' | 'team' | 'location'; label: string; currentName?: string; currentStartingYear?: number } | undefined} */
+  let editTarget;
+  let editForm = { name: '', startingYear: '', travelMinutes: '0' };
+  let editSaving = false;
+
+  /** @param {string} path @param {string} label */
+  /** @param {'season' | 'team' | 'location'} type @param {any} item */
+  const openEdit = (type, item) => {
+    editTarget = {
+      currentName: type === 'season' ? undefined : item.name,
+      currentStartingYear: type === 'season' ? item.startingYear : undefined,
+      label:
+        type === 'season'
+          ? `${item.startingYear}–${item.endingYear} season`
+          : `${item.name} ${type}`,
+      type,
+    };
+    editForm = {
+      name: type === 'season' ? '' : item.name,
+      startingYear: type === 'season' ? String(item.startingYear) : '',
+      travelMinutes: type === 'location' ? String(item.travelMinutes) : '0',
+    };
+    adminError = '';
+    adminMessage = '';
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+
+    editSaving = true;
+    adminError = '';
+    adminMessage = '';
+
+    try {
+      const payload =
+        editTarget.type === 'season'
+          ? {
+              currentStartingYear: editTarget.currentStartingYear,
+              startingYear: Number(editForm.startingYear),
+            }
+          : editTarget.type === 'team'
+            ? { currentName: editTarget.currentName, name: editForm.name }
+            : {
+                currentName: editTarget.currentName,
+                name: editForm.name,
+                travelMinutes: Number(editForm.travelMinutes),
+              };
+      const response = await fetch(`/api/${editTarget.type}s`, {
+        body: JSON.stringify(payload),
+        headers: { 'content-type': 'application/json' },
+        method: 'PUT',
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? `${editTarget.label} could not be updated.`);
+      }
+
+      adminMessage = `${editTarget.label} updated.`;
+      editTarget = undefined;
+      await invalidateAll();
+    } catch (caught) {
+      adminError = caught instanceof Error ? caught.message : 'The item could not be updated.';
+    } finally {
+      editSaving = false;
+    }
+  };
+
+  /** @param {string} path @param {string} label */
+  const deleteItem = async (path, label) => {
+    if (!window.confirm(`Delete ${label}?`)) return;
+
+    adminMessage = '';
+    adminError = '';
+
+    try {
+      const response = await fetch(path, { method: 'DELETE' });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? `${label} could not be deleted.`);
+      }
+
+      adminMessage = `${label} deleted.`;
+      await invalidateAll();
+    } catch (caught) {
+      adminError = caught instanceof Error ? caught.message : `${label} could not be deleted.`;
+    }
+  };
 
   const saveLocation = async () => {
     savingLocation = true;
@@ -70,6 +169,60 @@
         caught instanceof Error ? caught.message : 'The location could not be stored.';
     } finally {
       savingLocation = false;
+    }
+  };
+
+  const saveSeason = async () => {
+    savingSeason = true;
+    seasonMessage = '';
+    seasonError = '';
+
+    try {
+      const response = await fetch('/api/seasons', {
+        body: JSON.stringify({ startingYear: Number(seasonForm.startingYear) }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The season could not be stored.');
+      }
+
+      seasonForm = { startingYear: '' };
+      seasonMessage = `${body.startingYear}–${body.endingYear} is available as a team context.`;
+      await invalidateAll();
+    } catch (caught) {
+      seasonError = caught instanceof Error ? caught.message : 'The season could not be stored.';
+    } finally {
+      savingSeason = false;
+    }
+  };
+
+  const saveTeam = async () => {
+    savingTeam = true;
+    teamMessage = '';
+    teamError = '';
+
+    try {
+      const response = await fetch('/api/teams', {
+        body: JSON.stringify({ name: teamForm.name }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The team could not be stored.');
+      }
+
+      teamForm = { name: '' };
+      teamMessage = `${body.name} is available as a team context.`;
+      await invalidateAll();
+    } catch (caught) {
+      teamError = caught instanceof Error ? caught.message : 'The team could not be stored.';
+    } finally {
+      savingTeam = false;
     }
   };
 
@@ -299,17 +452,166 @@
 </script>
 
 <svelte:head>
-  <title>Settings · Team</title>
-  <meta name="description" content="Season, team, locations, and imports" />
+  <title>Admin · Team</title>
+  <meta name="description" content="Seasons, teams, locations, and imports" />
 </svelte:head>
 
 <section class="intro">
-  <p class="eyebrow">Configuration and imports</p>
-  <h1>Settings</h1>
-  <p class="lede">Preview schedule data before it is allowed to change the shared program.</p>
+  <p class="eyebrow">Shared configuration</p>
+  <h1>Admin</h1>
+  <p class="lede">Set up seasons, teams, locations, and imports for the shared team workspace.</p>
+  {#if adminMessage}<p class="form-message" role="status">{adminMessage}</p>{/if}
+  {#if adminError}<p class="form-error" role="alert">{adminError}</p>{/if}
 </section>
 
-<section class="panel" aria-labelledby="locations-heading">
+{#if editTarget}
+  <div class="modal-backdrop" role="presentation">
+    <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="edit-heading">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Edit configuration</p>
+          <h2 id="edit-heading">{editTarget.label}</h2>
+        </div>
+        <button class="close-button" type="button" on:click={() => (editTarget = undefined)}>
+          Close
+        </button>
+      </div>
+      <form class="configuration-form edit-form" on:submit|preventDefault={saveEdit}>
+        {#if editTarget.type === 'season'}
+          <label>
+            Starting year
+            <input bind:value={editForm.startingYear} min="2000" required type="number" />
+          </label>
+        {:else}
+          <label>
+            Name
+            <input bind:value={editForm.name} required />
+          </label>
+          {#if editTarget.type === 'location'}
+            <label>
+              Travel minutes
+              <input bind:value={editForm.travelMinutes} min="0" required type="number" />
+            </label>
+          {/if}
+        {/if}
+        <button disabled={editSaving} type="submit">
+          {editSaving ? 'Saving…' : 'Save changes'}
+        </button>
+      </form>
+    </div>
+  </div>
+{/if}
+
+<section class="panel" aria-labelledby="seasons-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Competition periods</p>
+      <h2 id="seasons-heading">Seasons</h2>
+    </div>
+  </div>
+
+  <form class="configuration-form" on:submit|preventDefault={saveSeason}>
+    <label>
+      Starting year
+      <input bind:value={seasonForm.startingYear} min="2000" required type="number" />
+    </label>
+    <button disabled={savingSeason} type="submit">
+      {savingSeason ? 'Saving…' : 'Add season'}
+    </button>
+  </form>
+  <p class="form-hint">A season starting in 2026 is shown as 2026–2027.</p>
+  {#if seasonMessage}<p class="form-message" role="status">{seasonMessage}</p>{/if}
+  {#if seasonError}<p class="form-error" role="alert">{seasonError}</p>{/if}
+
+  {#if data.seasons.length === 0}
+    <div class="empty-state compact">
+      <h3>No seasons configured yet</h3>
+      <p>Add a season before creating a team context.</p>
+    </div>
+  {:else}
+    <div class="configuration-list" aria-label="Configured seasons">
+      {#each data.seasons as season (season.startingYear)}
+        <div class="configuration-row">
+          <div>
+            <strong>{season.startingYear}–{season.endingYear}</strong>
+            <span>Available for team contexts</span>
+          </div>
+          <div class="row-actions">
+            <button class="edit-button" type="button" on:click={() => openEdit('season', season)}>
+              Edit
+            </button>
+            <button
+              class="delete-button"
+              type="button"
+              on:click={() =>
+                deleteItem(
+                  `/api/seasons?startingYear=${season.startingYear}`,
+                  `${season.startingYear}–${season.endingYear} season`,
+                )}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</section>
+
+<section class="panel configuration-panel" aria-labelledby="teams-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Roster groups</p>
+      <h2 id="teams-heading">Teams</h2>
+    </div>
+  </div>
+
+  <form class="configuration-form" on:submit|preventDefault={saveTeam}>
+    <label>
+      Team name
+      <input bind:value={teamForm.name} placeholder="e.g. U16-1" required />
+    </label>
+    <button disabled={savingTeam} type="submit">
+      {savingTeam ? 'Saving…' : 'Add team'}
+    </button>
+  </form>
+  <p class="form-hint">Teams can be used in more than one season.</p>
+  {#if teamMessage}<p class="form-message" role="status">{teamMessage}</p>{/if}
+  {#if teamError}<p class="form-error" role="alert">{teamError}</p>{/if}
+
+  {#if data.teams.length === 0}
+    <div class="empty-state compact">
+      <h3>No teams configured yet</h3>
+      <p>Add a team before creating a team context.</p>
+    </div>
+  {:else}
+    <div class="configuration-list" aria-label="Configured teams">
+      {#each data.teams as team (team.name)}
+        <div class="configuration-row">
+          <div>
+            <strong>{team.name}</strong>
+            <span>Available across seasons</span>
+          </div>
+          <div class="row-actions">
+            <button class="edit-button" type="button" on:click={() => openEdit('team', team)}>
+              Edit
+            </button>
+            <button
+              class="delete-button"
+              type="button"
+              on:click={() =>
+                deleteItem(`/api/teams?name=${encodeURIComponent(team.name)}`, `${team.name} team`)}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</section>
+
+<section class="panel configuration-panel" aria-labelledby="locations-heading">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">Reusable schedule data</p>
@@ -340,14 +642,36 @@
   {#if data.locations.length === 0}
     <div class="empty-state compact">
       <h3>No locations configured yet</h3>
-      <p>Add the first location to make it available in Program.</p>
+      <p>Add the first location to make it available in Events.</p>
     </div>
   {:else}
     <div class="location-list" aria-label="Configured locations">
       {#each data.locations as location (location.name)}
         <div class="location-row">
-          <strong>{location.name}</strong>
-          <span>{location.travelMinutes} minutes travel</span>
+          <div>
+            <strong>{location.name}</strong>
+            <span>{location.travelMinutes} minutes travel</span>
+          </div>
+          <div class="row-actions">
+            <button
+              class="edit-button"
+              type="button"
+              on:click={() => openEdit('location', location)}
+            >
+              Edit
+            </button>
+            <button
+              class="delete-button"
+              type="button"
+              on:click={() =>
+                deleteItem(
+                  `/api/locations?name=${encodeURIComponent(location.name)}`,
+                  `${location.name} location`,
+                )}
+            >
+              Delete
+            </button>
+          </div>
         </div>
       {/each}
     </div>
@@ -358,7 +682,7 @@
   <div class="panel-heading">
     <div>
       <p class="eyebrow">Spreadsheet mapping · preview · import</p>
-      <h2 id="import-heading">Import program data</h2>
+      <h2 id="import-heading">Import event data</h2>
     </div>
   </div>
 
@@ -495,8 +819,169 @@
 </section>
 
 <style>
-  .import-panel {
+  .import-panel,
+  .configuration-panel {
     margin-top: 1rem;
+  }
+
+  .configuration-form {
+    align-items: end;
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: 1fr auto;
+  }
+
+  .configuration-form label {
+    color: var(--muted);
+    display: grid;
+    font-size: 0.78rem;
+    font-weight: 800;
+    gap: 0.35rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .configuration-form input {
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 0.55rem;
+    box-sizing: border-box;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    min-height: 2.7rem;
+    padding: 0.55rem 0.65rem;
+    width: 100%;
+  }
+
+  .configuration-form button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 0.55rem;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    min-height: 2.7rem;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .configuration-form button:hover:not(:disabled) {
+    background: var(--accent-dark);
+  }
+
+  .configuration-form button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .configuration-list {
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .configuration-row {
+    align-items: baseline;
+    background: #faf7f0;
+    border: 1px solid #ebe4d8;
+    border-radius: 0.7rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+  }
+
+  .configuration-row > div,
+  .location-row > div {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .configuration-row span {
+    color: var(--muted);
+    font-size: 0.84rem;
+  }
+
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .edit-button,
+  .delete-button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 0.78rem;
+    min-height: 2.2rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .edit-button:hover {
+    background: #fffdf8;
+    border-color: var(--accent);
+  }
+
+  .delete-button {
+    border-color: #e2b8aa;
+    color: var(--accent-dark);
+  }
+
+  .delete-button:hover {
+    background: #fff4ef;
+  }
+
+  .modal-backdrop {
+    align-items: start;
+    background: rgba(36, 34, 31, 0.42);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    overflow: auto;
+    padding: 2rem 1rem;
+    position: fixed;
+    z-index: 10;
+  }
+
+  .modal {
+    margin: auto;
+    max-width: 32rem;
+    width: 100%;
+  }
+
+  .modal-header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+
+  .modal-header h2 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    letter-spacing: -0.05em;
+    margin: 0;
+  }
+
+  .close-button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
+    min-height: 2.2rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .edit-form {
+    grid-template-columns: 1fr;
   }
 
   .location-form {
@@ -750,6 +1235,14 @@
   }
 
   @media (max-width: 48rem) {
+    .configuration-form {
+      grid-template-columns: 1fr;
+    }
+
+    .configuration-form button {
+      justify-self: start;
+    }
+
     .location-form {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -765,6 +1258,12 @@
   }
 
   @media (max-width: 36rem) {
+    .configuration-row {
+      align-items: start;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
     .location-form {
       grid-template-columns: 1fr;
     }

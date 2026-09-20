@@ -22,4 +22,8 @@ export class InMemoryPlayerRepository implements PlayerRepository {
 
     return player;
   }
+
+  async deleteByAssociationId(associationId: string): Promise<void> {
+    this.players.delete(associationId);
+  }
 }

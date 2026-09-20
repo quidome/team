@@ -43,6 +43,24 @@ const readPlayer = async (request: Request): Promise<Player | undefined> => {
   return undefined;
 };
 
+export const DELETE = async ({ url }) => {
+  const associationId = url.searchParams.get('associationId')?.trim();
+
+  if (!associationId) {
+    return json({ error: 'invalid_player' }, { status: 400 });
+  }
+
+  await currentPlayerRepository().deleteByAssociationId(associationId);
+  await currentAuditRepository().record({
+    action: 'player_deleted',
+    entityId: associationId,
+    entityType: 'player',
+    metadata: {},
+  });
+
+  return json({ deleted: true });
+};
+
 export const POST = async ({ request }) => {
   const player = await readPlayer(request);
 

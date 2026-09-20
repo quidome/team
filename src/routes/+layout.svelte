@@ -1,17 +1,19 @@
 <script>
   import { page } from '$app/stores';
   import { resolve } from '$app/paths';
+  import { defaultTeamSeasonContext, formatTeamSeasonContext } from '$lib/application/team-context';
   import NavIcon from '$lib/components/NavIcon.svelte';
 
-  /** @type {Array<{href: '/' | '/program' | '/team' | '/duties' | '/messages' | '/history' | '/settings', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[]}>} */
+  const activeContextLabel = formatTeamSeasonContext(defaultTeamSeasonContext);
+
+  /** @type {Array<{href: '/' | '/events' | '/team' | '/messages' | '/history' | '/admin', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[]}>} */
   const navItems = [
     { activePaths: ['/'], href: '/', icon: 'home', label: 'Home' },
-    { activePaths: ['/program'], href: '/program', icon: 'calendar', label: 'Program' },
+    { activePaths: ['/events'], href: '/events', icon: 'calendar', label: 'Events' },
     { activePaths: ['/team', '/events'], href: '/team', icon: 'users', label: 'Team' },
-    { activePaths: ['/duties'], href: '/duties', icon: 'clipboard', label: 'Duties' },
     { activePaths: ['/messages'], href: '/messages', icon: 'chat', label: 'Messages' },
     { activePaths: ['/history'], href: '/history', icon: 'history', label: 'History' },
-    { activePaths: ['/settings'], href: '/settings', icon: 'settings', label: 'Settings' },
+    { activePaths: ['/admin'], href: '/admin', icon: 'settings', label: 'Admin' },
   ];
 
   $: pathname = $page.url.pathname;
@@ -28,7 +30,7 @@
 </svelte:head>
 
 <header class="site-header">
-  <a class="brand" href={resolve('/')}>Team <span>U16-1</span></a>
+  <a class="brand" href={resolve('/')}>Team <span>{activeContextLabel}</span></a>
   <nav aria-label="Primary navigation">
     {#each navItems as item (item.href)}
       <a
@@ -296,7 +298,7 @@
       display: grid;
       flex-basis: 100%;
       gap: 0.35rem;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       order: 3;
       overflow: visible;
       padding-bottom: 0;

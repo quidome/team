@@ -1,12 +1,13 @@
 import { env } from '$env/dynamic/private';
 
+import { defaultTeamSeasonContext } from '$lib/application/team-context';
 import { readTeam, type TeamPlayer } from '$lib/application/team/read-team';
 import { loadProgram } from '$lib/server/load-program';
 import { currentMembershipRepository, currentPlayerRepository } from '$lib/server/composition-root';
 import type { ProgramEvent } from '$lib/application/program/read-program';
 
-export const currentSeasonStartingYear = 2026;
-export const currentTeamName = 'U16-1';
+export const currentSeasonStartingYear = defaultTeamSeasonContext.seasonStartingYear;
+export const currentTeamName = defaultTeamSeasonContext.teamName;
 
 export interface TeamPageData {
   events: ProgramEvent[];

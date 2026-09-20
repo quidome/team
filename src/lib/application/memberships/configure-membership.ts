@@ -7,7 +7,7 @@ export const configureMembership = async (
   const existingMembership = await memberships.find(membership);
 
   if (existingMembership) {
-    return existingMembership;
+    return memberships.update(membership);
   }
 
   return memberships.save(membership);

@@ -22,4 +22,19 @@ export class InMemoryLocationRepository implements LocationRepository {
 
     return location;
   }
+
+  async updateName(currentName: string, location: Location): Promise<Location> {
+    if (!this.locations.has(currentName)) {
+      throw new Error('Location does not exist');
+    }
+
+    this.locations.delete(currentName);
+    this.locations.set(location.name, location);
+
+    return location;
+  }
+
+  async deleteByName(name: string): Promise<void> {
+    this.locations.delete(name);
+  }
 }

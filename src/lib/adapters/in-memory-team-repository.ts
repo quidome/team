@@ -9,6 +9,10 @@ export class InMemoryTeamRepository implements TeamRepository {
     }
   }
 
+  async findAll(): Promise<Team[]> {
+    return [...this.teams.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
   async findByName(name: string): Promise<Team | undefined> {
     return this.teams.get(name);
   }
@@ -17,5 +21,21 @@ export class InMemoryTeamRepository implements TeamRepository {
     this.teams.set(team.name, team);
 
     return team;
+  }
+
+  async updateName(currentName: string, name: string): Promise<Team> {
+    if (!this.teams.has(currentName)) {
+      throw new Error('Team does not exist');
+    }
+
+    const updated = { name };
+    this.teams.delete(currentName);
+    this.teams.set(name, updated);
+
+    return updated;
+  }
+
+  async deleteByName(name: string): Promise<void> {
+    this.teams.delete(name);
   }
 }

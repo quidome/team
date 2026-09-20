@@ -28,4 +28,16 @@ export class InMemoryMembershipRepository implements MembershipRepository {
 
     return membership;
   }
+
+  async update(membership: Membership): Promise<Membership> {
+    const key = membershipKey(membership);
+
+    if (!this.memberships.has(key)) {
+      throw new Error('Membership does not exist');
+    }
+
+    this.memberships.set(key, membership);
+
+    return membership;
+  }
 }
