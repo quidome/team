@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { previewGameImport } from './game-import';
+import { maxGameImportRows, previewGameImport } from './game-import';
 
 describe('game import preview', () => {
   it('parses quoted CSV values and validates mapped games', () => {
@@ -25,6 +25,15 @@ describe('game import preview', () => {
         travelMinutes: 20,
       }),
     ]);
+  });
+
+  it('rejects CSV files with too many data rows', () => {
+    const content = [
+      'home,away,date,time,location',
+      ...Array.from({ length: maxGameImportRows + 1 }, () => 'U16-1,U18-1,2026-08-15,14:30,Home'),
+    ].join('\n');
+
+    expect(() => previewGameImport(content, {})).toThrow('10,000 data rows');
   });
 
   it('reports unmapped required fields and invalid rows without importing them', () => {

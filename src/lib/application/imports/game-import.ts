@@ -8,6 +8,9 @@ export const gameImportFields = [
   'arrivalBufferMinutes',
 ] as const;
 
+export const maxGameImportColumns = 100;
+export const maxGameImportRows = 10_000;
+
 export type GameImportField = (typeof gameImportFields)[number];
 
 export type GameImportMapping = Partial<Record<GameImportField, string>>;
@@ -51,12 +54,22 @@ const parseCsvRows = (content: string): string[][] => {
   let quoted = false;
 
   const pushCell = () => {
+    if (row.length >= maxGameImportColumns) {
+      throw new Error(`Schedule files must not contain more than ${maxGameImportColumns} columns.`);
+    }
+
     row.push(current);
     current = '';
   };
   const pushRow = () => {
     if (row.length > 1 || row[0]?.trim()) {
       rows.push(row);
+
+      if (rows.length > maxGameImportRows + 1) {
+        throw new Error(
+          `Schedule files must not contain more than ${maxGameImportRows.toLocaleString('en-US')} data rows.`,
+        );
+      }
     }
     row = [];
   };
