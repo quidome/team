@@ -58,6 +58,10 @@ format:
 lint:
     npm run lint
 
+# Fail when an npm dependency has a high or critical advisory.
+audit-high:
+    npm run audit:high
+
 # Run Svelte and TypeScript checks.
 typecheck:
     npm run check

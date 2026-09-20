@@ -46,6 +46,8 @@ just db-backup-verify backups/team-20260101-120000.dump
 
 Spreadsheet imports use SheetJS `xlsx` 0.20.3 from the official SheetJS CDN. The public npm registry still serves the vulnerable 0.18.5 release, so do not replace the pinned tarball with a normal `xlsx` version range.
 
+Run `just audit-high` to fail on newly introduced high or critical dependency advisories. Moderate development-tooling advisories are tracked separately because their suggested fixes are breaking upgrades.
+
 For UI-only local development without OIDC, set this in `.env`:
 
 ```env
