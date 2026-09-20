@@ -1,7 +1,13 @@
 import { json } from '@sveltejs/kit';
 
 import { previewGameImport, type GameImportMapping } from '$lib/application/imports/game-import';
-import { importGames } from '$lib/application/imports/import-games';
+import {
+  findImportConflicts,
+  importGames,
+  type GameImportChoice,
+  type GameImportConflictField,
+  type GameImportResolution,
+} from '$lib/application/imports/import-games';
 import {
   readGameImportFile,
   type GameImportFileEncoding,
@@ -12,9 +18,63 @@ import { currentGameImportRepository, currentGameRepository } from '$lib/server/
 interface ImportRequest {
   mapping: GameImportMapping;
   primaryTeamName: string;
+  resolutions: GameImportResolution[];
   sourceName: string;
   upload: GameImportUpload;
 }
+
+const conflictFields = new Set<GameImportConflictField>([
+  'arrivalBufferMinutes',
+  'locationName',
+  'travelMinutes',
+]);
+
+const readResolutions = (value: unknown): GameImportResolution[] | undefined => {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const resolutions: GameImportResolution[] = [];
+
+  for (const candidate of value) {
+    if (typeof candidate !== 'object' || candidate === null) {
+      return undefined;
+    }
+
+    const { fields, sourceRow } = candidate as Record<string, unknown>;
+
+    if (
+      typeof sourceRow !== 'number' ||
+      !Number.isInteger(sourceRow) ||
+      sourceRow < 2 ||
+      typeof fields !== 'object' ||
+      fields === null
+    ) {
+      return undefined;
+    }
+
+    const choices: Partial<Record<GameImportConflictField, GameImportChoice>> = {};
+
+    for (const [field, choice] of Object.entries(fields)) {
+      if (
+        !conflictFields.has(field as GameImportConflictField) ||
+        (choice !== 'existing' && choice !== 'imported')
+      ) {
+        return undefined;
+      }
+
+      choices[field as GameImportConflictField] = choice;
+    }
+
+    resolutions.push({ fields: choices, sourceRow });
+  }
+
+  return resolutions;
+};
 
 const readRequest = async (request: Request): Promise<ImportRequest | undefined> => {
   try {
@@ -24,10 +84,9 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       return undefined;
     }
 
-    const { content, encoding, fileName, mapping, primaryTeamName, sourceName } = payload as Record<
-      string,
-      unknown
-    >;
+    const { content, encoding, fileName, mapping, primaryTeamName, resolutions, sourceName } =
+      payload as Record<string, unknown>;
+    const parsedResolutions = readResolutions(resolutions);
 
     if (
       typeof content !== 'string' ||
@@ -39,6 +98,7 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       mapping === null ||
       typeof primaryTeamName !== 'string' ||
       !primaryTeamName.trim() ||
+      parsedResolutions === undefined ||
       typeof sourceName !== 'string' ||
       !sourceName.trim()
     ) {
@@ -48,6 +108,7 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
     return {
       mapping: mapping as GameImportMapping,
       primaryTeamName: primaryTeamName.trim(),
+      resolutions: parsedResolutions,
       sourceName: sourceName.trim(),
       upload: {
         content,
@@ -86,11 +147,23 @@ export const POST = async ({ request }) => {
     return json({ error: 'empty_game_import' }, { status: 400 });
   }
 
+  const gameRepository = currentGameRepository();
+  const analysis = await findImportConflicts(gameRepository, preview.records);
+  const resolvedRows = new Set(input.resolutions.map((resolution) => resolution.sourceRow));
+  const unresolvedConflicts = analysis.conflicts.filter(
+    (conflict) => !resolvedRows.has(conflict.sourceRow),
+  );
+
+  if (unresolvedConflicts.length > 0) {
+    return json({ conflicts: unresolvedConflicts, error: 'import_conflicts' }, { status: 409 });
+  }
+
   return json(
-    await importGames(currentGameRepository(), currentGameImportRepository(), {
+    await importGames(gameRepository, currentGameImportRepository(), {
       importedAt: new Date(),
       primaryTeamName: input.primaryTeamName,
       records: preview.records,
+      resolutions: input.resolutions,
       sourceName: input.sourceName,
     }),
   );

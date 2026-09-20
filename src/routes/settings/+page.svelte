@@ -25,6 +25,10 @@
   let error = '';
   let importMessage = '';
   let primaryTeamName = 'U16-1';
+  /** @type {Array<{sourceRow: number, existingOccurrenceId: string, fields: Array<{field: string, existingValue: string | number, importedValue: string | number}>}>} */
+  let conflicts = [];
+  /** @type {Record<string, Record<string, string>>} */
+  let conflictChoices = {};
 
   /** @param {string} value */
   const readHeaders = (value) => {
@@ -82,6 +86,22 @@
     return next;
   };
 
+  const loadHeaders = async () => {
+    const response = await fetch('/api/imports/games/preview', {
+      body: JSON.stringify({ content, encoding, fileName, mapping: {} }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const body = await response.json();
+
+    if (!response.ok) {
+      throw new Error(body.error ?? 'The import file could not be read.');
+    }
+
+    headers = body.headers;
+    mapping = guessMapping(headers);
+  };
+
   /** @param {Event} event */
   const handleFile = async (event) => {
     const input = /** @type {HTMLInputElement} */ (event.currentTarget);
@@ -104,11 +124,20 @@
 
       content = btoa(binary);
     }
-    headers = readHeaders(content);
-    mapping = guessMapping(headers);
+    headers = encoding === 'text' ? readHeaders(content) : [];
+    mapping = encoding === 'text' ? guessMapping(headers) : {};
+    if (encoding === 'base64') {
+      try {
+        await loadHeaders();
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : 'The import file could not be read.';
+      }
+    }
     preview = undefined;
     error = '';
     importMessage = '';
+    conflicts = [];
+    conflictChoices = {};
   };
 
   const previewImport = async () => {
@@ -136,6 +165,11 @@
     }
   };
 
+  const allConflictChoicesSelected = () =>
+    conflicts.every((conflict) =>
+      conflict.fields.every((field) => Boolean(conflictChoices[conflict.sourceRow]?.[field.field])),
+    );
+
   const importValidGames = async () => {
     importing = true;
     error = '';
@@ -149,6 +183,10 @@
           fileName,
           mapping,
           primaryTeamName,
+          resolutions: conflicts.map((conflict) => ({
+            fields: conflictChoices[conflict.sourceRow],
+            sourceRow: conflict.sourceRow,
+          })),
           sourceName: fileName,
         }),
         headers: { 'content-type': 'application/json' },
@@ -156,11 +194,27 @@
       });
       const body = await response.json();
 
+      if (response.status === 409 && body.error === 'import_conflicts') {
+        conflicts = body.conflicts;
+        conflictChoices = Object.fromEntries(
+          conflicts.map((conflict) => [
+            conflict.sourceRow,
+            Object.fromEntries(conflict.fields.map((field) => [field.field, ''])),
+          ]),
+        );
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(body.error ?? 'The games could not be imported.');
       }
 
-      importMessage = `${body.imported.length} games imported; ${body.duplicates.length} duplicates skipped.`;
+      conflicts = [];
+      conflictChoices = {};
+      /** @type {Array<{merged: boolean}>} */
+      const importedGames = body.imported;
+      const mergedCount = importedGames.filter((game) => game.merged).length;
+      importMessage = `${body.imported.length} games imported; ${body.duplicates.length} duplicates skipped${mergedCount ? `; ${mergedCount} conflicts merged.` : '.'}`;
     } catch (caught) {
       error = caught instanceof Error ? caught.message : 'The games could not be imported.';
     } finally {
@@ -220,7 +274,7 @@
       {#if preview && preview.issues.length === 0 && preview.records.length > 0}
         <button
           class="secondary-button"
-          disabled={importing}
+          disabled={importing || !allConflictChoicesSelected()}
           type="button"
           on:click={importValidGames}
         >
@@ -230,13 +284,35 @@
     </div>
   {:else}
     <div class="empty-state compact">
-      <h3>Select a CSV export</h3>
+      <h3>Select a schedule export</h3>
       <p>CSV, XLS, XLSX, and ODS files are mapped and validated before import.</p>
     </div>
   {/if}
 
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
   {#if importMessage}<p class="form-message" role="status">{importMessage}</p>{/if}
+
+  {#if conflicts.length > 0}
+    <section class="conflict-list" aria-labelledby="conflicts-heading">
+      <h3 id="conflicts-heading">Resolve existing game differences</h3>
+      <p class="form-hint">Choose which value should be kept for each conflicting field.</p>
+      {#each conflicts as conflict (conflict.sourceRow)}
+        <fieldset>
+          <legend>Source row {conflict.sourceRow}</legend>
+          {#each conflict.fields as field (field.field)}
+            <label>
+              {field.field}
+              <select bind:value={conflictChoices[conflict.sourceRow][field.field]}>
+                <option value="">Choose a value</option>
+                <option value="existing">Existing: {field.existingValue}</option>
+                <option value="imported">Imported: {field.importedValue}</option>
+              </select>
+            </label>
+          {/each}
+        </fieldset>
+      {/each}
+    </section>
+  {/if}
 
   {#if preview}
     <div class="preview-summary" role="status">
@@ -388,6 +464,40 @@
     text-transform: lowercase;
   }
 
+  .conflict-list {
+    border-top: 1px solid var(--line);
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .conflict-list h3 {
+    margin: 0;
+  }
+
+  .conflict-list fieldset {
+    border: 1px solid #e2b8aa;
+    border-radius: 0.7rem;
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 1rem 0 0;
+    padding: 1rem;
+  }
+
+  .conflict-list legend,
+  .conflict-list label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .conflict-list label {
+    display: grid;
+    gap: 0.35rem;
+  }
+
   .preview-summary {
     align-items: baseline;
     border-top: 1px solid var(--line);
@@ -450,13 +560,15 @@
   }
 
   @media (max-width: 48rem) {
-    .mapping-grid {
+    .mapping-grid,
+    .conflict-list fieldset {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 36rem) {
-    .mapping-grid {
+    .mapping-grid,
+    .conflict-list fieldset {
       grid-template-columns: 1fr;
     }
   }

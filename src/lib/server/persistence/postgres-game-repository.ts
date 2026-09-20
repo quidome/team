@@ -199,6 +199,42 @@ export const createPostgresGameRepository = (database: Database): GameRepository
     };
   },
 
+  async updateOccurrence(id: string, occurrence: GameOccurrence): Promise<StoredGameOccurrence> {
+    const [location] = await database
+      .select({ id: locations.id })
+      .from(locations)
+      .where(eq(locations.name, occurrence.locationName))
+      .limit(1);
+
+    if (!location) {
+      throw new Error(`Location ${occurrence.locationName} does not exist`);
+    }
+
+    const [updatedOccurrence] = await database
+      .update(gameOccurrences)
+      .set({
+        arrivalBufferMinutes: occurrence.arrivalBufferMinutes,
+        date: occurrence.date,
+        locationId: location.id,
+        startTime: occurrence.startTime,
+        travelMinutes: occurrence.travelMinutes,
+      })
+      .where(eq(gameOccurrences.id, id))
+      .returning({ id: gameOccurrences.id });
+
+    if (!updatedOccurrence) {
+      throw new Error(`Game occurrence ${id} does not exist`);
+    }
+
+    const updated = await this.findOccurrenceById(updatedOccurrence.id);
+
+    if (!updated) {
+      throw new Error(`Game occurrence ${id} could not be loaded after update`);
+    }
+
+    return updated;
+  },
+
   async updateOccurrenceStatus(
     id: string,
     status: 'cancelled' | 'scheduled',

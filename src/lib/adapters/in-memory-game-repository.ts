@@ -82,6 +82,25 @@ export class InMemoryGameRepository implements GameRepository {
     return storedOccurrence;
   }
 
+  async updateOccurrence(id: string, occurrence: GameOccurrence): Promise<StoredGameOccurrence> {
+    const existing = await this.findOccurrenceById(id);
+
+    if (!existing) {
+      throw new Error(`Game occurrence ${id} does not exist`);
+    }
+
+    Object.assign(existing, {
+      ...occurrence,
+      suggestedDepartureTime: suggestDepartureTime(
+        occurrence.startTime,
+        occurrence.travelMinutes,
+        occurrence.arrivalBufferMinutes,
+      ),
+    });
+
+    return existing;
+  }
+
   async updateOccurrenceStatus(
     id: string,
     status: 'cancelled' | 'scheduled',

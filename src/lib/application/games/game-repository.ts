@@ -41,5 +41,6 @@ export interface GameRepository {
   findOccurrences(fixtureId: string): Promise<StoredGameOccurrence[]>;
   saveFixture(fixture: GameFixture): Promise<StoredGameFixture>;
   saveOccurrence(fixtureId: string, occurrence: GameOccurrence): Promise<StoredGameOccurrence>;
+  updateOccurrence(id: string, occurrence: GameOccurrence): Promise<StoredGameOccurrence>;
   updateOccurrenceStatus(id: string, status: GameOccurrenceStatus): Promise<StoredGameOccurrence>;
 }

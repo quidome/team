@@ -71,7 +71,13 @@ export const POST = async ({ request }) => {
   }
 
   try {
-    return json(previewGameImport(readGameImportFile(input.upload), input.mapping));
+    const preview = previewGameImport(readGameImportFile(input.upload), input.mapping);
+
+    if (Object.keys(input.mapping).length === 0) {
+      return json({ headers: preview.headers, issues: [], records: [], validRowCount: 0 });
+    }
+
+    return json(preview);
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },
