@@ -50,6 +50,13 @@
       "when": 1789673853895,
       "tag": "0006_perfect_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789892750968,
+      "tag": "0007_yummy_purple_man",
+      "breakpoints": true
     }
   ]
 }

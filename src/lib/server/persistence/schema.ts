@@ -43,6 +43,26 @@ export const participationOccurrenceType = pgEnum('participation_occurrence_type
   'training',
 ]);
 export const participationStatus = pgEnum('participation_status', ['absent', 'present']);
+export const dutyType = pgEnum('duty_type', ['driving', 'jury', 'referee']);
+export const dutySlotStatus = pgEnum('duty_slot_status', [
+  'assigned',
+  'cancelled',
+  'completed',
+  'incomplete',
+  'open',
+]);
+export const dutySignupStatus = pgEnum('duty_signup_status', [
+  'selected',
+  'volunteer',
+  'waitlisted',
+]);
+export const dutyHistoryStatus = pgEnum('duty_history_status', [
+  'assigned',
+  'cancelled',
+  'completed',
+  'incomplete',
+  'reassigned',
+]);
 
 export const seasons = pgTable(
   'seasons',
@@ -152,6 +172,80 @@ export const gameOccurrences = pgTable('game_occurrences', {
   status: gameOccurrenceStatus('status').notNull(),
   travelMinutes: integer('travel_minutes').notNull(),
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+});
+
+export const dutyRequirements = pgTable(
+  'duty_requirements',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    drivingSlots: integer('driving_slots').notNull(),
+    gameOccurrenceId: uuid('game_occurrence_id')
+      .notNull()
+      .references(() => gameOccurrences.id, { onDelete: 'cascade' }),
+    jurySlots: integer('jury_slots').notNull(),
+    refereeSlots: integer('referee_slots').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('duty_requirements_occurrence_unique').on(table.gameOccurrenceId)],
+);
+
+export const dutySlots = pgTable(
+  'duty_slots',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    assignedPlayerId: uuid('assigned_player_id').references(() => players.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+    gameOccurrenceId: uuid('game_occurrence_id')
+      .notNull()
+      .references(() => gameOccurrences.id, { onDelete: 'cascade' }),
+    slotNumber: integer('slot_number').notNull(),
+    status: dutySlotStatus('status').notNull(),
+    type: dutyType('type').notNull(),
+  },
+  (table) => [
+    uniqueIndex('duty_slots_occurrence_type_number_unique').on(
+      table.gameOccurrenceId,
+      table.type,
+      table.slotNumber,
+    ),
+  ],
+);
+
+export const dutySignups = pgTable(
+  'duty_signups',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+    gameOccurrenceId: uuid('game_occurrence_id')
+      .notNull()
+      .references(() => gameOccurrences.id, { onDelete: 'cascade' }),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    status: dutySignupStatus('status').notNull(),
+    type: dutyType('type').notNull(),
+  },
+  (table) => [
+    uniqueIndex('duty_signups_occurrence_type_player_unique').on(
+      table.gameOccurrenceId,
+      table.type,
+      table.playerId,
+    ),
+  ],
+);
+
+export const dutyAssignmentHistory = pgTable('duty_assignment_history', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  playerId: uuid('player_id')
+    .notNull()
+    .references(() => players.id),
+  slotId: uuid('slot_id')
+    .notNull()
+    .references(() => dutySlots.id, { onDelete: 'cascade' }),
+  status: dutyHistoryStatus('status').notNull(),
 });
 
 export const participationRecords = pgTable(
