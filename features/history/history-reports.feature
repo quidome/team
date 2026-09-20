@@ -22,3 +22,8 @@ Feature: Review participation and duty history
     Given a game is scheduled, rescheduled, and cancelled
     When the coordinator opens History
     Then the game lifecycle actions are visible in the audit list
+
+  Scenario: Inspecting attendance changes
+    Given attendance is stored for a training or game occurrence
+    When the coordinator opens History
+    Then the attendance action and record counts are visible in the audit list

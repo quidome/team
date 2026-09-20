@@ -8,7 +8,10 @@ import type {
   AbsenceReason,
   ParticipationOccurrenceType,
 } from '$lib/application/participation/participation-repository';
-import { currentParticipationRepository } from '$lib/server/composition-root';
+import {
+  currentAuditRepository,
+  currentParticipationRepository,
+} from '$lib/server/composition-root';
 
 const absenceReasons = new Set<AbsenceReason>(['illness', 'injury', 'other']);
 const occurrenceTypes = new Set<ParticipationOccurrenceType>(['game', 'training']);
@@ -89,7 +92,22 @@ export const POST = async ({ request }) => {
   }
 
   try {
-    return json(await recordAttendance(currentParticipationRepository(), command));
+    const storedRecords = await recordAttendance(currentParticipationRepository(), command);
+
+    await currentAuditRepository().record({
+      action: 'attendance_recorded',
+      entityId: `${command.occurrenceType}:${command.occurrenceId}`,
+      entityType: 'participation',
+      metadata: {
+        absent: storedRecords.filter((record) => record.status === 'absent').length,
+        occurrenceId: command.occurrenceId,
+        occurrenceType: command.occurrenceType,
+        present: storedRecords.filter((record) => record.status === 'present').length,
+        records: storedRecords.length,
+      },
+    });
+
+    return json(storedRecords);
   } catch (error) {
     if (error instanceof Error && error.message.includes('is not eligible')) {
       return json({ error: 'player_not_eligible' }, { status: 400 });
