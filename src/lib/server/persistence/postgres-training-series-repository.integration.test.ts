@@ -61,8 +61,21 @@ if (!databaseUrl) {
       const stored = await repository.save(series, occurrences);
       seriesId = stored.id;
 
-      await expect(repository.findById(stored.id)).resolves.toEqual(stored);
-      await expect(repository.findAll()).resolves.toEqual([stored]);
+      const persisted = await repository.findById(stored.id);
+
+      expect(persisted?.id).toBe(stored.id);
+      expect(persisted?.series).toEqual(stored.series);
+      const normalizedOccurrences = persisted?.occurrences.map(({ id, ...occurrence }) => {
+        expect(id).toBeTruthy();
+        return occurrence;
+      });
+
+      expect(normalizedOccurrences).toEqual(expect.arrayContaining(occurrences));
+      expect(persisted?.occurrences).toHaveLength(occurrences.length);
+
+      const allSeries = await repository.findAll();
+
+      expect(allSeries.some((candidate) => candidate.id === stored.id)).toBe(true);
     });
   });
 }

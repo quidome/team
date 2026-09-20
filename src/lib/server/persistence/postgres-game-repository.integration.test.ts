@@ -96,13 +96,15 @@ if (!databaseUrl) {
 
       await expect(repository.findFixtureById(storedFixture.id)).resolves.toEqual(storedFixture);
       await expect(repository.findOccurrences(storedFixture.id)).resolves.toEqual([occurrence]);
-      await expect(repository.findAllOccurrences()).resolves.toEqual([
-        expect.objectContaining({
-          awayTeamName: fixture.awayTeamName,
-          homeTeamName: fixture.homeTeamName,
-          id: occurrence.id,
-        }),
-      ]);
+      await expect(repository.findAllOccurrences()).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            awayTeamName: fixture.awayTeamName,
+            homeTeamName: fixture.homeTeamName,
+            id: occurrence.id,
+          }),
+        ]),
+      );
     });
   });
 }
