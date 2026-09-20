@@ -9,6 +9,10 @@ export class InMemoryLocationRepository implements LocationRepository {
     }
   }
 
+  async findAll(): Promise<Location[]> {
+    return [...this.locations.values()].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
   async findByName(name: string): Promise<Location | undefined> {
     return this.locations.get(name);
   }

@@ -4,6 +4,7 @@ export interface Location {
 }
 
 export interface LocationRepository {
+  findAll(): Promise<Location[]>;
   findByName(name: string): Promise<Location | undefined>;
   save(location: Location): Promise<Location>;
 }

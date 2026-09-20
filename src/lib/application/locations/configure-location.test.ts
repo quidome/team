@@ -16,6 +16,18 @@ describe('configure location', () => {
     await expect(locations.findByName('Home court')).resolves.toEqual(location);
   });
 
+  it('lists reusable locations alphabetically', async () => {
+    const locations = new InMemoryLocationRepository([
+      { name: 'Away court', travelMinutes: 35 },
+      { name: 'Home court', travelMinutes: 20 },
+    ]);
+
+    await expect(locations.findAll()).resolves.toEqual([
+      { name: 'Away court', travelMinutes: 35 },
+      { name: 'Home court', travelMinutes: 20 },
+    ]);
+  });
+
   it('returns an existing location rather than creating a duplicate', async () => {
     const locations = new InMemoryLocationRepository([{ name: 'Home court', travelMinutes: 20 }]);
 

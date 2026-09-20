@@ -25,9 +25,10 @@ if (!databaseUrl) {
       await database.close();
     });
 
-    it('persists and retrieves a reusable location', async () => {
+    it('persists and retrieves reusable locations', async () => {
       await expect(repository.save(location)).resolves.toEqual(location);
       await expect(repository.findByName(location.name)).resolves.toEqual(location);
+      await expect(repository.findAll()).resolves.toContainEqual(location);
     });
   });
 }

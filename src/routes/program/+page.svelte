@@ -1,5 +1,6 @@
 <script>
   import { invalidateAll } from '$app/navigation';
+  import { resolve } from '$app/paths';
 
   export let data;
 
@@ -345,7 +346,7 @@
   {:else}
     <div class="program-list">
       {#each data.events as event (event.id)}
-        <article class="program-row">
+        <article class="program-row" id={`event-${event.id}`}>
           <div class="program-date">
             <strong>{formatDate(event.date)}</strong>
             <span>{event.startTime}</span>
@@ -378,7 +379,12 @@
                     </label>
                     <label>
                       Location
-                      <input bind:value={rescheduleForm.locationName} required />
+                      <select bind:value={rescheduleForm.locationName} required>
+                        <option disabled value="">Choose a location</option>
+                        {#each data.locations as location (location.name)}
+                          <option value={location.name}>{location.name}</option>
+                        {/each}
+                      </select>
                     </label>
                     <label>
                       Travel minutes
@@ -445,7 +451,12 @@
                     </label>
                     <label>
                       Location
-                      <input bind:value={trainingRescheduleForm.locationName} required />
+                      <select bind:value={trainingRescheduleForm.locationName} required>
+                        <option disabled value="">Choose a location</option>
+                        {#each data.locations as location (location.name)}
+                          <option value={location.name}>{location.name}</option>
+                        {/each}
+                      </select>
                     </label>
                     <button disabled={trainingLifecycleAction === event.occurrenceId} type="submit">
                       {trainingLifecycleAction === event.occurrenceId
@@ -494,7 +505,12 @@
     </label>
     <label>
       Location
-      <input bind:value={gameForm.locationName} required />
+      <select bind:value={gameForm.locationName} required>
+        <option disabled value="">Choose a location</option>
+        {#each data.locations as location (location.name)}
+          <option value={location.name}>{location.name}</option>
+        {/each}
+      </select>
     </label>
     <label>
       Travel minutes
@@ -507,8 +523,11 @@
     <button disabled={savingGame} type="submit">{savingGame ? 'Saving…' : 'Add game'}</button>
   </form>
   <p class="form-hint">
-    The location must already exist in Settings. Departure is calculated from travel time and
-    arrival buffer.
+    {#if data.locations.length === 0}
+      Add a location in <a href={resolve('/settings')}>Settings</a> before adding events.
+    {:else}
+      Departure is calculated from travel time and arrival buffer.
+    {/if}
   </p>
   {#if gameMessage}<p class="form-message" role="status">{gameMessage}</p>{/if}
   {#if gameError}<p class="form-error" role="alert">{gameError}</p>{/if}
@@ -555,13 +574,24 @@
     </label>
     <label>
       Location
-      <input bind:value={trainingForm.locationName} required />
+      <select bind:value={trainingForm.locationName} required>
+        <option disabled value="">Choose a location</option>
+        {#each data.locations as location (location.name)}
+          <option value={location.name}>{location.name}</option>
+        {/each}
+      </select>
     </label>
     <button disabled={savingTraining} type="submit">
       {savingTraining ? 'Saving…' : 'Add training series'}
     </button>
   </form>
-  <p class="form-hint">The location must already exist in Settings.</p>
+  <p class="form-hint">
+    {#if data.locations.length === 0}
+      Add a location in <a href={resolve('/settings')}>Settings</a> before adding training.
+    {:else}
+      Locations are managed in <a href={resolve('/settings')}>Settings</a>.
+    {/if}
+  </p>
   {#if trainingMessage}<p class="form-message" role="status">{trainingMessage}</p>{/if}
   {#if trainingError}<p class="form-error" role="alert">{trainingError}</p>{/if}
 </section>
@@ -589,13 +619,24 @@
     </label>
     <label>
       Location
-      <input bind:value={oneOffTrainingForm.locationName} required />
+      <select bind:value={oneOffTrainingForm.locationName} required>
+        <option disabled value="">Choose a location</option>
+        {#each data.locations as location (location.name)}
+          <option value={location.name}>{location.name}</option>
+        {/each}
+      </select>
     </label>
     <button disabled={savingOneOffTraining} type="submit">
       {savingOneOffTraining ? 'Saving…' : 'Add one-off training'}
     </button>
   </form>
-  <p class="form-hint">The location must already exist in Settings.</p>
+  <p class="form-hint">
+    {#if data.locations.length === 0}
+      Add a location in <a href={resolve('/settings')}>Settings</a> before adding training.
+    {:else}
+      Locations are managed in <a href={resolve('/settings')}>Settings</a>.
+    {/if}
+  </p>
   {#if oneOffTrainingMessage}<p class="form-message" role="status">{oneOffTrainingMessage}</p>{/if}
   {#if oneOffTrainingError}<p class="form-error" role="alert">{oneOffTrainingError}</p>{/if}
 </section>

@@ -1,5 +1,7 @@
 <script>
-  /** @typedef {import('$lib/application/imports/game-import').GameImportPreview} GameImportPreview */
+  import { invalidateAll } from '$app/navigation';
+
+  export let data;
 
   const fields = [
     { key: 'homeTeamName', label: 'Home team', required: true },
@@ -21,7 +23,7 @@
   let sheetName = '';
   /** @type {Record<string, string>} */
   let mapping = {};
-  /** @type {GameImportPreview | undefined} */
+  /** @type {import('$lib/application/imports/game-import').GameImportPreview | undefined} */
   let preview = undefined;
   let loading = false;
   let importing = false;
@@ -32,6 +34,44 @@
   let conflicts = [];
   /** @type {Record<string, Record<string, string>>} */
   let conflictChoices = {};
+  let locationForm = {
+    name: '',
+    travelMinutes: '0',
+  };
+  let savingLocation = false;
+  let locationMessage = '';
+  let locationError = '';
+
+  const saveLocation = async () => {
+    savingLocation = true;
+    locationMessage = '';
+    locationError = '';
+
+    try {
+      const response = await fetch('/api/locations', {
+        body: JSON.stringify({
+          name: locationForm.name,
+          travelMinutes: Number(locationForm.travelMinutes),
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The location could not be stored.');
+      }
+
+      locationForm = { name: '', travelMinutes: '0' };
+      locationMessage = `${body.name} is available for games and training.`;
+      await invalidateAll();
+    } catch (caught) {
+      locationError =
+        caught instanceof Error ? caught.message : 'The location could not be stored.';
+    } finally {
+      savingLocation = false;
+    }
+  };
 
   /** @param {string} value */
   const readHeaders = (value) => {
@@ -269,7 +309,52 @@
   <p class="lede">Preview schedule data before it is allowed to change the shared program.</p>
 </section>
 
-<section class="panel" aria-labelledby="import-heading">
+<section class="panel" aria-labelledby="locations-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Reusable schedule data</p>
+      <h2 id="locations-heading">Locations</h2>
+    </div>
+  </div>
+
+  <form class="location-form" on:submit|preventDefault={saveLocation}>
+    <label>
+      Name
+      <input bind:value={locationForm.name} placeholder="e.g. Home court" required />
+    </label>
+    <label>
+      Travel minutes
+      <input bind:value={locationForm.travelMinutes} min="0" required type="number" />
+    </label>
+    <button disabled={savingLocation} type="submit">
+      {savingLocation ? 'Saving…' : 'Add location'}
+    </button>
+  </form>
+  <p class="form-hint">
+    Add each venue here before using it for a game or training. Travel time is used for suggested
+    game departure times.
+  </p>
+  {#if locationMessage}<p class="form-message" role="status">{locationMessage}</p>{/if}
+  {#if locationError}<p class="form-error" role="alert">{locationError}</p>{/if}
+
+  {#if data.locations.length === 0}
+    <div class="empty-state compact">
+      <h3>No locations configured yet</h3>
+      <p>Add the first location to make it available in Program.</p>
+    </div>
+  {:else}
+    <div class="location-list" aria-label="Configured locations">
+      {#each data.locations as location (location.name)}
+        <div class="location-row">
+          <strong>{location.name}</strong>
+          <span>{location.travelMinutes} minutes travel</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</section>
+
+<section class="panel import-panel" aria-labelledby="import-heading">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">Spreadsheet mapping · preview · import</p>
@@ -410,6 +495,65 @@
 </section>
 
 <style>
+  .import-panel {
+    margin-top: 1rem;
+  }
+
+  .location-form {
+    align-items: end;
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: 1fr 12rem auto;
+  }
+
+  .location-form label {
+    color: var(--muted);
+    display: grid;
+    font-size: 0.78rem;
+    font-weight: 800;
+    gap: 0.35rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .location-form input {
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 0.55rem;
+    box-sizing: border-box;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    min-height: 2.7rem;
+    padding: 0.55rem 0.65rem;
+    width: 100%;
+  }
+
+  .location-list {
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .location-row {
+    align-items: baseline;
+    background: #faf7f0;
+    border: 1px solid #ebe4d8;
+    border-radius: 0.7rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+  }
+
+  .location-row span {
+    color: var(--muted);
+    font-size: 0.84rem;
+  }
+
   .file-picker,
   .primary-team,
   .mapping-grid label {
@@ -606,6 +750,14 @@
   }
 
   @media (max-width: 48rem) {
+    .location-form {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .location-form button {
+      grid-column: 1 / -1;
+    }
+
     .mapping-grid,
     .conflict-list fieldset {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -613,6 +765,20 @@
   }
 
   @media (max-width: 36rem) {
+    .location-form {
+      grid-template-columns: 1fr;
+    }
+
+    .location-form button {
+      grid-column: auto;
+    }
+
+    .location-row {
+      align-items: start;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
     .mapping-grid,
     .conflict-list fieldset {
       grid-template-columns: 1fr;
