@@ -11,6 +11,7 @@ export interface ParticipationRecord {
 }
 
 export interface ParticipationRepository {
+  findAll(): Promise<ParticipationRecord[]>;
   findByOccurrence(
     occurrenceType: ParticipationOccurrenceType,
     occurrenceId: string,

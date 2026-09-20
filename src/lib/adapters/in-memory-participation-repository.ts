@@ -10,6 +10,10 @@ const recordKey = (record: ParticipationRecord) =>
 export class InMemoryParticipationRepository implements ParticipationRepository {
   private readonly records = new Map<string, ParticipationRecord>();
 
+  async findAll(): Promise<ParticipationRecord[]> {
+    return [...this.records.values()];
+  }
+
   async findByOccurrence(
     occurrenceType: ParticipationOccurrenceType,
     occurrenceId: string,

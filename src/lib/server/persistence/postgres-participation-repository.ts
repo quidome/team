@@ -14,6 +14,27 @@ type Database = ReturnType<typeof createDatabase>;
 export const createPostgresParticipationRepository = (
   database: Database,
 ): ParticipationRepository => ({
+  async findAll(): Promise<ParticipationRecord[]> {
+    const records = await database
+      .select({
+        absenceReason: participationRecords.absenceReason,
+        occurrenceId: participationRecords.occurrenceId,
+        occurrenceType: participationRecords.occurrenceType,
+        playerAssociationId: players.associationId,
+        status: participationRecords.status,
+      })
+      .from(participationRecords)
+      .innerJoin(players, eq(participationRecords.playerId, players.id));
+
+    return records.map((record) => ({
+      ...(record.absenceReason === null ? {} : { absenceReason: record.absenceReason }),
+      occurrenceId: record.occurrenceId,
+      occurrenceType: record.occurrenceType,
+      playerAssociationId: record.playerAssociationId,
+      status: record.status,
+    }));
+  },
+
   async findByOccurrence(
     occurrenceType: ParticipationOccurrenceType,
     occurrenceId: string,
