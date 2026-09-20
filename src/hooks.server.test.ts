@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createSessionToken } from '$lib/server/authentication/session';
 
-vi.mock('$env/dynamic/private', () => ({
+const mocks = vi.hoisted(() => ({
   env: {
     ORIGIN: 'https://team.example.test',
     OIDC_CLIENT_ID: 'team-coordinator',
@@ -11,8 +11,12 @@ vi.mock('$env/dynamic/private', () => ({
     OIDC_ISSUER_URL: 'https://pocket-id.example.test',
     SESSION_SECRET: 'a-secure-session-secret-with-at-least-thirty-two-characters',
     SESSION_TTL_SECONDS: '28800',
+    DEV_AUTH_BYPASS: undefined as string | undefined,
   },
 }));
+
+vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
+vi.mock('$app/environment', () => ({ dev: true }));
 
 import { handle } from './hooks.server';
 
@@ -60,6 +64,19 @@ describe('default-deny API access', () => {
 
     expect(response.status).toBe(200);
     expect(resolve).toHaveBeenCalledOnce();
+  });
+
+  it('bypasses authentication for local development when explicitly enabled', async () => {
+    mocks.env.DEV_AUTH_BYPASS = 'true';
+    const resolve = vi.fn(async () => new Response('route handler reached'));
+    const event = requestEvent('/api/players');
+
+    const response = await handle({ event, resolve });
+
+    expect(response.status).toBe(200);
+    expect(event.locals.coordinatorSession).toEqual({ subject: 'local-development' });
+    expect(resolve).toHaveBeenCalledOnce();
+    delete mocks.env.DEV_AUTH_BYPASS;
   });
 
   it('loads a valid signed coordinator session from the session cookie', async () => {

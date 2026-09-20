@@ -29,6 +29,14 @@ cp .env.example .env
 just db-migrate
 ```
 
+For UI-only local development without OIDC, set this in `.env`:
+
+```env
+DEV_AUTH_BYPASS=true
+```
+
+This bypass is active only in the Vite development server. Without `DATABASE_URL`, pages use empty in-memory responses; configure PostgreSQL and run migrations for persisted data.
+
 Start the development server:
 
 ```sh

@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { dev } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
 
 import { readAuthenticationConfiguration } from '$lib/server/authentication/config';
@@ -11,6 +12,11 @@ const isApiRequest = (pathname: string) => pathname === '/api' || pathname.start
 export const handle: Handle = async ({ event, resolve }) => {
   const { pathname } = event.url;
   const sessionToken = event.cookies.get(coordinatorSessionCookieName);
+  const developmentAuthBypass = dev && env.DEV_AUTH_BYPASS?.trim().toLowerCase() === 'true';
+
+  if (developmentAuthBypass && !event.locals.coordinatorSession) {
+    event.locals.coordinatorSession = { subject: 'local-development' };
+  }
 
   if (sessionToken && !event.locals.coordinatorSession) {
     const authentication = readAuthenticationConfiguration(env);
