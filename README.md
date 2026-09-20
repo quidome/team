@@ -75,3 +75,26 @@ Before starting the production server:
 6. Run `SMOKE_BASE_URL=https://team.example.test just smoke-production` to verify health and unauthenticated API protection.
 7. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
 8. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.
+
+## Container deployment
+
+Build the production image:
+
+```sh
+docker build --tag team:local .
+```
+
+Run migrations as a separate one-shot job using the migration image target:
+
+```sh
+docker build --target migration --tag team-migration:local .
+docker run --rm --env-file .env team-migration:local
+```
+
+Start the runtime image with the same production environment values:
+
+```sh
+docker run --rm --env-file .env --publish 3000:3000 team:local
+```
+
+Set `SMOKE_BASE_URL` to the externally reachable HTTPS URL and run `just smoke-production` after ingress and Pocket ID are configured.

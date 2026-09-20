@@ -1,0 +1,11 @@
+.env
+.git
+.github
+.svelte-kit
+build
+coverage
+node_modules
+outputs
+backups
+
+npm-debug.log*
