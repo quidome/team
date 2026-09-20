@@ -72,5 +72,6 @@ Before starting the production server:
 3. Confirm production dependencies with `just audit-production`.
 4. Apply migrations with `just db-migrate`.
 5. Build and start with `just serve`.
-6. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
-7. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.
+6. Run `SMOKE_BASE_URL=https://team.example.test just smoke-production` to verify health and unauthenticated API protection.
+7. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
+8. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.

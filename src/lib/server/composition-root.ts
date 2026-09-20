@@ -42,11 +42,47 @@ let seasons: SeasonRepository | undefined;
 let teams: TeamRepository | undefined;
 let gameImports: GameImportRepository | undefined;
 let audit: AuditRepository | undefined;
+let shutdownRegistered = false;
 
 const currentDatabase = (): Database => {
   database ??= createDatabase(readDatabaseUrl(env));
 
   return database;
+};
+
+export const closeCurrentDatabase = async (): Promise<void> => {
+  const activeDatabase = database;
+  database = undefined;
+  players = undefined;
+  memberships = undefined;
+  locations = undefined;
+  trainingSeries = undefined;
+  games = undefined;
+  participation = undefined;
+  duties = undefined;
+  tasks = undefined;
+  seasons = undefined;
+  teams = undefined;
+  gameImports = undefined;
+  audit = undefined;
+
+  if (activeDatabase) {
+    await activeDatabase.close();
+  }
+};
+
+export const registerDatabaseShutdown = (): void => {
+  if (shutdownRegistered) {
+    return;
+  }
+
+  shutdownRegistered = true;
+  const shutdown = () => {
+    void closeCurrentDatabase().finally(() => process.exit(0));
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 };
 
 export const currentPlayerRepository = (): PlayerRepository => {

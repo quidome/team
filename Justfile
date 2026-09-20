@@ -70,6 +70,10 @@ audit-high:
 audit-production:
     npm run audit:production
 
+# Smoke-test a running production server. Set SMOKE_BASE_URL to override the local URL.
+smoke-production:
+    npm run smoke:production
+
 # Run Svelte and TypeScript checks.
 typecheck:
     npm run check

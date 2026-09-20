@@ -4,6 +4,9 @@ import type { Handle } from '@sveltejs/kit';
 
 import { readAuthenticationConfiguration } from '$lib/server/authentication/config';
 import { coordinatorSessionCookieName, readSessionToken } from '$lib/server/authentication/session';
+import { registerDatabaseShutdown } from '$lib/server/composition-root';
+
+registerDatabaseShutdown();
 
 const unauthenticatedApiPaths = new Set(['/api/health/liveness', '/api/health/readiness']);
 
