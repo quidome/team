@@ -40,9 +40,10 @@ Create and verify a PostgreSQL backup with explicit destination paths:
 ```sh
 just db-backup backups/team-$(date +%Y%m%d-%H%M%S).dump
 just db-backup-verify backups/team-20260101-120000.dump
+just db-backup-restore-verify backups/team-20260101-120000.dump
 ```
 
-`db-backup-verify` checks that the custom-format archive can be read. Periodically perform a restore into an isolated database as part of deployment operations; the Docker volume is not a substitute for tested backups.
+`db-backup-verify` checks that the custom-format archive can be read. `db-backup-restore-verify` performs a local restore into a temporary database and removes it afterward. The restore command refuses non-local PostgreSQL hosts; deployment environments should periodically perform an equivalent isolated restore. The Docker volume is not a substitute for tested backups.
 
 Spreadsheet imports use SheetJS `xlsx` 0.20.3 from the official SheetJS CDN. The public npm registry still serves the vulnerable 0.18.5 release, so do not replace the pinned tarball with a normal `xlsx` version range.
 

@@ -37,11 +37,15 @@ db-seed:
 # Write a PostgreSQL custom-format backup. Pass a destination path.
 db-backup output="backups/team.sql":
     mkdir -p "$(dirname \"{{output}}\")"
-    pg_dump "$DATABASE_URL" --format=custom --no-owner --file="{{output}}"
+    docker compose exec -T postgres pg_dump --format=custom --no-owner postgresql://team:team@localhost:5432/team > "{{output}}"
 
 # Verify that a custom-format backup can be inspected by pg_restore.
 db-backup-verify input:
     pg_restore --list "{{input}}" >/dev/null
+
+# Restore a backup into a temporary local database and remove it afterward.
+db-backup-restore-verify input:
+    node scripts/verify-postgres-backup.mjs "{{input}}"
 
 # Run all local quality checks.
 check: format-check lint typecheck test
