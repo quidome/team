@@ -1,15 +1,374 @@
+<script>
+  /** @typedef {import('$lib/application/imports/game-import').GameImportPreview} GameImportPreview */
+
+  const fields = [
+    { key: 'homeTeamName', label: 'Home team', required: true },
+    { key: 'awayTeamName', label: 'Away team', required: true },
+    { key: 'date', label: 'Date', required: true },
+    { key: 'startTime', label: 'Start time', required: true },
+    { key: 'locationName', label: 'Location', required: true },
+    { key: 'travelMinutes', label: 'Travel minutes', required: false },
+    { key: 'arrivalBufferMinutes', label: 'Arrival buffer', required: false },
+  ];
+
+  let fileName = '';
+  let content = '';
+  /** @type {string[]} */
+  let headers = [];
+  /** @type {Record<string, string>} */
+  let mapping = {};
+  /** @type {GameImportPreview | undefined} */
+  let preview = undefined;
+  let loading = false;
+  let error = '';
+
+  /** @param {string} value */
+  const readHeaders = (value) => {
+    const firstLine = value.split(/\r?\n/, 1)[0] ?? '';
+    const found = [];
+    let current = '';
+    let quoted = false;
+
+    for (let index = 0; index < firstLine.length; index += 1) {
+      const character = firstLine[index];
+      const next = firstLine[index + 1];
+
+      if (character === '"') {
+        if (quoted && next === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (character === ',' && !quoted) {
+        found.push(current.trim());
+        current = '';
+      } else {
+        current += character;
+      }
+    }
+
+    found.push(current.trim());
+    return found.filter(Boolean);
+  };
+
+  /** @param {string[]} availableHeaders */
+  const guessMapping = (availableHeaders) => {
+    /** @type {Record<string, string>} */
+    const next = {};
+    /** @type {Record<string, string[]>} */
+    const aliases = {
+      awayTeamName: ['away', 'away team', 'visitor'],
+      arrivalBufferMinutes: ['arrival buffer', 'buffer'],
+      date: ['date', 'datum'],
+      homeTeamName: ['home', 'home team'],
+      locationName: ['location', 'venue', 'plaats'],
+      startTime: ['start time', 'time', 'tijd'],
+      travelMinutes: ['travel', 'travel minutes', 'reistijd'],
+    };
+
+    for (const field of fields) {
+      const match = availableHeaders.find((header) =>
+        aliases[field.key].includes(header.toLowerCase()),
+      );
+
+      if (match) next[field.key] = match;
+    }
+
+    return next;
+  };
+
+  /** @param {Event} event */
+  const handleFile = async (event) => {
+    const input = /** @type {HTMLInputElement} */ (event.currentTarget);
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    fileName = file.name;
+    content = await file.text();
+    headers = readHeaders(content);
+    mapping = guessMapping(headers);
+    preview = undefined;
+    error = '';
+  };
+
+  const previewImport = async () => {
+    loading = true;
+    error = '';
+
+    try {
+      const response = await fetch('/api/imports/games/preview', {
+        body: JSON.stringify({ content, mapping }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The import preview could not be generated.');
+      }
+
+      preview = body;
+    } catch (caught) {
+      error =
+        caught instanceof Error ? caught.message : 'The import preview could not be generated.';
+    } finally {
+      loading = false;
+    }
+  };
+</script>
+
 <svelte:head>
   <title>Settings · Team</title>
-  <meta name="description" content="Team configuration and imports" />
+  <meta name="description" content="Season, team, locations, and imports" />
 </svelte:head>
 
 <section class="intro">
-  <p class="eyebrow">Configuration</p>
+  <p class="eyebrow">Configuration and imports</p>
   <h1>Settings</h1>
-  <p class="lede">Season, team identity, locations, and imports will be managed here.</p>
+  <p class="lede">Preview schedule data before it is allowed to change the shared program.</p>
 </section>
 
-<section class="panel empty-state" aria-labelledby="settings-heading">
-  <h2 id="settings-heading">Settings are next</h2>
-  <p>Configuration APIs are available while the coordinator settings view is being built.</p>
+<section class="panel" aria-labelledby="import-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">CSV preview · no writes</p>
+      <h2 id="import-heading">Import program data</h2>
+    </div>
+  </div>
+
+  <label class="file-picker">
+    CSV file
+    <input accept=".csv,text/csv" type="file" on:change={handleFile} />
+  </label>
+
+  {#if fileName}
+    <p class="file-name">Selected: <strong>{fileName}</strong></p>
+    <div class="mapping-grid">
+      {#each fields as field (field.key)}
+        <label>
+          {field.label}{#if field.required}
+            <span class="required">required</span>{/if}
+          <select bind:value={mapping[field.key]}>
+            <option value="">Not mapped</option>
+            {#each headers as header (header)}
+              <option value={header}>{header}</option>
+            {/each}
+          </select>
+        </label>
+      {/each}
+    </div>
+    <button disabled={loading} type="button" on:click={previewImport}>
+      {loading ? 'Previewing…' : 'Preview mapped games'}
+    </button>
+  {:else}
+    <div class="empty-state compact">
+      <h3>Select a CSV export</h3>
+      <p>Column mapping and validation happen before any import is performed.</p>
+    </div>
+  {/if}
+
+  {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+
+  {#if preview}
+    <div class="preview-summary" role="status">
+      <strong>{preview.validRowCount} valid games</strong>
+      <span>{preview.issues.length} validation issues</span>
+    </div>
+    {#if preview.issues.length > 0}
+      <div class="issue-list">
+        {#each preview.issues as issue, index (`${issue.row}-${issue.field ?? 'row'}-${index}`)}
+          <p>
+            Row {issue.row}{#if issue.field}
+              · {issue.field}{/if}: {issue.message}
+          </p>
+        {/each}
+      </div>
+    {/if}
+    {#if preview.records.length > 0}
+      <div class="preview-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Home</th>
+              <th>Away</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each preview.records as record (record.sourceRow)}
+              <tr>
+                <td>{record.sourceRow}</td>
+                <td>{record.homeTeamName}</td>
+                <td>{record.awayTeamName}</td>
+                <td>{record.date}</td>
+                <td>{record.startTime}</td>
+                <td>{record.locationName}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+    <p class="form-hint">
+      Importing and field-level reconciliation will follow this preview slice.
+    </p>
+  {/if}
 </section>
+
+<style>
+  .file-picker,
+  .mapping-grid label {
+    color: var(--muted);
+    display: grid;
+    font-size: 0.78rem;
+    font-weight: 800;
+    gap: 0.35rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  input[type='file'],
+  select {
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 0.55rem;
+    box-sizing: border-box;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    min-height: 2.7rem;
+    padding: 0.55rem 0.65rem;
+    text-transform: none;
+    width: 100%;
+  }
+
+  button {
+    background: var(--accent);
+    border: 0;
+    border-radius: 0.55rem;
+    color: white;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    min-height: 2.7rem;
+    padding: 0.65rem 0.9rem;
+  }
+
+  button:hover:not(:disabled) {
+    background: var(--accent-dark);
+  }
+
+  button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .file-name,
+  .form-hint,
+  .form-error {
+    font-size: 0.88rem;
+    margin: 1rem 0 0;
+  }
+
+  .file-name,
+  .form-hint {
+    color: var(--muted);
+  }
+
+  .form-error {
+    color: var(--accent-dark);
+  }
+
+  .mapping-grid {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 1rem 0;
+  }
+
+  .required {
+    color: var(--accent-dark);
+    font-size: 0.68rem;
+    letter-spacing: 0;
+    text-transform: lowercase;
+  }
+
+  .preview-summary {
+    align-items: baseline;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .preview-summary span {
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .issue-list {
+    background: #fff4ef;
+    border: 1px solid #e2b8aa;
+    border-radius: 0.7rem;
+    margin-top: 0.8rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .issue-list p {
+    color: var(--accent-dark);
+    font-size: 0.84rem;
+    margin: 0.3rem 0;
+  }
+
+  .preview-table-wrap {
+    margin-top: 1rem;
+    overflow-x: auto;
+  }
+
+  table {
+    border-collapse: collapse;
+    min-width: 42rem;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.7rem;
+    text-align: left;
+  }
+
+  th {
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  td {
+    font-size: 0.88rem;
+  }
+
+  .compact {
+    padding: 1.25rem;
+  }
+
+  @media (max-width: 48rem) {
+    .mapping-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 36rem) {
+    .mapping-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
