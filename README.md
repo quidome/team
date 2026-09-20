@@ -28,7 +28,10 @@ For local persistence work, start the bundled PostgreSQL container, copy `.env.e
 just db-up
 cp .env.example .env
 just db-migrate
+just db-seed
 ```
+
+`just db-seed` adds ten development players and three sample games. It is idempotent.
 
 Stop the container when finished with `just db-down`. The database data is kept in the `team-postgres-data` Docker volume.
 

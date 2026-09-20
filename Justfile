@@ -1,3 +1,5 @@
+set dotenv-load := true
+
 default: check
 
 # Start the local development server.
@@ -27,6 +29,10 @@ db-generate:
 # Apply generated PostgreSQL migrations using DATABASE_URL.
 db-migrate:
     npm run db:migrate
+
+# Seed the local database with development players and games.
+db-seed:
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --file scripts/seed-dev.sql
 
 # Run all local quality checks.
 check: format-check lint typecheck test
