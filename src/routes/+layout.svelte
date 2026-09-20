@@ -13,6 +13,7 @@
     <a href={resolve('/program')}>Program</a>
     <a href={resolve('/team')}>Team</a>
     <a href={resolve('/duties')}>Duties</a>
+    <a href={resolve('/messages')}>Messages</a>
     <a href={resolve('/history')}>History</a>
     <a href={resolve('/settings')}>Settings</a>
   </nav>

@@ -57,6 +57,13 @@
       "when": 1789892750968,
       "tag": "0007_yummy_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789894145328,
+      "tag": "0008_last_champions",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,3 @@
-import { loadProgram } from '$lib/server/load-program';
+import { loadHome } from '$lib/server/load-home';
 
-export const load = async () => loadProgram();
+export const load = async () => loadHome();

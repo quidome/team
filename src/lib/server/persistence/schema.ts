@@ -63,6 +63,8 @@ export const dutyHistoryStatus = pgEnum('duty_history_status', [
   'incomplete',
   'reassigned',
 ]);
+export const taskSource = pgEnum('task_source', ['generated', 'manual']);
+export const taskStatus = pgEnum('task_status', ['completed', 'open']);
 
 export const seasons = pgTable(
   'seasons',
@@ -246,6 +248,20 @@ export const dutyAssignmentHistory = pgTable('duty_assignment_history', {
     .notNull()
     .references(() => dutySlots.id, { onDelete: 'cascade' }),
   status: dutyHistoryStatus('status').notNull(),
+});
+
+export const tasks = pgTable('tasks', {
+  completedAt: timestamp('completed_at', { mode: 'date', withTimezone: true }),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  description: text('description'),
+  dueDate: date('due_date', { mode: 'string' }),
+  id: uuid('id').defaultRandom().primaryKey(),
+  occurrenceId: uuid('occurrence_id').references(() => gameOccurrences.id, {
+    onDelete: 'set null',
+  }),
+  source: taskSource('source').notNull(),
+  status: taskStatus('status').notNull(),
+  title: text('title').notNull(),
 });
 
 export const participationRecords = pgTable(
