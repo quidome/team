@@ -10,10 +10,8 @@ import type {
   StoredGameOccurrence,
   StoredGameProgramOccurrence,
 } from '../../application/games/game-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { gameFixtures, gameOccurrences, locations, teams } from './schema';
-
-type Database = ReturnType<typeof createDatabase>;
 
 const homeTeams = alias(teams, 'home_teams');
 const awayTeams = alias(teams, 'away_teams');
@@ -31,7 +29,7 @@ const withoutFixtureNames = (occurrence: StoredGameProgramOccurrence): StoredGam
 });
 
 const findStoredOccurrence = async (
-  database: Database,
+  database: DatabaseConnection,
   id: string,
 ): Promise<StoredGameProgramOccurrence | undefined> => {
   const [occurrence] = await database
@@ -67,7 +65,7 @@ const findStoredOccurrence = async (
     : undefined;
 };
 
-export const createPostgresGameRepository = (database: Database): GameRepository => ({
+export const createPostgresGameRepository = (database: DatabaseConnection): GameRepository => ({
   async findAllOccurrences(): Promise<StoredGameProgramOccurrence[]> {
     const occurrenceRows = await database.select({ id: gameOccurrences.id }).from(gameOccurrences);
 

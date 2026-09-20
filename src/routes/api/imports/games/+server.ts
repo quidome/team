@@ -13,11 +13,7 @@ import {
   type GameImportFileEncoding,
   type GameImportUpload,
 } from '$lib/server/imports/game-import-upload';
-import {
-  currentAuditRepository,
-  currentGameImportRepository,
-  currentGameRepository,
-} from '$lib/server/composition-root';
+import { currentGameRepository, withCurrentImportTransaction } from '$lib/server/composition-root';
 
 interface ImportRequest {
   mapping: GameImportMapping;
@@ -162,26 +158,39 @@ export const POST = async ({ request }) => {
     return json({ conflicts: unresolvedConflicts, error: 'import_conflicts' }, { status: 409 });
   }
 
-  const result = await importGames(gameRepository, currentGameImportRepository(), {
-    importedAt: new Date(),
-    primaryTeamName: input.primaryTeamName,
-    records: preview.records,
-    resolutions: input.resolutions,
-    sourceName: input.sourceName,
-  });
+  try {
+    const result = await withCurrentImportTransaction(async ({ audit, gameImports, games }) => {
+      const importedResult = await importGames(games, gameImports, {
+        atomic: true,
+        importedAt: new Date(),
+        primaryTeamName: input.primaryTeamName,
+        records: preview.records,
+        resolutions: input.resolutions,
+        sourceName: input.sourceName,
+      });
 
-  await currentAuditRepository().record({
-    action: 'games_imported',
-    entityId: input.sourceName,
-    entityType: 'game_import',
-    metadata: {
-      conflicts: result.conflicts.length,
-      duplicates: result.duplicates.length,
-      failed: result.failed.length,
-      imported: result.imported.length,
-      sourceName: input.sourceName,
-    },
-  });
+      await audit.record({
+        action: 'games_imported',
+        entityId: input.sourceName,
+        entityType: 'game_import',
+        metadata: {
+          conflicts: importedResult.conflicts.length,
+          duplicates: importedResult.duplicates.length,
+          failed: importedResult.failed.length,
+          imported: importedResult.imported.length,
+          sourceName: input.sourceName,
+        },
+      });
 
-  return json(result);
+      return importedResult;
+    });
+
+    return json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('does not exist')) {
+      return json({ error: 'game_import_failed' }, { status: 400 });
+    }
+
+    throw error;
+  }
 };

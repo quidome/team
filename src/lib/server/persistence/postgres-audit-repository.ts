@@ -5,10 +5,8 @@ import type {
   AuditRepository,
   NewAuditEntry,
 } from '../../application/audit/audit-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { auditEntries } from './schema';
-
-type Database = ReturnType<typeof createDatabase>;
 
 const toAuditEntry = (entry: typeof auditEntries.$inferSelect): AuditEntry => ({
   action: entry.action,
@@ -19,7 +17,7 @@ const toAuditEntry = (entry: typeof auditEntries.$inferSelect): AuditEntry => ({
   occurredAt: entry.occurredAt,
 });
 
-export const createPostgresAuditRepository = (database: Database): AuditRepository => ({
+export const createPostgresAuditRepository = (database: DatabaseConnection): AuditRepository => ({
   async findAll() {
     const rows = await database.select().from(auditEntries).orderBy(desc(auditEntries.occurredAt));
 

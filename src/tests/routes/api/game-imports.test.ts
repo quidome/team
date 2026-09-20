@@ -19,6 +19,8 @@ vi.mock('$lib/server/composition-root', () => ({
   currentAuditRepository: () => mocks.audit,
   currentGameImportRepository: () => mocks.imports,
   currentGameRepository: () => mocks.games,
+  withCurrentImportTransaction: async (work: (repositories: unknown) => unknown) =>
+    work({ audit: mocks.audit, gameImports: mocks.imports, games: mocks.games }),
 }));
 
 import { POST } from '../../../routes/api/imports/games/+server';
@@ -100,6 +102,35 @@ describe('POST /api/imports/games', () => {
     expect(mocks.audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'games_imported', entityId: 'schedule.csv' }),
     );
+  });
+
+  it('returns a failure when an import target is missing', async () => {
+    mocks.imports.save.mockRejectedValue(new Error('Location Away court does not exist'));
+
+    const response = await POST({
+      request: new Request('http://localhost/api/imports/games', {
+        body: JSON.stringify({
+          content: 'home,away,date,time,location\nU16-1,U18-1,2026-08-15,14:30,Away court',
+          encoding: 'text',
+          fileName: 'schedule.csv',
+          mapping: {
+            awayTeamName: 'away',
+            date: 'date',
+            homeTeamName: 'home',
+            locationName: 'location',
+            startTime: 'time',
+          },
+          primaryTeamName: 'U16-1',
+          sourceName: 'schedule.csv',
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+    } as never);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'game_import_failed' });
+    expect(mocks.audit.record).not.toHaveBeenCalled();
   });
 
   it('returns field-level conflicts before changing an existing game', async () => {

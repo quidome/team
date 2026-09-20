@@ -94,6 +94,36 @@ describe('importGames', () => {
     });
   });
 
+  it('fails fast in atomic mode when provenance cannot be stored', async () => {
+    const games = new InMemoryGameRepository();
+    const imports = {
+      save: async () => {
+        throw new Error('provenance storage failed');
+      },
+    };
+
+    await expect(
+      importGames(games, imports, {
+        atomic: true,
+        importedAt: new Date('2026-08-01T10:00:00.000Z'),
+        primaryTeamName: 'U16-1',
+        records: [
+          {
+            arrivalBufferMinutes: 30,
+            awayTeamName: 'U18-1',
+            date: '2026-08-15',
+            homeTeamName: 'U16-1',
+            locationName: 'Away court',
+            sourceRow: 2,
+            startTime: '14:30',
+            travelMinutes: 20,
+          },
+        ],
+        sourceName: 'schedule.csv',
+      }),
+    ).rejects.toThrow('provenance storage failed');
+  });
+
   it('skips an exact duplicate on a repeated import', async () => {
     const games = new InMemoryGameRepository();
     const imports = new InMemoryGameImportRepository();

@@ -16,3 +16,8 @@ Feature: Preview imported program data
     Given a schedule export exceeds the upload size limit
     When the coordinator requests a preview
     Then the upload is rejected before spreadsheet parsing
+
+  Scenario: Keeping a failed import atomic
+    Given an import fails while storing an occurrence or its provenance
+    When the coordinator confirms the import
+    Then no part of that import is persisted

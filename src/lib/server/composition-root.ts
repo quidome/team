@@ -12,7 +12,7 @@ import type { SeasonRepository } from '../application/seasons/season-repository'
 import type { TeamRepository } from '../application/teams/team-repository';
 import type { GameImportRepository } from '../application/imports/game-import-repository';
 import type { AuditRepository } from '../application/audit/audit-repository';
-import { createDatabase } from './persistence/database';
+import { createDatabase, type Database } from './persistence/database';
 import { readDatabaseUrl } from './persistence/database-configuration';
 import { createPostgresPlayerRepository } from './persistence/postgres-player-repository';
 import { createPostgresMembershipRepository } from './persistence/postgres-membership-repository';
@@ -26,8 +26,6 @@ import { createPostgresSeasonRepository } from './persistence/postgres-season-re
 import { createPostgresTeamRepository } from './persistence/postgres-team-repository';
 import { createPostgresGameImportRepository } from './persistence/postgres-game-import-repository';
 import { createPostgresAuditRepository } from './persistence/postgres-audit-repository';
-
-type Database = ReturnType<typeof createDatabase>;
 
 let database: Database | undefined;
 let players: PlayerRepository | undefined;
@@ -120,3 +118,18 @@ export const currentAuditRepository = (): AuditRepository => {
 
   return audit;
 };
+
+export const withCurrentImportTransaction = async <T>(
+  work: (repositories: {
+    audit: AuditRepository;
+    gameImports: GameImportRepository;
+    games: GameRepository;
+  }) => Promise<T>,
+): Promise<T> =>
+  currentDatabase().transaction(async (transaction) =>
+    work({
+      audit: createPostgresAuditRepository(transaction),
+      gameImports: createPostgresGameImportRepository(transaction),
+      games: createPostgresGameRepository(transaction),
+    }),
+  );

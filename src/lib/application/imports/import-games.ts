@@ -50,6 +50,7 @@ export interface ImportGamesInput {
   records: ImportedGame[];
   resolutions?: GameImportResolution[];
   sourceName: string;
+  atomic?: boolean;
 }
 
 const conflictFields: GameImportConflictField[] = [
@@ -231,6 +232,10 @@ export const importGames = async (
         homeTeamName: record.homeTeamName,
       });
     } catch (error) {
+      if (input.atomic) {
+        throw error;
+      }
+
       failed.push({
         message: error instanceof Error ? error.message : 'The game could not be imported.',
         sourceRow: record.sourceRow,

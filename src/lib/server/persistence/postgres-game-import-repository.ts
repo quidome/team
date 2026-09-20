@@ -2,12 +2,12 @@ import type {
   GameImportProvenance,
   GameImportRepository,
 } from '../../application/imports/game-import-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { gameImportProvenance } from './schema';
 
-type Database = ReturnType<typeof createDatabase>;
-
-export const createPostgresGameImportRepository = (database: Database): GameImportRepository => ({
+export const createPostgresGameImportRepository = (
+  database: DatabaseConnection,
+): GameImportRepository => ({
   async save(provenance: GameImportProvenance) {
     const [stored] = await database
       .insert(gameImportProvenance)

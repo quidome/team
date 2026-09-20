@@ -11,3 +11,7 @@ export const createDatabase = (databaseUrl: string) => {
     close: () => client.end({ timeout: 5 }),
   });
 };
+
+export type Database = ReturnType<typeof createDatabase>;
+export type DatabaseTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+export type DatabaseConnection = Database | DatabaseTransaction;
