@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { createManualTask } from '$lib/application/tasks/generate-tasks';
 import type { Task } from '$lib/application/tasks/task-repository';
-import { currentTaskRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentTaskRepository } from '$lib/server/composition-root';
 
 const isCalendarDate = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -54,5 +54,14 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_task' }, { status: 400 });
   }
 
-  return json(await createManualTask(currentTaskRepository(), task));
+  const storedTask = await createManualTask(currentTaskRepository(), task);
+
+  await currentAuditRepository().record({
+    action: 'task_created',
+    entityId: storedTask.id,
+    entityType: 'task',
+    metadata: { source: storedTask.source, title: storedTask.title },
+  });
+
+  return json(storedTask);
 };

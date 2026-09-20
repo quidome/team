@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  audit: {
+    record: vi.fn(),
+  },
   tasks: {
     findAll: vi.fn(),
     save: vi.fn(),
@@ -9,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
+  currentAuditRepository: () => mocks.audit,
   currentTaskRepository: () => mocks.tasks,
 }));
 
@@ -37,6 +41,9 @@ describe('/api/tasks', () => {
       status: 'open',
       title: 'Confirm rides',
     });
+    expect(mocks.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'task_created', entityId: 'task-1' }),
+    );
   });
 
   it('rejects an invalid due date', async () => {

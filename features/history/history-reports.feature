@@ -12,3 +12,8 @@ Feature: Review participation and duty history
     Given a coordinator import has completed
     When the coordinator opens History
     Then the import action, source, and result counts are visible in the audit list
+
+  Scenario: Inspecting task changes
+    Given a manual reminder is created and completed
+    When the coordinator opens History
+    Then the task creation and status change are visible in the audit list
