@@ -6,7 +6,7 @@ import type {
   DutySignupStatus,
   DutyType,
 } from '$lib/application/duties/duty-repository';
-import { currentDutyRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentDutyRepository } from '$lib/server/composition-root';
 
 const dutyTypes = new Set<DutyType>(['driving', 'jury', 'referee']);
 const signupStatuses = new Set<DutySignupStatus>(['selected', 'volunteer', 'waitlisted']);
@@ -56,7 +56,16 @@ export const POST = async ({ request }) => {
   }
 
   try {
-    return json(await recordDutySignup(currentDutyRepository(), signup));
+    const dutyView = await recordDutySignup(currentDutyRepository(), signup);
+
+    await currentAuditRepository().record({
+      action: 'duty_signup_recorded',
+      entityId: `${signup.occurrenceId}:${signup.playerAssociationId}:${signup.dutyType}`,
+      entityType: 'duty_signup',
+      metadata: { status: signup.status },
+    });
+
+    return json(dutyView);
   } catch (error) {
     if (error instanceof Error && error.message.includes('does not exist')) {
       return json({ error: 'player_not_found' }, { status: 400 });

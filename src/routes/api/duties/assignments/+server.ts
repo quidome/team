@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 
 import { assignDuty } from '$lib/application/duties/manage-duties';
-import { currentDutyRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentDutyRepository } from '$lib/server/composition-root';
 
 const readAssignment = async (
   request: Request,
@@ -38,9 +38,20 @@ export const POST = async ({ request }) => {
   }
 
   try {
-    return json(
-      await assignDuty(currentDutyRepository(), assignment.slotId, assignment.playerAssociationId),
+    const assignedDuty = await assignDuty(
+      currentDutyRepository(),
+      assignment.slotId,
+      assignment.playerAssociationId,
     );
+
+    await currentAuditRepository().record({
+      action: 'duty_assigned',
+      entityId: assignment.slotId,
+      entityType: 'duty_slot',
+      metadata: { playerAssociationId: assignment.playerAssociationId },
+    });
+
+    return json(assignedDuty);
   } catch (error) {
     if (error instanceof Error && error.message.includes('does not exist')) {
       return json({ error: 'duty_assignment_target_not_found' }, { status: 400 });

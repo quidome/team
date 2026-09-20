@@ -27,3 +27,8 @@ Feature: Review participation and duty history
     Given attendance is stored for a training or game occurrence
     When the coordinator opens History
     Then the attendance action and record counts are visible in the audit list
+
+  Scenario: Inspecting duty coordination changes
+    Given duty requirements, assignments, signups, and statuses are changed
+    When the coordinator opens History
+    Then the duty coordination actions are visible in the audit list

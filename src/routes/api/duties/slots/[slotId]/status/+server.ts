@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { correctDutyStatus } from '$lib/application/duties/manage-duties';
 import type { DutySlotStatus } from '$lib/application/duties/duty-repository';
-import { currentDutyRepository } from '$lib/server/composition-root';
+import { currentAuditRepository, currentDutyRepository } from '$lib/server/composition-root';
 
 const statuses = new Set<DutySlotStatus>([
   'assigned',
@@ -24,9 +24,20 @@ export const POST = async ({ params, request }) => {
       return json({ error: 'invalid_duty_status' }, { status: 400 });
     }
 
-    return json(
-      await correctDutyStatus(currentDutyRepository(), params.slotId, status as DutySlotStatus),
+    const updatedDuties = await correctDutyStatus(
+      currentDutyRepository(),
+      params.slotId,
+      status as DutySlotStatus,
     );
+
+    await currentAuditRepository().record({
+      action: 'duty_status_changed',
+      entityId: params.slotId,
+      entityType: 'duty_slot',
+      metadata: { status },
+    });
+
+    return json(updatedDuties);
   } catch (error) {
     if (error instanceof Error && error.message.includes('does not exist')) {
       return json({ error: 'duty_slot_not_found' }, { status: 400 });
