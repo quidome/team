@@ -2,13 +2,18 @@ import { json } from '@sveltejs/kit';
 
 import { previewGameImport, type GameImportMapping } from '$lib/application/imports/game-import';
 import { importGames } from '$lib/application/imports/import-games';
+import {
+  readGameImportFile,
+  type GameImportFileEncoding,
+  type GameImportUpload,
+} from '$lib/server/imports/game-import-upload';
 import { currentGameImportRepository, currentGameRepository } from '$lib/server/composition-root';
 
 interface ImportRequest {
-  content: string;
   mapping: GameImportMapping;
   primaryTeamName: string;
   sourceName: string;
+  upload: GameImportUpload;
 }
 
 const readRequest = async (request: Request): Promise<ImportRequest | undefined> => {
@@ -19,11 +24,17 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       return undefined;
     }
 
-    const { content, mapping, primaryTeamName, sourceName } = payload as Record<string, unknown>;
+    const { content, encoding, fileName, mapping, primaryTeamName, sourceName } = payload as Record<
+      string,
+      unknown
+    >;
 
     if (
       typeof content !== 'string' ||
       !content.trim() ||
+      (encoding !== 'base64' && encoding !== 'text') ||
+      typeof fileName !== 'string' ||
+      !fileName.trim() ||
       typeof mapping !== 'object' ||
       mapping === null ||
       typeof primaryTeamName !== 'string' ||
@@ -35,10 +46,14 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
     }
 
     return {
-      content,
       mapping: mapping as GameImportMapping,
       primaryTeamName: primaryTeamName.trim(),
       sourceName: sourceName.trim(),
+      upload: {
+        content,
+        encoding: encoding as GameImportFileEncoding,
+        fileName: fileName.trim(),
+      },
     };
   } catch {
     return undefined;
@@ -52,7 +67,16 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_game_import' }, { status: 400 });
   }
 
-  const preview = previewGameImport(input.content, input.mapping);
+  let preview;
+
+  try {
+    preview = previewGameImport(readGameImportFile(input.upload), input.mapping);
+  } catch (error) {
+    return json(
+      { error: error instanceof Error ? error.message : 'The import file could not be read.' },
+      { status: 400 },
+    );
+  }
 
   if (preview.issues.length > 0) {
     return json({ error: 'invalid_import_rows', preview }, { status: 400 });

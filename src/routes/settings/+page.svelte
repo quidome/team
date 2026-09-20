@@ -13,6 +13,7 @@
 
   let fileName = '';
   let content = '';
+  let encoding = 'text';
   /** @type {string[]} */
   let headers = [];
   /** @type {Record<string, string>} */
@@ -89,7 +90,20 @@
     if (!file) return;
 
     fileName = file.name;
-    content = await file.text();
+    if (/\.csv$/i.test(file.name)) {
+      encoding = 'text';
+      content = await file.text();
+    } else {
+      encoding = 'base64';
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+
+      content = btoa(binary);
+    }
     headers = readHeaders(content);
     mapping = guessMapping(headers);
     preview = undefined;
@@ -103,7 +117,7 @@
 
     try {
       const response = await fetch('/api/imports/games/preview', {
-        body: JSON.stringify({ content, mapping }),
+        body: JSON.stringify({ content, encoding, fileName, mapping }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       });
@@ -129,7 +143,14 @@
 
     try {
       const response = await fetch('/api/imports/games', {
-        body: JSON.stringify({ content, mapping, primaryTeamName, sourceName: fileName }),
+        body: JSON.stringify({
+          content,
+          encoding,
+          fileName,
+          mapping,
+          primaryTeamName,
+          sourceName: fileName,
+        }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       });
@@ -162,14 +183,14 @@
 <section class="panel" aria-labelledby="import-heading">
   <div class="panel-heading">
     <div>
-      <p class="eyebrow">CSV mapping · preview · import</p>
+      <p class="eyebrow">Spreadsheet mapping · preview · import</p>
       <h2 id="import-heading">Import program data</h2>
     </div>
   </div>
 
   <label class="file-picker">
-    CSV file
-    <input accept=".csv,text/csv" type="file" on:change={handleFile} />
+    Schedule file
+    <input accept=".csv,.xls,.xlsx,.ods,text/csv" type="file" on:change={handleFile} />
   </label>
 
   {#if fileName}
@@ -210,7 +231,7 @@
   {:else}
     <div class="empty-state compact">
       <h3>Select a CSV export</h3>
-      <p>Column mapping and validation happen before any import is performed.</p>
+      <p>CSV, XLS, XLSX, and ODS files are mapped and validated before import.</p>
     </div>
   {/if}
 

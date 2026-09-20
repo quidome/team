@@ -48,6 +48,8 @@ describe('POST /api/imports/games', () => {
       request: new Request('http://localhost/api/imports/games', {
         body: JSON.stringify({
           content: 'home,away,date,time,location\nU16-1,U18-1,2026-08-15,14:30,Away court',
+          encoding: 'text',
+          fileName: 'schedule.csv',
           mapping: {
             awayTeamName: 'away',
             date: 'date',
@@ -85,6 +87,8 @@ describe('POST /api/imports/games', () => {
       request: new Request('http://localhost/api/imports/games', {
         body: JSON.stringify({
           content: 'home,away,date,time,location\nU16-1,U18-1,not-a-date,14:30,Away court',
+          encoding: 'text',
+          fileName: 'schedule.csv',
           mapping: {
             awayTeamName: 'away',
             date: 'date',

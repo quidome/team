@@ -8,6 +8,8 @@ describe('POST /api/imports/games/preview', () => {
       request: new Request('http://localhost/api/imports/games/preview', {
         body: JSON.stringify({
           content: 'home,away,date,time,location\nU16-1,U18-1,2026-08-15,14:30,Away court',
+          encoding: 'text',
+          fileName: 'schedule.csv',
           mapping: {
             awayTeamName: 'away',
             date: 'date',
@@ -30,7 +32,12 @@ describe('POST /api/imports/games/preview', () => {
   it('rejects malformed preview requests', async () => {
     const response = await POST({
       request: new Request('http://localhost/api/imports/games/preview', {
-        body: JSON.stringify({ content: 'home,away', mapping: 'invalid' }),
+        body: JSON.stringify({
+          content: 'home,away',
+          encoding: 'text',
+          fileName: 'schedule.csv',
+          mapping: 'invalid',
+        }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       }),

@@ -5,10 +5,15 @@ import {
   previewGameImport,
   type GameImportMapping,
 } from '$lib/application/imports/game-import';
+import {
+  readGameImportFile,
+  type GameImportFileEncoding,
+  type GameImportUpload,
+} from '$lib/server/imports/game-import-upload';
 
 const readRequest = async (
   request: Request,
-): Promise<{ content: string; mapping: GameImportMapping } | undefined> => {
+): Promise<{ mapping: GameImportMapping; upload: GameImportUpload } | undefined> => {
   try {
     const payload: unknown = await request.json();
 
@@ -16,11 +21,14 @@ const readRequest = async (
       return undefined;
     }
 
-    const { content, mapping } = payload as Record<string, unknown>;
+    const { content, encoding, fileName, mapping } = payload as Record<string, unknown>;
 
     if (
       typeof content !== 'string' ||
       !content.trim() ||
+      (encoding !== 'base64' && encoding !== 'text') ||
+      typeof fileName !== 'string' ||
+      !fileName.trim() ||
       typeof mapping !== 'object' ||
       mapping === null
     ) {
@@ -42,7 +50,14 @@ const readRequest = async (
       }
     }
 
-    return { content, mapping: validatedMapping };
+    return {
+      mapping: validatedMapping,
+      upload: {
+        content,
+        encoding: encoding as GameImportFileEncoding,
+        fileName: fileName.trim(),
+      },
+    };
   } catch {
     return undefined;
   }
@@ -55,5 +70,12 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_import_preview' }, { status: 400 });
   }
 
-  return json(previewGameImport(input.content, input.mapping));
+  try {
+    return json(previewGameImport(readGameImportFile(input.upload), input.mapping));
+  } catch (error) {
+    return json(
+      { error: error instanceof Error ? error.message : 'The import file could not be read.' },
+      { status: 400 },
+    );
+  }
 };
