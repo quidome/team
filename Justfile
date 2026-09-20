@@ -34,6 +34,15 @@ db-migrate:
 db-seed:
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --file scripts/seed-dev.sql
 
+# Write a PostgreSQL custom-format backup. Pass a destination path.
+db-backup output="backups/team.sql":
+    mkdir -p "$(dirname \"{{output}}\")"
+    pg_dump "$DATABASE_URL" --format=custom --no-owner --file="{{output}}"
+
+# Verify that a custom-format backup can be inspected by pg_restore.
+db-backup-verify input:
+    pg_restore --list "{{input}}" >/dev/null
+
 # Run all local quality checks.
 check: format-check lint typecheck test
 

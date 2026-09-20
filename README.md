@@ -35,6 +35,15 @@ just db-seed
 
 Stop the container when finished with `just db-down`. The database data is kept in the `team-postgres-data` Docker volume.
 
+Create and verify a PostgreSQL backup with explicit destination paths:
+
+```sh
+just db-backup backups/team-$(date +%Y%m%d-%H%M%S).dump
+just db-backup-verify backups/team-20260101-120000.dump
+```
+
+`db-backup-verify` checks that the custom-format archive can be read. Periodically perform a restore into an isolated database as part of deployment operations; the Docker volume is not a substitute for tested backups.
+
 For UI-only local development without OIDC, set this in `.env`:
 
 ```env
