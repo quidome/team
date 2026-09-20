@@ -78,7 +78,12 @@ export const registerDatabaseShutdown = (): void => {
 
   shutdownRegistered = true;
   const shutdown = () => {
-    void closeCurrentDatabase().finally(() => process.exit(0));
+    void closeCurrentDatabase()
+      .then(() => process.exit(0))
+      .catch((error: unknown) => {
+        console.error('Failed to close the database during shutdown.', error);
+        process.exit(1);
+      });
   };
 
   process.once('SIGINT', shutdown);
