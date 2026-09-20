@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm';
+
 import { env } from '$env/dynamic/private';
 
 import type { PlayerRepository } from '../application/players/player-repository';
@@ -133,3 +135,12 @@ export const withCurrentImportTransaction = async <T>(
       games: createPostgresGameRepository(transaction),
     }),
   );
+
+export const checkDatabaseConnection = async (): Promise<boolean> => {
+  try {
+    await currentDatabase().execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
+};
