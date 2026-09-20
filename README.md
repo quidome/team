@@ -98,3 +98,14 @@ docker run --rm --env-file .env --publish 3000:3000 team:local
 ```
 
 Set `SMOKE_BASE_URL` to the externally reachable HTTPS URL and run `just smoke-production` after ingress and Pocket ID are configured.
+
+## GitHub Actions and image publishing
+
+`.github/workflows/container.yml` builds both Docker targets for pull requests. Pushes to `main` and version tags publish the runtime image and the migration image to GHCR:
+
+```text
+ghcr.io/quidome/team:latest
+ghcr.io/quidome/team:latest-migration
+```
+
+The workflow uses the repository-provided `GITHUB_TOKEN`; no application secrets are stored in GitHub Actions. Configure `DATABASE_URL`, OIDC settings, and `SESSION_SECRET` in the eventual deployment platform, not in the image or workflow.
