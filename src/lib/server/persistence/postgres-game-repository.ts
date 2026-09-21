@@ -275,8 +275,8 @@ const saveOpponentFixture = async (
   const [storedFixture] = await database
     .insert(gameFixtures)
     .values({
-      awayTeamId: isHome ? null : ourTeam.id,
-      homeTeamId: isHome ? ourTeam.id : null,
+      awayTeamId: null,
+      homeTeamId: null,
       isHome,
       opponentId: opponent.id,
       ourTeamId: ourTeam.id,
