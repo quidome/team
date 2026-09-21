@@ -4,6 +4,8 @@
   import { defaultTeamSeasonContext, formatTeamSeasonContext } from '$lib/application/team-context';
   import NavIcon from '$lib/components/NavIcon.svelte';
 
+  export let data;
+
   const activeContextLabel = formatTeamSeasonContext(defaultTeamSeasonContext);
 
   /** @type {Array<{href: '/' | '/events' | '/team' | '/messages' | '/history' | '/admin', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[]}>} */
@@ -44,7 +46,13 @@
       </a>
     {/each}
   </nav>
-  <a class="login-link" href={resolve('/auth/login')}>Coordinator login</a>
+  {#if data.isAuthenticated}
+    <form class="logout-form" method="POST" action={resolve('/auth/logout')}>
+      <button class="login-link" type="submit">Log out</button>
+    </form>
+  {:else}
+    <a class="login-link" href={resolve('/auth/login')}>Coordinator login</a>
+  {/if}
 </header>
 
 <main class="page-shell">
@@ -150,10 +158,21 @@
   }
 
   .login-link {
+    appearance: none;
+    background: none;
     border: 1px solid var(--line);
     border-radius: 999px;
+    font: inherit;
     padding: 0.55rem 0.85rem;
     white-space: nowrap;
+  }
+
+  button.login-link {
+    cursor: pointer;
+  }
+
+  .logout-form {
+    display: contents;
   }
 
   .page-shell {
