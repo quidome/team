@@ -8,11 +8,17 @@
 
   const activeContextLabel = formatTeamSeasonContext(defaultTeamSeasonContext);
 
-  /** @type {Array<{href: '/' | '/events' | '/team' | '/messages' | '/history' | '/admin', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[]}>} */
+  /** @type {Array<{href: '/' | '/events' | '/team' | '/messages' | '/history' | '/admin', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[], activePrefixes?: string[]}>} */
   const navItems = [
     { activePaths: ['/'], href: '/', icon: 'home', label: 'Home' },
     { activePaths: ['/events'], href: '/events', icon: 'calendar', label: 'Events' },
-    { activePaths: ['/team', '/events'], href: '/team', icon: 'users', label: 'Team' },
+    {
+      activePaths: ['/team'],
+      activePrefixes: ['/events/'],
+      href: '/team',
+      icon: 'users',
+      label: 'Team',
+    },
     { activePaths: ['/messages'], href: '/messages', icon: 'chat', label: 'Messages' },
     { activePaths: ['/history'], href: '/history', icon: 'history', label: 'History' },
     { activePaths: ['/admin'], href: '/admin', icon: 'settings', label: 'Admin' },
@@ -20,11 +26,11 @@
 
   $: pathname = $page.url.pathname;
 
-  /** @param {{ activePaths: string[] }} item */
+  /** @param {{ activePaths: string[], activePrefixes?: string[] }} item */
   const isActive = (item) =>
     item.activePaths.some(
       (path) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)),
-    );
+    ) || (item.activePrefixes ?? []).some((prefix) => pathname.startsWith(prefix));
 </script>
 
 <svelte:head>
