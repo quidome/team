@@ -140,13 +140,13 @@
 </script>
 
 <svelte:head>
-  <title>Team · Team</title>
+  <title>Roster · Team</title>
   <meta name="description" content="Players, memberships, and attendance for the team" />
 </svelte:head>
 
 <section class="intro">
   <p class="eyebrow">{data.teamName} · {data.season.startingYear}–{data.season.endingYear}</p>
-  <h1>Team</h1>
+  <h1>Roster</h1>
   <p class="lede">Keep the current roster up to date and record attendance in one place.</p>
 </section>
 

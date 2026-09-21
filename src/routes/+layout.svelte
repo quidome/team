@@ -17,7 +17,7 @@
       activePrefixes: ['/events/'],
       href: '/team',
       icon: 'users',
-      label: 'Team',
+      label: 'Roster',
     },
     { activePaths: ['/messages'], href: '/messages', icon: 'chat', label: 'Messages' },
     { activePaths: ['/history'], href: '/history', icon: 'history', label: 'History' },
