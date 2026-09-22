@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   imports: {
     save: vi.fn(),
   },
+  locations: {
+    findAll: vi.fn(),
+  },
   settings: {
     get: vi.fn(),
   },
@@ -29,6 +32,7 @@ vi.mock('$lib/server/composition-root', () => ({
   currentCoordinatorSettingsRepository: () => mocks.settings,
   currentGameImportRepository: () => mocks.imports,
   currentGameRepository: () => mocks.games,
+  currentLocationRepository: () => mocks.locations,
   currentTeamRepository: () => mocks.teams,
   withCurrentImportTransaction: async (work: (repositories: unknown) => unknown) =>
     work({
@@ -49,6 +53,7 @@ describe('POST /api/imports/games', () => {
       seasonStartingYear: 2026,
     });
     mocks.teams.findAll.mockResolvedValue([{ name: 'U16-1' }, { name: 'U18-1' }]);
+    mocks.locations.findAll.mockResolvedValue([{ name: 'Away court', travelMinutes: 20 }]);
     mocks.games.findAllOccurrences.mockResolvedValue([]);
     mocks.games.saveFixture.mockResolvedValue({
       fixture: { awayTeamName: 'U18-1', homeTeamName: 'U16-1' },

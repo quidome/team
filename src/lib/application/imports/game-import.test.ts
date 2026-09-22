@@ -129,6 +129,57 @@ describe('game import preview', () => {
     expect(record?.refereeSlots).toBeUndefined();
   });
 
+  it("defaults unmapped travel minutes to the location's known travel time", () => {
+    const preview = previewGameImport(
+      'home,away,date,time,location\nU16-1,U18-1,2026-08-15,14:30,Away court',
+      {
+        awayTeamName: 'away',
+        date: 'date',
+        homeTeamName: 'home',
+        locationName: 'location',
+        startTime: 'time',
+      },
+      { 'Away court': 25 },
+    );
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.records).toEqual([expect.objectContaining({ travelMinutes: 25 })]);
+  });
+
+  it('honors an explicitly mapped travel minutes column over the location default', () => {
+    const preview = previewGameImport(
+      'home,away,date,time,location,travel\nU16-1,U18-1,2026-08-15,14:30,Away court,40',
+      {
+        awayTeamName: 'away',
+        date: 'date',
+        homeTeamName: 'home',
+        locationName: 'location',
+        startTime: 'time',
+        travelMinutes: 'travel',
+      },
+      { 'Away court': 25 },
+    );
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.records).toEqual([expect.objectContaining({ travelMinutes: 40 })]);
+  });
+
+  it('falls back to zero travel minutes when the location has no known default', () => {
+    const preview = previewGameImport(
+      'home,away,date,time,location\nU16-1,U18-1,2026-08-15,14:30,Unknown court',
+      {
+        awayTeamName: 'away',
+        date: 'date',
+        homeTeamName: 'home',
+        locationName: 'location',
+        startTime: 'time',
+      },
+    );
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.records).toEqual([expect.objectContaining({ travelMinutes: 0 })]);
+  });
+
   it('rejects a jury or referee slot count outside 0-2', () => {
     const preview = previewGameImport(
       'home,away,date,time,location,jury\nU16-1,U18-1,2026-08-15,14:30,Home court,3',

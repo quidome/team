@@ -137,10 +137,15 @@ export const POST = async ({ request }) => {
     return json({ error: 'coordinator_settings_not_configured' }, { status: 400 });
   }
 
+  const context = await buildGameImportContext();
   let preview;
 
   try {
-    preview = previewGameImport(readImportFile(input.upload), input.mapping);
+    preview = previewGameImport(
+      readImportFile(input.upload),
+      input.mapping,
+      context.knownLocationTravelMinutes,
+    );
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },
@@ -148,7 +153,6 @@ export const POST = async ({ request }) => {
     );
   }
 
-  const context = await buildGameImportContext();
   preview = applyImportContext(preview, context);
 
   if (preview.issues.length > 0) {

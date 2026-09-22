@@ -118,6 +118,7 @@ const readOptionalSlotCount = (
 export const previewGameImport = (
   content: string,
   mapping: GameImportMapping,
+  knownLocationTravelMinutes: Record<string, number> = {},
 ): GameImportPreview => {
   const rows = parseCsvRows(content);
   const headers = (rows.shift() ?? []).map((header, index) =>
@@ -178,7 +179,7 @@ export const previewGameImport = (
       row,
       mapping,
       'travelMinutes',
-      0,
+      knownLocationTravelMinutes[locationName] ?? 0,
       rowNumber,
       rowIssues,
     );

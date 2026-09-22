@@ -51,7 +51,7 @@ if (!databaseUrl) {
     });
 
     it('converges dash-formatted variants of the same opponent name onto one row', async () => {
-      const context = { knownTeamNames: [teamName] };
+      const context = { knownLocationTravelMinutes: {}, knownTeamNames: [teamName] };
 
       await importGames(games, gameImports, duties, {
         context,

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  locations: {
+    findAll: vi.fn(),
+  },
   settings: {
     get: vi.fn(),
   },
@@ -11,10 +14,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('$lib/server/composition-root', () => ({
   currentCoordinatorSettingsRepository: () => mocks.settings,
+  currentLocationRepository: () => mocks.locations,
   currentTeamRepository: () => mocks.teams,
 }));
 
 mocks.settings.get.mockResolvedValue({ primaryTeamName: 'U16-1', seasonStartingYear: 2026 });
+mocks.locations.findAll.mockResolvedValue([{ name: 'Away court', travelMinutes: 20 }]);
 mocks.teams.findAll.mockResolvedValue([{ name: 'U16-1' }, { name: 'U18-1' }]);
 
 import { POST } from '../../../routes/api/imports/games/preview/+server';

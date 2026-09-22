@@ -47,6 +47,7 @@ export interface GameImportResult {
 }
 
 export interface GameImportContext {
+  knownLocationTravelMinutes: Record<string, number>;
   knownTeamNames: string[];
 }
 

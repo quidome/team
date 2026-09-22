@@ -5,7 +5,7 @@ import { InMemoryGameImportRepository } from '../../adapters/in-memory-game-impo
 import { InMemoryGameRepository } from '../../adapters/in-memory-game-repository';
 import { applyImportContext, findImportConflicts, importGames } from './import-games';
 
-const knownTeamsContext = { knownTeamNames: ['U16-1', 'U18-1'] };
+const knownTeamsContext = { knownLocationTravelMinutes: {}, knownTeamNames: ['U16-1', 'U18-1'] };
 
 describe('applyImportContext', () => {
   it('adds a non-blocking notice for each team name not already known, without dropping the row', () => {
@@ -230,7 +230,7 @@ describe('importGames', () => {
     const imports = new InMemoryGameImportRepository();
     const duties = new InMemoryDutyRepository();
     const result = await importGames(games, imports, duties, {
-      context: { knownTeamNames: ['U16-1'] },
+      context: { knownLocationTravelMinutes: {}, knownTeamNames: ['U16-1'] },
       importedAt: new Date('2026-08-01T10:00:00.000Z'),
       primaryTeamName: 'U16-1',
       records: [

@@ -77,7 +77,12 @@ export const POST = async ({ request }) => {
 
   try {
     const worksheets = listImportWorksheets(input.upload);
-    const preview = previewGameImport(readImportFile(input.upload), input.mapping);
+    const context = await buildGameImportContext();
+    const preview = previewGameImport(
+      readImportFile(input.upload),
+      input.mapping,
+      context.knownLocationTravelMinutes,
+    );
 
     if (Object.keys(input.mapping).length === 0) {
       return json({
@@ -89,7 +94,7 @@ export const POST = async ({ request }) => {
       });
     }
 
-    const contextualizedPreview = applyImportContext(preview, await buildGameImportContext());
+    const contextualizedPreview = applyImportContext(preview, context);
 
     return json({ ...contextualizedPreview, worksheets });
   } catch (error) {
