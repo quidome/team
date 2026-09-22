@@ -37,8 +37,8 @@ describe('POST /api/teams', () => {
     expect(mocks.audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'team_configured', entityId: 'U16-1' }),
     );
-    await expect(response.json()).resolves.toEqual({ name: 'U16-1' });
-    expect(mocks.teams.save).toHaveBeenCalledWith({ name: 'U16-1' });
+    await expect(response.json()).resolves.toEqual({ isOwnTeam: true, name: 'U16-1' });
+    expect(mocks.teams.save).toHaveBeenCalledWith({ isOwnTeam: true, name: 'U16-1' });
   });
 
   it('rejects a blank team name', async () => {

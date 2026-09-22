@@ -6,23 +6,29 @@ import { teams } from './schema';
 
 type Database = ReturnType<typeof createDatabase>;
 
+const columns = { isOwnTeam: teams.isOwnTeam, name: teams.name };
+
 export const createPostgresTeamRepository = (database: Database): TeamRepository => ({
   async findAll(): Promise<Team[]> {
-    return database.select({ name: teams.name }).from(teams).orderBy(asc(teams.name));
+    return database.select(columns).from(teams).orderBy(asc(teams.name));
+  },
+
+  async findAllOwnTeams(): Promise<Team[]> {
+    return database
+      .select(columns)
+      .from(teams)
+      .where(eq(teams.isOwnTeam, true))
+      .orderBy(asc(teams.name));
   },
 
   async findByName(name: string): Promise<Team | undefined> {
-    const [team] = await database
-      .select({ name: teams.name })
-      .from(teams)
-      .where(eq(teams.name, name))
-      .limit(1);
+    const [team] = await database.select(columns).from(teams).where(eq(teams.name, name)).limit(1);
 
     return team;
   },
 
   async save(team: Team): Promise<Team> {
-    const [storedTeam] = await database.insert(teams).values(team).returning({ name: teams.name });
+    const [storedTeam] = await database.insert(teams).values(team).returning(columns);
 
     if (!storedTeam) {
       throw new Error('PostgreSQL did not return the stored team');
@@ -36,7 +42,7 @@ export const createPostgresTeamRepository = (database: Database): TeamRepository
       .update(teams)
       .set({ name })
       .where(eq(teams.name, currentName))
-      .returning({ name: teams.name });
+      .returning(columns);
 
     if (!updatedTeam) {
       throw new Error('Team does not exist');

@@ -120,6 +120,13 @@
       "when": 1790064574231,
       "tag": "0016_players_optional_identity_name_split",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790072361235,
+      "tag": "0017_unify_teams_drop_season_half",
+      "breakpoints": true
     }
   ]
 }

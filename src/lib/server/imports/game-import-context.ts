@@ -5,14 +5,10 @@ import {
 } from '$lib/server/composition-root';
 
 export const buildGameImportContext = async (): Promise<GameImportContext> => {
-  const [teams, settings] = await Promise.all([
-    currentTeamRepository().findAll(),
-    currentCoordinatorSettingsRepository().get(),
-  ]);
+  const teams = await currentTeamRepository().findAll();
 
   return {
     knownTeamNames: teams.map((team) => team.name),
-    ...(settings ? { season: { startingYear: settings.seasonStartingYear } } : {}),
   };
 };
 

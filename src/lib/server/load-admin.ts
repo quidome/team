@@ -34,7 +34,7 @@ export const loadAdmin = async (): Promise<AdminPageData> => {
   const [locations, seasons, teams, coordinatorSettings] = await Promise.all([
     currentLocationRepository().findAll(),
     currentSeasonRepository().findAll(),
-    currentTeamRepository().findAll(),
+    currentTeamRepository().findAllOwnTeams(),
     currentCoordinatorSettingsRepository().get(),
   ]);
 

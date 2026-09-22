@@ -9,13 +9,16 @@ describe('configure team', () => {
 
     const team = await configureTeam(teams, 'U16-1');
 
-    expect(team).toEqual({ name: 'U16-1' });
+    expect(team).toEqual({ isOwnTeam: true, name: 'U16-1' });
     await expect(teams.findByName('U16-1')).resolves.toEqual(team);
   });
 
   it('returns an already-configured team rather than creating a duplicate', async () => {
-    const teams = new InMemoryTeamRepository([{ name: 'U16-1' }]);
+    const teams = new InMemoryTeamRepository([{ isOwnTeam: true, name: 'U16-1' }]);
 
-    await expect(configureTeam(teams, 'U16-1')).resolves.toEqual({ name: 'U16-1' });
+    await expect(configureTeam(teams, 'U16-1')).resolves.toEqual({
+      isOwnTeam: true,
+      name: 'U16-1',
+    });
   });
 });

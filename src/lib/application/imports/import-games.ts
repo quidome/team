@@ -3,7 +3,6 @@ import type { GameImportRepository } from './game-import-repository';
 import type { GameRepository, StoredGameProgramOccurrence } from '../games/game-repository';
 import type { DutyRepository } from '../duties/duty-repository';
 import { normalizeTeamName, teamNamesMatch } from '../../domain/team-name';
-import { deriveSeasonHalf, type SeasonHalf } from '../../domain/season-half';
 
 export type GameImportConflictField = 'arrivalBufferMinutes' | 'locationName' | 'travelMinutes';
 export type GameImportChoice = 'existing' | 'imported';
@@ -49,13 +48,7 @@ export interface GameImportResult {
 
 export interface GameImportContext {
   knownTeamNames: string[];
-  season?: { startingYear: number };
 }
-
-export type FixtureResolution =
-  | { kind: 'plain'; awayTeamName: string; homeTeamName: string }
-  | { kind: 'opponent'; isHome: boolean; opponentName: string; ourTeamName: string }
-  | { kind: 'unrecognized' };
 
 export interface ImportGamesInput {
   context: GameImportContext;
@@ -73,56 +66,11 @@ const conflictFields: GameImportConflictField[] = [
   'arrivalBufferMinutes',
 ];
 
-export const resolveFixtureTeams = (
-  homeTeamName: string,
-  awayTeamName: string,
-  knownTeamNames: string[],
-): FixtureResolution => {
-  const homeMatch = knownTeamNames.find((name) => teamNamesMatch(name, homeTeamName));
-  const awayMatch = knownTeamNames.find((name) => teamNamesMatch(name, awayTeamName));
+const fixtureKey = (homeTeamName: string, awayTeamName: string): string =>
+  [normalizeTeamName(homeTeamName), normalizeTeamName(awayTeamName)].join('\u0000');
 
-  if (homeMatch && awayMatch) {
-    return { kind: 'plain', awayTeamName: awayMatch, homeTeamName: homeMatch };
-  }
-
-  if (homeMatch) {
-    return {
-      isHome: true,
-      kind: 'opponent',
-      opponentName: normalizeTeamName(awayTeamName),
-      ourTeamName: homeMatch,
-    };
-  }
-
-  if (awayMatch) {
-    return {
-      isHome: false,
-      kind: 'opponent',
-      opponentName: normalizeTeamName(homeTeamName),
-      ourTeamName: awayMatch,
-    };
-  }
-
-  return { kind: 'unrecognized' };
-};
-
-const fixtureKey = (
-  resolution: Exclude<FixtureResolution, { kind: 'unrecognized' }>,
-  seasonHalf?: SeasonHalf,
-): string =>
-  resolution.kind === 'plain'
-    ? [
-        'plain',
-        normalizeTeamName(resolution.homeTeamName),
-        normalizeTeamName(resolution.awayTeamName),
-      ].join('\u0000')
-    : [
-        'opponent',
-        normalizeTeamName(resolution.ourTeamName),
-        normalizeTeamName(resolution.opponentName),
-        resolution.isHome,
-        seasonHalf ?? '',
-      ].join('\u0000');
+const resolveTeamName = (rawName: string, knownTeamNames: string[]): string =>
+  knownTeamNames.find((known) => teamNamesMatch(known, rawName)) ?? normalizeTeamName(rawName);
 
 const isSameIdentity = (existing: StoredGameProgramOccurrence, imported: ImportedGame) =>
   existing.date === imported.date &&
@@ -181,48 +129,24 @@ export const applyImportContext = (
   preview: GameImportPreview,
   context: GameImportContext,
 ): GameImportPreview => {
-  const contextIssues: GameImportPreview['issues'] = [];
-  const records = preview.records.filter((record) => {
-    const resolution = resolveFixtureTeams(
-      record.homeTeamName,
-      record.awayTeamName,
-      context.knownTeamNames,
+  const notices: GameImportPreview['notices'] = [];
+
+  for (const record of preview.records) {
+    const newTeamNames = [record.homeTeamName, record.awayTeamName].filter(
+      (name) => !context.knownTeamNames.some((known) => teamNamesMatch(known, name)),
     );
 
-    if (resolution.kind === 'unrecognized') {
-      contextIssues.push({
-        message: 'Neither team is recognized — add one as a team in Admin first.',
+    for (const name of newTeamNames) {
+      notices.push({
+        message: `"${name}" is a new team and will be created automatically.`,
         row: record.sourceRow,
       });
-      return false;
     }
-
-    if (resolution.kind === 'opponent') {
-      if (!context.season) {
-        contextIssues.push({
-          message: 'Configure a current season in Settings before importing.',
-          row: record.sourceRow,
-        });
-        return false;
-      }
-
-      if (!deriveSeasonHalf(record.date, context.season.startingYear)) {
-        contextIssues.push({
-          message: 'Game date falls outside the configured season.',
-          row: record.sourceRow,
-        });
-        return false;
-      }
-    }
-
-    return true;
-  });
+  }
 
   return {
-    headers: preview.headers,
-    issues: [...preview.issues, ...contextIssues],
-    records,
-    validRowCount: records.length,
+    ...preview,
+    notices: [...preview.notices, ...notices],
   };
 };
 
@@ -328,54 +252,14 @@ export const importGames = async (
         continue;
       }
 
-      const fixtureResolution = resolveFixtureTeams(
-        record.homeTeamName,
-        record.awayTeamName,
-        input.context.knownTeamNames,
-      );
-
-      if (fixtureResolution.kind === 'unrecognized') {
-        throw new Error('Neither team is recognized — add one as a team in Admin first.');
-      }
-
-      let seasonHalf: SeasonHalf | undefined;
-
-      if (fixtureResolution.kind === 'opponent') {
-        if (!input.context.season) {
-          throw new Error('Configure a current season in Settings before importing.');
-        }
-
-        seasonHalf = deriveSeasonHalf(record.date, input.context.season.startingYear);
-
-        if (!seasonHalf) {
-          throw new Error('Game date falls outside the configured season.');
-        }
-      }
-
-      const key = fixtureKey(fixtureResolution, seasonHalf);
+      const key = fixtureKey(record.homeTeamName, record.awayTeamName);
       let fixtureId = fixtureIds.get(key);
 
       if (!fixtureId) {
-        const fixture = await games.saveFixture(
-          fixtureResolution.kind === 'plain'
-            ? {
-                awayTeamName: fixtureResolution.awayTeamName,
-                homeTeamName: fixtureResolution.homeTeamName,
-              }
-            : {
-                awayTeamName: fixtureResolution.isHome
-                  ? fixtureResolution.opponentName
-                  : fixtureResolution.ourTeamName,
-                homeTeamName: fixtureResolution.isHome
-                  ? fixtureResolution.ourTeamName
-                  : fixtureResolution.opponentName,
-                isHome: fixtureResolution.isHome,
-                opponentName: fixtureResolution.opponentName,
-                ourTeamName: fixtureResolution.ourTeamName,
-                seasonHalf,
-                seasonStartingYear: input.context.season?.startingYear,
-              },
-        );
+        const fixture = await games.saveFixture({
+          awayTeamName: resolveTeamName(record.awayTeamName, input.context.knownTeamNames),
+          homeTeamName: resolveTeamName(record.homeTeamName, input.context.knownTeamNames),
+        });
         fixtureId = fixture.id;
         fixtureIds.set(key, fixtureId);
       }

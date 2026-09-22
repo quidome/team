@@ -1,5 +1,6 @@
 <script>
   import { resolve } from '$app/paths';
+  import { deriveSeasonHalf } from '$lib/domain/season-half';
 
   export let data;
 
@@ -78,8 +79,8 @@
             <div class="event-details">
               {#if event.type === 'game'}
                 <p class="event-kind">
-                  Game · {event.status}{#if event.seasonHalf}
-                    · {event.seasonHalf}{/if}
+                  Game · {event.status}{#if deriveSeasonHalf(event.date, data.seasonStartingYear)}
+                    · {deriveSeasonHalf(event.date, data.seasonStartingYear)}{/if}
                 </p>
                 <h3>
                   {event.homeTeamName} <span aria-hidden="true">vs</span>

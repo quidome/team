@@ -8,7 +8,7 @@ import { configureCoordinatorSettings } from './configure-coordinator-settings';
 describe('configure coordinator settings', () => {
   it('stores the primary team and season once both exist', async () => {
     const settings = new InMemoryCoordinatorSettingsRepository();
-    const teams = new InMemoryTeamRepository([{ name: 'Blue Drakes M16-1' }]);
+    const teams = new InMemoryTeamRepository([{ isOwnTeam: true, name: 'Blue Drakes M16-1' }]);
     const seasons = new InMemorySeasonRepository([{ endingYear: 2027, startingYear: 2026 }]);
 
     const result = await configureCoordinatorSettings(settings, teams, seasons, {
@@ -35,7 +35,7 @@ describe('configure coordinator settings', () => {
 
   it('rejects a season that does not exist', async () => {
     const settings = new InMemoryCoordinatorSettingsRepository();
-    const teams = new InMemoryTeamRepository([{ name: 'Blue Drakes M16-1' }]);
+    const teams = new InMemoryTeamRepository([{ isOwnTeam: true, name: 'Blue Drakes M16-1' }]);
     const seasons = new InMemorySeasonRepository();
 
     await expect(

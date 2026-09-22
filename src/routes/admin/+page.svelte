@@ -984,6 +984,13 @@
         {/each}
       </div>
     {/if}
+    {#if 'notices' in preview && preview.notices.length > 0}
+      <div class="notice-list">
+        {#each preview.notices as notice, index (`${notice.row}-${notice.field ?? 'row'}-${index}`)}
+          <p>Row {notice.row}: {notice.message}</p>
+        {/each}
+      </div>
+    {/if}
     {#if preview.records.length > 0}
       <div class="preview-table-wrap">
         <table>
@@ -1393,6 +1400,20 @@
 
   .issue-list p {
     color: var(--accent-dark);
+    font-size: 0.84rem;
+    margin: 0.3rem 0;
+  }
+
+  .notice-list {
+    background: #faf7f0;
+    border: 1px solid #ebe4d8;
+    border-radius: 0.7rem;
+    margin-top: 0.8rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .notice-list p {
+    color: var(--muted);
     font-size: 0.84rem;
     margin: 0.3rem 0;
   }

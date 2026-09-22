@@ -13,6 +13,10 @@ export class InMemoryTeamRepository implements TeamRepository {
     return [...this.teams.values()].sort((left, right) => left.name.localeCompare(right.name));
   }
 
+  async findAllOwnTeams(): Promise<Team[]> {
+    return (await this.findAll()).filter((team) => team.isOwnTeam);
+  }
+
   async findByName(name: string): Promise<Team | undefined> {
     return this.teams.get(name);
   }
@@ -24,11 +28,13 @@ export class InMemoryTeamRepository implements TeamRepository {
   }
 
   async updateName(currentName: string, name: string): Promise<Team> {
-    if (!this.teams.has(currentName)) {
+    const existing = this.teams.get(currentName);
+
+    if (!existing) {
       throw new Error('Team does not exist');
     }
 
-    const updated = { name };
+    const updated = { ...existing, name };
     this.teams.delete(currentName);
     this.teams.set(name, updated);
 

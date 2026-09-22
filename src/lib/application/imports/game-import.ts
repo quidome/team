@@ -39,6 +39,7 @@ export interface ImportIssue {
 export interface GameImportPreview {
   headers: string[];
   issues: ImportIssue[];
+  notices: ImportIssue[];
   records: ImportedGame[];
   validRowCount: number;
 }
@@ -209,5 +210,5 @@ export const previewGameImport = (
     }
   });
 
-  return { headers, issues, records, validRowCount: records.length };
+  return { headers, issues, notices: [], records, validRowCount: records.length };
 };

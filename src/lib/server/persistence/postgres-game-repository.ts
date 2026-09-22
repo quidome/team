@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import { suggestDepartureTime } from '../../domain/game';
@@ -6,122 +6,46 @@ import type {
   GameFixture,
   GameOccurrence,
   GameRepository,
-  SeasonHalf,
   StoredGameFixture,
   StoredGameOccurrence,
   StoredGameProgramOccurrence,
 } from '../../application/games/game-repository';
 import type { DatabaseConnection } from './database';
-import {
-  gameFixtures,
-  gameOccurrences,
-  locations,
-  opponentSeasonHalves,
-  opponents,
-  seasonHalves,
-  seasons,
-  teams,
-} from './schema';
+import { gameFixtures, gameOccurrences, locations, teams } from './schema';
 
 const homeTeams = alias(teams, 'home_teams');
 const awayTeams = alias(teams, 'away_teams');
-const ourTeams = alias(teams, 'our_teams');
 
 type ProgramOccurrenceRow = {
   arrivalBufferMinutes: number;
-  awayTeamName: string | null;
+  awayTeamName: string;
   date: string;
   fixtureId: string;
-  homeTeamName: string | null;
+  homeTeamName: string;
   id: string;
-  isHome: boolean;
   locationName: string;
-  opponentName: string | null;
-  ourTeamName: string | null;
-  seasonHalf: SeasonHalf | null;
   startTime: string;
   status: 'cancelled' | 'scheduled';
   travelMinutes: number;
 };
 
-type FixtureRow = {
-  awayTeamName: string | null;
-  homeTeamName: string | null;
-  isHome: boolean;
-  opponentName: string | null;
-  ourTeamName: string | null;
-  seasonHalf: SeasonHalf | null;
-  seasonStartingYear: number | null;
-};
-
-const toFixture = (row: FixtureRow): GameFixture | undefined => {
-  const homeTeamName =
-    row.opponentName && row.ourTeamName
-      ? row.isHome
-        ? row.ourTeamName
-        : row.opponentName
-      : row.homeTeamName;
-  const awayTeamName =
-    row.opponentName && row.ourTeamName
-      ? row.isHome
-        ? row.opponentName
-        : row.ourTeamName
-      : row.awayTeamName;
-
-  if (!homeTeamName || !awayTeamName) {
-    return undefined;
-  }
-
-  return {
-    awayTeamName,
-    homeTeamName,
-    ...(row.opponentName ? { opponentName: row.opponentName } : {}),
-    ...(row.ourTeamName ? { ourTeamName: row.ourTeamName } : {}),
-    ...(row.seasonHalf ? { seasonHalf: row.seasonHalf } : {}),
-    ...(row.seasonStartingYear !== null ? { seasonStartingYear: row.seasonStartingYear } : {}),
-    isHome: row.isHome,
-  };
-};
-
-const toProgramOccurrence = (
-  row: ProgramOccurrenceRow,
-): StoredGameProgramOccurrence | undefined => {
-  const homeTeamName =
-    row.opponentName && row.ourTeamName
-      ? row.isHome
-        ? row.ourTeamName
-        : row.opponentName
-      : row.homeTeamName;
-  const awayTeamName =
-    row.opponentName && row.ourTeamName
-      ? row.isHome
-        ? row.opponentName
-        : row.ourTeamName
-      : row.awayTeamName;
-
-  if (!homeTeamName || !awayTeamName) {
-    return undefined;
-  }
-
-  return {
-    arrivalBufferMinutes: row.arrivalBufferMinutes,
-    awayTeamName,
-    ...(row.seasonHalf ? { seasonHalf: row.seasonHalf } : {}),
-    date: row.date,
-    fixtureId: row.fixtureId,
-    homeTeamName,
-    id: row.id,
-    locationName: row.locationName,
-    startTime: row.startTime,
-    status: row.status,
-    suggestedDepartureTime: suggestDepartureTime(
-      row.startTime,
-      row.travelMinutes,
-      row.arrivalBufferMinutes,
-    ),
-    travelMinutes: row.travelMinutes,
-  };
-};
+const toProgramOccurrence = (row: ProgramOccurrenceRow): StoredGameProgramOccurrence => ({
+  arrivalBufferMinutes: row.arrivalBufferMinutes,
+  awayTeamName: row.awayTeamName,
+  date: row.date,
+  fixtureId: row.fixtureId,
+  homeTeamName: row.homeTeamName,
+  id: row.id,
+  locationName: row.locationName,
+  startTime: row.startTime,
+  status: row.status,
+  suggestedDepartureTime: suggestDepartureTime(
+    row.startTime,
+    row.travelMinutes,
+    row.arrivalBufferMinutes,
+  ),
+  travelMinutes: row.travelMinutes,
+});
 
 const withoutFixtureNames = (occurrence: StoredGameProgramOccurrence): StoredGameOccurrence => ({
   arrivalBufferMinutes: occurrence.arrivalBufferMinutes,
@@ -147,22 +71,15 @@ const findStoredOccurrence = async (
       fixtureId: gameOccurrences.fixtureId,
       homeTeamName: homeTeams.name,
       id: gameOccurrences.id,
-      isHome: gameFixtures.isHome,
       locationName: locations.name,
-      opponentName: opponents.name,
-      ourTeamName: ourTeams.name,
-      seasonHalf: seasonHalves.half,
       startTime: gameOccurrences.startTime,
       status: gameOccurrences.status,
       travelMinutes: gameOccurrences.travelMinutes,
     })
     .from(gameOccurrences)
     .innerJoin(gameFixtures, eq(gameOccurrences.fixtureId, gameFixtures.id))
-    .leftJoin(homeTeams, eq(gameFixtures.homeTeamId, homeTeams.id))
-    .leftJoin(awayTeams, eq(gameFixtures.awayTeamId, awayTeams.id))
-    .leftJoin(ourTeams, eq(gameFixtures.ourTeamId, ourTeams.id))
-    .leftJoin(opponents, eq(gameFixtures.opponentId, opponents.id))
-    .leftJoin(seasonHalves, eq(gameFixtures.seasonHalfId, seasonHalves.id))
+    .innerJoin(homeTeams, eq(gameFixtures.homeTeamId, homeTeams.id))
+    .innerJoin(awayTeams, eq(gameFixtures.awayTeamId, awayTeams.id))
     .innerJoin(locations, eq(gameOccurrences.locationId, locations.id))
     .where(eq(gameOccurrences.id, id))
     .limit(1);
@@ -170,132 +87,27 @@ const findStoredOccurrence = async (
   return occurrence ? toProgramOccurrence(occurrence) : undefined;
 };
 
-const saveOpponentFixture = async (
-  database: DatabaseConnection,
-  fixture: GameFixture,
-): Promise<StoredGameFixture> => {
-  if (
-    !fixture.opponentName ||
-    !fixture.ourTeamName ||
-    fixture.seasonStartingYear === undefined ||
-    !fixture.seasonHalf
-  ) {
-    throw new Error('Opponent fixtures require a team, season, half, and opponent');
-  }
-
-  const [ourTeam] = await database
+const findOrCreateTeamId = async (database: DatabaseConnection, name: string): Promise<string> => {
+  const [existing] = await database
     .select({ id: teams.id })
     .from(teams)
-    .where(eq(teams.name, fixture.ourTeamName))
-    .limit(1);
-  const [season] = await database
-    .select({ id: seasons.id })
-    .from(seasons)
-    .where(eq(seasons.startingYear, fixture.seasonStartingYear))
+    .where(eq(teams.name, name))
     .limit(1);
 
-  if (!ourTeam) {
-    throw new Error(`Team ${fixture.ourTeamName} does not exist`);
+  if (existing) {
+    return existing.id;
   }
 
-  if (!season) {
-    throw new Error(`Season ${fixture.seasonStartingYear} does not exist`);
+  const [created] = await database
+    .insert(teams)
+    .values({ isOwnTeam: false, name })
+    .returning({ id: teams.id });
+
+  if (!created) {
+    throw new Error(`Team ${name} could not be stored`);
   }
 
-  let [half] = await database
-    .select({ id: seasonHalves.id })
-    .from(seasonHalves)
-    .where(and(eq(seasonHalves.seasonId, season.id), eq(seasonHalves.half, fixture.seasonHalf)))
-    .limit(1);
-
-  if (!half) {
-    [half] = await database
-      .insert(seasonHalves)
-      .values({ half: fixture.seasonHalf, seasonId: season.id })
-      .returning({ id: seasonHalves.id });
-  }
-
-  if (!half) {
-    throw new Error('Season half could not be stored');
-  }
-
-  let [opponent] = await database
-    .select({ id: opponents.id })
-    .from(opponents)
-    .where(and(eq(opponents.name, fixture.opponentName), eq(opponents.seasonId, season.id)))
-    .limit(1);
-
-  if (!opponent) {
-    [opponent] = await database
-      .insert(opponents)
-      .values({
-        address: fixture.opponentAddress,
-        name: fixture.opponentName,
-        seasonId: season.id,
-        travelMinutes: fixture.opponentTravelMinutes ?? 0,
-      })
-      .returning({ id: opponents.id });
-  }
-
-  if (!opponent) {
-    throw new Error('Opponent could not be stored');
-  }
-
-  if (fixture.opponentAddress !== undefined || fixture.opponentTravelMinutes !== undefined) {
-    await database
-      .update(opponents)
-      .set({
-        ...(fixture.opponentAddress === undefined ? {} : { address: fixture.opponentAddress }),
-        ...(fixture.opponentTravelMinutes === undefined
-          ? {}
-          : { travelMinutes: fixture.opponentTravelMinutes }),
-      })
-      .where(eq(opponents.id, opponent.id));
-  }
-
-  const [existingHalf] = await database
-    .select({ id: opponentSeasonHalves.id })
-    .from(opponentSeasonHalves)
-    .where(
-      and(
-        eq(opponentSeasonHalves.halfId, half.id),
-        eq(opponentSeasonHalves.opponentId, opponent.id),
-      ),
-    )
-    .limit(1);
-
-  if (!existingHalf) {
-    await database.insert(opponentSeasonHalves).values({
-      halfId: half.id,
-      opponentId: opponent.id,
-    });
-  }
-
-  const isHome = fixture.isHome ?? true;
-  const [storedFixture] = await database
-    .insert(gameFixtures)
-    .values({
-      awayTeamId: null,
-      homeTeamId: null,
-      isHome,
-      opponentId: opponent.id,
-      ourTeamId: ourTeam.id,
-      seasonHalfId: half.id,
-    })
-    .returning({ id: gameFixtures.id });
-
-  if (!storedFixture) {
-    throw new Error('PostgreSQL did not return the stored game fixture');
-  }
-
-  return {
-    fixture: {
-      ...fixture,
-      awayTeamName: isHome ? fixture.opponentName : fixture.ourTeamName,
-      homeTeamName: isHome ? fixture.ourTeamName : fixture.opponentName,
-    },
-    id: storedFixture.id,
-  };
+  return created.id;
 };
 
 export const createPostgresGameRepository = (database: DatabaseConnection): GameRepository => ({
@@ -314,29 +126,14 @@ export const createPostgresGameRepository = (database: DatabaseConnection): Game
       .select({
         awayTeamName: awayTeams.name,
         homeTeamName: homeTeams.name,
-        isHome: gameFixtures.isHome,
-        opponentName: opponents.name,
-        ourTeamName: ourTeams.name,
-        seasonHalf: seasonHalves.half,
-        seasonStartingYear: seasons.startingYear,
       })
       .from(gameFixtures)
-      .leftJoin(homeTeams, eq(gameFixtures.homeTeamId, homeTeams.id))
-      .leftJoin(awayTeams, eq(gameFixtures.awayTeamId, awayTeams.id))
-      .leftJoin(ourTeams, eq(gameFixtures.ourTeamId, ourTeams.id))
-      .leftJoin(opponents, eq(gameFixtures.opponentId, opponents.id))
-      .leftJoin(seasonHalves, eq(gameFixtures.seasonHalfId, seasonHalves.id))
-      .leftJoin(seasons, eq(seasonHalves.seasonId, seasons.id))
+      .innerJoin(homeTeams, eq(gameFixtures.homeTeamId, homeTeams.id))
+      .innerJoin(awayTeams, eq(gameFixtures.awayTeamId, awayTeams.id))
       .where(eq(gameFixtures.id, id))
       .limit(1);
 
-    if (!row) {
-      return undefined;
-    }
-
-    const fixture = toFixture(row);
-
-    return fixture ? { fixture, id } : undefined;
+    return row ? { fixture: row, id } : undefined;
   },
 
   async findOccurrenceById(id: string): Promise<StoredGameOccurrence | undefined> {
@@ -361,32 +158,12 @@ export const createPostgresGameRepository = (database: DatabaseConnection): Game
   },
 
   async saveFixture(fixture: GameFixture): Promise<StoredGameFixture> {
-    if (fixture.opponentName) {
-      return saveOpponentFixture(database, fixture);
-    }
-
-    const [homeTeam] = await database
-      .select({ id: teams.id })
-      .from(teams)
-      .where(eq(teams.name, fixture.homeTeamName))
-      .limit(1);
-    const [awayTeam] = await database
-      .select({ id: teams.id })
-      .from(teams)
-      .where(eq(teams.name, fixture.awayTeamName))
-      .limit(1);
-
-    if (!homeTeam) {
-      throw new Error(`Team ${fixture.homeTeamName} does not exist`);
-    }
-
-    if (!awayTeam) {
-      throw new Error(`Team ${fixture.awayTeamName} does not exist`);
-    }
+    const homeTeamId = await findOrCreateTeamId(database, fixture.homeTeamName);
+    const awayTeamId = await findOrCreateTeamId(database, fixture.awayTeamName);
 
     const [storedFixture] = await database
       .insert(gameFixtures)
-      .values({ awayTeamId: awayTeam.id, homeTeamId: homeTeam.id })
+      .values({ awayTeamId, homeTeamId })
       .returning({ id: gameFixtures.id });
 
     if (!storedFixture) {

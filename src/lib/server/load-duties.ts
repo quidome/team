@@ -14,11 +14,7 @@ export interface DutiesPageData {
 
 export const loadDuties = async (): Promise<DutiesPageData> => {
   const team = await loadTeam();
-  const events = team.events.filter(
-    (event): event is ProgramGameEvent =>
-      event.type === 'game' &&
-      (event.homeTeamName === team.teamName || event.awayTeamName === team.teamName),
-  );
+  const events = team.events.filter((event): event is ProgramGameEvent => event.type === 'game');
 
   if (events.length === 0) {
     return { duties: {}, ...team, events };

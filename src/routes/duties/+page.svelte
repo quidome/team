@@ -189,15 +189,15 @@
 <section class="panel" aria-labelledby="game-heading">
   <div class="panel-heading">
     <div>
-      <p class="eyebrow">{data.events.length} own games</p>
+      <p class="eyebrow">{data.events.length} games</p>
       <h2 id="game-heading">Game duties and transport</h2>
     </div>
   </div>
 
   {#if data.events.length === 0}
     <div class="empty-state">
-      <h3>No own games configured yet</h3>
-      <p>Games involving {data.teamName} will appear here when they are added to the Program.</p>
+      <h3>No games configured yet</h3>
+      <p>Games will appear here when they are added to the Program.</p>
     </div>
   {:else if selectedEvent && selectedDuties}
     <label class="event-picker">

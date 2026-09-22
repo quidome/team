@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DutyRepository } from '../../application/duties/duty-repository';
 import { createDatabase } from './database';
 import { createPostgresDutyRepository } from './postgres-duty-repository';
-import { gameFixtures, gameOccurrences, locations, players } from './schema';
+import { gameFixtures, gameOccurrences, locations, players, teams } from './schema';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -14,6 +14,8 @@ if (!databaseUrl) {
   describe('PostgreSQL duty repository', () => {
     const playerAssociationIds = ['duty-integration-avery', 'duty-integration-blake'];
     const locationName = 'Duty integration court';
+    const homeTeamName = 'Duty integration home team';
+    const awayTeamName = 'Duty integration away team';
     const database = createDatabase(databaseUrl);
     const repository: DutyRepository = createPostgresDutyRepository(database);
 
@@ -23,6 +25,8 @@ if (!databaseUrl) {
     beforeAll(async () => {
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[0]));
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[1]));
+      await database.delete(teams).where(eq(teams.name, homeTeamName));
+      await database.delete(teams).where(eq(teams.name, awayTeamName));
 
       const insertedPlayers = await database
         .insert(players)
@@ -49,13 +53,26 @@ if (!databaseUrl) {
         .insert(locations)
         .values({ name: locationName, travelMinutes: 0 })
         .returning({ id: locations.id });
+      const [homeTeam] = await database
+        .insert(teams)
+        .values({ isOwnTeam: true, name: homeTeamName })
+        .returning({ id: teams.id });
+      const [awayTeam] = await database
+        .insert(teams)
+        .values({ isOwnTeam: false, name: awayTeamName })
+        .returning({ id: teams.id });
+
+      if (!location || !homeTeam || !awayTeam) {
+        throw new Error('Could not create duty integration location/teams');
+      }
+
       const [fixture] = await database
         .insert(gameFixtures)
-        .values({})
+        .values({ awayTeamId: awayTeam.id, homeTeamId: homeTeam.id })
         .returning({ id: gameFixtures.id });
 
-      if (!location || !fixture) {
-        throw new Error('Could not create duty integration fixture/location');
+      if (!fixture) {
+        throw new Error('Could not create duty integration fixture');
       }
 
       const [occurrence] = await database
@@ -81,6 +98,8 @@ if (!databaseUrl) {
     afterAll(async () => {
       await database.delete(gameOccurrences).where(eq(gameOccurrences.id, occurrenceId));
       await database.delete(locations).where(eq(locations.name, locationName));
+      await database.delete(teams).where(eq(teams.name, homeTeamName));
+      await database.delete(teams).where(eq(teams.name, awayTeamName));
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[0]));
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[1]));
       await database.close();

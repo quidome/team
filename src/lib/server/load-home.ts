@@ -8,6 +8,7 @@ import { loadProgram } from './load-program';
 
 export interface HomePageData {
   events: Awaited<ReturnType<typeof loadProgram>>['events'];
+  seasonStartingYear: number;
   tasks: Task[];
   teamName: string;
 }
@@ -15,14 +16,18 @@ export interface HomePageData {
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date());
 
 export const loadHome = async (): Promise<HomePageData> => {
-  const [program, { teamName }] = await Promise.all([loadProgram(), currentTeamSeasonContext()]);
+  const [program, { seasonStartingYear, teamName }] = await Promise.all([
+    loadProgram(),
+    currentTeamSeasonContext(),
+  ]);
 
   if (!env.DATABASE_URL?.trim()) {
-    return { ...program, tasks: [], teamName };
+    return { ...program, seasonStartingYear, tasks: [], teamName };
   }
 
   return {
     ...program,
+    seasonStartingYear,
     tasks: await readTasks(currentTaskRepository(), program.events, {
       teamName,
       today: today(),

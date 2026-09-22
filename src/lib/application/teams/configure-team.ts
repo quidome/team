@@ -7,5 +7,5 @@ export const configureTeam = async (teams: TeamRepository, name: string): Promis
     return existingTeam;
   }
 
-  return teams.save({ name });
+  return teams.save({ isOwnTeam: true, name });
 };

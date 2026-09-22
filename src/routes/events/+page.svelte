@@ -22,9 +22,7 @@
     date: '',
     isHome: 'home',
     locationName: '',
-    opponentAddress: '',
     opponentName: '',
-    seasonHalf: 'H1',
     startTime: '',
     travelMinutes: '0',
   };
@@ -102,14 +100,6 @@
     }
   };
 
-  const updateGameSeasonHalf = () => {
-    const seasonHalf = deriveSeasonHalf(gameForm.date, data.season.startingYear);
-
-    if (seasonHalf) {
-      gameForm = { ...gameForm, seasonHalf };
-    }
-  };
-
   const updateRescheduleTravelTime = () => {
     const location = data.locations.find(
       (candidate) => candidate.name === rescheduleForm.locationName,
@@ -148,13 +138,6 @@
         {
           awayTeamName: isHome ? opponentName : data.teamName,
           homeTeamName: isHome ? data.teamName : opponentName,
-          isHome,
-          opponentAddress: gameForm.opponentAddress,
-          opponentName,
-          opponentTravelMinutes: Number(gameForm.travelMinutes),
-          ourTeamName: data.teamName,
-          seasonHalf: gameForm.seasonHalf,
-          seasonStartingYear: data.season.startingYear,
         },
         'The game could not be stored.',
       );
@@ -171,7 +154,7 @@
         'The game could not be stored.',
       );
       gameMessage = 'Game added to the events.';
-      gameForm = { ...gameForm, date: '', opponentAddress: '', opponentName: '', startTime: '' };
+      gameForm = { ...gameForm, date: '', opponentName: '', startTime: '' };
       showGameModal = false;
       await invalidateAll();
     } catch (error) {
@@ -421,8 +404,8 @@
           <div class="program-event">
             {#if event.type === 'game'}
               <p class="event-kind">
-                Game · {event.status}{#if event.seasonHalf}
-                  · {event.seasonHalf}{/if}
+                Game · {event.status}{#if deriveSeasonHalf(event.date, data.season.startingYear)}
+                  · {deriveSeasonHalf(event.date, data.season.startingYear)}{/if}
               </p>
               <h2>{event.homeTeamName} <span aria-hidden="true">vs</span> {event.awayTeamName}</h2>
               <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
@@ -582,19 +565,8 @@
           />
         </label>
         <label>
-          Season half
-          <select bind:value={gameForm.seasonHalf}>
-            <option value="H1">First half (H1)</option>
-            <option value="H2">Second half (H2)</option>
-          </select>
-        </label>
-        <label>
-          Opponent venue/address <span class="optional">optional</span>
-          <input bind:value={gameForm.opponentAddress} placeholder="Away venue address" />
-        </label>
-        <label>
           Date
-          <input bind:value={gameForm.date} on:change={updateGameSeasonHalf} required type="date" />
+          <input bind:value={gameForm.date} required type="date" />
         </label>
         <label>
           Start time
@@ -837,13 +809,6 @@
     font-size: clamp(1.5rem, 4vw, 2rem);
     letter-spacing: -0.05em;
     margin: 0;
-  }
-
-  .optional {
-    font-size: 0.68rem;
-    font-weight: 500;
-    letter-spacing: 0;
-    text-transform: none;
   }
 
   .game-form {

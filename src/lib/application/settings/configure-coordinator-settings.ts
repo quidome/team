@@ -16,7 +16,7 @@ export const configureCoordinatorSettings = async (
     seasons.findByStartingYear(input.seasonStartingYear),
   ]);
 
-  if (!team) {
+  if (!team || !team.isOwnTeam) {
     throw new Error(`Team ${input.primaryTeamName} does not exist`);
   }
 

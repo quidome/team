@@ -28,6 +28,7 @@ export const teams = pgTable(
   'teams',
   {
     id: uuid('id').defaultRandom().primaryKey(),
+    isOwnTeam: boolean('is_own_team').notNull().default(false),
     name: text('name').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
@@ -73,8 +74,6 @@ export const dutyHistoryStatus = pgEnum('duty_history_status', [
 export const taskSource = pgEnum('task_source', ['generated', 'manual']);
 export const taskStatus = pgEnum('task_status', ['completed', 'open']);
 
-export const seasonHalfCode = pgEnum('season_half_code', ['H1', 'H2']);
-
 export const seasons = pgTable(
   'seasons',
   {
@@ -84,49 +83,6 @@ export const seasons = pgTable(
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex('seasons_starting_year_unique').on(table.startingYear)],
-);
-
-export const seasonHalves = pgTable(
-  'season_halves',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    half: seasonHalfCode('half').notNull(),
-    seasonId: uuid('season_id')
-      .notNull()
-      .references(() => seasons.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [uniqueIndex('season_halves_season_half_unique').on(table.seasonId, table.half)],
-);
-
-export const opponents = pgTable(
-  'opponents',
-  {
-    address: text('address'),
-    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
-    id: uuid('id').defaultRandom().primaryKey(),
-    name: text('name').notNull(),
-    seasonId: uuid('season_id')
-      .notNull()
-      .references(() => seasons.id, { onDelete: 'cascade' }),
-    travelMinutes: integer('travel_minutes').notNull().default(0),
-  },
-  (table) => [uniqueIndex('opponents_season_name_unique').on(table.seasonId, table.name)],
-);
-
-export const opponentSeasonHalves = pgTable(
-  'opponent_season_halves',
-  {
-    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
-    halfId: uuid('half_id')
-      .notNull()
-      .references(() => seasonHalves.id, { onDelete: 'cascade' }),
-    id: uuid('id').defaultRandom().primaryKey(),
-    opponentId: uuid('opponent_id')
-      .notNull()
-      .references(() => opponents.id, { onDelete: 'cascade' }),
-  },
-  (table) => [uniqueIndex('opponent_season_halves_unique').on(table.opponentId, table.halfId)],
 );
 
 export const memberships = pgTable(
@@ -201,14 +157,14 @@ export const trainingOccurrences = pgTable(
 );
 
 export const gameFixtures = pgTable('game_fixtures', {
-  awayTeamId: uuid('away_team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  awayTeamId: uuid('away_team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
-  homeTeamId: uuid('home_team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  homeTeamId: uuid('home_team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'cascade' }),
   id: uuid('id').defaultRandom().primaryKey(),
-  isHome: boolean('is_home').notNull().default(true),
-  opponentId: uuid('opponent_id').references(() => opponents.id, { onDelete: 'cascade' }),
-  ourTeamId: uuid('our_team_id').references(() => teams.id, { onDelete: 'cascade' }),
-  seasonHalfId: uuid('season_half_id').references(() => seasonHalves.id, { onDelete: 'cascade' }),
 });
 
 export const gameOccurrences = pgTable('game_occurrences', {

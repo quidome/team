@@ -1,21 +1,12 @@
 import { suggestDepartureTime } from '../../domain/game';
-import type { SeasonHalf } from '../../domain/season-half';
 
 export { suggestDepartureTime };
-export type { SeasonHalf };
 
 export type GameOccurrenceStatus = 'cancelled' | 'scheduled';
 
 export interface GameFixture {
   awayTeamName: string;
   homeTeamName: string;
-  isHome?: boolean;
-  opponentAddress?: string;
-  opponentName?: string;
-  opponentTravelMinutes?: number;
-  ourTeamName?: string;
-  seasonHalf?: SeasonHalf;
-  seasonStartingYear?: number;
 }
 
 export interface GameOccurrence {
@@ -34,7 +25,6 @@ export interface StoredGameFixture {
 export interface StoredGameProgramOccurrence extends StoredGameOccurrence {
   awayTeamName: string;
   homeTeamName: string;
-  seasonHalf?: SeasonHalf;
 }
 
 export interface StoredGameOccurrence extends GameOccurrence {
