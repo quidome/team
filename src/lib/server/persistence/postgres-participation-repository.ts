@@ -1,5 +1,4 @@
-import { eq, inArray, and } from 'drizzle-orm';
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type {
   ParticipationOccurrenceType,
@@ -20,17 +19,16 @@ export const createPostgresParticipationRepository = (
         absenceReason: participationRecords.absenceReason,
         occurrenceId: participationRecords.occurrenceId,
         occurrenceType: participationRecords.occurrenceType,
-        playerAssociationId: players.associationId,
+        playerId: participationRecords.playerId,
         status: participationRecords.status,
       })
-      .from(participationRecords)
-      .innerJoin(players, eq(participationRecords.playerId, players.id));
+      .from(participationRecords);
 
     return records.map((record) => ({
       ...(record.absenceReason === null ? {} : { absenceReason: record.absenceReason }),
       occurrenceId: record.occurrenceId,
       occurrenceType: record.occurrenceType,
-      playerAssociationId: record.playerAssociationId,
+      playerId: record.playerId,
       status: record.status,
     }));
   },
@@ -44,11 +42,10 @@ export const createPostgresParticipationRepository = (
         absenceReason: participationRecords.absenceReason,
         occurrenceId: participationRecords.occurrenceId,
         occurrenceType: participationRecords.occurrenceType,
-        playerAssociationId: players.associationId,
+        playerId: participationRecords.playerId,
         status: participationRecords.status,
       })
       .from(participationRecords)
-      .innerJoin(players, eq(participationRecords.playerId, players.id))
       .where(
         and(
           eq(participationRecords.occurrenceId, occurrenceId),
@@ -60,7 +57,7 @@ export const createPostgresParticipationRepository = (
       ...(record.absenceReason === null ? {} : { absenceReason: record.absenceReason }),
       occurrenceId: record.occurrenceId,
       occurrenceType: record.occurrenceType,
-      playerAssociationId: record.playerAssociationId,
+      playerId: record.playerId,
       status: record.status,
     }));
   },
@@ -70,31 +67,27 @@ export const createPostgresParticipationRepository = (
       return [];
     }
 
-    const playerRows = await database
-      .select({ associationId: players.associationId, id: players.id })
+    const existingRows = await database
+      .select({ id: players.id })
       .from(players)
       .where(
         inArray(
-          players.associationId,
-          records.map((record) => record.playerAssociationId),
+          players.id,
+          records.map((record) => record.playerId),
         ),
       );
-    const playerIdsByAssociationId = new Map(
-      playerRows.map((player) => [player.associationId, player.id]),
-    );
+    const existingIds = new Set(existingRows.map((row) => row.id));
 
     const values = records.map((record) => {
-      const playerId = playerIdsByAssociationId.get(record.playerAssociationId);
-
-      if (!playerId) {
-        throw new Error(`Player ${record.playerAssociationId} does not exist`);
+      if (!existingIds.has(record.playerId)) {
+        throw new Error(`Player ${record.playerId} does not exist`);
       }
 
       return {
         absenceReason: record.absenceReason ?? null,
         occurrenceId: record.occurrenceId,
         occurrenceType: record.occurrenceType,
-        playerId,
+        playerId: record.playerId,
         status: record.status,
       };
     });
@@ -118,15 +111,13 @@ export const createPostgresParticipationRepository = (
     const storedRecords = await Promise.all(
       records.map((record) => this.findByOccurrence(record.occurrenceType, record.occurrenceId)),
     );
-    const storedByPlayer = new Map(
-      storedRecords.flat().map((record) => [record.playerAssociationId, record]),
-    );
+    const storedByPlayer = new Map(storedRecords.flat().map((record) => [record.playerId, record]));
 
     return records.map((record) => {
-      const storedRecord = storedByPlayer.get(record.playerAssociationId);
+      const storedRecord = storedByPlayer.get(record.playerId);
 
       if (!storedRecord) {
-        throw new Error(`Participation for ${record.playerAssociationId} was not stored`);
+        throw new Error(`Participation for ${record.playerId} was not stored`);
       }
 
       return storedRecord;

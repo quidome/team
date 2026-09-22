@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import type { Player, PlayerRepository } from '../application/players/player-repository';
 
 export class InMemoryPlayerRepository implements PlayerRepository {
@@ -5,7 +7,7 @@ export class InMemoryPlayerRepository implements PlayerRepository {
 
   constructor(initialPlayers: Player[] = []) {
     for (const player of initialPlayers) {
-      this.players.set(player.associationId, player);
+      this.players.set(player.id, player);
     }
   }
 
@@ -13,17 +15,32 @@ export class InMemoryPlayerRepository implements PlayerRepository {
     return [...this.players.values()];
   }
 
-  async findByAssociationId(associationId: string): Promise<Player | undefined> {
-    return this.players.get(associationId);
+  async findById(id: string): Promise<Player | undefined> {
+    return this.players.get(id);
   }
 
-  async save(player: Player): Promise<Player> {
-    this.players.set(player.associationId, player);
+  async findByAssociationId(associationId: string): Promise<Player | undefined> {
+    return [...this.players.values()].find((player) => player.associationId === associationId);
+  }
+
+  async save(player: Omit<Player, 'id'>): Promise<Player> {
+    const storedPlayer: Player = { ...player, id: randomUUID() };
+    this.players.set(storedPlayer.id, storedPlayer);
+
+    return storedPlayer;
+  }
+
+  async update(player: Player): Promise<Player> {
+    if (!this.players.has(player.id)) {
+      throw new Error('Player does not exist');
+    }
+
+    this.players.set(player.id, player);
 
     return player;
   }
 
-  async deleteByAssociationId(associationId: string): Promise<void> {
-    this.players.delete(associationId);
+  async deleteById(id: string): Promise<void> {
+    this.players.delete(id);
   }
 }

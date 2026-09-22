@@ -19,8 +19,8 @@ export const recordDutySignup = (duties: DutyRepository, signup: DutySignup): Pr
 export const assignDuty = (
   duties: DutyRepository,
   slotId: string,
-  playerAssociationId: string,
-): Promise<DutyView> => duties.assign(slotId, playerAssociationId);
+  playerId: string,
+): Promise<DutyView> => duties.assign(slotId, playerId);
 
 export const correctDutyStatus = (
   duties: DutyRepository,

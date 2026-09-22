@@ -12,7 +12,7 @@ const readMembership = async (request: Request): Promise<Membership | undefined>
       const {
         jerseyNumber,
         participationType,
-        playerAssociationId,
+        playerId,
         relationship,
         seasonStartingYear,
         status,
@@ -25,8 +25,8 @@ const readMembership = async (request: Request): Promise<Membership | undefined>
             Number.isInteger(jerseyNumber) &&
             jerseyNumber > 0)) &&
         (participationType === 'trains_and_plays' || participationType === 'trains_only') &&
-        typeof playerAssociationId === 'string' &&
-        playerAssociationId.trim() &&
+        typeof playerId === 'string' &&
+        playerId.trim() &&
         (relationship === 'primary' || relationship === 'secondary') &&
         typeof seasonStartingYear === 'number' &&
         Number.isInteger(seasonStartingYear) &&
@@ -37,7 +37,7 @@ const readMembership = async (request: Request): Promise<Membership | undefined>
         return {
           ...(jerseyNumber === undefined ? {} : { jerseyNumber }),
           participationType,
-          playerAssociationId: playerAssociationId.trim(),
+          playerId: playerId.trim(),
           relationship,
           seasonStartingYear,
           status,
@@ -63,7 +63,7 @@ export const POST = async ({ request }) => {
 
   await currentAuditRepository().record({
     action: 'membership_configured',
-    entityId: `${configuredMembership.playerAssociationId}:${configuredMembership.seasonStartingYear}:${configuredMembership.teamName}:${configuredMembership.relationship}`,
+    entityId: `${configuredMembership.playerId}:${configuredMembership.seasonStartingYear}:${configuredMembership.teamName}:${configuredMembership.relationship}`,
     entityType: 'membership',
     metadata: {
       participationType: configuredMembership.participationType,

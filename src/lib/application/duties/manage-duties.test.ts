@@ -29,13 +29,13 @@ describe('manage duties', () => {
     await recordDutySignup(duties, {
       dutyType: 'referee',
       occurrenceId: occurrence.id,
-      playerAssociationId: 'avery',
+      playerId: 'avery',
       status: 'volunteer',
     });
     await recordDutySignup(duties, {
       dutyType: 'referee',
       occurrenceId: occurrence.id,
-      playerAssociationId: 'blake',
+      playerId: 'blake',
       status: 'volunteer',
     });
     await assignDuty(
@@ -51,15 +51,15 @@ describe('manage duties', () => {
     await completeDueDuties(duties, games, new Date('2026-08-16T00:00:00.000Z'));
 
     expect(reassigned.signups).toEqual([
-      expect.objectContaining({ playerAssociationId: 'avery', status: 'volunteer' }),
-      expect.objectContaining({ playerAssociationId: 'blake', status: 'selected' }),
+      expect.objectContaining({ playerId: 'avery', status: 'volunteer' }),
+      expect.objectContaining({ playerId: 'blake', status: 'selected' }),
     ]);
     await expect(duties.findByOccurrence(occurrence.id)).resolves.toEqual(
       expect.objectContaining({
-        fairness: [{ completedCount: 1, playerAssociationId: 'blake' }],
+        fairness: [{ completedCount: 1, playerId: 'blake' }],
         slots: expect.arrayContaining([
           expect.objectContaining({
-            assignedPlayerAssociationId: 'blake',
+            assignedPlayerId: 'blake',
             status: 'completed',
           }),
         ]),
@@ -67,8 +67,8 @@ describe('manage duties', () => {
     );
     await expect(duties.findByOccurrence(occurrence.id)).resolves.toMatchObject({
       assignmentHistory: expect.arrayContaining([
-        expect.objectContaining({ playerAssociationId: 'avery', status: 'reassigned' }),
-        expect.objectContaining({ playerAssociationId: 'blake', status: 'completed' }),
+        expect.objectContaining({ playerId: 'avery', status: 'reassigned' }),
+        expect.objectContaining({ playerId: 'blake', status: 'completed' }),
       ]),
     });
   });

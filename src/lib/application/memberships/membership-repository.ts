@@ -5,7 +5,7 @@ export type ParticipationType = 'trains_and_plays' | 'trains_only';
 export interface Membership {
   jerseyNumber?: number;
   participationType: ParticipationType;
-  playerAssociationId: string;
+  playerId: string;
   relationship: MembershipRelationship;
   seasonStartingYear: number;
   status: MembershipStatus;

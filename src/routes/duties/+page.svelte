@@ -37,7 +37,7 @@
   let configuration = initialEvent
     ? { ...data.duties[initialEvent.id].requirements }
     : { drivingSlots: 0, jurySlots: 0, refereeSlots: 0 };
-  let signupPlayerAssociationId = data.players[0]?.associationId ?? '';
+  let signupPlayerId = data.players[0]?.id ?? '';
   let signupType = 'referee';
   let signupStatus = 'volunteer';
   let savingConfiguration = false;
@@ -55,7 +55,7 @@
   );
 
   /** @param {string} id */
-  const playerName = (id) => data.players.find((player) => player.associationId === id)?.name ?? id;
+  const playerName = (id) => data.players.find((player) => player.id === id)?.firstName ?? id;
 
   /** @param {Event} event */
   const handleGameChange = (event) => {
@@ -111,7 +111,7 @@
   };
 
   const storeSignup = async () => {
-    if (!selectedEvent || !signupPlayerAssociationId) return;
+    if (!selectedEvent || !signupPlayerId) return;
 
     savingSignup = true;
     message = '';
@@ -122,7 +122,7 @@
         await postJson('/api/duties/signups', {
           dutyType: signupType,
           occurrenceId: selectedEvent.id,
-          playerAssociationId: signupPlayerAssociationId,
+          playerId: signupPlayerId,
           status: signupStatus,
         })
       );
@@ -145,7 +145,7 @@
     try {
       const view = /** @type {DutyView} */ (
         await postJson('/api/duties/assignments', {
-          playerAssociationId: select.value,
+          playerId: select.value,
           slotId,
         })
       );
@@ -267,9 +267,9 @@
           <div class="form-grid">
             <label>
               Player
-              <select bind:value={signupPlayerAssociationId}>
-                {#each eligiblePlayers as player (player.associationId)}
-                  <option value={player.associationId}>{player.name}</option>
+              <select bind:value={signupPlayerId}>
+                {#each eligiblePlayers as player (player.id)}
+                  <option value={player.id}>{player.firstName}</option>
                 {/each}
               </select>
             </label>
@@ -321,13 +321,13 @@
                 <label>
                   Assigned player
                   <select
-                    value={slot.assignedPlayerAssociationId ?? ''}
+                    value={slot.assignedPlayerId ?? ''}
                     disabled={slot.status === 'cancelled' || slot.status === 'completed'}
                     on:change={(event) => assignSlot(slot.id, event)}
                   >
                     <option value="">Unassigned</option>
-                    {#each eligiblePlayers as player (player.associationId)}
-                      <option value={player.associationId}>{player.name}</option>
+                    {#each eligiblePlayers as player (player.id)}
+                      <option value={player.id}>{player.firstName}</option>
                     {/each}
                   </select>
                 </label>
@@ -359,10 +359,10 @@
           </div>
         {:else}
           <div class="signup-list">
-            {#each selectedDuties.signups as signup (signup.playerAssociationId + signup.dutyType)}
+            {#each selectedDuties.signups as signup (signup.playerId + signup.dutyType)}
               <div class="signup-row">
                 <span
-                  ><strong>{playerName(signup.playerAssociationId)}</strong> · {dutyLabel(
+                  ><strong>{playerName(signup.playerId)}</strong> · {dutyLabel(
                     signup.dutyType,
                   )}</span
                 >
@@ -385,10 +385,10 @@
         <p class="hint">Assignments will be retained here when slots are confirmed or changed.</p>
       {:else}
         <div class="signup-list">
-          {#each selectedDuties.assignmentHistory as history, index (`${history.slotId}-${history.playerAssociationId}-${history.status}-${index}`)}
+          {#each selectedDuties.assignmentHistory as history, index (`${history.slotId}-${history.playerId}-${history.status}-${index}`)}
             <div class="signup-row">
               <span
-                ><strong>{playerName(history.playerAssociationId)}</strong> · {dutyLabel(
+                ><strong>{playerName(history.playerId)}</strong> · {dutyLabel(
                   history.dutyType,
                 )}</span
               >
@@ -410,9 +410,9 @@
         <p class="hint">No completed duties have been recorded yet.</p>
       {:else}
         <div class="fairness-list">
-          {#each selectedDuties.fairness as player (player.playerAssociationId)}
+          {#each selectedDuties.fairness as player (player.playerId)}
             <div class="fairness-row">
-              <span>{playerName(player.playerAssociationId)}</span>
+              <span>{playerName(player.playerId)}</span>
               <strong>{player.completedCount}</strong>
             </div>
           {/each}

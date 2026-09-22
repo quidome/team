@@ -11,7 +11,7 @@ export interface DutyRequirements {
 }
 
 export interface DutySlot {
-  assignedPlayerAssociationId?: string;
+  assignedPlayerId?: string;
   dutyType: DutyType;
   id: string;
   occurrenceId: string;
@@ -22,21 +22,21 @@ export interface DutySlot {
 export interface DutySignup {
   dutyType: DutyType;
   occurrenceId: string;
-  playerAssociationId: string;
+  playerId: string;
   status: DutySignupStatus;
 }
 
 export interface DutyAssignmentHistory {
   dutyType: DutyType;
   occurrenceId: string;
-  playerAssociationId: string;
+  playerId: string;
   slotId: string;
   status: DutyHistoryStatus;
 }
 
 export interface DutyFairness {
   completedCount: number;
-  playerAssociationId: string;
+  playerId: string;
 }
 
 export interface DutyView {
@@ -49,7 +49,7 @@ export interface DutyView {
 }
 
 export interface DutyRepository {
-  assign(slotId: string, playerAssociationId: string): Promise<DutyView>;
+  assign(slotId: string, playerId: string): Promise<DutyView>;
   configure(occurrenceId: string, requirements: DutyRequirements): Promise<DutyView>;
   findAllSlots(): Promise<DutySlot[]>;
   findByOccurrence(occurrenceId: string): Promise<DutyView>;

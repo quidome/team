@@ -8,8 +8,8 @@ describe('record attendance', () => {
     const participation = new InMemoryParticipationRepository();
 
     const records = await recordAttendance(participation, {
-      absences: [{ playerAssociationId: 'blake', reason: 'illness' }],
-      eligiblePlayerAssociationIds: ['avery', 'blake', 'casey'],
+      absences: [{ playerId: 'blake', reason: 'illness' }],
+      eligiblePlayerIds: ['avery', 'blake', 'casey'],
       occurrenceId: 'training-occurrence-1',
       occurrenceType: 'training',
     });
@@ -19,21 +19,21 @@ describe('record attendance', () => {
         absenceReason: undefined,
         occurrenceId: 'training-occurrence-1',
         occurrenceType: 'training',
-        playerAssociationId: 'avery',
+        playerId: 'avery',
         status: 'present',
       },
       {
         absenceReason: 'illness',
         occurrenceId: 'training-occurrence-1',
         occurrenceType: 'training',
-        playerAssociationId: 'blake',
+        playerId: 'blake',
         status: 'absent',
       },
       {
         absenceReason: undefined,
         occurrenceId: 'training-occurrence-1',
         occurrenceType: 'training',
-        playerAssociationId: 'casey',
+        playerId: 'casey',
         status: 'present',
       },
     ]);
@@ -47,8 +47,8 @@ describe('record attendance', () => {
 
     await expect(
       recordAttendance(participation, {
-        absences: [{ playerAssociationId: 'unknown', reason: 'other' }],
-        eligiblePlayerAssociationIds: ['avery'],
+        absences: [{ playerId: 'unknown', reason: 'other' }],
+        eligiblePlayerIds: ['avery'],
         occurrenceId: 'training-occurrence-1',
         occurrenceType: 'training',
       }),

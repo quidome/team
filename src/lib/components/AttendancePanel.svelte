@@ -114,20 +114,18 @@
 
       /** @type {ParticipationRecord[]} */
       const records = await response.json();
-      const recordsByPlayer = new Map(
-        records.map((record) => [record.playerAssociationId, record]),
-      );
+      const recordsByPlayer = new Map(records.map((record) => [record.playerId, record]));
       /** @type {AttendanceState} */
       const nextAttendance = {};
       /** @type {AbsenceReasonState} */
       const nextAbsenceReasons = {};
 
       for (const player of eligiblePlayersFor(event)) {
-        const record = recordsByPlayer.get(player.associationId);
-        nextAttendance[player.associationId] = record?.status !== 'absent';
+        const record = recordsByPlayer.get(player.id);
+        nextAttendance[player.id] = record?.status !== 'absent';
 
         if (record?.status === 'absent') {
-          nextAbsenceReasons[player.associationId] = record.absenceReason ?? 'other';
+          nextAbsenceReasons[player.id] = record.absenceReason ?? 'other';
         }
       }
 
@@ -146,44 +144,42 @@
 
   /** @param {boolean} present */
   const setAllAttendance = (present) => {
-    attendance = Object.fromEntries(
-      eligiblePlayers.map((player) => [player.associationId, present]),
-    );
+    attendance = Object.fromEntries(eligiblePlayers.map((player) => [player.id, present]));
 
     if (!present) {
       recordedAbsenceReasons = Object.fromEntries(
-        eligiblePlayers.map((player) => [player.associationId, 'other']),
+        eligiblePlayers.map((player) => [player.id, 'other']),
       );
     }
   };
 
-  /** @param {string} associationId */
-  const toggleTrainingAttendance = (associationId) => {
-    const present = attendance[associationId] !== false;
-    attendance = { ...attendance, [associationId]: !present };
+  /** @param {string} playerId */
+  const toggleTrainingAttendance = (playerId) => {
+    const present = attendance[playerId] !== false;
+    attendance = { ...attendance, [playerId]: !present };
 
     if (present) {
-      recordedAbsenceReasons = { ...recordedAbsenceReasons, [associationId]: 'other' };
+      recordedAbsenceReasons = { ...recordedAbsenceReasons, [playerId]: 'other' };
     }
   };
 
-  /** @param {string} associationId @param {Event} event */
-  const setPlayerAttendance = (associationId, event) => {
+  /** @param {string} playerId @param {Event} event */
+  const setPlayerAttendance = (playerId, event) => {
     const input = /** @type {HTMLInputElement} */ (event.currentTarget);
-    attendance = { ...attendance, [associationId]: input.checked };
+    attendance = { ...attendance, [playerId]: input.checked };
 
-    if (!input.checked && !recordedAbsenceReasons[associationId]) {
-      recordedAbsenceReasons = { ...recordedAbsenceReasons, [associationId]: 'other' };
+    if (!input.checked && !recordedAbsenceReasons[playerId]) {
+      recordedAbsenceReasons = { ...recordedAbsenceReasons, [playerId]: 'other' };
     }
   };
 
-  /** @param {string} associationId @param {Event} event */
-  const setAbsenceReason = (associationId, event) => {
+  /** @param {string} playerId @param {Event} event */
+  const setAbsenceReason = (playerId, event) => {
     const select = /** @type {HTMLSelectElement} */ (event.currentTarget);
     const reason = /** @type {AbsenceReason} */ (select.value);
     recordedAbsenceReasons = {
       ...recordedAbsenceReasons,
-      [associationId]: reason,
+      [playerId]: reason,
     };
   };
 
@@ -198,12 +194,12 @@
       const response = await fetch('/api/participation', {
         body: JSON.stringify({
           absences: eligiblePlayers
-            .filter((player) => attendance[player.associationId] === false)
+            .filter((player) => attendance[player.id] === false)
             .map((player) => ({
-              playerAssociationId: player.associationId,
-              reason: recordedAbsenceReasons[player.associationId] ?? 'other',
+              playerId: player.id,
+              reason: recordedAbsenceReasons[player.id] ?? 'other',
             })),
-          eligiblePlayerAssociationIds: eligiblePlayers.map((player) => player.associationId),
+          eligiblePlayerIds: eligiblePlayers.map((player) => player.id),
           occurrenceId: occurrenceIdFor(selectedEvent),
           occurrenceType: selectedEvent.type,
         }),
@@ -304,52 +300,52 @@
         </div>
       {:else if selectedEvent.type === 'training'}
         <div class="attendance-grid" aria-label="Training attendance">
-          {#each eligiblePlayers as player (player.associationId)}
+          {#each eligiblePlayers as player (player.id)}
             <button
-              aria-label={`${player.name}: ${attendance[player.associationId] !== false ? 'present' : 'absent'}`}
-              aria-pressed={attendance[player.associationId] !== false}
-              class:present={attendance[player.associationId] !== false}
-              class:absent={attendance[player.associationId] === false}
+              aria-label={`${player.firstName}: ${attendance[player.id] !== false ? 'present' : 'absent'}`}
+              aria-pressed={attendance[player.id] !== false}
+              class:present={attendance[player.id] !== false}
+              class:absent={attendance[player.id] === false}
               class="attendance-tile"
               disabled={attendanceSaving}
               type="button"
-              on:click={() => toggleTrainingAttendance(player.associationId)}
+              on:click={() => toggleTrainingAttendance(player.id)}
             >
-              <strong>{player.name}</strong>
+              <strong>{player.firstName}</strong>
               <small
                 >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}
                   · #{player.membership.jerseyNumber}{/if}</small
               >
               <span class="attendance-tile-status">
-                {attendance[player.associationId] !== false ? 'Present' : 'Absent'}
+                {attendance[player.id] !== false ? 'Present' : 'Absent'}
               </span>
             </button>
           {/each}
         </div>
       {:else}
         <div class="attendance-list">
-          {#each eligiblePlayers as player (player.associationId)}
-            <div class:absent={attendance[player.associationId] === false} class="attendance-row">
+          {#each eligiblePlayers as player (player.id)}
+            <div class:absent={attendance[player.id] === false} class="attendance-row">
               <label class="attendance-player">
                 <input
-                  checked={attendance[player.associationId] !== false}
+                  checked={attendance[player.id] !== false}
                   type="checkbox"
-                  on:change={(event) => setPlayerAttendance(player.associationId, event)}
+                  on:change={(event) => setPlayerAttendance(player.id, event)}
                 />
                 <span>
-                  <strong>{player.name}</strong>
+                  <strong>{player.firstName}</strong>
                   <small
                     >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}
                       · #{player.membership.jerseyNumber}{/if}</small
                   ></span
                 >
               </label>
-              {#if attendance[player.associationId] === false}
+              {#if attendance[player.id] === false}
                 <label class="absence-reason">
                   <span>Absence reason</span>
                   <select
-                    value={recordedAbsenceReasons[player.associationId] ?? 'other'}
-                    on:change={(event) => setAbsenceReason(player.associationId, event)}
+                    value={recordedAbsenceReasons[player.id] ?? 'other'}
+                    on:change={(event) => setAbsenceReason(player.id, event)}
                   >
                     {#each absenceReasons as reason (reason.value)}
                       <option value={reason.value}>{reason.label}</option>

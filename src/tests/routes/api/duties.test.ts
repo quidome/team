@@ -107,7 +107,7 @@ describe('/api/duties', () => {
   it('records a duty assignment', async () => {
     const response = await assign({
       request: new Request('http://localhost/api/duties/assignments', {
-        body: JSON.stringify({ playerAssociationId: 'player-1', slotId: 'slot-1' }),
+        body: JSON.stringify({ playerId: 'player-1', slotId: 'slot-1' }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       }),
@@ -126,7 +126,7 @@ describe('/api/duties', () => {
         body: JSON.stringify({
           dutyType: 'driving',
           occurrenceId: 'game-occurrence-1',
-          playerAssociationId: 'player-1',
+          playerId: 'player-1',
           status: 'volunteer',
         }),
         headers: { 'content-type': 'application/json' },

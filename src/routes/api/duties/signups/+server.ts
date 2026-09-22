@@ -19,18 +19,15 @@ const readSignup = async (request: Request): Promise<DutySignup | undefined> => 
       return undefined;
     }
 
-    const { dutyType, occurrenceId, playerAssociationId, status } = payload as Record<
-      string,
-      unknown
-    >;
+    const { dutyType, occurrenceId, playerId, status } = payload as Record<string, unknown>;
 
     if (
       typeof dutyType !== 'string' ||
       !dutyTypes.has(dutyType as DutyType) ||
       typeof occurrenceId !== 'string' ||
       !occurrenceId.trim() ||
-      typeof playerAssociationId !== 'string' ||
-      !playerAssociationId.trim() ||
+      typeof playerId !== 'string' ||
+      !playerId.trim() ||
       typeof status !== 'string' ||
       !signupStatuses.has(status as DutySignupStatus)
     ) {
@@ -40,7 +37,7 @@ const readSignup = async (request: Request): Promise<DutySignup | undefined> => 
     return {
       dutyType: dutyType as DutyType,
       occurrenceId: occurrenceId.trim(),
-      playerAssociationId: playerAssociationId.trim(),
+      playerId: playerId.trim(),
       status: status as DutySignupStatus,
     };
   } catch {
@@ -60,7 +57,7 @@ export const POST = async ({ request }) => {
 
     await currentAuditRepository().record({
       action: 'duty_signup_recorded',
-      entityId: `${signup.occurrenceId}:${signup.playerAssociationId}:${signup.dutyType}`,
+      entityId: `${signup.occurrenceId}:${signup.playerId}:${signup.dutyType}`,
       entityType: 'duty_signup',
       metadata: { status: signup.status },
     });

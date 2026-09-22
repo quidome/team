@@ -5,7 +5,7 @@ import type {
 } from '../application/participation/participation-repository';
 
 const recordKey = (record: ParticipationRecord) =>
-  [record.occurrenceType, record.occurrenceId, record.playerAssociationId].join('|');
+  [record.occurrenceType, record.occurrenceId, record.playerId].join('|');
 
 export class InMemoryParticipationRepository implements ParticipationRepository {
   private readonly records = new Map<string, ParticipationRecord>();

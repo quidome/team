@@ -5,7 +5,7 @@ import { currentAuditRepository, currentDutyRepository } from '$lib/server/compo
 
 const readAssignment = async (
   request: Request,
-): Promise<{ playerAssociationId: string; slotId: string } | undefined> => {
+): Promise<{ playerId: string; slotId: string } | undefined> => {
   try {
     const payload: unknown = await request.json();
 
@@ -13,18 +13,18 @@ const readAssignment = async (
       return undefined;
     }
 
-    const { playerAssociationId, slotId } = payload as Record<string, unknown>;
+    const { playerId, slotId } = payload as Record<string, unknown>;
 
     if (
-      typeof playerAssociationId !== 'string' ||
-      !playerAssociationId.trim() ||
+      typeof playerId !== 'string' ||
+      !playerId.trim() ||
       typeof slotId !== 'string' ||
       !slotId.trim()
     ) {
       return undefined;
     }
 
-    return { playerAssociationId: playerAssociationId.trim(), slotId: slotId.trim() };
+    return { playerId: playerId.trim(), slotId: slotId.trim() };
   } catch {
     return undefined;
   }
@@ -41,14 +41,14 @@ export const POST = async ({ request }) => {
     const assignedDuty = await assignDuty(
       currentDutyRepository(),
       assignment.slotId,
-      assignment.playerAssociationId,
+      assignment.playerId,
     );
 
     await currentAuditRepository().record({
       action: 'duty_assigned',
       entityId: assignment.slotId,
       entityType: 'duty_slot',
-      metadata: { playerAssociationId: assignment.playerAssociationId },
+      metadata: { playerId: assignment.playerId },
     });
 
     return json(assignedDuty);

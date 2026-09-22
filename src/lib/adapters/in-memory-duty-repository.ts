@@ -13,7 +13,7 @@ import type {
 const dutyTypes: DutyType[] = ['referee', 'jury', 'driving'];
 
 const signupKey = (signup: DutySignup) =>
-  [signup.occurrenceId, signup.dutyType, signup.playerAssociationId].join('|');
+  [signup.occurrenceId, signup.dutyType, signup.playerId].join('|');
 
 export class InMemoryDutyRepository implements DutyRepository {
   private readonly histories: DutyAssignmentHistory[] = [];
@@ -36,7 +36,7 @@ export class InMemoryDutyRepository implements DutyRepository {
 
         if (existingSlot) {
           if (existingSlot.status === 'cancelled') {
-            existingSlot.status = existingSlot.assignedPlayerAssociationId ? 'assigned' : 'open';
+            existingSlot.status = existingSlot.assignedPlayerId ? 'assigned' : 'open';
           }
           continue;
         }
@@ -54,7 +54,7 @@ export class InMemoryDutyRepository implements DutyRepository {
       for (const slot of existingSlots.filter((slot) => slot.slotNumber > requiredSlots)) {
         if (slot.status !== 'cancelled') {
           slot.status = 'cancelled';
-          this.addHistory(slot, slot.assignedPlayerAssociationId, 'cancelled');
+          this.addHistory(slot, slot.assignedPlayerId, 'cancelled');
         }
       }
     }
@@ -93,16 +93,13 @@ export class InMemoryDutyRepository implements DutyRepository {
     const completed = new Map<string, number>();
 
     for (const history of this.histories.filter((history) => history.status === 'completed')) {
-      completed.set(
-        history.playerAssociationId,
-        (completed.get(history.playerAssociationId) ?? 0) + 1,
-      );
+      completed.set(history.playerId, (completed.get(history.playerId) ?? 0) + 1);
     }
 
     return [...completed.entries()]
-      .map(([playerAssociationId, completedCount]) => ({
+      .map(([playerId, completedCount]) => ({
         completedCount,
-        playerAssociationId,
+        playerId,
       }))
       .sort((left, right) => left.completedCount - right.completedCount);
   }
@@ -113,7 +110,7 @@ export class InMemoryDutyRepository implements DutyRepository {
     return this.findByOccurrence(signup.occurrenceId);
   }
 
-  async assign(slotId: string, playerAssociationId: string): Promise<DutyView> {
+  async assign(slotId: string, playerId: string): Promise<DutyView> {
     const slot = this.slots.get(slotId);
 
     if (!slot) {
@@ -124,19 +121,19 @@ export class InMemoryDutyRepository implements DutyRepository {
       throw new Error(`Duty slot ${slotId} cannot be assigned`);
     }
 
-    if (slot.assignedPlayerAssociationId === playerAssociationId) {
+    if (slot.assignedPlayerId === playerId) {
       return this.findByOccurrence(slot.occurrenceId);
     }
 
-    if (slot.assignedPlayerAssociationId) {
-      this.addHistory(slot, slot.assignedPlayerAssociationId, 'reassigned');
-      this.updateSignupStatus(slot, slot.assignedPlayerAssociationId, 'volunteer');
+    if (slot.assignedPlayerId) {
+      this.addHistory(slot, slot.assignedPlayerId, 'reassigned');
+      this.updateSignupStatus(slot, slot.assignedPlayerId, 'volunteer');
     }
 
-    slot.assignedPlayerAssociationId = playerAssociationId;
+    slot.assignedPlayerId = playerId;
     slot.status = 'assigned';
-    this.updateSignupStatus(slot, playerAssociationId, 'selected');
-    this.addHistory(slot, playerAssociationId, 'assigned');
+    this.updateSignupStatus(slot, playerId, 'selected');
+    this.addHistory(slot, playerId, 'assigned');
 
     return this.findByOccurrence(slot.occurrenceId);
   }
@@ -150,8 +147,8 @@ export class InMemoryDutyRepository implements DutyRepository {
 
     slot.status = status;
 
-    if (slot.assignedPlayerAssociationId && status !== 'assigned' && status !== 'open') {
-      this.addHistory(slot, slot.assignedPlayerAssociationId, status);
+    if (slot.assignedPlayerId && status !== 'assigned' && status !== 'open') {
+      this.addHistory(slot, slot.assignedPlayerId, status);
     }
 
     return this.findByOccurrence(slot.occurrenceId);
@@ -159,31 +156,27 @@ export class InMemoryDutyRepository implements DutyRepository {
 
   private addHistory(
     slot: DutySlot,
-    playerAssociationId: string | undefined,
+    playerId: string | undefined,
     status: DutyAssignmentHistory['status'],
   ): void {
-    if (!playerAssociationId) {
+    if (!playerId) {
       return;
     }
 
     this.histories.push({
       dutyType: slot.dutyType,
       occurrenceId: slot.occurrenceId,
-      playerAssociationId,
+      playerId,
       slotId: slot.id,
       status,
     });
   }
 
-  private updateSignupStatus(
-    slot: DutySlot,
-    playerAssociationId: string,
-    status: DutySignup['status'],
-  ): void {
+  private updateSignupStatus(slot: DutySlot, playerId: string, status: DutySignup['status']): void {
     const key = signupKey({
       dutyType: slot.dutyType,
       occurrenceId: slot.occurrenceId,
-      playerAssociationId,
+      playerId,
       status,
     });
     const existing = this.signups.get(key);
@@ -196,7 +189,7 @@ export class InMemoryDutyRepository implements DutyRepository {
     this.signups.set(key, {
       dutyType: slot.dutyType,
       occurrenceId: slot.occurrenceId,
-      playerAssociationId,
+      playerId,
       status,
     });
   }

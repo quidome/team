@@ -15,9 +15,10 @@ export const players = pgTable(
   'players',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    associationId: text('association_id').notNull(),
-    birthDate: date('birth_date', { mode: 'string' }).notNull(),
-    name: text('name').notNull(),
+    associationId: text('association_id'),
+    birthDate: date('birth_date', { mode: 'string' }),
+    firstName: text('first_name').notNull(),
+    lastName: text('last_name'),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex('players_association_id_unique').on(table.associationId)],

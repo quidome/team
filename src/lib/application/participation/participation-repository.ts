@@ -6,7 +6,7 @@ export interface ParticipationRecord {
   absenceReason?: AbsenceReason;
   occurrenceId: string;
   occurrenceType: ParticipationOccurrenceType;
-  playerAssociationId: string;
+  playerId: string;
   status: ParticipationStatus;
 }
 

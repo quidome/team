@@ -5,9 +5,8 @@
   /** @type {PageData} */
   export let data;
 
-  /** @param {string} associationId */
-  const playerName = (associationId) =>
-    data.players.find((player) => player.associationId === associationId)?.name ?? associationId;
+  /** @param {string} id */
+  const playerName = (id) => data.players.find((player) => player.id === id)?.firstName ?? id;
 
   /** @param {{ percentage?: number }} metric */
   const percentage = (metric) => (metric.percentage === undefined ? '—' : `${metric.percentage}%`);
@@ -84,9 +83,9 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.players as player (player.associationId)}
+          {#each data.players as player (player.id)}
             <tr>
-              <th scope="row">{player.name}</th>
+              <th scope="row">{player.firstName}</th>
               <td
                 >{percentage(player.games)}
                 <span>{player.games.present}/{player.games.denominator}</span></td
@@ -128,14 +127,14 @@
     </div>
   {:else}
     <div class="entry-list">
-      {#each data.entries as entry (`${entry.eventId}-${entry.playerAssociationId}`)}
+      {#each data.entries as entry (`${entry.eventId}-${entry.playerId}`)}
         <article class="entry-row">
           <div>
             <strong>{formatDate(entry.date)}</strong>
             <span>{entry.occurrenceType === 'game' ? 'Game' : 'Training'}</span>
           </div>
           <div>
-            <strong>{playerName(entry.playerAssociationId)}</strong>
+            <strong>{playerName(entry.playerId)}</strong>
             <span>{entry.eventLabel}</span>
           </div>
           <strong class:absent={entry.status === 'absent'}>{entry.status}</strong>

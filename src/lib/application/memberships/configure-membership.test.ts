@@ -9,7 +9,7 @@ describe('configure season-specific team membership', () => {
     const membership = {
       jerseyNumber: 7,
       participationType: 'trains_and_plays' as const,
-      playerAssociationId: '12345',
+      playerId: 'player-1',
       relationship: 'primary' as const,
       seasonStartingYear: 2026,
       status: 'active' as const,
@@ -24,7 +24,7 @@ describe('configure season-specific team membership', () => {
     const membership = {
       jerseyNumber: 7,
       participationType: 'trains_and_plays' as const,
-      playerAssociationId: '12345',
+      playerId: 'player-1',
       relationship: 'primary' as const,
       seasonStartingYear: 2026,
       status: 'active' as const,

@@ -4,7 +4,7 @@ import type { Player, PlayerRepository } from '../players/player-repository';
 
 export interface TeamPlayer extends Player {
   membership?: Membership;
-  normalAgeGroup: ReturnType<typeof calculateNormalAgeGroup>;
+  normalAgeGroup?: ReturnType<typeof calculateNormalAgeGroup>;
 }
 
 export interface TeamRosterOptions {
@@ -28,17 +28,21 @@ export const readTeam = async (
           membership.seasonStartingYear === options.seasonStartingYear &&
           membership.teamName === options.teamName,
       )
-      .map((membership) => [membership.playerAssociationId, membership]),
+      .map((membership) => [membership.playerId, membership]),
   );
 
   return storedPlayers.map((player) => ({
     ...player,
-    ...(membershipsByPlayer.has(player.associationId)
-      ? { membership: membershipsByPlayer.get(player.associationId) }
+    ...(membershipsByPlayer.has(player.id)
+      ? { membership: membershipsByPlayer.get(player.id) }
       : {}),
-    normalAgeGroup: calculateNormalAgeGroup(
-      options.seasonStartingYear,
-      Number(player.birthDate.slice(0, 4)),
-    ),
+    ...(player.birthDate
+      ? {
+          normalAgeGroup: calculateNormalAgeGroup(
+            options.seasonStartingYear,
+            Number(player.birthDate.slice(0, 4)),
+          ),
+        }
+      : {}),
   }));
 };

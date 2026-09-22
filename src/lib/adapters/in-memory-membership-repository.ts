@@ -4,7 +4,7 @@ import type {
 } from '../application/memberships/membership-repository';
 
 const membershipKey = (membership: Membership) =>
-  [membership.playerAssociationId, membership.teamName, membership.seasonStartingYear].join('|');
+  [membership.playerId, membership.teamName, membership.seasonStartingYear].join('|');
 
 export class InMemoryMembershipRepository implements MembershipRepository {
   private readonly memberships = new Map<string, Membership>();

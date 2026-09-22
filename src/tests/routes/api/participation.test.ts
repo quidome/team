@@ -28,7 +28,7 @@ describe('POST /api/participation', () => {
       {
         occurrenceId: 'training-occurrence-1',
         occurrenceType: 'training',
-        playerAssociationId: 'avery',
+        playerId: 'avery',
         status: 'present',
       },
     ]);
@@ -41,7 +41,7 @@ describe('POST /api/participation', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual([
-      expect.objectContaining({ playerAssociationId: 'avery', status: 'present' }),
+      expect.objectContaining({ playerId: 'avery', status: 'present' }),
     ]);
   });
 
@@ -49,8 +49,8 @@ describe('POST /api/participation', () => {
     const response = await POST({
       request: new Request('http://localhost/api/participation', {
         body: JSON.stringify({
-          absences: [{ playerAssociationId: 'blake', reason: 'illness' }],
-          eligiblePlayerAssociationIds: ['avery', 'blake', 'casey'],
+          absences: [{ playerId: 'blake', reason: 'illness' }],
+          eligiblePlayerIds: ['avery', 'blake', 'casey'],
           occurrenceId: 'training-occurrence-1',
           occurrenceType: 'training',
         }),
@@ -64,13 +64,13 @@ describe('POST /api/participation', () => {
       expect.objectContaining({ action: 'attendance_recorded', entityType: 'participation' }),
     );
     await expect(response.json()).resolves.toEqual([
-      expect.objectContaining({ playerAssociationId: 'avery', status: 'present' }),
+      expect.objectContaining({ playerId: 'avery', status: 'present' }),
       expect.objectContaining({
         absenceReason: 'illness',
-        playerAssociationId: 'blake',
+        playerId: 'blake',
         status: 'absent',
       }),
-      expect.objectContaining({ playerAssociationId: 'casey', status: 'present' }),
+      expect.objectContaining({ playerId: 'casey', status: 'present' }),
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('POST /api/participation', () => {
       request: new Request('http://localhost/api/participation', {
         body: JSON.stringify({
           absences: [],
-          eligiblePlayerAssociationIds: ['avery'],
+          eligiblePlayerIds: ['avery'],
           occurrenceId: 'training-occurrence-1',
           occurrenceType: 'unknown',
         }),

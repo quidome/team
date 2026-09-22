@@ -15,7 +15,7 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
       .select({
         jerseyNumber: memberships.jerseyNumber,
         participationType: memberships.participationType,
-        playerAssociationId: players.associationId,
+        playerId: memberships.playerId,
         relationship: memberships.relationship,
         seasonStartingYear: seasons.startingYear,
         status: memberships.status,
@@ -25,7 +25,7 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
       .innerJoin(players, eq(memberships.playerId, players.id))
       .innerJoin(teams, eq(memberships.teamId, teams.id))
       .innerJoin(seasons, eq(memberships.seasonId, seasons.id))
-      .orderBy(asc(players.name));
+      .orderBy(asc(players.firstName));
 
     return storedMemberships.map((storedMembership) => ({
       ...storedMembership,
@@ -40,19 +40,18 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
       .select({
         jerseyNumber: memberships.jerseyNumber,
         participationType: memberships.participationType,
-        playerAssociationId: players.associationId,
+        playerId: memberships.playerId,
         relationship: memberships.relationship,
         seasonStartingYear: seasons.startingYear,
         status: memberships.status,
         teamName: teams.name,
       })
       .from(memberships)
-      .innerJoin(players, eq(memberships.playerId, players.id))
       .innerJoin(teams, eq(memberships.teamId, teams.id))
       .innerJoin(seasons, eq(memberships.seasonId, seasons.id))
       .where(
         and(
-          eq(players.associationId, membership.playerAssociationId),
+          eq(memberships.playerId, membership.playerId),
           eq(seasons.startingYear, membership.seasonStartingYear),
           eq(teams.name, membership.teamName),
         ),
@@ -75,7 +74,7 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
     const [player] = await database
       .select({ id: players.id })
       .from(players)
-      .where(eq(players.associationId, membership.playerAssociationId))
+      .where(eq(players.id, membership.playerId))
       .limit(1);
     const [season] = await database
       .select({ id: seasons.id })
@@ -89,7 +88,7 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
       .limit(1);
 
     if (!player) {
-      throw new Error(`Player ${membership.playerAssociationId} does not exist`);
+      throw new Error(`Player ${membership.playerId} does not exist`);
     }
 
     if (!season) {
@@ -117,7 +116,7 @@ export const createPostgresMembershipRepository = (database: Database): Membersh
     const [player] = await database
       .select({ id: players.id })
       .from(players)
-      .where(eq(players.associationId, membership.playerAssociationId))
+      .where(eq(players.id, membership.playerId))
       .limit(1);
     const [season] = await database
       .select({ id: seasons.id })

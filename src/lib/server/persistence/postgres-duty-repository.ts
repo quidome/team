@@ -21,16 +21,14 @@ const emptyRequirements: DutyRequirements = {
 };
 
 const toDutySlot = (row: {
-  assignedPlayerAssociationId: string | null;
+  assignedPlayerId: string | null;
   dutyType: DutyType;
   id: string;
   occurrenceId: string;
   slotNumber: number;
   status: DutySlotStatus;
 }): DutySlot => ({
-  ...(row.assignedPlayerAssociationId
-    ? { assignedPlayerAssociationId: row.assignedPlayerAssociationId }
-    : {}),
+  ...(row.assignedPlayerId ? { assignedPlayerId: row.assignedPlayerId } : {}),
   dutyType: row.dutyType,
   id: row.id,
   occurrenceId: row.occurrenceId,
@@ -50,7 +48,7 @@ const readView = async (database: DatabaseConnection, occurrenceId: string): Pro
     .limit(1);
   const slotRows = await database
     .select({
-      assignedPlayerAssociationId: players.associationId,
+      assignedPlayerId: dutySlots.assignedPlayerId,
       dutyType: dutySlots.type,
       id: dutySlots.id,
       occurrenceId: dutySlots.gameOccurrenceId,
@@ -58,31 +56,29 @@ const readView = async (database: DatabaseConnection, occurrenceId: string): Pro
       status: dutySlots.status,
     })
     .from(dutySlots)
-    .leftJoin(players, eq(dutySlots.assignedPlayerId, players.id))
     .where(eq(dutySlots.gameOccurrenceId, occurrenceId))
     .orderBy(asc(dutySlots.type), asc(dutySlots.slotNumber));
   const signupRows = await database
     .select({
       dutyType: dutySignups.type,
       occurrenceId: dutySignups.gameOccurrenceId,
-      playerAssociationId: players.associationId,
+      playerId: dutySignups.playerId,
       status: dutySignups.status,
     })
     .from(dutySignups)
     .innerJoin(players, eq(dutySignups.playerId, players.id))
     .where(eq(dutySignups.gameOccurrenceId, occurrenceId))
-    .orderBy(asc(players.name));
+    .orderBy(asc(players.firstName));
   const historyRows = await database
     .select({
       dutyType: dutySlots.type,
       occurrenceId: dutySlots.gameOccurrenceId,
-      playerAssociationId: players.associationId,
+      playerId: dutyAssignmentHistory.playerId,
       slotId: dutyAssignmentHistory.slotId,
       status: dutyAssignmentHistory.status,
     })
     .from(dutyAssignmentHistory)
     .innerJoin(dutySlots, eq(dutyAssignmentHistory.slotId, dutySlots.id))
-    .innerJoin(players, eq(dutyAssignmentHistory.playerId, players.id))
     .where(eq(dutySlots.gameOccurrenceId, occurrenceId))
     .orderBy(asc(dutyAssignmentHistory.createdAt));
 
@@ -99,21 +95,20 @@ const readView = async (database: DatabaseConnection, occurrenceId: string): Pro
 const findFairness = async (database: DatabaseConnection): Promise<DutyFairness[]> => {
   const rows = await database
     .select({
-      playerAssociationId: players.associationId,
+      playerId: dutyAssignmentHistory.playerId,
       status: dutyAssignmentHistory.status,
     })
-    .from(dutyAssignmentHistory)
-    .innerJoin(players, eq(dutyAssignmentHistory.playerId, players.id));
+    .from(dutyAssignmentHistory);
   const counts = new Map<string, number>();
 
   for (const row of rows.filter((row) => row.status === 'completed')) {
-    counts.set(row.playerAssociationId, (counts.get(row.playerAssociationId) ?? 0) + 1);
+    counts.set(row.playerId, (counts.get(row.playerId) ?? 0) + 1);
   }
 
   return [...counts.entries()]
-    .map(([playerAssociationId, completedCount]) => ({
+    .map(([playerId, completedCount]) => ({
       completedCount,
-      playerAssociationId,
+      playerId,
     }))
     .sort((left, right) => left.completedCount - right.completedCount);
 };
@@ -201,15 +196,14 @@ export const createPostgresDutyRepository = (database: DatabaseConnection): Duty
   async findAllSlots() {
     const rows = await database
       .select({
-        assignedPlayerAssociationId: players.associationId,
+        assignedPlayerId: dutySlots.assignedPlayerId,
         dutyType: dutySlots.type,
         id: dutySlots.id,
         occurrenceId: dutySlots.gameOccurrenceId,
         slotNumber: dutySlots.slotNumber,
         status: dutySlots.status,
       })
-      .from(dutySlots)
-      .leftJoin(players, eq(dutySlots.assignedPlayerId, players.id));
+      .from(dutySlots);
 
     return rows.map(toDutySlot);
   },
@@ -226,18 +220,18 @@ export const createPostgresDutyRepository = (database: DatabaseConnection): Duty
     const [player] = await database
       .select({ id: players.id })
       .from(players)
-      .where(eq(players.associationId, signup.playerAssociationId))
+      .where(eq(players.id, signup.playerId))
       .limit(1);
 
     if (!player) {
-      throw new Error(`Player ${signup.playerAssociationId} does not exist`);
+      throw new Error(`Player ${signup.playerId} does not exist`);
     }
 
     await database
       .insert(dutySignups)
       .values({
         gameOccurrenceId: signup.occurrenceId,
-        playerId: player.id,
+        playerId: signup.playerId,
         status: signup.status,
         type: signup.dutyType,
       })
@@ -249,7 +243,7 @@ export const createPostgresDutyRepository = (database: DatabaseConnection): Duty
     return readView(database, signup.occurrenceId);
   },
 
-  async assign(slotId, playerAssociationId) {
+  async assign(slotId, playerId) {
     const [slot] = await database
       .select({
         assignedPlayerId: dutySlots.assignedPlayerId,
@@ -272,11 +266,11 @@ export const createPostgresDutyRepository = (database: DatabaseConnection): Duty
     const [player] = await database
       .select({ id: players.id })
       .from(players)
-      .where(eq(players.associationId, playerAssociationId))
+      .where(eq(players.id, playerId))
       .limit(1);
 
     if (!player) {
-      throw new Error(`Player ${playerAssociationId} does not exist`);
+      throw new Error(`Player ${playerId} does not exist`);
     }
 
     if (slot.assignedPlayerId === player.id) {

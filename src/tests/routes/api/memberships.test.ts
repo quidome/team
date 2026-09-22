@@ -30,7 +30,7 @@ describe('POST /api/memberships', () => {
         body: JSON.stringify({
           jerseyNumber: 7,
           participationType: 'trains_and_plays',
-          playerAssociationId: '12345',
+          playerId: '12345',
           relationship: 'primary',
           seasonStartingYear: 2026,
           status: 'active',
@@ -48,7 +48,7 @@ describe('POST /api/memberships', () => {
     await expect(response.json()).resolves.toEqual({
       jerseyNumber: 7,
       participationType: 'trains_and_plays',
-      playerAssociationId: '12345',
+      playerId: '12345',
       relationship: 'primary',
       seasonStartingYear: 2026,
       status: 'active',
@@ -61,7 +61,7 @@ describe('POST /api/memberships', () => {
       request: new Request('http://localhost/api/memberships', {
         body: JSON.stringify({
           participationType: 'plays_only',
-          playerAssociationId: '12345',
+          playerId: '12345',
           relationship: 'primary',
           seasonStartingYear: 2026,
           status: 'active',

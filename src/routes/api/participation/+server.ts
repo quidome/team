@@ -24,8 +24,10 @@ const readCommand = async (request: Request): Promise<RecordAttendanceCommand | 
       return undefined;
     }
 
-    const { absences, eligiblePlayerAssociationIds, occurrenceId, occurrenceType } =
-      payload as Record<string, unknown>;
+    const { absences, eligiblePlayerIds, occurrenceId, occurrenceType } = payload as Record<
+      string,
+      unknown
+    >;
 
     if (
       !Array.isArray(absences) ||
@@ -33,11 +35,11 @@ const readCommand = async (request: Request): Promise<RecordAttendanceCommand | 
         (absence) =>
           typeof absence === 'object' &&
           absence !== null &&
-          typeof (absence as Record<string, unknown>).playerAssociationId === 'string' &&
+          typeof (absence as Record<string, unknown>).playerId === 'string' &&
           absenceReasons.has((absence as Record<string, unknown>).reason as AbsenceReason),
       ) ||
-      !Array.isArray(eligiblePlayerAssociationIds) ||
-      !eligiblePlayerAssociationIds.every((id) => typeof id === 'string') ||
+      !Array.isArray(eligiblePlayerIds) ||
+      !eligiblePlayerIds.every((id) => typeof id === 'string') ||
       typeof occurrenceId !== 'string' ||
       !occurrenceId.trim() ||
       typeof occurrenceType !== 'string' ||
@@ -51,11 +53,11 @@ const readCommand = async (request: Request): Promise<RecordAttendanceCommand | 
         const value = absence as Record<string, unknown>;
 
         return {
-          playerAssociationId: (value.playerAssociationId as string).trim(),
+          playerId: (value.playerId as string).trim(),
           reason: value.reason as AbsenceReason,
         };
       }),
-      eligiblePlayerAssociationIds: eligiblePlayerAssociationIds.map((id) => id.trim()),
+      eligiblePlayerIds: eligiblePlayerIds.map((id) => id.trim()),
       occurrenceId: occurrenceId.trim(),
       occurrenceType: occurrenceType as ParticipationOccurrenceType,
     };

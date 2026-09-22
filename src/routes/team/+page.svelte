@@ -10,39 +10,46 @@
   let playerForm = {
     associationId: '',
     birthDate: '',
-    name: '',
+    firstName: '',
+    lastName: '',
   };
   let membershipForm = {
     jerseyNumber: '',
     participationType: 'trains_and_plays',
-    playerAssociationId: data.players[0]?.associationId ?? '',
+    playerId: data.players[0]?.id ?? '',
     relationship: 'primary',
     status: 'active',
   };
+  let playerEditForm = {
+    associationId: '',
+    birthDate: '',
+    firstName: '',
+    lastName: '',
+  };
   let playerSaving = false;
   let membershipSaving = false;
+  let playerEditSaving = false;
   let showPlayerModal = false;
   let showMembershipModal = false;
-  let selectedPlayerAssociationId = '';
+  let selectedPlayerId = '';
   let playerMessage = '';
   let playerError = '';
   let membershipError = '';
+  let playerEditError = '';
 
   $: currentTeamPlayers = data.players.filter(
     (player) => player.membership?.teamName === data.teamName,
   );
-  $: selectedPlayer = data.players.find(
-    (player) => player.associationId === selectedPlayerAssociationId,
-  );
+  $: selectedPlayer = data.players.find((player) => player.id === selectedPlayerId);
 
-  /** @param {string} path @param {unknown} payload */
-  const postJson = async (path, payload) => {
+  /** @param {string} path @param {unknown} payload @param {string} [method] */
+  const postJson = async (path, payload, method = 'POST') => {
     const response = await fetch(path, {
       body: JSON.stringify(payload),
       headers: { 'content-type': 'application/json' },
-      method: 'POST',
+      method,
     });
-    /** @type {{ error?: string }} */
+    /** @type {any} */
     const body = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -53,27 +60,37 @@
   };
 
   /** @param {import('$lib/application/team/read-team').TeamPlayer} player */
+  const displayName = (player) =>
+    player.lastName ? `${player.firstName} ${player.lastName}` : player.firstName;
+
+  /** @param {import('$lib/application/team/read-team').TeamPlayer} player */
   const openMembershipEditor = (player) => {
-    selectedPlayerAssociationId = player.associationId;
+    selectedPlayerId = player.id;
     membershipForm = {
       jerseyNumber: player.membership?.jerseyNumber?.toString() ?? '',
       participationType: player.membership?.participationType ?? 'trains_and_plays',
-      playerAssociationId: player.associationId,
+      playerId: player.id,
       relationship: player.membership?.relationship ?? 'primary',
       status: player.membership?.status ?? 'active',
     };
+    playerEditForm = {
+      associationId: player.associationId ?? '',
+      birthDate: player.birthDate ?? '',
+      firstName: player.firstName,
+      lastName: player.lastName ?? '',
+    };
     membershipError = '';
+    playerEditError = '';
     showMembershipModal = true;
   };
 
   const deletePlayer = async () => {
-    if (!selectedPlayer || !window.confirm(`Delete ${selectedPlayer.name}?`)) return;
+    if (!selectedPlayer || !window.confirm(`Delete ${displayName(selectedPlayer)}?`)) return;
 
     try {
-      const response = await fetch(
-        `/api/players?associationId=${encodeURIComponent(selectedPlayer.associationId)}`,
-        { method: 'DELETE' },
-      );
+      const response = await fetch(`/api/players?id=${encodeURIComponent(selectedPlayer.id)}`, {
+        method: 'DELETE',
+      });
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -93,16 +110,23 @@
     playerError = '';
 
     try {
-      await postJson('/api/players', playerForm);
+      const createdPlayer = await postJson('/api/players', {
+        firstName: playerForm.firstName.trim(),
+        ...(playerForm.lastName.trim() ? { lastName: playerForm.lastName.trim() } : {}),
+        ...(playerForm.birthDate ? { birthDate: playerForm.birthDate } : {}),
+        ...(playerForm.associationId.trim()
+          ? { associationId: playerForm.associationId.trim() }
+          : {}),
+      });
       await postJson('/api/memberships', {
         participationType: 'trains_and_plays',
-        playerAssociationId: playerForm.associationId.trim(),
+        playerId: createdPlayer.id,
         relationship: 'primary',
         seasonStartingYear: data.season.startingYear,
         status: 'active',
         teamName: data.teamName,
       });
-      playerForm = { associationId: '', birthDate: '', name: '' };
+      playerForm = { associationId: '', birthDate: '', firstName: '', lastName: '' };
       playerMessage = `Player added to ${data.season.startingYear}–${data.season.endingYear} · ${data.teamName}.`;
       showPlayerModal = false;
       await invalidateAll();
@@ -123,7 +147,7 @@
           ? { jerseyNumber: Number(membershipForm.jerseyNumber) }
           : {}),
         participationType: membershipForm.participationType,
-        playerAssociationId: membershipForm.playerAssociationId,
+        playerId: membershipForm.playerId,
         relationship: membershipForm.relationship,
         seasonStartingYear: data.season.startingYear,
         status: membershipForm.status,
@@ -135,6 +159,35 @@
       membershipError = error instanceof Error ? error.message : 'Membership could not be saved.';
     } finally {
       membershipSaving = false;
+    }
+  };
+
+  const savePlayerDetails = async () => {
+    if (!selectedPlayer) return;
+
+    playerEditSaving = true;
+    playerEditError = '';
+
+    try {
+      await postJson(
+        '/api/players',
+        {
+          id: selectedPlayer.id,
+          firstName: playerEditForm.firstName.trim(),
+          ...(playerEditForm.lastName.trim() ? { lastName: playerEditForm.lastName.trim() } : {}),
+          ...(playerEditForm.birthDate ? { birthDate: playerEditForm.birthDate } : {}),
+          ...(playerEditForm.associationId.trim()
+            ? { associationId: playerEditForm.associationId.trim() }
+            : {}),
+        },
+        'PUT',
+      );
+      await invalidateAll();
+    } catch (error) {
+      playerEditError =
+        error instanceof Error ? error.message : 'Player details could not be saved.';
+    } finally {
+      playerEditSaving = false;
     }
   };
 </script>
@@ -170,12 +223,14 @@
     </div>
   {:else}
     <div class="player-list">
-      {#each data.players as player (player.associationId)}
+      {#each data.players as player (player.id)}
         <button class="player-card" type="button" on:click={() => openMembershipEditor(player)}>
           <div>
-            <p class="player-name">{player.name}</p>
+            <p class="player-name">{player.firstName}</p>
             <p class="player-meta">
-              {player.normalAgeGroup} · Born {player.birthDate} · Association ID {player.associationId}
+              {#if player.normalAgeGroup}{player.normalAgeGroup}{:else}Age group unknown{/if}
+              {#if player.birthDate}· Born {player.birthDate}{/if}
+              {#if player.associationId}· Association ID {player.associationId}{/if}
             </p>
           </div>
           {#if player.membership}
@@ -222,16 +277,20 @@
       </div>
       <form class="form-grid" on:submit|preventDefault={registerPlayer}>
         <label>
-          Name
-          <input bind:value={playerForm.name} required autocomplete="name" />
+          First name
+          <input bind:value={playerForm.firstName} required autocomplete="given-name" />
         </label>
         <label>
-          Birthday
-          <input bind:value={playerForm.birthDate} required type="date" />
+          Last name <span class="optional">optional</span>
+          <input bind:value={playerForm.lastName} autocomplete="family-name" />
         </label>
         <label>
-          Association ID
-          <input bind:value={playerForm.associationId} required autocomplete="off" />
+          Birthday <span class="optional">optional</span>
+          <input bind:value={playerForm.birthDate} type="date" />
+        </label>
+        <label>
+          Association ID <span class="optional">optional</span>
+          <input bind:value={playerForm.associationId} autocomplete="off" />
         </label>
         <button disabled={playerSaving} type="submit">
           {playerSaving ? 'Saving…' : 'Add player'}
@@ -250,12 +309,35 @@
           <p class="eyebrow">
             {data.teamName} · {data.season.startingYear}–{data.season.endingYear}
           </p>
-          <h2 id="membership-heading">{selectedPlayer.name}</h2>
+          <h2 id="membership-heading">{displayName(selectedPlayer)}</h2>
         </div>
         <button class="close-button" type="button" on:click={() => (showMembershipModal = false)}>
           Close
         </button>
       </div>
+      <p class="modal-context">Player details.</p>
+      <form class="form-grid" on:submit|preventDefault={savePlayerDetails}>
+        <label>
+          First name
+          <input bind:value={playerEditForm.firstName} required autocomplete="given-name" />
+        </label>
+        <label>
+          Last name <span class="optional">optional</span>
+          <input bind:value={playerEditForm.lastName} autocomplete="family-name" />
+        </label>
+        <label>
+          Birthday <span class="optional">optional</span>
+          <input bind:value={playerEditForm.birthDate} type="date" />
+        </label>
+        <label>
+          Association ID <span class="optional">optional</span>
+          <input bind:value={playerEditForm.associationId} autocomplete="off" />
+        </label>
+        <button disabled={playerEditSaving} type="submit">
+          {playerEditSaving ? 'Saving…' : 'Save details'}
+        </button>
+      </form>
+      {#if playerEditError}<p class="form-error" role="alert">{playerEditError}</p>{/if}
       <p class="modal-context">Membership for the active team-season context.</p>
       <form class="form-grid" on:submit|preventDefault={saveMembership}>
         <label>

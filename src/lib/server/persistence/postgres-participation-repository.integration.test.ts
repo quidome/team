@@ -19,17 +19,32 @@ if (!databaseUrl) {
     const database = createDatabase(databaseUrl);
     const repository: ParticipationRepository = createPostgresParticipationRepository(database);
 
+    let playerIds: string[];
+
     beforeAll(async () => {
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[0]));
       await database.delete(players).where(eq(players.associationId, playerAssociationIds[1]));
 
-      await database.insert(players).values(
-        playerAssociationIds.map((associationId, index) => ({
-          associationId,
-          birthDate: `201${index + 1}-01-01`,
-          name: `Participation integration ${index}`,
-        })),
-      );
+      const insertedPlayers = await database
+        .insert(players)
+        .values(
+          playerAssociationIds.map((associationId, index) => ({
+            associationId,
+            birthDate: `201${index + 1}-01-01`,
+            firstName: `Participation integration ${index}`,
+          })),
+        )
+        .returning({ associationId: players.associationId, id: players.id });
+
+      playerIds = playerAssociationIds.map((associationId) => {
+        const player = insertedPlayers.find((row) => row.associationId === associationId);
+
+        if (!player) {
+          throw new Error(`Could not create participation integration fixture ${associationId}`);
+        }
+
+        return player.id;
+      });
     });
 
     afterAll(async () => {
@@ -43,26 +58,26 @@ if (!databaseUrl) {
         {
           occurrenceId: '00000000-0000-0000-0000-000000000001',
           occurrenceType: 'training',
-          playerAssociationId: playerAssociationIds[0],
+          playerId: playerIds[0],
           status: 'present',
         },
         {
           absenceReason: 'illness',
           occurrenceId: '00000000-0000-0000-0000-000000000001',
           occurrenceType: 'training',
-          playerAssociationId: playerAssociationIds[1],
+          playerId: playerIds[1],
           status: 'absent',
         },
       ]);
 
       expect(initialRecords).toEqual([
         expect.objectContaining({
-          playerAssociationId: playerAssociationIds[0],
+          playerId: playerIds[0],
           status: 'present',
         }),
         expect.objectContaining({
           absenceReason: 'illness',
-          playerAssociationId: playerAssociationIds[1],
+          playerId: playerIds[1],
           status: 'absent',
         }),
       ]);
@@ -71,7 +86,7 @@ if (!databaseUrl) {
         {
           occurrenceId: '00000000-0000-0000-0000-000000000001',
           occurrenceType: 'training',
-          playerAssociationId: playerAssociationIds[1],
+          playerId: playerIds[1],
           status: 'present',
         },
       ]);
@@ -81,11 +96,11 @@ if (!databaseUrl) {
       ).resolves.toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            playerAssociationId: playerAssociationIds[0],
+            playerId: playerIds[0],
             status: 'present',
           }),
           expect.objectContaining({
-            playerAssociationId: playerAssociationIds[1],
+            playerId: playerIds[1],
             status: 'present',
           }),
         ]),

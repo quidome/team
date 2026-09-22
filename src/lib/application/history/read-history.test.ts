@@ -8,31 +8,31 @@ describe('readHistory', () => {
     const report = readHistory(
       [
         {
-          associationId: 'p-1',
           birthDate: '2010-01-01',
+          firstName: 'Alex',
+          id: 'p-1',
           membership: {
             participationType: 'trains_and_plays',
-            playerAssociationId: 'p-1',
+            playerId: 'p-1',
             relationship: 'primary',
             seasonStartingYear: 2026,
             status: 'active',
             teamName: 'U16-1',
           },
-          name: 'Alex',
           normalAgeGroup: calculateNormalAgeGroup(2026, 2010),
         },
         {
-          associationId: 'p-2',
           birthDate: '2010-01-01',
+          firstName: 'Robin',
+          id: 'p-2',
           membership: {
             participationType: 'trains_only',
-            playerAssociationId: 'p-2',
+            playerId: 'p-2',
             relationship: 'primary',
             seasonStartingYear: 2026,
             status: 'active',
             teamName: 'U16-1',
           },
-          name: 'Robin',
           normalAgeGroup: calculateNormalAgeGroup(2026, 2010),
         },
       ],
@@ -40,23 +40,23 @@ describe('readHistory', () => {
         {
           occurrenceId: 'g-1',
           occurrenceType: 'game',
-          playerAssociationId: 'p-1',
+          playerId: 'p-1',
           status: 'present',
         },
         {
           occurrenceId: 'g-2',
           occurrenceType: 'game',
-          playerAssociationId: 'p-1',
+          playerId: 'p-1',
           status: 'absent',
         },
         {
           occurrenceId: 't-1',
           occurrenceType: 'training',
-          playerAssociationId: 'p-2',
+          playerId: 'p-2',
           status: 'present',
         },
       ],
-      [{ completedCount: 2, playerAssociationId: 'p-1' }],
+      [{ completedCount: 2, playerId: 'p-1' }],
       [
         {
           awayTeamName: 'U18-1',
@@ -89,18 +89,18 @@ describe('readHistory', () => {
     expect(report.players).toEqual([
       expect.objectContaining({
         dutiesCompleted: 2,
+        firstName: 'Alex',
         games: { denominator: 2, percentage: 50, present: 1, recorded: 2 },
-        name: 'Alex',
       }),
       expect.objectContaining({
+        firstName: 'Robin',
         games: { denominator: 0, present: 0, recorded: 0 },
-        name: 'Robin',
         trainings: { denominator: 1, percentage: 100, present: 1, recorded: 1 },
       }),
     ]);
     expect(report.entries[0]).toMatchObject({
       eventLabel: 'U16-1 vs U18-1',
-      playerAssociationId: 'p-1',
+      playerId: 'p-1',
     });
   });
 
@@ -108,17 +108,17 @@ describe('readHistory', () => {
     const report = readHistory(
       [
         {
-          associationId: 'p-1',
           birthDate: '2010-01-01',
+          firstName: 'Alex',
+          id: 'p-1',
           membership: {
             participationType: 'trains_and_plays',
-            playerAssociationId: 'p-1',
+            playerId: 'p-1',
             relationship: 'primary',
             seasonStartingYear: 2026,
             status: 'active',
             teamName: 'U16-1',
           },
-          name: 'Alex',
           normalAgeGroup: calculateNormalAgeGroup(2026, 2010),
         },
       ],
@@ -126,7 +126,7 @@ describe('readHistory', () => {
         {
           occurrenceId: 't-1',
           occurrenceType: 'training',
-          playerAssociationId: 'p-1',
+          playerId: 'p-1',
           status: 'present',
         },
       ],
