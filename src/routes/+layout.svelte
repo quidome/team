@@ -49,7 +49,9 @@
       </a>
     {/each}
   </nav>
-  {#if data.isAuthenticated}
+  {#if data.isDeveloperMode}
+    <span class="login-link developer-mode">Developer mode</span>
+  {:else if data.isAuthenticated}
     <form class="logout-form" method="POST" action={resolve('/auth/logout')}>
       <button class="login-link" type="submit">Log out</button>
     </form>
@@ -172,6 +174,10 @@
 
   button.login-link {
     cursor: pointer;
+  }
+
+  .developer-mode {
+    border-style: dashed;
   }
 
   .logout-form {

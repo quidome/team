@@ -97,3 +97,39 @@ describe('default-deny API access', () => {
     expect(resolve).toHaveBeenCalledOnce();
   });
 });
+
+describe('default-deny page access', () => {
+  it.each(['/', '/events', '/team', '/admin', '/history', '/duties', '/messages'])(
+    'redirects an anonymous request for %s to login without calling the route handler',
+    async (pathname) => {
+      const resolve = vi.fn(async () => new Response('route handler reached'));
+
+      const response = await handle({ event: requestEvent(pathname), resolve });
+
+      expect(response.status).toBe(303);
+      expect(response.headers.get('location')).toBe('/auth/login');
+      expect(resolve).not.toHaveBeenCalled();
+    },
+  );
+
+  it('calls the route handler for an authenticated coordinator page request', async () => {
+    const resolve = vi.fn(async () => new Response('route handler reached'));
+
+    const response = await handle({ event: requestEvent('/admin', true), resolve });
+
+    expect(response.status).toBe(200);
+    expect(resolve).toHaveBeenCalledOnce();
+  });
+
+  it.each(['/auth/login', '/auth/callback', '/auth/logout'])(
+    'calls the route handler for the unauthenticated %s route',
+    async (pathname) => {
+      const resolve = vi.fn(async () => new Response('route handler reached'));
+
+      const response = await handle({ event: requestEvent(pathname), resolve });
+
+      expect(response.status).toBe(200);
+      expect(resolve).toHaveBeenCalledOnce();
+    },
+  );
+});

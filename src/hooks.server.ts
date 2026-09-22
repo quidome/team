@@ -9,6 +9,7 @@ import { registerDatabaseShutdown } from '$lib/server/composition-root';
 registerDatabaseShutdown();
 
 const unauthenticatedApiPaths = new Set(['/api/health/liveness', '/api/health/readiness']);
+const unauthenticatedPagePaths = new Set(['/auth/login', '/auth/callback', '/auth/logout']);
 
 const isApiRequest = (pathname: string) => pathname === '/api' || pathname.startsWith('/api/');
 
@@ -30,13 +31,21 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
 
-  if (
-    isApiRequest(pathname) &&
-    !unauthenticatedApiPaths.has(pathname) &&
-    !event.locals.coordinatorSession
-  ) {
+  if (event.locals.coordinatorSession) {
+    return resolve(event);
+  }
+
+  if (isApiRequest(pathname)) {
+    if (unauthenticatedApiPaths.has(pathname)) {
+      return resolve(event);
+    }
+
     return Response.json({ error: 'coordinator_session_required' }, { status: 401 });
   }
 
-  return resolve(event);
+  if (unauthenticatedPagePaths.has(pathname)) {
+    return resolve(event);
+  }
+
+  return new Response(null, { headers: { location: '/auth/login' }, status: 303 });
 };
