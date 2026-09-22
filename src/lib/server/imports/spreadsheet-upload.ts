@@ -1,19 +1,21 @@
 import * as XLSX from 'xlsx';
 
-import { maxGameImportColumns, maxGameImportRows } from '$lib/application/imports/game-import';
+import {
+  maxImportBytes,
+  maxImportColumns,
+  maxImportRows,
+} from '$lib/application/imports/import-limits';
 
-export type GameImportFileEncoding = 'base64' | 'text';
+export type ImportFileEncoding = 'base64' | 'text';
 
-export interface GameImportUpload {
+export interface ImportUpload {
   content: string;
-  encoding: GameImportFileEncoding;
+  encoding: ImportFileEncoding;
   fileName: string;
   sheetName?: string;
 }
 
 const supportedExtensions = new Set(['.csv', '.ods', '.xls', '.xlsx']);
-
-export const maxGameImportBytes = 10 * 1024 * 1024;
 
 const extensionOf = (fileName: string) => {
   const dot = fileName.lastIndexOf('.');
@@ -21,11 +23,11 @@ const extensionOf = (fileName: string) => {
   return dot === -1 ? '' : fileName.slice(dot).toLowerCase();
 };
 
-export const listGameImportWorksheets = (upload: GameImportUpload): string[] => {
+export const listImportWorksheets = (upload: ImportUpload): string[] => {
   const extension = extensionOf(upload.fileName);
 
   if (!supportedExtensions.has(extension)) {
-    throw new Error('Supported schedule files are CSV, XLS, XLSX, and ODS.');
+    throw new Error('Supported import files are CSV, XLS, XLSX, and ODS.');
   }
 
   if (extension === '.csv') {
@@ -38,13 +40,13 @@ export const listGameImportWorksheets = (upload: GameImportUpload): string[] => 
 
   const byteLength = Buffer.from(upload.content, 'base64').byteLength;
 
-  if (byteLength > maxGameImportBytes) {
-    throw new Error('Schedule files must not exceed 10 MiB.');
+  if (byteLength > maxImportBytes) {
+    throw new Error('Import files must not exceed 10 MiB.');
   }
 
   try {
     return XLSX.read(Buffer.from(upload.content, 'base64'), {
-      sheetRows: maxGameImportRows + 2,
+      sheetRows: maxImportRows + 2,
       type: 'buffer',
     }).SheetNames;
   } catch {
@@ -52,11 +54,11 @@ export const listGameImportWorksheets = (upload: GameImportUpload): string[] => 
   }
 };
 
-export const readGameImportFile = (upload: GameImportUpload): string => {
+export const readImportFile = (upload: ImportUpload): string => {
   const extension = extensionOf(upload.fileName);
 
   if (!supportedExtensions.has(extension)) {
-    throw new Error('Supported schedule files are CSV, XLS, XLSX, and ODS.');
+    throw new Error('Supported import files are CSV, XLS, XLSX, and ODS.');
   }
 
   const byteLength =
@@ -64,8 +66,8 @@ export const readGameImportFile = (upload: GameImportUpload): string => {
       ? Buffer.from(upload.content, 'base64').byteLength
       : Buffer.byteLength(upload.content, 'utf8');
 
-  if (byteLength > maxGameImportBytes) {
-    throw new Error('Schedule files must not exceed 10 MiB.');
+  if (byteLength > maxImportBytes) {
+    throw new Error('Import files must not exceed 10 MiB.');
   }
 
   if (extension === '.csv') {
@@ -84,7 +86,7 @@ export const readGameImportFile = (upload: GameImportUpload): string => {
 
   try {
     workbook = XLSX.read(Buffer.from(upload.content, 'base64'), {
-      sheetRows: maxGameImportRows + 2,
+      sheetRows: maxImportRows + 2,
       type: 'buffer',
     });
   } catch {
@@ -105,14 +107,14 @@ export const readGameImportFile = (upload: GameImportUpload): string => {
 
   const range = selectedSheet['!ref'] ? XLSX.utils.decode_range(selectedSheet['!ref']) : undefined;
 
-  if (range && range.e.r >= maxGameImportRows + 1) {
+  if (range && range.e.r >= maxImportRows + 1) {
     throw new Error(
-      `Schedule files must not contain more than ${maxGameImportRows.toLocaleString('en-US')} data rows.`,
+      `Import files must not contain more than ${maxImportRows.toLocaleString('en-US')} data rows.`,
     );
   }
 
-  if (range && range.e.c >= maxGameImportColumns) {
-    throw new Error(`Schedule files must not contain more than ${maxGameImportColumns} columns.`);
+  if (range && range.e.c >= maxImportColumns) {
+    throw new Error(`Import files must not contain more than ${maxImportColumns} columns.`);
   }
 
   const csv = XLSX.utils.sheet_to_csv(selectedSheet);
@@ -121,7 +123,7 @@ export const readGameImportFile = (upload: GameImportUpload): string => {
     throw new Error('The spreadsheet worksheet is empty.');
   }
 
-  if (Buffer.byteLength(csv, 'utf8') > maxGameImportBytes) {
+  if (Buffer.byteLength(csv, 'utf8') > maxImportBytes) {
     throw new Error('The expanded spreadsheet must not exceed 10 MiB.');
   }
 

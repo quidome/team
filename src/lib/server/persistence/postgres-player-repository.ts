@@ -1,10 +1,8 @@
 import { asc, eq } from 'drizzle-orm';
 
 import type { Player, PlayerRepository } from '../../application/players/player-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { players } from './schema';
-
-type Database = ReturnType<typeof createDatabase>;
 
 const columns = {
   id: players.id,
@@ -28,7 +26,7 @@ const toPlayer = (row: {
   ...(row.lastName ? { lastName: row.lastName } : {}),
 });
 
-export const createPostgresPlayerRepository = (database: Database): PlayerRepository => ({
+export const createPostgresPlayerRepository = (database: DatabaseConnection): PlayerRepository => ({
   async findAll(): Promise<Player[]> {
     const rows = await database.select(columns).from(players).orderBy(asc(players.firstName));
 

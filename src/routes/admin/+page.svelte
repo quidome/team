@@ -3,17 +3,61 @@
 
   export let data;
 
-  const fields = [
-    { key: 'homeTeamName', label: 'Home team', required: true },
-    { key: 'awayTeamName', label: 'Away team', required: true },
-    { key: 'date', label: 'Date', required: true },
-    { key: 'startTime', label: 'Start time', required: true },
-    { key: 'locationName', label: 'Location', required: true },
-    { key: 'travelMinutes', label: 'Travel minutes', required: false },
-    { key: 'arrivalBufferMinutes', label: 'Arrival buffer', required: false },
-    { key: 'jurySlots', label: 'Jury slots', required: false },
-    { key: 'refereeSlots', label: 'Referee slots', required: false },
-  ];
+  /** @type {Record<'games' | 'locations' | 'players', Array<{ key: string; label: string; required: boolean }>>} */
+  const fieldsByKind = {
+    games: [
+      { key: 'homeTeamName', label: 'Home team', required: true },
+      { key: 'awayTeamName', label: 'Away team', required: true },
+      { key: 'date', label: 'Date', required: true },
+      { key: 'startTime', label: 'Start time', required: true },
+      { key: 'locationName', label: 'Location', required: true },
+      { key: 'travelMinutes', label: 'Travel minutes', required: false },
+      { key: 'arrivalBufferMinutes', label: 'Arrival buffer', required: false },
+      { key: 'jurySlots', label: 'Jury slots', required: false },
+      { key: 'refereeSlots', label: 'Referee slots', required: false },
+    ],
+    locations: [
+      { key: 'name', label: 'Name', required: true },
+      { key: 'travelMinutes', label: 'Travel minutes', required: false },
+    ],
+    players: [
+      { key: 'firstName', label: 'First name', required: true },
+      { key: 'lastName', label: 'Last name', required: false },
+      { key: 'birthDate', label: 'Birthdate', required: false },
+      { key: 'associationId', label: 'Association ID', required: false },
+      { key: 'jerseyNumber', label: 'Jersey number', required: false },
+      { key: 'participationType', label: 'Participation type', required: false },
+    ],
+  };
+
+  /** @type {Record<'games' | 'locations' | 'players', Array<{ key: string; label: string }>>} */
+  const previewColumnsByKind = {
+    games: [
+      { key: 'homeTeamName', label: 'Home' },
+      { key: 'awayTeamName', label: 'Away' },
+      { key: 'date', label: 'Date' },
+      { key: 'startTime', label: 'Time' },
+      { key: 'locationName', label: 'Location' },
+    ],
+    locations: [
+      { key: 'name', label: 'Name' },
+      { key: 'travelMinutes', label: 'Travel minutes' },
+    ],
+    players: [
+      { key: 'firstName', label: 'First name' },
+      { key: 'lastName', label: 'Last name' },
+      { key: 'birthDate', label: 'Birthdate' },
+      { key: 'associationId', label: 'Association ID' },
+    ],
+  };
+
+  /** @type {Record<'games' | 'locations' | 'players', string>} */
+  const importKindLabels = { games: 'games', locations: 'locations', players: 'roster' };
+
+  /** @type {'games' | 'locations' | 'players'} */
+  let importKind = 'games';
+  $: fields = fieldsByKind[importKind];
+  $: previewColumns = previewColumnsByKind[importKind];
 
   let fileName = '';
   let content = '';
@@ -25,7 +69,14 @@
   let sheetName = '';
   /** @type {Record<string, string>} */
   let mapping = {};
-  /** @type {import('$lib/application/imports/game-import').GameImportPreview | undefined} */
+  /**
+   * @type {
+   *   | import('$lib/application/imports/game-import').GameImportPreview
+   *   | import('$lib/application/imports/player-import').PlayerImportPreview
+   *   | import('$lib/application/imports/location-import').LocationImportPreview
+   *   | undefined
+   * }
+   */
   let preview = undefined;
   let loading = false;
   let importing = false;
@@ -296,12 +347,9 @@
     return found.filter(Boolean);
   };
 
-  /** @param {string[]} availableHeaders */
-  const guessMapping = (availableHeaders) => {
-    /** @type {Record<string, string>} */
-    const next = {};
-    /** @type {Record<string, string[]>} */
-    const aliases = {
+  /** @type {Record<'games' | 'locations' | 'players', Record<string, string[]>>} */
+  const aliasesByKind = {
+    games: {
       awayTeamName: ['away', 'away team', 'visitor'],
       arrivalBufferMinutes: ['arrival buffer', 'buffer'],
       date: ['date', 'datum'],
@@ -311,7 +359,26 @@
       refereeSlots: ['referee', 'ref'],
       startTime: ['start time', 'time', 'tijd'],
       travelMinutes: ['travel', 'travel minutes', 'reistijd'],
-    };
+    },
+    locations: {
+      name: ['name', 'location', 'venue', 'plaats'],
+      travelMinutes: ['travel', 'travel minutes', 'reistijd'],
+    },
+    players: {
+      associationId: ['association id', 'association', 'bondsnummer', 'lidnummer'],
+      birthDate: ['birthdate', 'birthday', 'born', 'geboortedatum'],
+      firstName: ['first name', 'firstname', 'voornaam'],
+      jerseyNumber: ['jersey', 'jersey number', 'number', 'rugnummer'],
+      lastName: ['last name', 'lastname', 'surname', 'achternaam'],
+      participationType: ['participation', 'participation type', 'type'],
+    },
+  };
+
+  /** @param {string[]} availableHeaders */
+  const guessMapping = (availableHeaders) => {
+    /** @type {Record<string, string>} */
+    const next = {};
+    const aliases = aliasesByKind[importKind];
 
     for (const field of fields) {
       const match = availableHeaders.find((header) =>
@@ -324,8 +391,32 @@
     return next;
   };
 
+  const resetImportState = () => {
+    fileName = '';
+    content = '';
+    encoding = 'text';
+    headers = [];
+    worksheets = [];
+    sheetName = '';
+    mapping = {};
+    preview = undefined;
+    loading = false;
+    importing = false;
+    error = '';
+    importMessage = '';
+    conflicts = [];
+    conflictChoices = {};
+  };
+
+  /** @param {Event} event */
+  const handleImportKindChange = (event) => {
+    const select = /** @type {HTMLSelectElement} */ (event.currentTarget);
+    importKind = /** @type {'games' | 'locations' | 'players'} */ (select.value);
+    resetImportState();
+  };
+
   const loadHeaders = async () => {
-    const response = await fetch('/api/imports/games/preview', {
+    const response = await fetch(`/api/imports/${importKind}/preview`, {
       body: JSON.stringify({
         content,
         encoding,
@@ -408,7 +499,7 @@
     error = '';
 
     try {
-      const response = await fetch('/api/imports/games/preview', {
+      const response = await fetch(`/api/imports/${importKind}/preview`, {
         body: JSON.stringify({
           content,
           encoding,
@@ -439,23 +530,46 @@
       conflict.fields.every((field) => Boolean(conflictChoices[conflict.sourceRow]?.[field.field])),
     );
 
-  const importValidGames = async () => {
+  /** @param {any} body */
+  const describeImportResult = (body) => {
+    if (importKind === 'games') {
+      /** @type {Array<{merged: boolean}>} */
+      const importedGames = body.imported;
+      const mergedCount = importedGames.filter((game) => game.merged).length;
+      return `${body.imported.length} games imported; ${body.duplicates.length} duplicates skipped${mergedCount ? `; ${mergedCount} conflicts merged.` : '.'}`;
+    }
+
+    if (importKind === 'players') {
+      /** @type {Array<{updated: boolean}>} */
+      const importedPlayers = body.imported;
+      const updatedCount = importedPlayers.filter((player) => player.updated).length;
+      return `${body.imported.length} players imported (${updatedCount} updated)${body.failed.length ? `; ${body.failed.length} failed.` : '.'}`;
+    }
+
+    return `${body.imported.length} locations added, ${body.updated.length} updated, ${body.unchanged.length} unchanged${body.failed.length ? `; ${body.failed.length} failed.` : '.'}`;
+  };
+
+  const runImport = async () => {
     importing = true;
     error = '';
     importMessage = '';
 
     try {
-      const response = await fetch('/api/imports/games', {
+      const response = await fetch(`/api/imports/${importKind}`, {
         body: JSON.stringify({
           content,
           encoding,
           fileName,
           mapping,
           ...(sheetName ? { sheetName } : {}),
-          resolutions: conflicts.map((conflict) => ({
-            fields: conflictChoices[conflict.sourceRow],
-            sourceRow: conflict.sourceRow,
-          })),
+          ...(importKind === 'games'
+            ? {
+                resolutions: conflicts.map((conflict) => ({
+                  fields: conflictChoices[conflict.sourceRow],
+                  sourceRow: conflict.sourceRow,
+                })),
+              }
+            : {}),
           sourceName: fileName,
         }),
         headers: { 'content-type': 'application/json' },
@@ -463,7 +577,7 @@
       });
       const body = await response.json();
 
-      if (response.status === 409 && body.error === 'import_conflicts') {
+      if (importKind === 'games' && response.status === 409 && body.error === 'import_conflicts') {
         conflicts = body.conflicts;
         conflictChoices = Object.fromEntries(
           conflicts.map((conflict) => [
@@ -475,17 +589,17 @@
       }
 
       if (!response.ok) {
-        throw new Error(body.error ?? 'The games could not be imported.');
+        throw new Error(body.error ?? `The ${importKindLabels[importKind]} could not be imported.`);
       }
 
       conflicts = [];
       conflictChoices = {};
-      /** @type {Array<{merged: boolean}>} */
-      const importedGames = body.imported;
-      const mergedCount = importedGames.filter((game) => game.merged).length;
-      importMessage = `${body.imported.length} games imported; ${body.duplicates.length} duplicates skipped${mergedCount ? `; ${mergedCount} conflicts merged.` : '.'}`;
+      importMessage = describeImportResult(body);
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : 'The games could not be imported.';
+      error =
+        caught instanceof Error
+          ? caught.message
+          : `The ${importKindLabels[importKind]} could not be imported.`;
     } finally {
       importing = false;
     }
@@ -763,12 +877,21 @@
   <div class="panel-heading">
     <div>
       <p class="eyebrow">Spreadsheet mapping · preview · import</p>
-      <h2 id="import-heading">Import event data</h2>
+      <h2 id="import-heading">Import data</h2>
     </div>
   </div>
 
+  <label class="primary-team">
+    What are you importing?
+    <select bind:value={importKind} on:change={handleImportKindChange}>
+      <option value="games">Games</option>
+      <option value="players">Roster</option>
+      <option value="locations">Locations</option>
+    </select>
+  </label>
+
   <label class="file-picker">
-    Schedule file
+    Import file
     <input accept=".csv,.xls,.xlsx,.ods,text/csv" type="file" on:change={handleFile} />
   </label>
 
@@ -801,22 +924,22 @@
     </div>
     <div class="action-row">
       <button disabled={loading} type="button" on:click={previewImport}>
-        {loading ? 'Previewing…' : 'Preview mapped games'}
+        {loading ? 'Previewing…' : `Preview mapped ${importKindLabels[importKind]}`}
       </button>
       {#if preview && preview.issues.length === 0 && preview.records.length > 0}
         <button
           class="secondary-button"
           disabled={importing || !allConflictChoicesSelected()}
           type="button"
-          on:click={importValidGames}
+          on:click={runImport}
         >
-          {importing ? 'Importing…' : 'Import valid games'}
+          {importing ? 'Importing…' : `Import valid ${importKindLabels[importKind]}`}
         </button>
       {/if}
     </div>
   {:else}
     <div class="empty-state compact">
-      <h3>Select a schedule export</h3>
+      <h3>Select an import file</h3>
       <p>CSV, XLS, XLSX, and ODS files are mapped and validated before import.</p>
     </div>
   {/if}
@@ -824,7 +947,7 @@
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
   {#if importMessage}<p class="form-message" role="status">{importMessage}</p>{/if}
 
-  {#if conflicts.length > 0}
+  {#if importKind === 'games' && conflicts.length > 0}
     <section class="conflict-list" aria-labelledby="conflicts-heading">
       <h3 id="conflicts-heading">Resolve existing game differences</h3>
       <p class="form-hint">Choose which value should be kept for each conflicting field.</p>
@@ -848,7 +971,7 @@
 
   {#if preview}
     <div class="preview-summary" role="status">
-      <strong>{preview.validRowCount} valid games</strong>
+      <strong>{preview.validRowCount} valid {importKindLabels[importKind]}</strong>
       <span>{preview.issues.length} validation issues</span>
     </div>
     {#if preview.issues.length > 0}
@@ -867,22 +990,18 @@
           <thead>
             <tr>
               <th>Row</th>
-              <th>Home</th>
-              <th>Away</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Location</th>
+              {#each previewColumns as column (column.key)}
+                <th>{column.label}</th>
+              {/each}
             </tr>
           </thead>
           <tbody>
             {#each preview.records as record (record.sourceRow)}
               <tr>
                 <td>{record.sourceRow}</td>
-                <td>{record.homeTeamName}</td>
-                <td>{record.awayTeamName}</td>
-                <td>{record.date}</td>
-                <td>{record.startTime}</td>
-                <td>{record.locationName}</td>
+                {#each previewColumns as column (column.key)}
+                  <td>{record[column.key] ?? ''}</td>
+                {/each}
               </tr>
             {/each}
           </tbody>

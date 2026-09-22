@@ -178,6 +178,9 @@ export const withCurrentImportTransaction = async <T>(
     duties: DutyRepository;
     gameImports: GameImportRepository;
     games: GameRepository;
+    locations: LocationRepository;
+    memberships: MembershipRepository;
+    players: PlayerRepository;
   }) => Promise<T>,
 ): Promise<T> =>
   currentDatabase().transaction(async (transaction) =>
@@ -186,6 +189,9 @@ export const withCurrentImportTransaction = async <T>(
       duties: createPostgresDutyRepository(transaction),
       gameImports: createPostgresGameImportRepository(transaction),
       games: createPostgresGameRepository(transaction),
+      locations: createPostgresLocationRepository(transaction),
+      memberships: createPostgresMembershipRepository(transaction),
+      players: createPostgresPlayerRepository(transaction),
     }),
   );
 

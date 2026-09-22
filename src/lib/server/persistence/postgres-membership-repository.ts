@@ -4,12 +4,12 @@ import type {
   Membership,
   MembershipRepository,
 } from '../../application/memberships/membership-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { memberships, players, seasons, teams } from './schema';
 
-type Database = ReturnType<typeof createDatabase>;
-
-export const createPostgresMembershipRepository = (database: Database): MembershipRepository => ({
+export const createPostgresMembershipRepository = (
+  database: DatabaseConnection,
+): MembershipRepository => ({
   async findAll(): Promise<Membership[]> {
     const storedMemberships = await database
       .select({

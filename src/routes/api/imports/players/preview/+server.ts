@@ -1,22 +1,20 @@
 import { json } from '@sveltejs/kit';
 
 import {
-  gameImportFields,
-  previewGameImport,
-  type GameImportMapping,
-} from '$lib/application/imports/game-import';
-import { applyImportContext } from '$lib/application/imports/import-games';
+  playerImportFields,
+  previewPlayerImport,
+  type PlayerImportMapping,
+} from '$lib/application/imports/player-import';
 import {
   listImportWorksheets,
   readImportFile,
   type ImportFileEncoding,
   type ImportUpload,
 } from '$lib/server/imports/spreadsheet-upload';
-import { buildGameImportContext } from '$lib/server/imports/game-import-context';
 
 const readRequest = async (
   request: Request,
-): Promise<{ mapping: GameImportMapping; upload: ImportUpload } | undefined> => {
+): Promise<{ mapping: PlayerImportMapping; upload: ImportUpload } | undefined> => {
   try {
     const payload: unknown = await request.json();
 
@@ -39,10 +37,10 @@ const readRequest = async (
       return undefined;
     }
 
-    const validatedMapping: GameImportMapping = {};
+    const validatedMapping: PlayerImportMapping = {};
     const values = mapping as Record<string, unknown>;
 
-    for (const field of gameImportFields) {
+    for (const field of playerImportFields) {
       const value = values[field];
 
       if (value !== undefined && typeof value !== 'string') {
@@ -77,7 +75,7 @@ export const POST = async ({ request }) => {
 
   try {
     const worksheets = listImportWorksheets(input.upload);
-    const preview = previewGameImport(readImportFile(input.upload), input.mapping);
+    const preview = previewPlayerImport(readImportFile(input.upload), input.mapping);
 
     if (Object.keys(input.mapping).length === 0) {
       return json({
@@ -89,9 +87,7 @@ export const POST = async ({ request }) => {
       });
     }
 
-    const contextualizedPreview = applyImportContext(preview, await buildGameImportContext());
-
-    return json({ ...contextualizedPreview, worksheets });
+    return json({ ...preview, worksheets });
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },

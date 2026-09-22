@@ -1,12 +1,12 @@
 import { asc, eq } from 'drizzle-orm';
 
 import type { Location, LocationRepository } from '../../application/locations/location-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { locations } from './schema';
 
-type Database = ReturnType<typeof createDatabase>;
-
-export const createPostgresLocationRepository = (database: Database): LocationRepository => ({
+export const createPostgresLocationRepository = (
+  database: DatabaseConnection,
+): LocationRepository => ({
   async findAll(): Promise<Location[]> {
     return database
       .select({ name: locations.name, travelMinutes: locations.travelMinutes })

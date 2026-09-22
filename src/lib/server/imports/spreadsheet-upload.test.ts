@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 
-import { maxGameImportColumns, maxGameImportRows } from '$lib/application/imports/game-import';
+import { maxImportColumns, maxImportRows } from '$lib/application/imports/import-limits';
 
-import { listGameImportWorksheets, readGameImportFile } from './game-import-upload';
+import { listImportWorksheets, readImportFile } from './spreadsheet-upload';
 
-describe('readGameImportFile', () => {
+describe('readImportFile', () => {
   it('converts the first XLSX worksheet to the CSV import format', () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
@@ -16,9 +16,9 @@ describe('readGameImportFile', () => {
 
     const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
 
-    expect(
-      readGameImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
-    ).toContain('U16-1,U18-1,2026-08-15');
+    expect(readImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' })).toContain(
+      'U16-1,U18-1,2026-08-15',
+    );
   });
 
   it('lists worksheets and reads a selected worksheet', () => {
@@ -39,10 +39,10 @@ describe('readGameImportFile', () => {
     const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
 
     expect(
-      listGameImportWorksheets({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
+      listImportWorksheets({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
     ).toEqual(['Notes', 'Games']);
     expect(
-      readGameImportFile({
+      readImportFile({
         content,
         encoding: 'base64',
         fileName: 'schedule.xlsx',
@@ -50,7 +50,7 @@ describe('readGameImportFile', () => {
       }),
     ).toContain('U16-1,U18-1,2026-08-15');
     expect(() =>
-      readGameImportFile({
+      readImportFile({
         content,
         encoding: 'base64',
         fileName: 'schedule.xlsx',
@@ -61,42 +61,42 @@ describe('readGameImportFile', () => {
 
   it('rejects unsupported file extensions', () => {
     expect(() =>
-      readGameImportFile({ content: 'anything', encoding: 'text', fileName: 'schedule.pdf' }),
-    ).toThrow('Supported schedule files');
+      readImportFile({ content: 'anything', encoding: 'text', fileName: 'schedule.pdf' }),
+    ).toThrow('Supported import files');
   });
 
   it('rejects spreadsheets with too many data rows', () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
       ['home'],
-      ...Array.from({ length: maxGameImportRows + 1 }, () => ['U16-1']),
+      ...Array.from({ length: maxImportRows + 1 }, () => ['U16-1']),
     ]);
     XLSX.utils.book_append_sheet(workbook, sheet, 'Games');
 
     const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
 
     expect(() =>
-      readGameImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
+      readImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
     ).toThrow('10,000 data rows');
   });
 
   it('rejects spreadsheets with too many columns', () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
-      Array.from({ length: maxGameImportColumns + 1 }, (_, index) => `column-${index}`),
+      Array.from({ length: maxImportColumns + 1 }, (_, index) => `column-${index}`),
     ]);
     XLSX.utils.book_append_sheet(workbook, sheet, 'Games');
 
     const content = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
 
     expect(() =>
-      readGameImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
+      readImportFile({ content, encoding: 'base64', fileName: 'schedule.xlsx' }),
     ).toThrow('100 columns');
   });
 
-  it('rejects schedule files larger than 10 MiB', () => {
+  it('rejects import files larger than 10 MiB', () => {
     expect(() =>
-      readGameImportFile({
+      readImportFile({
         content: 'x'.repeat(10 * 1024 * 1024 + 1),
         encoding: 'text',
         fileName: 'schedule.csv',

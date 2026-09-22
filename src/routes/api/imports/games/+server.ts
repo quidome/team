@@ -10,10 +10,10 @@ import {
   type GameImportResolution,
 } from '$lib/application/imports/import-games';
 import {
-  readGameImportFile,
-  type GameImportFileEncoding,
-  type GameImportUpload,
-} from '$lib/server/imports/game-import-upload';
+  readImportFile,
+  type ImportFileEncoding,
+  type ImportUpload,
+} from '$lib/server/imports/spreadsheet-upload';
 import {
   buildGameImportContext,
   currentImportPrimaryTeamName,
@@ -24,7 +24,7 @@ interface ImportRequest {
   mapping: GameImportMapping;
   resolutions: GameImportResolution[];
   sourceName: string;
-  upload: GameImportUpload;
+  upload: ImportUpload;
 }
 
 const conflictFields = new Set<GameImportConflictField>([
@@ -114,7 +114,7 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       sourceName: sourceName.trim(),
       upload: {
         content,
-        encoding: encoding as GameImportFileEncoding,
+        encoding: encoding as ImportFileEncoding,
         fileName: fileName.trim(),
         ...(typeof sheetName === 'string' ? { sheetName: sheetName.trim() } : {}),
       },
@@ -140,7 +140,7 @@ export const POST = async ({ request }) => {
   let preview;
 
   try {
-    preview = previewGameImport(readGameImportFile(input.upload), input.mapping);
+    preview = previewGameImport(readImportFile(input.upload), input.mapping);
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },
