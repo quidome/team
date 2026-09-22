@@ -150,6 +150,8 @@
         eligiblePlayers.map((player) => [player.id, 'other']),
       );
     }
+
+    void storeAttendance();
   };
 
   /** @param {string} playerId */
@@ -160,6 +162,8 @@
     if (present) {
       recordedAbsenceReasons = { ...recordedAbsenceReasons, [playerId]: 'other' };
     }
+
+    void storeAttendance();
   };
 
   /** @param {string} playerId @param {Event} event */
@@ -170,6 +174,8 @@
     if (!input.checked && !recordedAbsenceReasons[playerId]) {
       recordedAbsenceReasons = { ...recordedAbsenceReasons, [playerId]: 'other' };
     }
+
+    void storeAttendance();
   };
 
   /** @param {string} playerId @param {Event} event */
@@ -180,6 +186,8 @@
       ...recordedAbsenceReasons,
       [playerId]: reason,
     };
+
+    void storeAttendance();
   };
 
   const storeAttendance = async () => {
@@ -240,6 +248,7 @@
       </p>
       <h2 id="attendance-heading">Attendance</h2>
     </div>
+    {#if attendanceSaving}<span class="saving-indicator">Saving…</span>{/if}
   </div>
 
   {#if attendanceEvents.length === 0}
@@ -358,15 +367,6 @@
           {/each}
         </div>
       {/if}
-
-      <button
-        class="primary-button store-button"
-        disabled={attendanceLoading || attendanceSaving}
-        type="button"
-        on:click={storeAttendance}
-      >
-        {attendanceSaving ? 'Storing…' : 'Store attendance'}
-      </button>
     {/if}
 
     {#if attendanceMessage}<p class="form-message" role="status">{attendanceMessage}</p>{/if}
@@ -446,6 +446,14 @@
 
   .attendance-panel {
     margin-top: 1rem;
+  }
+
+  .saving-indicator {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .event-picker {
@@ -625,15 +633,6 @@
     font-size: 0.84rem;
     font-weight: 700;
     padding: 0.75rem 0;
-  }
-
-  .store-button {
-    margin-top: 1rem;
-    width: 100%;
-  }
-
-  .primary-button {
-    background: var(--accent);
   }
 
   .compact {

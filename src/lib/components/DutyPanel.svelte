@@ -10,12 +10,22 @@
   export let players = [];
   /** @type {string} */
   export let teamName = '';
+  /** @type {boolean} */
+  export let showDriving = true;
+  /** @type {boolean} */
+  export let showRefereeJury = true;
 
   const statusOptions = ['open', 'assigned', 'completed', 'incomplete', 'cancelled'];
   const signupStatuses = [
     { value: 'volunteer', label: 'Volunteer' },
     { value: 'waitlisted', label: 'Waitlisted' },
   ];
+  /** @typedef {'drivingSlots' | 'jurySlots' | 'refereeSlots'} RequirementKey */
+
+  /** @type {Record<RequirementKey, string>} */
+  const requirementLabels = { drivingSlots: 'Driving', jurySlots: 'Jury', refereeSlots: 'Referee' };
+  /** @type {RequirementKey[]} */
+  const requirementOrder = ['refereeSlots', 'jurySlots', 'drivingSlots'];
 
   /** @param {DutyType} type */
   const dutyLabel = (type) => ({ driving: 'Driving', jury: 'Jury', referee: 'Referee' })[type];
@@ -28,6 +38,8 @@
   let loading = true;
   let loadError = '';
   let configuration = { drivingSlots: 0, jurySlots: 0, refereeSlots: 0 };
+  /** @type {import('$lib/application/participation/participation-repository').ParticipationRecord[]} */
+  let participationRecords = [];
   let signupPlayerId = players[0]?.id ?? '';
   let signupType = 'referee';
   let signupStatus = 'volunteer';
@@ -42,6 +54,14 @@
       player.membership.status === 'active' &&
       player.membership.participationType === 'trains_and_plays',
   );
+  $: visibleRequirementKeys = requirementOrder.filter((key) =>
+    key === 'drivingSlots' ? showDriving : showRefereeJury,
+  );
+  $: attendanceRecorded = participationRecords.length > 0;
+  $: attendingCount = attendanceRecorded
+    ? participationRecords.filter((record) => record.status === 'present').length
+    : eligiblePlayers.length;
+  $: suggestedDrivingSlots = Math.min(2, Math.ceil(attendingCount / 3));
 
   /** @param {string} path @param {unknown} payload @returns {Promise<unknown>} */
   const postJson = async (path, payload) => {
@@ -81,9 +101,29 @@
     }
   };
 
-  onMount(load);
+  const loadAttendance = async () => {
+    try {
+      const response = await fetch(
+        `/api/participation?occurrenceType=game&occurrenceId=${encodeURIComponent(occurrenceId)}`,
+      );
 
-  const storeConfiguration = async () => {
+      if (response.ok) {
+        participationRecords = await response.json();
+      }
+    } catch {
+      // Non-critical: the driving suggestion just falls back to the full roster.
+    }
+  };
+
+  onMount(() => {
+    void load();
+    if (showDriving) {
+      void loadAttendance();
+    }
+  });
+
+  /** @param {{ drivingSlots: number; jurySlots: number; refereeSlots: number }} nextConfiguration */
+  const saveRequirements = async (nextConfiguration) => {
     savingConfiguration = true;
     message = '';
     error = '';
@@ -91,7 +131,7 @@
     try {
       const view = /** @type {DutyView} */ (
         await postJson('/api/duties', {
-          ...configuration,
+          ...nextConfiguration,
           occurrenceId,
         })
       );
@@ -103,6 +143,19 @@
     } finally {
       savingConfiguration = false;
     }
+  };
+
+  /** @param {'drivingSlots' | 'jurySlots' | 'refereeSlots'} key @param {1 | -1} delta */
+  const adjustRequirement = (key, delta) => {
+    const next = Math.min(2, Math.max(0, configuration[key] + delta));
+
+    if (next === configuration[key]) return;
+
+    void saveRequirements({ ...configuration, [key]: next });
+  };
+
+  const applySuggestedDriving = () => {
+    void saveRequirements({ ...configuration, drivingSlots: suggestedDrivingSlots });
   };
 
   const storeSignup = async () => {
@@ -179,26 +232,56 @@
         <p class="eyebrow">Capacity</p>
         <h3 id="requirements-heading">Duty requirements</h3>
       </div>
+      {#if savingConfiguration}<span class="saving-indicator">Saving…</span>{/if}
     </div>
-    <div class="form-grid requirements-grid">
-      <label>
-        Referee slots
-        <input bind:value={configuration.refereeSlots} max="2" min="0" type="number" />
-      </label>
-      <label>
-        Jury slots
-        <input bind:value={configuration.jurySlots} max="2" min="0" type="number" />
-      </label>
-      <label>
-        Driving slots
-        <input bind:value={configuration.drivingSlots} max="2" min="0" type="number" />
-      </label>
-      <button disabled={savingConfiguration} type="button" on:click={storeConfiguration}>
-        {savingConfiguration ? 'Saving…' : 'Store requirements'}
-      </button>
+    <div class="stepper-list">
+      {#each visibleRequirementKeys as key (key)}
+        <div class="stepper-row">
+          <div class="stepper-main">
+            <span class="stepper-label">{requirementLabels[key]}</span>
+            <div class="stepper-controls">
+              <button
+                aria-label={`Decrease ${requirementLabels[key].toLowerCase()} slots`}
+                disabled={savingConfiguration || configuration[key] <= 0}
+                type="button"
+                on:click={() => adjustRequirement(key, -1)}
+              >
+                −
+              </button>
+              <span class="stepper-count">{configuration[key]}</span>
+              <button
+                aria-label={`Increase ${requirementLabels[key].toLowerCase()} slots`}
+                disabled={savingConfiguration || configuration[key] >= 2}
+                type="button"
+                on:click={() => adjustRequirement(key, 1)}
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {#if key === 'drivingSlots'}
+            <p class="stepper-suggestion">
+              {attendingCount}
+              {attendanceRecorded ? 'attending' : 'on the roster (no attendance recorded yet)'} · suggest
+              {suggestedDrivingSlots}
+              {#if suggestedDrivingSlots !== configuration.drivingSlots}
+                <button
+                  class="suggestion-button"
+                  disabled={savingConfiguration}
+                  type="button"
+                  on:click={applySuggestedDriving}
+                >
+                  Use {suggestedDrivingSlots}
+                </button>
+              {/if}
+            </p>
+          {/if}
+        </div>
+      {/each}
     </div>
     <p class="hint">
-      Driving slots apply to away games. Referee and jury slots can be configured independently.
+      Referee, jury, and driving can each be configured independently — set whichever applies to
+      this game.
     </p>
   </section>
 
@@ -377,7 +460,6 @@
     text-transform: uppercase;
   }
 
-  input,
   select {
     background: #fffdf8;
     border: 1px solid var(--line);
@@ -415,7 +497,6 @@
     opacity: 0.55;
   }
 
-  input:focus,
   select:focus,
   button:focus-visible {
     outline: 3px solid rgba(213, 99, 62, 0.25);
@@ -452,12 +533,82 @@
     gap: 0.8rem;
   }
 
-  .requirements-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .saving-indicator {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
-  .requirements-grid button {
-    grid-column: 1 / -1;
+  .stepper-list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .stepper-row {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 0.7rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .stepper-main {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .stepper-label {
+    font-weight: 700;
+  }
+
+  .stepper-controls {
+    align-items: center;
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  .stepper-controls button {
+    align-items: center;
+    border-radius: 50%;
+    display: flex;
+    font-size: 1.1rem;
+    height: 2.4rem;
+    justify-content: center;
+    min-height: 0;
+    padding: 0;
+    width: 2.4rem;
+  }
+
+  .stepper-count {
+    font-size: 1.1rem;
+    font-weight: 800;
+    min-width: 1.4rem;
+    text-align: center;
+  }
+
+  .stepper-suggestion {
+    align-items: center;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0;
+  }
+
+  .suggestion-button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--accent-dark);
+    font-size: 0.76rem;
+    min-height: 1.9rem;
+    padding: 0.3rem 0.65rem;
+  }
+
+  .suggestion-button:hover:not(:disabled) {
+    background: #f4eee4;
   }
 
   .hint {
@@ -554,14 +705,6 @@
   }
 
   @media (max-width: 30rem) {
-    .requirements-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .requirements-grid button {
-      grid-column: auto;
-    }
-
     .fairness-list {
       grid-template-columns: 1fr;
     }

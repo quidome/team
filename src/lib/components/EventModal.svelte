@@ -32,7 +32,12 @@
   $: seasonHalf =
     event.type === 'game' ? deriveSeasonHalf(event.date, seasonStartingYear) : undefined;
   $: showAttendance = event.type === 'training' || isAttendanceEligible(event, teamName);
-  $: showDuty = event.type === 'game';
+  $: isAwayGame = event.type === 'game' && event.awayTeamName === teamName;
+  $: isHomeGame = event.type === 'game' && event.homeTeamName === teamName;
+  $: isDutyOnlyGame = event.type === 'game' && !isHomeGame && !isAwayGame;
+  $: showDriving = isAwayGame;
+  $: showRefereeJury = isDutyOnlyGame;
+  $: showDuty = showDriving || showRefereeJury;
 </script>
 
 <div class="modal-backdrop" role="presentation" on:click|self={onClose}>
@@ -59,7 +64,7 @@
       />
     {/if}
     {#if showDuty}
-      <DutyPanel occurrenceId={event.id} {players} {teamName} />
+      <DutyPanel occurrenceId={event.id} {players} {teamName} {showDriving} {showRefereeJury} />
     {/if}
   </div>
 </div>
