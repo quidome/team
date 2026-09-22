@@ -33,10 +33,13 @@
             ] ++ browserPackages;
 
             shellHook = ''
-              printf '\\nTeam development shell\\n'
-              printf 'Node: %s\\n' "$(node --version)"
-              printf 'npm:  %s\\n' "$(npm --version)"
-              printf 'Just: %s\\n\\n' "$(just --version)"
+              # Printed to stderr, not stdout: `nix develop --command` is also used to
+              # run stdio programs (like the Playwright MCP server) whose stdout must
+              # stay free of anything but their own protocol output.
+              printf '\\nTeam development shell\\n' >&2
+              printf 'Node: %s\\n' "$(node --version)" >&2
+              printf 'npm:  %s\\n' "$(npm --version)" >&2
+              printf 'Just: %s\\n\\n' "$(just --version)" >&2
               ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                 export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="${pkgs.chromium}/bin/chromium"
               ''}
