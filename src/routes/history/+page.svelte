@@ -79,7 +79,7 @@
             <th>Player</th>
             <th>Games</th>
             <th>Training</th>
-            <th>Duties completed</th>
+            <th>Duties</th>
           </tr>
         </thead>
         <tbody>
@@ -210,7 +210,6 @@
 
   table {
     border-collapse: collapse;
-    min-width: 38rem;
     width: 100%;
   }
 
@@ -219,6 +218,26 @@
     border-bottom: 1px solid var(--line);
     padding: 0.8rem;
     text-align: left;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 26rem) {
+    th,
+    td {
+      padding: 0.6rem 0.5rem;
+    }
+
+    thead th {
+      font-size: 0.62rem;
+    }
+
+    tbody th {
+      font-size: 0.85rem;
+    }
+
+    td span {
+      display: block;
+    }
   }
 
   thead th {

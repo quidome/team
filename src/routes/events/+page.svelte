@@ -9,6 +9,7 @@
 
   /** @type {import('$lib/application/program/read-program').ProgramEvent | undefined} */
   let activeEvent = undefined;
+  let showPastEvents = false;
 
   /** @param {string} date */
   const formatDate = (date) =>
@@ -19,6 +20,11 @@
       weekday: 'short',
       year: 'numeric',
     }).format(new Date(`${date}T00:00:00.000Z`));
+
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(new Date());
+  $: pastEvents = data.events.filter((event) => event.date < today);
+  $: upcomingEvents = data.events.filter((event) => event.date >= today);
+  $: visibleEvents = showPastEvents ? data.events : upcomingEvents;
 
   let gameForm = {
     arrivalBufferMinutes: '30',
@@ -379,7 +385,7 @@
 <section class="panel" aria-labelledby="events-heading">
   <div class="panel-heading">
     <div>
-      <p class="eyebrow">{data.events.length} events</p>
+      <p class="eyebrow">{upcomingEvents.length} upcoming</p>
       <h2 id="events-heading">All events</h2>
     </div>
     <div class="action-row">
@@ -397,8 +403,23 @@
       <p>Add a game or training event to start the timeline.</p>
     </div>
   {:else}
+    {#if pastEvents.length > 0}
+      <button
+        class="past-events-toggle"
+        type="button"
+        on:click={() => (showPastEvents = !showPastEvents)}
+      >
+        {showPastEvents ? 'Hide past events' : `Show ${pastEvents.length} past events`}
+      </button>
+    {/if}
+    {#if visibleEvents.length === 0}
+      <div class="empty-state">
+        <h3>No upcoming events</h3>
+        <p>Everything on the timeline so far is in the past.</p>
+      </div>
+    {/if}
     <div class="program-list">
-      {#each data.events as event (event.id)}
+      {#each visibleEvents as event (event.id)}
         {@const seasonHalf =
           event.type === 'game'
             ? deriveSeasonHalf(event.date, data.season.startingYear)
@@ -907,6 +928,18 @@
 
   .form-error {
     color: var(--accent-dark);
+  }
+
+  .past-events-toggle {
+    background: transparent;
+    border: 0;
+    color: var(--accent-dark);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    padding: 0;
   }
 
   .program-list {

@@ -368,8 +368,6 @@
                     {/each}
                   </select>
                 </label>
-              {:else}
-                <span class="present-label">Present</span>
               {/if}
             </div>
           {/each}
@@ -588,14 +586,14 @@
   }
 
   .attendance-row {
-    align-items: start;
+    align-items: center;
     background: #faf7f0;
     border: 1px solid #ebe4d8;
     border-radius: 0.9rem;
     display: flex;
     gap: 1rem;
     justify-content: space-between;
-    padding: 1rem;
+    padding: 0.6rem 0.9rem;
   }
 
   .attendance-row.absent {
@@ -636,13 +634,6 @@
     text-transform: uppercase;
   }
 
-  .present-label {
-    color: #397044;
-    font-size: 0.84rem;
-    font-weight: 700;
-    padding: 0.75rem 0;
-  }
-
   .compact {
     padding: 1.25rem;
   }
@@ -657,7 +648,7 @@
       justify-content: start;
     }
 
-    .attendance-row {
+    .attendance-row.absent {
       align-items: stretch;
       flex-direction: column;
     }
