@@ -399,6 +399,10 @@
   {:else}
     <div class="program-list">
       {#each data.events as event (event.id)}
+        {@const seasonHalf =
+          event.type === 'game'
+            ? deriveSeasonHalf(event.date, data.season.startingYear)
+            : undefined}
         <article class="program-row" id={`event-${event.id}`}>
           <div class="program-date">
             <strong>{formatDate(event.date)}</strong>
@@ -408,14 +412,13 @@
             {#if event.type === 'game'}
               <button class="event-summary" type="button" on:click={() => (activeEvent = event)}>
                 <p class="event-kind">
-                  Game · {event.status}{#if deriveSeasonHalf(event.date, data.season.startingYear)}
-                    · {deriveSeasonHalf(event.date, data.season.startingYear)}{/if}
+                  Game · {event.status}{#if seasonHalf}&nbsp;·&nbsp;{seasonHalf}{/if}
                 </p>
                 <h2>
                   {event.homeTeamName} <span aria-hidden="true">vs</span>
                   {event.awayTeamName}
                 </h2>
-                <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
+                <p>{event.locationName} · Leave by {event.suggestedDepartureTime}</p>
               </button>
               {#if event.status === 'scheduled'}
                 <div class="event-actions">
@@ -560,7 +563,7 @@
 
       <form class="game-form" on:submit|preventDefault={saveGame}>
         <label>
-          Venue
+          Fixture
           <select bind:value={gameForm.isHome}>
             <option value="home">Home game</option>
             <option value="away">Away game</option>
@@ -583,7 +586,7 @@
           <input bind:value={gameForm.startTime} pattern="\d{2}:\d{2}" required type="time" />
         </label>
         <label>
-          Venue
+          Location
           <input
             bind:value={gameForm.locationName}
             list="event-locations"

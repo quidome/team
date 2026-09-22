@@ -38,6 +38,9 @@
   $: showDriving = isAwayGame;
   $: showRefereeJury = isDutyOnlyGame;
   $: showDuty = showDriving || showRefereeJury;
+
+  /** @type {import('$lib/application/participation/participation-repository').ParticipationRecord[]} */
+  let participationRecords = [];
 </script>
 
 <div class="modal-backdrop" role="presentation" on:click|self={onClose}>
@@ -45,8 +48,7 @@
     <div class="modal-header">
       <div>
         <p class="eyebrow">
-          {formatDate(event.date)} · {event.startTime} · {event.locationName}{#if seasonHalf}
-            · {seasonHalf}{/if}
+          {formatDate(event.date)} · {event.startTime} · {event.locationName}{#if seasonHalf}&nbsp;·&nbsp;{seasonHalf}{/if}
         </p>
         <h2 id="event-modal-heading">{title}</h2>
       </div>
@@ -61,10 +63,18 @@
         selectedEventId={event.id}
         showEventPicker={false}
         showEventSummary={false}
+        onParticipationLoaded={(records) => (participationRecords = records)}
       />
     {/if}
     {#if showDuty}
-      <DutyPanel occurrenceId={event.id} {players} {teamName} {showDriving} {showRefereeJury} />
+      <DutyPanel
+        occurrenceId={event.id}
+        {players}
+        {teamName}
+        {showDriving}
+        {showRefereeJury}
+        {participationRecords}
+      />
     {/if}
   </div>
 </div>

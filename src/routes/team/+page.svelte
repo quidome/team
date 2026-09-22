@@ -243,9 +243,10 @@
                   : 'Trains and plays'}
               </span>
               <span>
-                {player.membership.relationship === 'primary' ? 'Primary' : 'Secondary'}
-                {#if player.membership.jerseyNumber}
-                  · #{player.membership.jerseyNumber}{/if}
+                {player.membership.relationship === 'primary'
+                  ? 'Primary'
+                  : 'Secondary'}{#if player.membership.jerseyNumber}&nbsp;·&nbsp;#{player.membership
+                    .jerseyNumber}{/if}
               </span>
             </div>
           {:else}
@@ -338,7 +339,11 @@
         </button>
       </form>
       {#if playerEditError}<p class="form-error" role="alert">{playerEditError}</p>{/if}
-      <p class="modal-context">Membership for the active team-season context.</p>
+      <p class="modal-context">
+        {selectedPlayer.membership
+          ? 'Membership for the active team-season context.'
+          : `No ${data.teamName} membership yet — saving will create one with the values below.`}
+      </p>
       <form class="form-grid" on:submit|preventDefault={saveMembership}>
         <label>
           Participation

@@ -21,6 +21,8 @@
   export let showEventPicker = true;
   /** @type {boolean} */
   export let showEventSummary = true;
+  /** @type {((records: ParticipationRecord[]) => void) | undefined} */
+  export let onParticipationLoaded = undefined;
 
   const absenceReasons = [
     { value: 'illness', label: 'Illness' },
@@ -89,6 +91,27 @@
       ? `${event.locationName} · ${event.durationMinutes} minutes`
       : `${event.locationName} · Leave by ${event.suggestedDepartureTime}`;
 
+  /** @param {ProgramEvent} event @param {ParticipationRecord[]} records */
+  const applyRecords = (event, records) => {
+    const recordsByPlayer = new Map(records.map((record) => [record.playerId, record]));
+    /** @type {AttendanceState} */
+    const nextAttendance = {};
+    /** @type {AbsenceReasonState} */
+    const nextAbsenceReasons = {};
+
+    for (const player of eligiblePlayersFor(event)) {
+      const record = recordsByPlayer.get(player.id);
+      nextAttendance[player.id] = record?.status !== 'absent';
+
+      if (record?.status === 'absent') {
+        nextAbsenceReasons[player.id] = record.absenceReason ?? 'other';
+      }
+    }
+
+    attendance = nextAttendance;
+    recordedAbsenceReasons = nextAbsenceReasons;
+  };
+
   /** @param {ProgramEvent | undefined} event */
   const loadAttendance = async (event) => {
     attendanceMessage = '';
@@ -113,23 +136,8 @@
 
       /** @type {ParticipationRecord[]} */
       const records = await response.json();
-      const recordsByPlayer = new Map(records.map((record) => [record.playerId, record]));
-      /** @type {AttendanceState} */
-      const nextAttendance = {};
-      /** @type {AbsenceReasonState} */
-      const nextAbsenceReasons = {};
-
-      for (const player of eligiblePlayersFor(event)) {
-        const record = recordsByPlayer.get(player.id);
-        nextAttendance[player.id] = record?.status !== 'absent';
-
-        if (record?.status === 'absent') {
-          nextAbsenceReasons[player.id] = record.absenceReason ?? 'other';
-        }
-      }
-
-      attendance = nextAttendance;
-      recordedAbsenceReasons = nextAbsenceReasons;
+      applyRecords(event, records);
+      onParticipationLoaded?.(records);
     } catch (error) {
       attendanceError = error instanceof Error ? error.message : 'Attendance could not be loaded.';
     } finally {
@@ -321,8 +329,8 @@
             >
               <strong>{player.firstName}</strong>
               <small
-                >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}
-                  · #{player.membership.jerseyNumber}{/if}</small
+                >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}&nbsp;·&nbsp;#{player
+                    .membership.jerseyNumber}{/if}</small
               >
               <span class="attendance-tile-status">
                 {attendance[player.id] !== false ? 'Present' : 'Absent'}
@@ -343,8 +351,8 @@
                 <span>
                   <strong>{player.firstName}</strong>
                   <small
-                    >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}
-                      · #{player.membership.jerseyNumber}{/if}</small
+                    >{player.normalAgeGroup}{#if player.membership?.jerseyNumber}&nbsp;·&nbsp;#{player
+                        .membership.jerseyNumber}{/if}</small
                   ></span
                 >
               </label>

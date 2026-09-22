@@ -1036,10 +1036,10 @@
       <h3 id="conflicts-heading">Resolve existing game differences</h3>
       <p class="form-hint">Choose which value should be kept for each conflicting field.</p>
       {#each conflicts as conflict (conflict.sourceRow)}
+        {@const gameSummary = conflictGameSummary(conflict.sourceRow)}
         <fieldset>
           <legend>
-            Source row {conflict.sourceRow}{#if conflictGameSummary(conflict.sourceRow)}
-              · {conflictGameSummary(conflict.sourceRow)}{/if}
+            Source row {conflict.sourceRow}{#if gameSummary}&nbsp;·&nbsp;{gameSummary}{/if}
           </legend>
           {#each conflict.fields as field (field.field)}
             <label>
@@ -1112,8 +1112,7 @@
       <div class="issue-list">
         {#each preview.issues as issue, index (`${issue.row}-${issue.field ?? 'row'}-${index}`)}
           <p>
-            Row {issue.row}{#if issue.field}
-              · {issue.field}{/if}: {issue.message}
+            Row {issue.row}{#if issue.field}&nbsp;·&nbsp;{issue.field}{/if}: {issue.message}
           </p>
         {/each}
       </div>

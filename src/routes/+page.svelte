@@ -53,6 +53,8 @@
   {:else}
     <div class="event-list">
       {#each visibleEvents as event, index (event.id)}
+        {@const seasonHalf =
+          event.type === 'game' ? deriveSeasonHalf(event.date, data.seasonStartingYear) : undefined}
         <button class="event-card-link" type="button" on:click={() => (activeEvent = event)}>
           <article
             class:past-event={index < previousEvents.length}
@@ -72,8 +74,7 @@
             <div class="event-details">
               {#if event.type === 'game'}
                 <p class="event-kind">
-                  Game · {event.status}{#if deriveSeasonHalf(event.date, data.seasonStartingYear)}
-                    · {deriveSeasonHalf(event.date, data.seasonStartingYear)}{/if}
+                  Game · {event.status}{#if seasonHalf}&nbsp;·&nbsp;{seasonHalf}{/if}
                 </p>
                 <h3>
                   {event.homeTeamName} <span aria-hidden="true">vs</span>

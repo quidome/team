@@ -14,6 +14,8 @@
   export let showDriving = true;
   /** @type {boolean} */
   export let showRefereeJury = true;
+  /** @type {import('$lib/application/participation/participation-repository').ParticipationRecord[]} */
+  export let participationRecords = [];
 
   const statusOptions = ['open', 'assigned', 'completed', 'incomplete', 'cancelled'];
   const signupStatuses = [
@@ -38,8 +40,6 @@
   let loading = true;
   let loadError = '';
   let configuration = { drivingSlots: 0, jurySlots: 0, refereeSlots: 0 };
-  /** @type {import('$lib/application/participation/participation-repository').ParticipationRecord[]} */
-  let participationRecords = [];
   let signupPlayerId = players[0]?.id ?? '';
   let signupType = 'referee';
   let signupStatus = 'volunteer';
@@ -101,25 +101,8 @@
     }
   };
 
-  const loadAttendance = async () => {
-    try {
-      const response = await fetch(
-        `/api/participation?occurrenceType=game&occurrenceId=${encodeURIComponent(occurrenceId)}`,
-      );
-
-      if (response.ok) {
-        participationRecords = await response.json();
-      }
-    } catch {
-      // Non-critical: the driving suggestion just falls back to the full roster.
-    }
-  };
-
   onMount(() => {
     void load();
-    if (showDriving) {
-      void loadAttendance();
-    }
   });
 
   /** @param {{ drivingSlots: number; jurySlots: number; refereeSlots: number }} nextConfiguration */
@@ -280,8 +263,11 @@
       {/each}
     </div>
     <p class="hint">
-      Referee, jury, and driving can each be configured independently — set whichever applies to
-      this game.
+      {#if showDriving}
+        This is an away game — set how many players need to drive.
+      {:else}
+        Referee and jury slots can be configured independently.
+      {/if}
     </p>
   </section>
 
@@ -352,6 +338,9 @@
               <select
                 value={slot.assignedPlayerId ?? ''}
                 disabled={slot.status === 'cancelled' || slot.status === 'completed'}
+                title={slot.status === 'cancelled' || slot.status === 'completed'
+                  ? 'Change status below to reassign'
+                  : undefined}
                 on:change={(event) => assignSlot(slot.id, event)}
               >
                 <option value="">Unassigned</option>
