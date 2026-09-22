@@ -540,22 +540,34 @@
     }
   };
 
-  const allConflictChoicesSelected = () =>
-    conflicts.every((conflict) =>
-      conflict.fields.every((field) => Boolean(conflictChoices[conflict.sourceRow]?.[field.field])),
-    );
+  $: allConflictChoicesSelected = conflicts.every((conflict) =>
+    conflict.fields.every((field) => Boolean(conflictChoices[conflict.sourceRow]?.[field.field])),
+  );
 
-  const allPlayerDuplicatesResolved = () =>
-    playerDuplicates.every((duplicate) => {
-      const choice = duplicateChoices[duplicate.sourceRow];
+  $: allPlayerDuplicatesResolved = playerDuplicates.every((duplicate) => {
+    const choice = duplicateChoices[duplicate.sourceRow];
 
-      if (!choice?.choice) return false;
-      if (choice.choice === 'overwrite' && duplicate.candidates.length > 1) {
-        return Boolean(choice.matchedPlayerId);
-      }
+    if (!choice?.choice) return false;
+    if (choice.choice === 'overwrite' && duplicate.candidates.length > 1) {
+      return Boolean(choice.matchedPlayerId);
+    }
 
-      return true;
-    });
+    return true;
+  });
+
+  /** @param {string} key */
+  const conflictFieldLabel = (key) =>
+    fieldsByKind.games.find((field) => field.key === key)?.label ?? key;
+
+  /** @param {number} sourceRow */
+  const conflictGameSummary = (sourceRow) => {
+    const records = /** @type {any[]} */ (preview?.records ?? []);
+    const record = records.find((candidate) => candidate.sourceRow === sourceRow);
+
+    return record
+      ? `${record.homeTeamName} vs ${record.awayTeamName} · ${record.date} · ${record.startTime}`
+      : undefined;
+  };
 
   /** @param {any} body */
   const describeImportResult = (body) => {
@@ -1001,7 +1013,7 @@
       {#if preview && preview.issues.length === 0 && preview.records.length > 0}
         <button
           class="secondary-button"
-          disabled={importing || !allConflictChoicesSelected() || !allPlayerDuplicatesResolved()}
+          disabled={importing || !allConflictChoicesSelected || !allPlayerDuplicatesResolved}
           type="button"
           on:click={runImport}
         >
@@ -1025,10 +1037,13 @@
       <p class="form-hint">Choose which value should be kept for each conflicting field.</p>
       {#each conflicts as conflict (conflict.sourceRow)}
         <fieldset>
-          <legend>Source row {conflict.sourceRow}</legend>
+          <legend>
+            Source row {conflict.sourceRow}{#if conflictGameSummary(conflict.sourceRow)}
+              · {conflictGameSummary(conflict.sourceRow)}{/if}
+          </legend>
           {#each conflict.fields as field (field.field)}
             <label>
-              {field.field}
+              {conflictFieldLabel(field.field)}
               <select bind:value={conflictChoices[conflict.sourceRow][field.field]}>
                 <option value="">Choose a value</option>
                 <option value="existing">Existing: {field.existingValue}</option>
