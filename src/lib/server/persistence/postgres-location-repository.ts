@@ -4,51 +4,74 @@ import type { Location, LocationRepository } from '../../application/locations/l
 import type { DatabaseConnection } from './database';
 import { locations } from './schema';
 
+const columns = {
+  address: locations.address,
+  name: locations.name,
+  travelMinutes: locations.travelMinutes,
+};
+
+const toLocation = (row: {
+  address: string | null;
+  name: string;
+  travelMinutes: number;
+}): Location => ({
+  ...(row.address ? { address: row.address } : {}),
+  name: row.name,
+  travelMinutes: row.travelMinutes,
+});
+
 export const createPostgresLocationRepository = (
   database: DatabaseConnection,
 ): LocationRepository => ({
   async findAll(): Promise<Location[]> {
-    return database
-      .select({ name: locations.name, travelMinutes: locations.travelMinutes })
-      .from(locations)
-      .orderBy(asc(locations.name));
+    const rows = await database.select(columns).from(locations).orderBy(asc(locations.name));
+
+    return rows.map(toLocation);
   },
 
   async findByName(name: string): Promise<Location | undefined> {
-    const [location] = await database
-      .select({ name: locations.name, travelMinutes: locations.travelMinutes })
+    const [row] = await database
+      .select(columns)
       .from(locations)
       .where(eq(locations.name, name))
       .limit(1);
 
-    return location;
+    return row ? toLocation(row) : undefined;
   },
 
   async save(location: Location): Promise<Location> {
-    const [storedLocation] = await database
+    const [row] = await database
       .insert(locations)
-      .values(location)
-      .returning({ name: locations.name, travelMinutes: locations.travelMinutes });
+      .values({
+        address: location.address ?? null,
+        name: location.name,
+        travelMinutes: location.travelMinutes,
+      })
+      .returning(columns);
 
-    if (!storedLocation) {
+    if (!row) {
       throw new Error('PostgreSQL did not return the stored location');
     }
 
-    return storedLocation;
+    return toLocation(row);
   },
 
   async updateName(currentName: string, location: Location): Promise<Location> {
-    const [updatedLocation] = await database
+    const [row] = await database
       .update(locations)
-      .set(location)
+      .set({
+        address: location.address ?? null,
+        name: location.name,
+        travelMinutes: location.travelMinutes,
+      })
       .where(eq(locations.name, currentName))
-      .returning({ name: locations.name, travelMinutes: locations.travelMinutes });
+      .returning(columns);
 
-    if (!updatedLocation) {
+    if (!row) {
       throw new Error('Location does not exist');
     }
 
-    return updatedLocation;
+    return toLocation(row);
   },
 
   async deleteByName(name: string): Promise<void> {

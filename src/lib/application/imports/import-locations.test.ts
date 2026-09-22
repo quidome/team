@@ -32,4 +32,33 @@ describe('import locations', () => {
       travelMinutes: 35,
     });
   });
+
+  it('stores an imported address on create and update, without clearing one when unmapped', async () => {
+    const locations = new InMemoryLocationRepository([
+      { address: 'Kamillehof 24, Huizen', name: 'Home court', travelMinutes: 0 },
+      { name: 'Away court', travelMinutes: 20 },
+    ]);
+
+    const result = await importLocations(locations, [
+      { name: 'Home court', sourceRow: 2, travelMinutes: 5 },
+      { address: 'Stromenlaan 130, Woerden', name: 'Away court', sourceRow: 3, travelMinutes: 20 },
+      { address: 'De Smidse 1, Leusden', name: 'North court', sourceRow: 4, travelMinutes: 35 },
+    ]);
+
+    expect(result.unchanged).toEqual([]);
+    expect(result.imported).toEqual([
+      { address: 'De Smidse 1, Leusden', name: 'North court', sourceRow: 4, travelMinutes: 35 },
+    ]);
+
+    await expect(locations.findByName('Home court')).resolves.toEqual({
+      address: 'Kamillehof 24, Huizen',
+      name: 'Home court',
+      travelMinutes: 5,
+    });
+    await expect(locations.findByName('Away court')).resolves.toEqual({
+      address: 'Stromenlaan 130, Woerden',
+      name: 'Away court',
+      travelMinutes: 20,
+    });
+  });
 });

@@ -12,7 +12,11 @@ if (!databaseUrl) {
   describe.skip('PostgreSQL location repository', () => {});
 } else {
   describe('PostgreSQL location repository', () => {
-    const location = { name: 'Integration test court', travelMinutes: 20 };
+    const location = {
+      address: 'Kamillehof 24, 3991GZ, Huizen',
+      name: 'Integration test court',
+      travelMinutes: 20,
+    };
     const database = createDatabase(databaseUrl);
     const repository: LocationRepository = createPostgresLocationRepository(database);
 

@@ -18,6 +18,7 @@
     ],
     locations: [
       { key: 'name', label: 'Name', required: true },
+      { key: 'address', label: 'Address', required: false },
       { key: 'travelMinutes', label: 'Travel minutes', required: false },
     ],
     players: [
@@ -41,6 +42,7 @@
     ],
     locations: [
       { key: 'name', label: 'Name' },
+      { key: 'address', label: 'Address' },
       { key: 'travelMinutes', label: 'Travel minutes' },
     ],
     players: [
@@ -86,6 +88,10 @@
   let conflicts = [];
   /** @type {Record<string, Record<string, string>>} */
   let conflictChoices = {};
+  /** @type {Array<{sourceRow: number, candidates: Array<{id: string, firstName: string, lastName?: string, birthDate?: string, associationId?: string}>}>} */
+  let playerDuplicates = [];
+  /** @type {Record<string, { choice: string; matchedPlayerId: string }>} */
+  let duplicateChoices = {};
   let settingsForm = {
     primaryTeamName: data.coordinatorSettings?.primaryTeamName ?? '',
     seasonStartingYear: data.coordinatorSettings?.seasonStartingYear
@@ -104,6 +110,7 @@
   let teamMessage = '';
   let teamError = '';
   let locationForm = {
+    address: '',
     name: '',
     travelMinutes: '0',
   };
@@ -114,7 +121,7 @@
   let adminError = '';
   /** @type {{ type: 'season' | 'team' | 'location'; label: string; currentName?: string; currentStartingYear?: number } | undefined} */
   let editTarget;
-  let editForm = { name: '', startingYear: '', travelMinutes: '0' };
+  let editForm = { address: '', name: '', startingYear: '', travelMinutes: '0' };
   let editSaving = false;
 
   /** @param {string} path @param {string} label */
@@ -130,6 +137,7 @@
       type,
     };
     editForm = {
+      address: type === 'location' ? (item.address ?? '') : '',
       name: type === 'season' ? '' : item.name,
       startingYear: type === 'season' ? String(item.startingYear) : '',
       travelMinutes: type === 'location' ? String(item.travelMinutes) : '0',
@@ -155,6 +163,7 @@
           : editTarget.type === 'team'
             ? { currentName: editTarget.currentName, name: editForm.name }
             : {
+                ...(editForm.address.trim() ? { address: editForm.address.trim() } : {}),
                 currentName: editTarget.currentName,
                 name: editForm.name,
                 travelMinutes: Number(editForm.travelMinutes),
@@ -210,6 +219,7 @@
     try {
       const response = await fetch('/api/locations', {
         body: JSON.stringify({
+          ...(locationForm.address.trim() ? { address: locationForm.address.trim() } : {}),
           name: locationForm.name,
           travelMinutes: Number(locationForm.travelMinutes),
         }),
@@ -222,7 +232,7 @@
         throw new Error(body.error ?? 'The location could not be stored.');
       }
 
-      locationForm = { name: '', travelMinutes: '0' };
+      locationForm = { address: '', name: '', travelMinutes: '0' };
       locationMessage = `${body.name} is available for games and training.`;
       await invalidateAll();
     } catch (caught) {
@@ -361,6 +371,7 @@
       travelMinutes: ['travel', 'travel minutes', 'reistijd'],
     },
     locations: {
+      address: ['address', 'adres'],
       name: ['name', 'location', 'venue', 'plaats'],
       travelMinutes: ['travel', 'travel minutes', 'reistijd'],
     },
@@ -406,6 +417,8 @@
     importMessage = '';
     conflicts = [];
     conflictChoices = {};
+    playerDuplicates = [];
+    duplicateChoices = {};
   };
 
   /** @param {Event} event */
@@ -492,6 +505,8 @@
     importMessage = '';
     conflicts = [];
     conflictChoices = {};
+    playerDuplicates = [];
+    duplicateChoices = {};
   };
 
   const previewImport = async () => {
@@ -530,6 +545,18 @@
       conflict.fields.every((field) => Boolean(conflictChoices[conflict.sourceRow]?.[field.field])),
     );
 
+  const allPlayerDuplicatesResolved = () =>
+    playerDuplicates.every((duplicate) => {
+      const choice = duplicateChoices[duplicate.sourceRow];
+
+      if (!choice?.choice) return false;
+      if (choice.choice === 'overwrite' && duplicate.candidates.length > 1) {
+        return Boolean(choice.matchedPlayerId);
+      }
+
+      return true;
+    });
+
   /** @param {any} body */
   const describeImportResult = (body) => {
     if (importKind === 'games') {
@@ -543,7 +570,8 @@
       /** @type {Array<{updated: boolean}>} */
       const importedPlayers = body.imported;
       const updatedCount = importedPlayers.filter((player) => player.updated).length;
-      return `${body.imported.length} players imported (${updatedCount} updated)${body.failed.length ? `; ${body.failed.length} failed.` : '.'}`;
+      const skippedCount = body.skipped.length;
+      return `${body.imported.length} players imported (${updatedCount} updated)${skippedCount ? `; ${skippedCount} skipped` : ''}${body.failed.length ? `; ${body.failed.length} failed.` : '.'}`;
     }
 
     return `${body.imported.length} locations added, ${body.updated.length} updated, ${body.unchanged.length} unchanged${body.failed.length ? `; ${body.failed.length} failed.` : '.'}`;
@@ -570,6 +598,17 @@
                 })),
               }
             : {}),
+          ...(importKind === 'players'
+            ? {
+                resolutions: playerDuplicates.map((duplicate) => ({
+                  choice: duplicateChoices[duplicate.sourceRow]?.choice,
+                  ...(duplicateChoices[duplicate.sourceRow]?.matchedPlayerId
+                    ? { matchedPlayerId: duplicateChoices[duplicate.sourceRow].matchedPlayerId }
+                    : {}),
+                  sourceRow: duplicate.sourceRow,
+                })),
+              }
+            : {}),
           sourceName: fileName,
         }),
         headers: { 'content-type': 'application/json' },
@@ -588,12 +627,32 @@
         return;
       }
 
+      if (
+        importKind === 'players' &&
+        response.status === 409 &&
+        body.error === 'import_duplicates'
+      ) {
+        playerDuplicates = body.duplicates;
+        duplicateChoices = Object.fromEntries(
+          playerDuplicates.map((duplicate) => [
+            duplicate.sourceRow,
+            {
+              choice: '',
+              matchedPlayerId: duplicate.candidates.length === 1 ? duplicate.candidates[0].id : '',
+            },
+          ]),
+        );
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(body.error ?? `The ${importKindLabels[importKind]} could not be imported.`);
       }
 
       conflicts = [];
       conflictChoices = {};
+      playerDuplicates = [];
+      duplicateChoices = {};
       importMessage = describeImportResult(body);
     } catch (caught) {
       error =
@@ -643,6 +702,10 @@
             <input bind:value={editForm.name} required />
           </label>
           {#if editTarget.type === 'location'}
+            <label>
+              Address <span class="optional">optional</span>
+              <input bind:value={editForm.address} autocomplete="street-address" />
+            </label>
             <label>
               Travel minutes
               <input bind:value={editForm.travelMinutes} min="0" required type="number" />
@@ -820,6 +883,14 @@
       <input bind:value={locationForm.name} placeholder="e.g. Home court" required />
     </label>
     <label>
+      Address <span class="optional">optional</span>
+      <input
+        bind:value={locationForm.address}
+        autocomplete="street-address"
+        placeholder="e.g. Kamillehof 24, 3991GZ, Huizen"
+      />
+    </label>
+    <label>
       Travel minutes
       <input bind:value={locationForm.travelMinutes} min="0" required type="number" />
     </label>
@@ -845,6 +916,7 @@
         <div class="location-row">
           <div>
             <strong>{location.name}</strong>
+            {#if location.address}<span>{location.address}</span>{/if}
             <span>{location.travelMinutes} minutes travel</span>
           </div>
           <div class="row-actions">
@@ -929,7 +1001,7 @@
       {#if preview && preview.issues.length === 0 && preview.records.length > 0}
         <button
           class="secondary-button"
-          disabled={importing || !allConflictChoicesSelected()}
+          disabled={importing || !allConflictChoicesSelected() || !allPlayerDuplicatesResolved()}
           type="button"
           on:click={runImport}
         >
@@ -964,6 +1036,53 @@
               </select>
             </label>
           {/each}
+        </fieldset>
+      {/each}
+    </section>
+  {/if}
+
+  {#if importKind === 'players' && playerDuplicates.length > 0}
+    <section class="conflict-list" aria-labelledby="duplicates-heading">
+      <h3 id="duplicates-heading">Resolve possible duplicate players</h3>
+      <p class="form-hint">
+        These rows have no association ID and share a name with a player already on this roster.
+        Choose whether to overwrite that player, add a new player anyway, or skip the row.
+      </p>
+      {#each playerDuplicates as duplicate (duplicate.sourceRow)}
+        <fieldset>
+          <legend>Source row {duplicate.sourceRow}</legend>
+          <p class="form-hint">
+            Matches: {duplicate.candidates
+              .map(
+                (candidate) =>
+                  `${candidate.firstName}${candidate.lastName ? ` ${candidate.lastName}` : ''}${candidate.birthDate ? ` (born ${candidate.birthDate})` : ''}`,
+              )
+              .join(', ')}
+          </p>
+          <label>
+            Resolution
+            <select bind:value={duplicateChoices[duplicate.sourceRow].choice}>
+              <option value="">Choose a resolution</option>
+              <option value="overwrite">Overwrite the matched player</option>
+              <option value="add">Add as a new player</option>
+              <option value="skip">Skip this row</option>
+            </select>
+          </label>
+          {#if duplicateChoices[duplicate.sourceRow].choice === 'overwrite' && duplicate.candidates.length > 1}
+            <label>
+              Player to overwrite
+              <select bind:value={duplicateChoices[duplicate.sourceRow].matchedPlayerId}>
+                <option value="">Choose a player</option>
+                {#each duplicate.candidates as candidate (candidate.id)}
+                  <option value={candidate.id}
+                    >{candidate.firstName}{candidate.lastName
+                      ? ` ${candidate.lastName}`
+                      : ''}{candidate.birthDate ? ` (born ${candidate.birthDate})` : ''}</option
+                  >
+                {/each}
+              </select>
+            </label>
+          {/if}
         </fieldset>
       {/each}
     </section>
@@ -1042,6 +1161,13 @@
     gap: 0.35rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+
+  .optional {
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .configuration-form input {

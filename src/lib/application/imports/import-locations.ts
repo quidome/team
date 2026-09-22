@@ -36,17 +36,24 @@ export const importLocations = async (
       const existing = await locations.findByName(record.name);
 
       if (!existing) {
-        await locations.save({ name: record.name, travelMinutes: record.travelMinutes });
+        await locations.save({
+          ...(record.address ? { address: record.address } : {}),
+          name: record.name,
+          travelMinutes: record.travelMinutes,
+        });
         imported.push(record);
         continue;
       }
 
-      if (existing.travelMinutes === record.travelMinutes) {
+      const nextAddress = record.address ?? existing.address;
+
+      if (existing.travelMinutes === record.travelMinutes && existing.address === nextAddress) {
         unchanged.push({ sourceRow: record.sourceRow, travelMinutes: existing.travelMinutes });
         continue;
       }
 
       await locations.updateName(record.name, {
+        ...(nextAddress ? { address: nextAddress } : {}),
         name: record.name,
         travelMinutes: record.travelMinutes,
       });

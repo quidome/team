@@ -118,6 +118,7 @@ export const locations = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     name: text('name').notNull(),
+    address: text('address'),
     travelMinutes: integer('travel_minutes').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },

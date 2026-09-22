@@ -48,4 +48,17 @@ describe('location import preview', () => {
 
     expect(preview.issues).toEqual([expect.objectContaining({ field: 'name', row: 2 })]);
   });
+
+  it('parses an optional address column', () => {
+    const preview = previewLocationImport(
+      'name,address,travel\nHome court,Kamillehof 24 Huizen,20\nAway court,,0',
+      { address: 'address', name: 'name', travelMinutes: 'travel' },
+    );
+
+    expect(preview.issues).toEqual([]);
+    expect(preview.records).toEqual([
+      { address: 'Kamillehof 24 Huizen', name: 'Home court', sourceRow: 2, travelMinutes: 20 },
+      { name: 'Away court', sourceRow: 3, travelMinutes: 0 },
+    ]);
+  });
 });

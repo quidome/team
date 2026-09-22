@@ -9,16 +9,21 @@ const readLocation = async (request: Request): Promise<Location | undefined> => 
     const payload: unknown = await request.json();
 
     if (typeof payload === 'object' && payload !== null) {
-      const { name, travelMinutes } = payload as Record<string, unknown>;
+      const { address, name, travelMinutes } = payload as Record<string, unknown>;
 
       if (
+        (address === undefined || typeof address === 'string') &&
         typeof name === 'string' &&
         name.trim() &&
         typeof travelMinutes === 'number' &&
         Number.isInteger(travelMinutes) &&
         travelMinutes >= 0
       ) {
-        return { name: name.trim(), travelMinutes };
+        return {
+          ...(address?.trim() ? { address: address.trim() } : {}),
+          name: name.trim(),
+          travelMinutes,
+        };
       }
     }
   } catch {
@@ -35,9 +40,10 @@ const readLocationUpdate = async (
     const payload: unknown = await request.json();
 
     if (typeof payload === 'object' && payload !== null) {
-      const { currentName, name, travelMinutes } = payload as Record<string, unknown>;
+      const { address, currentName, name, travelMinutes } = payload as Record<string, unknown>;
 
       if (
+        (address === undefined || typeof address === 'string') &&
         typeof currentName === 'string' &&
         currentName.trim() &&
         typeof name === 'string' &&
@@ -48,7 +54,11 @@ const readLocationUpdate = async (
       ) {
         return {
           currentName: currentName.trim(),
-          location: { name: name.trim(), travelMinutes },
+          location: {
+            ...(address?.trim() ? { address: address.trim() } : {}),
+            name: name.trim(),
+            travelMinutes,
+          },
         };
       }
     }
@@ -74,7 +84,11 @@ export const PUT = async ({ request }) => {
     action: 'location_updated',
     entityId: location.name,
     entityType: 'location',
-    metadata: { name: location.name, travelMinutes: location.travelMinutes },
+    metadata: {
+      ...(location.address ? { address: location.address } : {}),
+      name: location.name,
+      travelMinutes: location.travelMinutes,
+    },
   });
 
   return json(location);
@@ -111,7 +125,11 @@ export const POST = async ({ request }) => {
     action: 'location_configured',
     entityId: configuredLocation.name,
     entityType: 'location',
-    metadata: { name: configuredLocation.name, travelMinutes: configuredLocation.travelMinutes },
+    metadata: {
+      ...(configuredLocation.address ? { address: configuredLocation.address } : {}),
+      name: configuredLocation.name,
+      travelMinutes: configuredLocation.travelMinutes,
+    },
   });
 
   return json(configuredLocation);

@@ -1,12 +1,13 @@
 import { parseCsvRows } from './parse-import-csv';
 
-export const locationImportFields = ['name', 'travelMinutes'] as const;
+export const locationImportFields = ['name', 'address', 'travelMinutes'] as const;
 
 export type LocationImportField = (typeof locationImportFields)[number];
 
 export type LocationImportMapping = Partial<Record<LocationImportField, string>>;
 
 export interface ImportedLocation {
+  address?: string;
   name: string;
   sourceRow: number;
   travelMinutes: number;
@@ -56,6 +57,7 @@ export const previewLocationImport = (
     const rowNumber = index + 2;
     const row = Object.fromEntries(headers.map((header, column) => [header, values[column] ?? '']));
     const name = readValue(row, mapping, 'name');
+    const address = readValue(row, mapping, 'address');
     const travelMinutesRaw = readValue(row, mapping, 'travelMinutes');
     const rowIssues: ImportIssue[] = [];
 
@@ -81,7 +83,12 @@ export const previewLocationImport = (
 
     issues.push(...rowIssues);
     if (rowIssues.length === 0) {
-      records.push({ name, sourceRow: rowNumber, travelMinutes });
+      records.push({
+        ...(address ? { address } : {}),
+        name,
+        sourceRow: rowNumber,
+        travelMinutes,
+      });
     }
   });
 

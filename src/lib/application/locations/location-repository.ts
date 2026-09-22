@@ -1,4 +1,5 @@
 export interface Location {
+  address?: string;
   name: string;
   travelMinutes: number;
 }
