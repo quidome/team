@@ -1,6 +1,7 @@
 <script>
   import { invalidateAll } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { isAttendanceEligible } from '$lib/application/program/read-program';
 
   /** @typedef {import('$lib/application/participation/participation-repository').ParticipationRecord} ParticipationRecord */
   /** @typedef {import('$lib/application/program/read-program').ProgramEvent} ProgramEvent */
@@ -39,9 +40,7 @@
 
   /** @param {ProgramEvent} event */
   const isAttendanceEvent = (event) =>
-    event.type === 'training' ||
-    (event.status === 'scheduled' &&
-      (event.homeTeamName === teamName || event.awayTeamName === teamName));
+    event.type === 'training' || isAttendanceEligible(event, teamName);
   const initialEvent =
     events.find((event) => event.id === selectedEventId && isAttendanceEvent(event)) ??
     events.find(isAttendanceEvent);

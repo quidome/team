@@ -1,12 +1,15 @@
 <script>
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import EventModal from '$lib/components/EventModal.svelte';
   import { normalizeTeamName } from '$lib/domain/team-name';
   import { deriveSeasonHalf } from '$lib/domain/season-half';
 
   export let data;
 
-  /** @param {string} date */
+  /** @type {import('$lib/application/program/read-program').ProgramEvent | undefined} */
+  let activeEvent = undefined;
+
   /** @param {string} date */
   const formatDate = (date) =>
     new Intl.DateTimeFormat('en', {
@@ -403,12 +406,17 @@
           </div>
           <div class="program-event">
             {#if event.type === 'game'}
-              <p class="event-kind">
-                Game · {event.status}{#if deriveSeasonHalf(event.date, data.season.startingYear)}
-                  · {deriveSeasonHalf(event.date, data.season.startingYear)}{/if}
-              </p>
-              <h2>{event.homeTeamName} <span aria-hidden="true">vs</span> {event.awayTeamName}</h2>
-              <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
+              <button class="event-summary" type="button" on:click={() => (activeEvent = event)}>
+                <p class="event-kind">
+                  Game · {event.status}{#if deriveSeasonHalf(event.date, data.season.startingYear)}
+                    · {deriveSeasonHalf(event.date, data.season.startingYear)}{/if}
+                </p>
+                <h2>
+                  {event.homeTeamName} <span aria-hidden="true">vs</span>
+                  {event.awayTeamName}
+                </h2>
+                <p>{event.locationName} · Suggested departure {event.suggestedDepartureTime}</p>
+              </button>
               {#if event.status === 'scheduled'}
                 <div class="event-actions">
                   <button
@@ -468,9 +476,11 @@
                 {/if}
               {/if}
             {:else}
-              <p class="event-kind">Training · {event.status}</p>
-              <h2>Team training</h2>
-              <p>{event.locationName} · {event.durationMinutes} minutes</p>
+              <button class="event-summary" type="button" on:click={() => (activeEvent = event)}>
+                <p class="event-kind">Training · {event.status}</p>
+                <h2>Team training</h2>
+                <p>{event.locationName} · {event.durationMinutes} minutes</p>
+              </button>
               {#if event.status === 'scheduled' && event.occurrenceId}
                 <div class="event-actions">
                   <button
@@ -753,6 +763,16 @@
   </div>
 {/if}
 
+{#if activeEvent}
+  <EventModal
+    event={activeEvent}
+    players={data.players}
+    teamName={data.teamName}
+    seasonStartingYear={data.season.startingYear}
+    onClose={() => (activeEvent = undefined)}
+  />
+{/if}
+
 <style>
   .action-row {
     display: flex;
@@ -913,6 +933,29 @@
 
   .program-date strong {
     color: var(--ink);
+  }
+
+  .event-summary {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+    width: 100%;
+  }
+
+  .event-summary:hover h2,
+  .event-summary:focus-visible h2 {
+    color: var(--accent-dark);
+  }
+
+  .event-summary:focus-visible {
+    border-radius: 0.4rem;
+    outline: 3px solid rgba(213, 99, 62, 0.25);
+    outline-offset: 3px;
   }
 
   .program-event h2 {

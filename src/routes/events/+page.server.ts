@@ -1,21 +1,14 @@
 import { loadLocations } from '$lib/server/load-admin';
-import { currentTeamSeasonContext } from '$lib/server/load-team';
-import { loadProgram } from '$lib/server/load-program';
+import { loadTeam } from '$lib/server/load-team';
 
 export const load = async () => {
-  const [program, locations, context] = await Promise.all([
-    loadProgram(),
-    loadLocations(),
-    currentTeamSeasonContext(),
-  ]);
+  const [team, locations] = await Promise.all([loadTeam(), loadLocations()]);
 
   return {
-    ...program,
+    events: team.events,
     locations,
-    season: {
-      endingYear: context.seasonStartingYear + 1,
-      startingYear: context.seasonStartingYear,
-    },
-    teamName: context.teamName,
+    players: team.players,
+    season: team.season,
+    teamName: team.teamName,
   };
 };

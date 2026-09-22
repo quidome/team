@@ -1,8 +1,12 @@
 <script>
   import { resolve } from '$app/paths';
+  import EventModal from '$lib/components/EventModal.svelte';
   import { deriveSeasonHalf } from '$lib/domain/season-half';
 
   export let data;
+
+  /** @type {import('$lib/application/program/read-program').ProgramEvent | undefined} */
+  let activeEvent = undefined;
 
   /** @param {string} date */
   const formatDate = (date) =>
@@ -19,16 +23,6 @@
   const nextEvents = scheduledEvents.filter((event) => event.date > today).slice(0, 3);
   const visibleEvents = [...previousEvents, ...todayEvents, ...nextEvents];
   const nextEventId = todayEvents.length === 0 ? nextEvents[0]?.id : undefined;
-  /** @param {import('$lib/application/program/read-program').ProgramEvent} event */
-  const isAttendanceEvent = (event) =>
-    event.type === 'training' ||
-    event.homeTeamName === data.teamName ||
-    event.awayTeamName === data.teamName;
-  /** @param {import('$lib/application/program/read-program').ProgramEvent} event */
-  const eventHref = (event) =>
-    isAttendanceEvent(event)
-      ? resolve('/events/[eventId]', { eventId: event.id })
-      : `${resolve('/events')}#event-${encodeURIComponent(event.id)}`;
 </script>
 
 <svelte:head>
@@ -59,8 +53,7 @@
   {:else}
     <div class="event-list">
       {#each visibleEvents as event, index (event.id)}
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-        <a class="event-card-link" href={eventHref(event)}>
+        <button class="event-card-link" type="button" on:click={() => (activeEvent = event)}>
           <article
             class:past-event={index < previousEvents.length}
             class:today-event={event.date === today}
@@ -94,17 +87,34 @@
               {/if}
             </div>
           </article>
-        </a>
+        </button>
       {/each}
     </div>
   {/if}
 </section>
 
+{#if activeEvent}
+  <EventModal
+    event={activeEvent}
+    players={data.players}
+    teamName={data.teamName}
+    seasonStartingYear={data.seasonStartingYear}
+    onClose={() => (activeEvent = undefined)}
+  />
+{/if}
+
 <style>
   :global(.event-card-link) {
+    background: none;
+    border: 0;
     color: inherit;
+    cursor: pointer;
     display: block;
+    font: inherit;
+    padding: 0;
+    text-align: left;
     text-decoration: none;
+    width: 100%;
   }
 
   :global(.event-card-link:hover .event-card),

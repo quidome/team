@@ -23,6 +23,11 @@ export interface ProgramTrainingEvent {
 
 export type ProgramEvent = ProgramGameEvent | ProgramTrainingEvent;
 
+export const isAttendanceEligible = (event: ProgramEvent, teamName: string): boolean =>
+  event.type === 'game' &&
+  event.status === 'scheduled' &&
+  (event.homeTeamName === teamName || event.awayTeamName === teamName);
+
 const byDateAndTime = (left: ProgramEvent, right: ProgramEvent) =>
   `${left.date}T${left.startTime}`.localeCompare(`${right.date}T${right.startTime}`);
 
