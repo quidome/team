@@ -8,6 +8,14 @@ export class InMemoryGameImportRepository implements GameImportRepository {
   readonly records: (GameImportProvenance & { id: string })[] = [];
 
   async save(provenance: GameImportProvenance) {
+    const existing = this.records.find((record) => record.occurrenceId === provenance.occurrenceId);
+
+    if (existing) {
+      Object.assign(existing, provenance);
+
+      return existing;
+    }
+
     const stored = { ...provenance, id: `game-import-${this.nextId++}` };
 
     this.records.push(stored);

@@ -17,6 +17,14 @@ export const createPostgresGameImportRepository = (
         sourceName: provenance.sourceName,
         sourceRow: provenance.sourceRow,
       })
+      .onConflictDoUpdate({
+        set: {
+          importedAt: provenance.importedAt,
+          sourceName: provenance.sourceName,
+          sourceRow: provenance.sourceRow,
+        },
+        target: gameImportProvenance.occurrenceId,
+      })
       .returning({
         id: gameImportProvenance.id,
         importedAt: gameImportProvenance.importedAt,
