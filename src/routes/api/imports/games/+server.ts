@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 
 import { previewGameImport, type GameImportMapping } from '$lib/application/imports/game-import';
 import {
+  applyImportContext,
   findImportConflicts,
   importGames,
   type GameImportChoice,
@@ -13,11 +14,14 @@ import {
   type GameImportFileEncoding,
   type GameImportUpload,
 } from '$lib/server/imports/game-import-upload';
+import {
+  buildGameImportContext,
+  currentImportPrimaryTeamName,
+} from '$lib/server/imports/game-import-context';
 import { currentGameRepository, withCurrentImportTransaction } from '$lib/server/composition-root';
 
 interface ImportRequest {
   mapping: GameImportMapping;
-  primaryTeamName: string;
   resolutions: GameImportResolution[];
   sourceName: string;
   upload: GameImportUpload;
@@ -84,16 +88,8 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       return undefined;
     }
 
-    const {
-      content,
-      encoding,
-      fileName,
-      mapping,
-      primaryTeamName,
-      resolutions,
-      sheetName,
-      sourceName,
-    } = payload as Record<string, unknown>;
+    const { content, encoding, fileName, mapping, resolutions, sheetName, sourceName } =
+      payload as Record<string, unknown>;
     const parsedResolutions = readResolutions(resolutions);
 
     if (
@@ -105,8 +101,6 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
       (sheetName !== undefined && (typeof sheetName !== 'string' || !sheetName.trim())) ||
       typeof mapping !== 'object' ||
       mapping === null ||
-      typeof primaryTeamName !== 'string' ||
-      !primaryTeamName.trim() ||
       parsedResolutions === undefined ||
       typeof sourceName !== 'string' ||
       !sourceName.trim()
@@ -116,7 +110,6 @@ const readRequest = async (request: Request): Promise<ImportRequest | undefined>
 
     return {
       mapping: mapping as GameImportMapping,
-      primaryTeamName: primaryTeamName.trim(),
       resolutions: parsedResolutions,
       sourceName: sourceName.trim(),
       upload: {
@@ -138,6 +131,12 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_game_import' }, { status: 400 });
   }
 
+  const primaryTeamName = await currentImportPrimaryTeamName();
+
+  if (!primaryTeamName) {
+    return json({ error: 'coordinator_settings_not_configured' }, { status: 400 });
+  }
+
   let preview;
 
   try {
@@ -148,6 +147,9 @@ export const POST = async ({ request }) => {
       { status: 400 },
     );
   }
+
+  const context = await buildGameImportContext();
+  preview = applyImportContext(preview, context);
 
   if (preview.issues.length > 0) {
     return json({ error: 'invalid_import_rows', preview }, { status: 400 });
@@ -169,31 +171,34 @@ export const POST = async ({ request }) => {
   }
 
   try {
-    const result = await withCurrentImportTransaction(async ({ audit, gameImports, games }) => {
-      const importedResult = await importGames(games, gameImports, {
-        atomic: true,
-        importedAt: new Date(),
-        primaryTeamName: input.primaryTeamName,
-        records: preview.records,
-        resolutions: input.resolutions,
-        sourceName: input.sourceName,
-      });
-
-      await audit.record({
-        action: 'games_imported',
-        entityId: input.sourceName,
-        entityType: 'game_import',
-        metadata: {
-          conflicts: importedResult.conflicts.length,
-          duplicates: importedResult.duplicates.length,
-          failed: importedResult.failed.length,
-          imported: importedResult.imported.length,
+    const result = await withCurrentImportTransaction(
+      async ({ audit, duties, gameImports, games }) => {
+        const importedResult = await importGames(games, gameImports, duties, {
+          atomic: true,
+          context,
+          importedAt: new Date(),
+          primaryTeamName,
+          records: preview.records,
+          resolutions: input.resolutions,
           sourceName: input.sourceName,
-        },
-      });
+        });
 
-      return importedResult;
-    });
+        await audit.record({
+          action: 'games_imported',
+          entityId: input.sourceName,
+          entityType: 'game_import',
+          metadata: {
+            conflicts: importedResult.conflicts.length,
+            duplicates: importedResult.duplicates.length,
+            failed: importedResult.failed.length,
+            imported: importedResult.imported.length,
+            sourceName: input.sourceName,
+          },
+        });
+
+        return importedResult;
+      },
+    );
 
     return json(result);
   } catch (error) {

@@ -1,3 +1,5 @@
+import { parseImportDate } from './parse-import-date';
+
 export const gameImportFields = [
   'awayTeamName',
   'date',
@@ -6,6 +8,8 @@ export const gameImportFields = [
   'startTime',
   'travelMinutes',
   'arrivalBufferMinutes',
+  'jurySlots',
+  'refereeSlots',
 ] as const;
 
 export const maxGameImportColumns = 100;
@@ -20,7 +24,9 @@ export interface ImportedGame {
   awayTeamName: string;
   date: string;
   homeTeamName: string;
+  jurySlots?: number;
   locationName: string;
+  refereeSlots?: number;
   sourceRow: number;
   startTime: string;
   travelMinutes: number;
@@ -106,16 +112,6 @@ const parseCsvRows = (content: string): string[][] => {
   return rows;
 };
 
-const isCalendarDate = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-};
-
 const isTime = (value: string) => {
   if (!/^\d{2}:\d{2}$/.test(value)) {
     return false;
@@ -156,6 +152,29 @@ const readOptionalNumber = (
   return number;
 };
 
+const readOptionalSlotCount = (
+  row: Record<string, string>,
+  mapping: GameImportMapping,
+  field: 'jurySlots' | 'refereeSlots',
+  rowNumber: number,
+  issues: ImportIssue[],
+): number | undefined => {
+  const value = readValue(row, mapping, field);
+
+  if (!value) {
+    return undefined;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < 0 || number > 2) {
+    issues.push({ field, message: 'Must be a whole number from 0 to 2.', row: rowNumber });
+    return undefined;
+  }
+
+  return number;
+};
+
 export const previewGameImport = (
   content: string,
   mapping: GameImportMapping,
@@ -184,11 +203,12 @@ export const previewGameImport = (
     const awayTeamName = readValue(row, mapping, 'awayTeamName');
     const locationName = readValue(row, mapping, 'locationName');
     const rowIssues: ImportIssue[] = [];
+    const parsedDate = date ? parseImportDate(date) : undefined;
 
-    if (date && !isCalendarDate(date)) {
+    if (date && !parsedDate) {
       rowIssues.push({
         field: 'date',
-        message: 'Use a valid date in YYYY-MM-DD format.',
+        message: 'Use a valid date (YYYY-MM-DD or DD-MM-YYYY).',
         row: rowNumber,
       });
     }
@@ -230,15 +250,19 @@ export const previewGameImport = (
       rowNumber,
       rowIssues,
     );
+    const jurySlots = readOptionalSlotCount(row, mapping, 'jurySlots', rowNumber, rowIssues);
+    const refereeSlots = readOptionalSlotCount(row, mapping, 'refereeSlots', rowNumber, rowIssues);
 
     issues.push(...rowIssues);
     if (rowIssues.length === 0) {
       records.push({
         arrivalBufferMinutes,
         awayTeamName,
-        date,
+        date: parsedDate ?? date,
         homeTeamName,
+        ...(jurySlots !== undefined ? { jurySlots } : {}),
         locationName,
+        ...(refereeSlots !== undefined ? { refereeSlots } : {}),
         sourceRow: rowNumber,
         startTime,
         travelMinutes,

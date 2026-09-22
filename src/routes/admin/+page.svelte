@@ -11,6 +11,8 @@
     { key: 'locationName', label: 'Location', required: true },
     { key: 'travelMinutes', label: 'Travel minutes', required: false },
     { key: 'arrivalBufferMinutes', label: 'Arrival buffer', required: false },
+    { key: 'jurySlots', label: 'Jury slots', required: false },
+    { key: 'refereeSlots', label: 'Referee slots', required: false },
   ];
 
   let fileName = '';
@@ -29,11 +31,19 @@
   let importing = false;
   let error = '';
   let importMessage = '';
-  let primaryTeamName = 'U16-1';
   /** @type {Array<{sourceRow: number, existingOccurrenceId: string, fields: Array<{field: string, existingValue: string | number, importedValue: string | number}>}>} */
   let conflicts = [];
   /** @type {Record<string, Record<string, string>>} */
   let conflictChoices = {};
+  let settingsForm = {
+    primaryTeamName: data.coordinatorSettings?.primaryTeamName ?? '',
+    seasonStartingYear: data.coordinatorSettings?.seasonStartingYear
+      ? String(data.coordinatorSettings.seasonStartingYear)
+      : '',
+  };
+  let savingSettings = false;
+  let settingsMessage = '';
+  let settingsError = '';
   let seasonForm = { startingYear: '' };
   let savingSeason = false;
   let seasonMessage = '';
@@ -172,6 +182,36 @@
     }
   };
 
+  const saveSettings = async () => {
+    savingSettings = true;
+    settingsMessage = '';
+    settingsError = '';
+
+    try {
+      const response = await fetch('/api/settings', {
+        body: JSON.stringify({
+          primaryTeamName: settingsForm.primaryTeamName,
+          seasonStartingYear: Number(settingsForm.seasonStartingYear),
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PUT',
+      });
+      const body = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(body.error ?? 'The coordinator settings could not be saved.');
+      }
+
+      settingsMessage = `${body.primaryTeamName} · ${body.seasonStartingYear}–${body.seasonStartingYear + 1} is the active workspace context.`;
+      await invalidateAll();
+    } catch (caught) {
+      settingsError =
+        caught instanceof Error ? caught.message : 'The coordinator settings could not be saved.';
+    } finally {
+      savingSettings = false;
+    }
+  };
+
   const saveSeason = async () => {
     savingSeason = true;
     seasonMessage = '';
@@ -266,7 +306,9 @@
       arrivalBufferMinutes: ['arrival buffer', 'buffer'],
       date: ['date', 'datum'],
       homeTeamName: ['home', 'home team'],
+      jurySlots: ['jury', 'jury duty'],
       locationName: ['location', 'venue', 'plaats'],
+      refereeSlots: ['referee', 'ref'],
       startTime: ['start time', 'time', 'tijd'],
       travelMinutes: ['travel', 'travel minutes', 'reistijd'],
     };
@@ -410,7 +452,6 @@
           fileName,
           mapping,
           ...(sheetName ? { sheetName } : {}),
-          primaryTeamName,
           resolutions: conflicts.map((conflict) => ({
             fields: conflictChoices[conflict.sourceRow],
             sourceRow: conflict.sourceRow,
@@ -501,6 +542,46 @@
     </div>
   </div>
 {/if}
+
+<section class="panel" aria-labelledby="settings-heading">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Active workspace context</p>
+      <h2 id="settings-heading">Coordinator settings</h2>
+    </div>
+  </div>
+
+  <form class="configuration-form" on:submit|preventDefault={saveSettings}>
+    <label>
+      Primary team
+      <select bind:value={settingsForm.primaryTeamName} required>
+        <option value="" disabled>Choose a team</option>
+        {#each data.teams as team (team.name)}
+          <option value={team.name}>{team.name}</option>
+        {/each}
+      </select>
+    </label>
+    <label>
+      Current season
+      <select bind:value={settingsForm.seasonStartingYear} required>
+        <option value="" disabled>Choose a season</option>
+        {#each data.seasons as season (season.startingYear)}
+          <option value={String(season.startingYear)}
+            >{season.startingYear}–{season.endingYear}</option
+          >
+        {/each}
+      </select>
+    </label>
+    <button disabled={savingSettings} type="submit">
+      {savingSettings ? 'Saving…' : 'Save settings'}
+    </button>
+  </form>
+  <p class="form-hint">
+    Sets the team and season shown across Home, Events, Roster, Messages, and History.
+  </p>
+  {#if settingsMessage}<p class="form-message" role="status">{settingsMessage}</p>{/if}
+  {#if settingsError}<p class="form-error" role="alert">{settingsError}</p>{/if}
+</section>
 
 <section class="panel" aria-labelledby="seasons-heading">
   <div class="panel-heading">
@@ -704,10 +785,6 @@
       </label>
       <p class="form-hint">Choose which worksheet contains the schedule data.</p>
     {/if}
-    <label class="primary-team">
-      Primary team
-      <input bind:value={primaryTeamName} required />
-    </label>
     <div class="mapping-grid">
       {#each fields as field (field.key)}
         <label>

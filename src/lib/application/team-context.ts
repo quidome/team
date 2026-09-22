@@ -3,7 +3,7 @@ export interface TeamSeasonContext {
   teamName: string;
 }
 
-export const defaultTeamSeasonContext: TeamSeasonContext = {
+export const fallbackTeamSeasonContext: TeamSeasonContext = {
   seasonStartingYear: 2026,
   teamName: 'U16-1',
 };

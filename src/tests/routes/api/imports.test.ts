@@ -1,4 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  settings: {
+    get: vi.fn(),
+  },
+  teams: {
+    findAll: vi.fn(),
+  },
+}));
+
+vi.mock('$lib/server/composition-root', () => ({
+  currentCoordinatorSettingsRepository: () => mocks.settings,
+  currentTeamRepository: () => mocks.teams,
+}));
+
+mocks.settings.get.mockResolvedValue({ primaryTeamName: 'U16-1', seasonStartingYear: 2026 });
+mocks.teams.findAll.mockResolvedValue([{ name: 'U16-1' }, { name: 'U18-1' }]);
 
 import { POST } from '../../../routes/api/imports/games/preview/+server';
 

@@ -9,10 +9,8 @@ import type {
   DutyType,
   DutyView,
 } from '../../application/duties/duty-repository';
-import { createDatabase } from './database';
+import type { DatabaseConnection } from './database';
 import { dutyAssignmentHistory, dutyRequirements, dutySignups, dutySlots, players } from './schema';
-
-type Database = ReturnType<typeof createDatabase>;
 
 const dutyTypes: DutyType[] = ['referee', 'jury', 'driving'];
 
@@ -40,7 +38,7 @@ const toDutySlot = (row: {
   status: row.status,
 });
 
-const readView = async (database: Database, occurrenceId: string): Promise<DutyView> => {
+const readView = async (database: DatabaseConnection, occurrenceId: string): Promise<DutyView> => {
   const [requirements] = await database
     .select({
       drivingSlots: dutyRequirements.drivingSlots,
@@ -98,7 +96,7 @@ const readView = async (database: Database, occurrenceId: string): Promise<DutyV
   };
 };
 
-const findFairness = async (database: Database): Promise<DutyFairness[]> => {
+const findFairness = async (database: DatabaseConnection): Promise<DutyFairness[]> => {
   const rows = await database
     .select({
       playerAssociationId: players.associationId,
@@ -120,7 +118,7 @@ const findFairness = async (database: Database): Promise<DutyFairness[]> => {
     .sort((left, right) => left.completedCount - right.completedCount);
 };
 
-export const createPostgresDutyRepository = (database: Database): DutyRepository => ({
+export const createPostgresDutyRepository = (database: DatabaseConnection): DutyRepository => ({
   async configure(occurrenceId, requirements) {
     await database
       .insert(dutyRequirements)

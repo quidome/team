@@ -5,12 +5,14 @@ import {
   previewGameImport,
   type GameImportMapping,
 } from '$lib/application/imports/game-import';
+import { applyImportContext } from '$lib/application/imports/import-games';
 import {
   listGameImportWorksheets,
   readGameImportFile,
   type GameImportFileEncoding,
   type GameImportUpload,
 } from '$lib/server/imports/game-import-upload';
+import { buildGameImportContext } from '$lib/server/imports/game-import-context';
 
 const readRequest = async (
   request: Request,
@@ -87,7 +89,9 @@ export const POST = async ({ request }) => {
       });
     }
 
-    return json({ ...preview, worksheets });
+    const contextualizedPreview = applyImportContext(preview, await buildGameImportContext());
+
+    return json({ ...contextualizedPreview, worksheets });
   } catch (error) {
     return json(
       { error: error instanceof Error ? error.message : 'The import file could not be read.' },

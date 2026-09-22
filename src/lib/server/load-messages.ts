@@ -1,5 +1,5 @@
 import { defaultPollTemplates } from '$lib/application/messages/poll-drafts';
-import { currentTeamName } from '$lib/server/load-team';
+import { currentTeamSeasonContext } from '$lib/server/load-team';
 import { loadProgram } from './load-program';
 import type { ProgramGameEvent } from '$lib/application/program/read-program';
 
@@ -10,15 +10,15 @@ export interface MessagesPageData {
 }
 
 export const loadMessages = async (): Promise<MessagesPageData> => {
-  const program = await loadProgram();
+  const [program, { teamName }] = await Promise.all([loadProgram(), currentTeamSeasonContext()]);
 
   return {
     events: program.events.filter(
       (event): event is ProgramGameEvent =>
         event.type === 'game' &&
-        (event.homeTeamName === currentTeamName || event.awayTeamName === currentTeamName),
+        (event.homeTeamName === teamName || event.awayTeamName === teamName),
     ),
-    teamName: currentTeamName,
+    teamName,
     templates: defaultPollTemplates,
   };
 };

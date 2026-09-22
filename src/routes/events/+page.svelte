@@ -1,6 +1,8 @@
 <script>
   import { invalidateAll } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { normalizeTeamName } from '$lib/domain/team-name';
+  import { deriveSeasonHalf } from '$lib/domain/season-half';
 
   export let data;
 
@@ -100,6 +102,14 @@
     }
   };
 
+  const updateGameSeasonHalf = () => {
+    const seasonHalf = deriveSeasonHalf(gameForm.date, data.season.startingYear);
+
+    if (seasonHalf) {
+      gameForm = { ...gameForm, seasonHalf };
+    }
+  };
+
   const updateRescheduleTravelTime = () => {
     const location = data.locations.find(
       (candidate) => candidate.name === rescheduleForm.locationName,
@@ -132,14 +142,15 @@
       }
 
       const isHome = gameForm.isHome === 'home';
+      const opponentName = normalizeTeamName(gameForm.opponentName);
       const fixture = await postJson(
         '/api/games/fixtures',
         {
-          awayTeamName: isHome ? gameForm.opponentName : data.teamName,
-          homeTeamName: isHome ? data.teamName : gameForm.opponentName,
+          awayTeamName: isHome ? opponentName : data.teamName,
+          homeTeamName: isHome ? data.teamName : opponentName,
           isHome,
           opponentAddress: gameForm.opponentAddress,
-          opponentName: gameForm.opponentName,
+          opponentName,
           opponentTravelMinutes: Number(gameForm.travelMinutes),
           ourTeamName: data.teamName,
           seasonHalf: gameForm.seasonHalf,
@@ -583,7 +594,7 @@
         </label>
         <label>
           Date
-          <input bind:value={gameForm.date} required type="date" />
+          <input bind:value={gameForm.date} on:change={updateGameSeasonHalf} required type="date" />
         </label>
         <label>
           Start time

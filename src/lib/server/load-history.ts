@@ -6,7 +6,7 @@ import {
   currentDutyRepository,
   currentParticipationRepository,
 } from '$lib/server/composition-root';
-import { currentTeamName, loadTeam } from './load-team';
+import { loadTeam } from './load-team';
 
 export const loadHistory = async (denominator: HistoryDenominator = 'recorded') => {
   if (!env.DATABASE_URL?.trim()) {
@@ -21,7 +21,7 @@ export const loadHistory = async (denominator: HistoryDenominator = 'recorded') 
   ]);
 
   return {
-    ...readHistory(team.players, records, fairness, team.events, currentTeamName, denominator),
+    ...readHistory(team.players, records, fairness, team.events, team.teamName, denominator),
     auditEntries,
   };
 };

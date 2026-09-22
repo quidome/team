@@ -338,6 +338,17 @@ export const tasks = pgTable('tasks', {
   title: text('title').notNull(),
 });
 
+export const coordinatorSettings = pgTable('coordinator_settings', {
+  id: text('id').primaryKey().default('singleton'),
+  primaryTeamId: uuid('primary_team_id')
+    .notNull()
+    .references(() => teams.id, { onDelete: 'restrict' }),
+  seasonId: uuid('season_id')
+    .notNull()
+    .references(() => seasons.id, { onDelete: 'restrict' }),
+  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+});
+
 export const participationRecords = pgTable(
   'participation_records',
   {

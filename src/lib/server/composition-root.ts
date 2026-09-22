@@ -14,6 +14,7 @@ import type { SeasonRepository } from '../application/seasons/season-repository'
 import type { TeamRepository } from '../application/teams/team-repository';
 import type { GameImportRepository } from '../application/imports/game-import-repository';
 import type { AuditRepository } from '../application/audit/audit-repository';
+import type { CoordinatorSettingsRepository } from '../application/settings/coordinator-settings-repository';
 import { createDatabase, type Database } from './persistence/database';
 import { readDatabaseUrl } from './persistence/database-configuration';
 import { createPostgresPlayerRepository } from './persistence/postgres-player-repository';
@@ -28,6 +29,7 @@ import { createPostgresSeasonRepository } from './persistence/postgres-season-re
 import { createPostgresTeamRepository } from './persistence/postgres-team-repository';
 import { createPostgresGameImportRepository } from './persistence/postgres-game-import-repository';
 import { createPostgresAuditRepository } from './persistence/postgres-audit-repository';
+import { createPostgresCoordinatorSettingsRepository } from './persistence/postgres-coordinator-settings-repository';
 
 let database: Database | undefined;
 let players: PlayerRepository | undefined;
@@ -42,6 +44,7 @@ let seasons: SeasonRepository | undefined;
 let teams: TeamRepository | undefined;
 let gameImports: GameImportRepository | undefined;
 let audit: AuditRepository | undefined;
+let coordinatorSettings: CoordinatorSettingsRepository | undefined;
 let shutdownRegistered = false;
 
 const currentDatabase = (): Database => {
@@ -65,6 +68,7 @@ export const closeCurrentDatabase = async (): Promise<void> => {
   teams = undefined;
   gameImports = undefined;
   audit = undefined;
+  coordinatorSettings = undefined;
 
   if (activeDatabase) {
     await activeDatabase.close();
@@ -162,9 +166,16 @@ export const currentAuditRepository = (): AuditRepository => {
   return audit;
 };
 
+export const currentCoordinatorSettingsRepository = (): CoordinatorSettingsRepository => {
+  coordinatorSettings ??= createPostgresCoordinatorSettingsRepository(currentDatabase());
+
+  return coordinatorSettings;
+};
+
 export const withCurrentImportTransaction = async <T>(
   work: (repositories: {
     audit: AuditRepository;
+    duties: DutyRepository;
     gameImports: GameImportRepository;
     games: GameRepository;
   }) => Promise<T>,
@@ -172,6 +183,7 @@ export const withCurrentImportTransaction = async <T>(
   currentDatabase().transaction(async (transaction) =>
     work({
       audit: createPostgresAuditRepository(transaction),
+      duties: createPostgresDutyRepository(transaction),
       gameImports: createPostgresGameImportRepository(transaction),
       games: createPostgresGameRepository(transaction),
     }),

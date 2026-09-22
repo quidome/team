@@ -1,6 +1,9 @@
-import type { ImportedGame } from './game-import';
+import type { GameImportPreview, ImportedGame } from './game-import';
 import type { GameImportRepository } from './game-import-repository';
 import type { GameRepository, StoredGameProgramOccurrence } from '../games/game-repository';
+import type { DutyRepository } from '../duties/duty-repository';
+import { normalizeTeamName, teamNamesMatch } from '../../domain/team-name';
+import { deriveSeasonHalf, type SeasonHalf } from '../../domain/season-half';
 
 export type GameImportConflictField = 'arrivalBufferMinutes' | 'locationName' | 'travelMinutes';
 export type GameImportChoice = 'existing' | 'imported';
@@ -44,7 +47,18 @@ export interface GameImportResult {
   imported: ImportedGameResult[];
 }
 
+export interface GameImportContext {
+  knownTeamNames: string[];
+  season?: { startingYear: number };
+}
+
+export type FixtureResolution =
+  | { kind: 'plain'; awayTeamName: string; homeTeamName: string }
+  | { kind: 'opponent'; isHome: boolean; opponentName: string; ourTeamName: string }
+  | { kind: 'unrecognized' };
+
 export interface ImportGamesInput {
+  context: GameImportContext;
   importedAt: Date;
   primaryTeamName: string;
   records: ImportedGame[];
@@ -59,14 +73,62 @@ const conflictFields: GameImportConflictField[] = [
   'arrivalBufferMinutes',
 ];
 
-const fixtureKey = (homeTeamName: string, awayTeamName: string) =>
-  `${homeTeamName}\u0000${awayTeamName}`;
+export const resolveFixtureTeams = (
+  homeTeamName: string,
+  awayTeamName: string,
+  knownTeamNames: string[],
+): FixtureResolution => {
+  const homeMatch = knownTeamNames.find((name) => teamNamesMatch(name, homeTeamName));
+  const awayMatch = knownTeamNames.find((name) => teamNamesMatch(name, awayTeamName));
+
+  if (homeMatch && awayMatch) {
+    return { kind: 'plain', awayTeamName: awayMatch, homeTeamName: homeMatch };
+  }
+
+  if (homeMatch) {
+    return {
+      isHome: true,
+      kind: 'opponent',
+      opponentName: normalizeTeamName(awayTeamName),
+      ourTeamName: homeMatch,
+    };
+  }
+
+  if (awayMatch) {
+    return {
+      isHome: false,
+      kind: 'opponent',
+      opponentName: normalizeTeamName(homeTeamName),
+      ourTeamName: awayMatch,
+    };
+  }
+
+  return { kind: 'unrecognized' };
+};
+
+const fixtureKey = (
+  resolution: Exclude<FixtureResolution, { kind: 'unrecognized' }>,
+  seasonHalf?: SeasonHalf,
+): string =>
+  resolution.kind === 'plain'
+    ? [
+        'plain',
+        normalizeTeamName(resolution.homeTeamName),
+        normalizeTeamName(resolution.awayTeamName),
+      ].join('\u0000')
+    : [
+        'opponent',
+        normalizeTeamName(resolution.ourTeamName),
+        normalizeTeamName(resolution.opponentName),
+        resolution.isHome,
+        seasonHalf ?? '',
+      ].join('\u0000');
 
 const isSameIdentity = (existing: StoredGameProgramOccurrence, imported: ImportedGame) =>
   existing.date === imported.date &&
   existing.startTime === imported.startTime &&
-  existing.homeTeamName === imported.homeTeamName &&
-  existing.awayTeamName === imported.awayTeamName;
+  teamNamesMatch(existing.homeTeamName, imported.homeTeamName) &&
+  teamNamesMatch(existing.awayTeamName, imported.awayTeamName);
 
 const isSameOccurrence = (existing: StoredGameProgramOccurrence, imported: ImportedGame) =>
   isSameIdentity(existing, imported) &&
@@ -115,6 +177,55 @@ export const findImportConflicts = async (
   return { conflicts, duplicates };
 };
 
+export const applyImportContext = (
+  preview: GameImportPreview,
+  context: GameImportContext,
+): GameImportPreview => {
+  const contextIssues: GameImportPreview['issues'] = [];
+  const records = preview.records.filter((record) => {
+    const resolution = resolveFixtureTeams(
+      record.homeTeamName,
+      record.awayTeamName,
+      context.knownTeamNames,
+    );
+
+    if (resolution.kind === 'unrecognized') {
+      contextIssues.push({
+        message: 'Neither team is recognized — add one as a team in Admin first.',
+        row: record.sourceRow,
+      });
+      return false;
+    }
+
+    if (resolution.kind === 'opponent') {
+      if (!context.season) {
+        contextIssues.push({
+          message: 'Configure a current season in Settings before importing.',
+          row: record.sourceRow,
+        });
+        return false;
+      }
+
+      if (!deriveSeasonHalf(record.date, context.season.startingYear)) {
+        contextIssues.push({
+          message: 'Game date falls outside the configured season.',
+          row: record.sourceRow,
+        });
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  return {
+    headers: preview.headers,
+    issues: [...preview.issues, ...contextIssues],
+    records,
+    validRowCount: records.length,
+  };
+};
+
 const occurrenceInput = (record: ImportedGame) => ({
   arrivalBufferMinutes: record.arrivalBufferMinutes,
   date: record.date,
@@ -123,9 +234,30 @@ const occurrenceInput = (record: ImportedGame) => ({
   travelMinutes: record.travelMinutes,
 });
 
+const applyDutiesIfPresent = async (
+  duties: DutyRepository,
+  occurrenceId: string,
+  record: ImportedGame,
+): Promise<void> => {
+  if (record.jurySlots === undefined && record.refereeSlots === undefined) {
+    return;
+  }
+
+  await duties.configure(occurrenceId, {
+    drivingSlots: 0,
+    jurySlots: record.jurySlots ?? 0,
+    refereeSlots: record.refereeSlots ?? 0,
+  });
+};
+
+const isPrimaryTeamGame = (record: ImportedGame, primaryTeamName: string): boolean =>
+  teamNamesMatch(record.homeTeamName, primaryTeamName) ||
+  teamNamesMatch(record.awayTeamName, primaryTeamName);
+
 export const importGames = async (
   games: GameRepository,
   imports: GameImportRepository,
+  duties: DutyRepository,
   input: ImportGamesInput,
 ): Promise<GameImportResult> => {
   const existingOccurrences = await games.findAllOccurrences();
@@ -172,6 +304,8 @@ export const importGames = async (
 
         const occurrence = await games.updateOccurrence(identity.id, occurrenceInput(mergedRecord));
 
+        await applyDutiesIfPresent(duties, occurrence.id, mergedRecord);
+
         await imports.save({
           importedAt: input.importedAt,
           occurrenceId: occurrence.id,
@@ -182,9 +316,7 @@ export const importGames = async (
         imported.push({
           ...mergedRecord,
           fixtureId: identity.fixtureId,
-          isPrimaryTeamGame:
-            record.homeTeamName === input.primaryTeamName ||
-            record.awayTeamName === input.primaryTeamName,
+          isPrimaryTeamGame: isPrimaryTeamGame(record, input.primaryTeamName),
           merged: true,
           occurrenceId: occurrence.id,
         });
@@ -196,19 +328,61 @@ export const importGames = async (
         continue;
       }
 
-      const key = fixtureKey(record.homeTeamName, record.awayTeamName);
+      const fixtureResolution = resolveFixtureTeams(
+        record.homeTeamName,
+        record.awayTeamName,
+        input.context.knownTeamNames,
+      );
+
+      if (fixtureResolution.kind === 'unrecognized') {
+        throw new Error('Neither team is recognized — add one as a team in Admin first.');
+      }
+
+      let seasonHalf: SeasonHalf | undefined;
+
+      if (fixtureResolution.kind === 'opponent') {
+        if (!input.context.season) {
+          throw new Error('Configure a current season in Settings before importing.');
+        }
+
+        seasonHalf = deriveSeasonHalf(record.date, input.context.season.startingYear);
+
+        if (!seasonHalf) {
+          throw new Error('Game date falls outside the configured season.');
+        }
+      }
+
+      const key = fixtureKey(fixtureResolution, seasonHalf);
       let fixtureId = fixtureIds.get(key);
 
       if (!fixtureId) {
-        const fixture = await games.saveFixture({
-          awayTeamName: record.awayTeamName,
-          homeTeamName: record.homeTeamName,
-        });
+        const fixture = await games.saveFixture(
+          fixtureResolution.kind === 'plain'
+            ? {
+                awayTeamName: fixtureResolution.awayTeamName,
+                homeTeamName: fixtureResolution.homeTeamName,
+              }
+            : {
+                awayTeamName: fixtureResolution.isHome
+                  ? fixtureResolution.opponentName
+                  : fixtureResolution.ourTeamName,
+                homeTeamName: fixtureResolution.isHome
+                  ? fixtureResolution.ourTeamName
+                  : fixtureResolution.opponentName,
+                isHome: fixtureResolution.isHome,
+                opponentName: fixtureResolution.opponentName,
+                ourTeamName: fixtureResolution.ourTeamName,
+                seasonHalf,
+                seasonStartingYear: input.context.season?.startingYear,
+              },
+        );
         fixtureId = fixture.id;
         fixtureIds.set(key, fixtureId);
       }
 
       const occurrence = await games.saveOccurrence(fixtureId, occurrenceInput(record));
+
+      await applyDutiesIfPresent(duties, occurrence.id, record);
 
       await imports.save({
         importedAt: input.importedAt,
@@ -220,9 +394,7 @@ export const importGames = async (
       imported.push({
         ...record,
         fixtureId,
-        isPrimaryTeamGame:
-          record.homeTeamName === input.primaryTeamName ||
-          record.awayTeamName === input.primaryTeamName,
+        isPrimaryTeamGame: isPrimaryTeamGame(record, input.primaryTeamName),
         merged: false,
         occurrenceId: occurrence.id,
       });

@@ -4,6 +4,9 @@ const mocks = vi.hoisted(() => ({
   audit: {
     record: vi.fn(),
   },
+  duties: {
+    configure: vi.fn(),
+  },
   games: {
     findAllOccurrences: vi.fn(),
     saveFixture: vi.fn(),
@@ -13,14 +16,27 @@ const mocks = vi.hoisted(() => ({
   imports: {
     save: vi.fn(),
   },
+  settings: {
+    get: vi.fn(),
+  },
+  teams: {
+    findAll: vi.fn(),
+  },
 }));
 
 vi.mock('$lib/server/composition-root', () => ({
   currentAuditRepository: () => mocks.audit,
+  currentCoordinatorSettingsRepository: () => mocks.settings,
   currentGameImportRepository: () => mocks.imports,
   currentGameRepository: () => mocks.games,
+  currentTeamRepository: () => mocks.teams,
   withCurrentImportTransaction: async (work: (repositories: unknown) => unknown) =>
-    work({ audit: mocks.audit, gameImports: mocks.imports, games: mocks.games }),
+    work({
+      audit: mocks.audit,
+      duties: mocks.duties,
+      gameImports: mocks.imports,
+      games: mocks.games,
+    }),
 }));
 
 import { POST } from '../../../routes/api/imports/games/+server';
@@ -28,6 +44,11 @@ import { POST } from '../../../routes/api/imports/games/+server';
 describe('POST /api/imports/games', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.settings.get.mockResolvedValue({
+      primaryTeamName: 'U16-1',
+      seasonStartingYear: 2026,
+    });
+    mocks.teams.findAll.mockResolvedValue([{ name: 'U16-1' }, { name: 'U18-1' }]);
     mocks.games.findAllOccurrences.mockResolvedValue([]);
     mocks.games.saveFixture.mockResolvedValue({
       fixture: { awayTeamName: 'U18-1', homeTeamName: 'U16-1' },
@@ -75,7 +96,6 @@ describe('POST /api/imports/games', () => {
             locationName: 'location',
             startTime: 'time',
           },
-          primaryTeamName: 'U16-1',
           sourceName: 'schedule.csv',
         }),
         headers: { 'content-type': 'application/json' },
@@ -120,7 +140,6 @@ describe('POST /api/imports/games', () => {
             locationName: 'location',
             startTime: 'time',
           },
-          primaryTeamName: 'U16-1',
           sourceName: 'schedule.csv',
         }),
         headers: { 'content-type': 'application/json' },
@@ -164,7 +183,6 @@ describe('POST /api/imports/games', () => {
             startTime: 'time',
             travelMinutes: 'travel',
           },
-          primaryTeamName: 'U16-1',
           sourceName: 'schedule.csv',
         }),
         headers: { 'content-type': 'application/json' },
@@ -199,7 +217,6 @@ describe('POST /api/imports/games', () => {
             locationName: 'location',
             startTime: 'time',
           },
-          primaryTeamName: 'U16-1',
           sourceName: 'schedule.csv',
         }),
         headers: { 'content-type': 'application/json' },

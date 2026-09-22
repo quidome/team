@@ -1,9 +1,10 @@
 import { suggestDepartureTime } from '../../domain/game';
+import type { SeasonHalf } from '../../domain/season-half';
 
 export { suggestDepartureTime };
+export type { SeasonHalf };
 
 export type GameOccurrenceStatus = 'cancelled' | 'scheduled';
-export type SeasonHalf = 'H1' | 'H2';
 
 export interface GameFixture {
   awayTeamName: string;

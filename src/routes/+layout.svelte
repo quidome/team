@@ -1,12 +1,9 @@
 <script>
   import { page } from '$app/stores';
   import { resolve } from '$app/paths';
-  import { defaultTeamSeasonContext, formatTeamSeasonContext } from '$lib/application/team-context';
   import NavIcon from '$lib/components/NavIcon.svelte';
 
   export let data;
-
-  const activeContextLabel = formatTeamSeasonContext(defaultTeamSeasonContext);
 
   /** @type {Array<{href: '/' | '/events' | '/team' | '/messages' | '/history' | '/admin', label: string, icon: 'calendar' | 'chat' | 'clipboard' | 'history' | 'home' | 'settings' | 'users', activePaths: string[], activePrefixes?: string[]}>} */
   const navItems = [
@@ -38,7 +35,7 @@
 </svelte:head>
 
 <header class="site-header">
-  <a class="brand" href={resolve('/')}>Team <span>{activeContextLabel}</span></a>
+  <a class="brand" href={resolve('/')}>Team <span>{data.teamSeasonLabel}</span></a>
   <nav aria-label="Primary navigation">
     {#each navItems as item (item.href)}
       <a
