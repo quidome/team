@@ -1,5 +1,5 @@
 Feature: Coordinator login
-  The sole MVP coordinator signs in through Pocket ID, while this application owns the session.
+  A coordinator signs in through Pocket ID, while this application owns the session.
 
   Scenario: Starting a login
     Given Pocket ID client configuration is available
