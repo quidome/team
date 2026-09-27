@@ -134,6 +134,13 @@
       "when": 1790086064157,
       "tag": "0018_locations_address",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790542290677,
+      "tag": "0019_clubs_and_coordinators",
+      "breakpoints": true
     }
   ]
 }

@@ -8,11 +8,13 @@ import {
 
 const mocks = vi.hoisted(() => ({
   completeAuthorization: vi.fn(),
+  coordinators: { ensure: vi.fn() },
 }));
 
 vi.mock('$env/dynamic/private', () => ({
   env: {
     ORIGIN: 'https://team.example.test',
+    DATABASE_URL: 'postgres://team:team@localhost:5432/team',
     OIDC_CLIENT_ID: 'team-coordinator',
     OIDC_CLIENT_SECRET: 'client-secret',
     OIDC_ISSUER_URL: 'https://pocket-id.example.test',
@@ -27,6 +29,10 @@ vi.mock('$lib/server/authentication/oidc', () => ({
   }),
 }));
 
+vi.mock('$lib/server/composition-root', () => ({
+  currentCoordinatorRepository: () => mocks.coordinators,
+}));
+
 import { GET } from '../../../routes/auth/callback/+server';
 
 const sessionSecret = 'a-secure-session-secret-with-at-least-thirty-two-characters';
@@ -35,6 +41,10 @@ describe('GET /auth/callback', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.completeAuthorization.mockResolvedValue({ subject: 'pocket-id-subject' });
+    mocks.coordinators.ensure.mockImplementation(async (subject: string) => ({
+      subject,
+      teamNames: [],
+    }));
   });
 
   it('exchanges a valid transaction for a secure coordinator session', async () => {
@@ -65,6 +75,7 @@ describe('GET /auth/callback', () => {
         state: 'oidc-state',
       }),
     );
+    expect(mocks.coordinators.ensure).toHaveBeenCalledWith('pocket-id-subject');
     expect(cookies.delete).toHaveBeenCalledWith(authorizationTransactionCookieName, {
       path: '/auth',
     });

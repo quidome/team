@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   date,
@@ -24,10 +25,29 @@ export const players = pgTable(
   (table) => [uniqueIndex('players_association_id_unique').on(table.associationId)],
 );
 
+export const clubs = pgTable(
+  'clubs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    isOwnClub: boolean('is_own_club').notNull().default(false),
+    name: text('name').notNull(),
+    sourceClubId: integer('source_club_id'),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('clubs_name_unique').on(table.name),
+    uniqueIndex('clubs_source_club_id_unique').on(table.sourceClubId),
+    uniqueIndex('clubs_single_own_club')
+      .on(table.isOwnClub)
+      .where(sql`${table.isOwnClub}`),
+  ],
+);
+
 export const teams = pgTable(
   'teams',
   {
     id: uuid('id').defaultRandom().primaryKey(),
+    clubId: uuid('club_id').references(() => clubs.id, { onDelete: 'set null' }),
     isOwnTeam: boolean('is_own_team').notNull().default(false),
     name: text('name').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
@@ -306,6 +326,33 @@ export const coordinatorSettings = pgTable('coordinator_settings', {
     .references(() => seasons.id, { onDelete: 'restrict' }),
   updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 });
+
+export const coordinators = pgTable(
+  'coordinators',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    defaultTeamId: uuid('default_team_id').references(() => teams.id, { onDelete: 'set null' }),
+    subject: text('subject').notNull(),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('coordinators_subject_unique').on(table.subject)],
+);
+
+export const coordinatorTeams = pgTable(
+  'coordinator_teams',
+  {
+    coordinatorId: uuid('coordinator_id')
+      .notNull()
+      .references(() => coordinators.id, { onDelete: 'cascade' }),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('coordinator_teams_coordinator_team_unique').on(table.coordinatorId, table.teamId),
+  ],
+);
 
 export const participationRecords = pgTable(
   'participation_records',

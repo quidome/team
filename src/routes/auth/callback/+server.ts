@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { error, redirect } from '@sveltejs/kit';
 
+import { recordCoordinatorLogin } from '$lib/application/coordinators/coordinator-teams';
 import { readAuthenticationConfiguration } from '$lib/server/authentication/config';
 import { createOidcClient, type OidcIdentity } from '$lib/server/authentication/oidc';
 import {
@@ -11,6 +12,7 @@ import {
   authorizationTransactionCookieName,
   readAuthorizationTransaction,
 } from '$lib/server/authentication/transaction';
+import { currentCoordinatorRepository } from '$lib/server/composition-root';
 
 export const GET = async ({ cookies, url }) => {
   const transactionValue = cookies.get(authorizationTransactionCookieName);
@@ -33,6 +35,10 @@ export const GET = async ({ cookies, url }) => {
     identity = await createOidcClient(authentication).completeAuthorization(url, transaction);
   } catch {
     error(401, 'OpenID Connect authentication failed');
+  }
+
+  if (env.DATABASE_URL?.trim()) {
+    await recordCoordinatorLogin(currentCoordinatorRepository(), identity.subject);
   }
 
   const expiresAt = new Date(Date.now() + authentication.sessionTtlSeconds * 1000);

@@ -15,6 +15,8 @@ import type { TeamRepository } from '../application/teams/team-repository';
 import type { GameImportRepository } from '../application/imports/game-import-repository';
 import type { AuditRepository } from '../application/audit/audit-repository';
 import type { CoordinatorSettingsRepository } from '../application/settings/coordinator-settings-repository';
+import type { ClubRepository } from '../application/clubs/club-repository';
+import type { CoordinatorRepository } from '../application/coordinators/coordinator-repository';
 import { createDatabase, type Database } from './persistence/database';
 import { readDatabaseUrl } from './persistence/database-configuration';
 import { createPostgresPlayerRepository } from './persistence/postgres-player-repository';
@@ -30,6 +32,8 @@ import { createPostgresTeamRepository } from './persistence/postgres-team-reposi
 import { createPostgresGameImportRepository } from './persistence/postgres-game-import-repository';
 import { createPostgresAuditRepository } from './persistence/postgres-audit-repository';
 import { createPostgresCoordinatorSettingsRepository } from './persistence/postgres-coordinator-settings-repository';
+import { createPostgresClubRepository } from './persistence/postgres-club-repository';
+import { createPostgresCoordinatorRepository } from './persistence/postgres-coordinator-repository';
 
 let database: Database | undefined;
 let players: PlayerRepository | undefined;
@@ -45,6 +49,8 @@ let teams: TeamRepository | undefined;
 let gameImports: GameImportRepository | undefined;
 let audit: AuditRepository | undefined;
 let coordinatorSettings: CoordinatorSettingsRepository | undefined;
+let clubs: ClubRepository | undefined;
+let coordinators: CoordinatorRepository | undefined;
 let shutdownRegistered = false;
 
 const currentDatabase = (): Database => {
@@ -69,6 +75,8 @@ export const closeCurrentDatabase = async (): Promise<void> => {
   gameImports = undefined;
   audit = undefined;
   coordinatorSettings = undefined;
+  clubs = undefined;
+  coordinators = undefined;
 
   if (activeDatabase) {
     await activeDatabase.close();
@@ -170,6 +178,18 @@ export const currentCoordinatorSettingsRepository = (): CoordinatorSettingsRepos
   coordinatorSettings ??= createPostgresCoordinatorSettingsRepository(currentDatabase());
 
   return coordinatorSettings;
+};
+
+export const currentClubRepository = (): ClubRepository => {
+  clubs ??= createPostgresClubRepository(currentDatabase());
+
+  return clubs;
+};
+
+export const currentCoordinatorRepository = (): CoordinatorRepository => {
+  coordinators ??= createPostgresCoordinatorRepository(currentDatabase());
+
+  return coordinators;
 };
 
 export const withCurrentImportTransaction = async <T>(
