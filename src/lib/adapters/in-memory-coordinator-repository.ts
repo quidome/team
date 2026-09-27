@@ -1,5 +1,6 @@
 import type {
   Coordinator,
+  CoordinatorProfile,
   CoordinatorRepository,
 } from '../application/coordinators/coordinator-repository';
 
@@ -55,12 +56,18 @@ export class InMemoryCoordinatorRepository implements CoordinatorRepository {
   }
 
   async setDefaultTeam(subject: string, teamName: string | undefined): Promise<Coordinator> {
-    const { subject: storedSubject, teamNames } = await this.ensure(subject);
-    const coordinator: Coordinator = { subject: storedSubject, teamNames };
+    const { profile, subject: storedSubject, teamNames } = await this.ensure(subject);
+    const coordinator: Coordinator = profile
+      ? { profile, subject: storedSubject, teamNames }
+      : { subject: storedSubject, teamNames };
 
     return this.store(
       teamName === undefined ? coordinator : { ...coordinator, defaultTeamName: teamName },
     );
+  }
+
+  async setProfile(subject: string, profile: CoordinatorProfile): Promise<Coordinator> {
+    return this.store({ ...(await this.ensure(subject)), profile });
   }
 
   private store(coordinator: Coordinator): Coordinator {

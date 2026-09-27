@@ -77,5 +77,14 @@ if (!databaseUrl) {
         teamNames: [secondTeam],
       });
     });
+
+    it('stores and clears the profile email', async () => {
+      await expect(
+        repository.setProfile(robin, { displayName: 'Robin', email: 'robin@example.test' }),
+      ).resolves.toMatchObject({ profile: { displayName: 'Robin', email: 'robin@example.test' } });
+      await expect(repository.setProfile(robin, { displayName: 'Robin' })).resolves.toMatchObject({
+        profile: { displayName: 'Robin' },
+      });
+    });
   });
 }

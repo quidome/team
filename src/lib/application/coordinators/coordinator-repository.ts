@@ -1,5 +1,11 @@
+export interface CoordinatorProfile {
+  displayName: string;
+  email?: string;
+}
+
 export interface Coordinator {
   defaultTeamName?: string;
+  profile?: CoordinatorProfile;
   subject: string;
   teamNames: string[];
 }
@@ -12,4 +18,5 @@ export interface CoordinatorRepository {
   addTeam(subject: string, teamName: string): Promise<Coordinator>;
   removeTeam(subject: string, teamName: string): Promise<Coordinator>;
   setDefaultTeam(subject: string, teamName: string | undefined): Promise<Coordinator>;
+  setProfile(subject: string, profile: CoordinatorProfile): Promise<Coordinator>;
 }

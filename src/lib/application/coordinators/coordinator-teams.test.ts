@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryCoordinatorRepository } from '../../adapters/in-memory-coordinator-repository';
 import { InMemoryTeamRepository } from '../../adapters/in-memory-team-repository';
 import {
-  CoordinatorTeamError,
+  CoordinatorError,
   giveUpTeamResponsibility,
   recordCoordinatorLogin,
+  setCoordinatorProfile,
   setDefaultTeam,
   takeTeamResponsibility,
 } from './coordinator-teams';
@@ -56,7 +57,7 @@ describe('coordinator teams', () => {
 
     await expect(
       takeTeamResponsibility(coordinators, createTeams(), sam, 'U20-1'),
-    ).rejects.toBeInstanceOf(CoordinatorTeamError);
+    ).rejects.toBeInstanceOf(CoordinatorError);
   });
 
   it('Sharing a team between coordinators', async () => {
@@ -111,5 +112,28 @@ describe('coordinator teams', () => {
     const coordinator = await giveUpTeamResponsibility(coordinators, sam, 'U16-2');
 
     expect(coordinator).toEqual({ defaultTeamName: 'U16-1', subject: sam, teamNames: ['U16-1'] });
+  });
+
+  it('Keeping a coordinator profile', async () => {
+    const coordinators = new InMemoryCoordinatorRepository([{ subject: sam, teamNames: [] }]);
+
+    const coordinator = await setCoordinatorProfile(coordinators, sam, {
+      displayName: ' Sam Jansen ',
+      email: 'sam@example.test',
+    });
+
+    expect(coordinator.profile).toEqual({ displayName: 'Sam Jansen', email: 'sam@example.test' });
+    await expect(coordinators.findBySubject(sam)).resolves.toEqual(coordinator);
+  });
+
+  it('rejects a profile without a display name or with an invalid email', async () => {
+    const coordinators = new InMemoryCoordinatorRepository();
+
+    await expect(setCoordinatorProfile(coordinators, sam, { displayName: '  ' })).rejects.toThrow(
+      'Display name is required',
+    );
+    await expect(
+      setCoordinatorProfile(coordinators, sam, { displayName: 'Sam', email: 'not-an-email' }),
+    ).rejects.toThrow('Email address is not valid');
   });
 });

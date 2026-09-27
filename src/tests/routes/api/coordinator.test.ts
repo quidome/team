@@ -17,7 +17,7 @@ vi.mock('$lib/server/composition-root', () => ({
   currentTeamRepository: () => mocks.repositories.teams,
 }));
 
-import { DELETE, GET, POST, PUT } from '../../../routes/api/coordinator/+server';
+import { DELETE, GET, PATCH, POST, PUT } from '../../../routes/api/coordinator/+server';
 
 const subject = 'pocket-id-subject-sam';
 const locals = { coordinatorSession: { subject } };
@@ -94,6 +94,20 @@ describe('/api/coordinator', () => {
     } as never);
 
     await expect(response.json()).resolves.toEqual({ subject, teamNames: [] });
+  });
+
+  it('updates the coordinator profile', async () => {
+    const response = await PATCH({
+      locals,
+      request: jsonRequest('PATCH', { displayName: 'Sam Jansen', email: 'sam@example.test' }),
+    } as never);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      profile: { displayName: 'Sam Jansen', email: 'sam@example.test' },
+      subject,
+      teamNames: [],
+    });
   });
 
   it('rejects requests without a coordinator session', async () => {

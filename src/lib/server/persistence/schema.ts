@@ -332,6 +332,8 @@ export const coordinators = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     defaultTeamId: uuid('default_team_id').references(() => teams.id, { onDelete: 'set null' }),
+    displayName: text('display_name'),
+    email: text('email'),
     subject: text('subject').notNull(),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },

@@ -1,8 +1,9 @@
 import { json } from '@sveltejs/kit';
 
 import {
-  CoordinatorTeamError,
+  CoordinatorError,
   giveUpTeamResponsibility,
+  setCoordinatorProfile,
   setDefaultTeam,
   takeTeamResponsibility,
 } from '$lib/application/coordinators/coordinator-teams';
@@ -30,6 +31,26 @@ const readTeamName = async (request: Request): Promise<string | undefined> => {
   return undefined;
 };
 
+const readProfile = async (
+  request: Request,
+): Promise<{ displayName: string; email?: string } | undefined> => {
+  try {
+    const payload: unknown = await request.json();
+
+    if (typeof payload === 'object' && payload !== null) {
+      const { displayName, email } = payload as Record<string, unknown>;
+
+      if (typeof displayName === 'string' && (email === undefined || typeof email === 'string')) {
+        return email === undefined ? { displayName } : { displayName, email };
+      }
+    }
+  } catch {
+    // The endpoint reports all malformed bodies as an invalid profile.
+  }
+
+  return undefined;
+};
+
 const sessionSubject = (locals: App.Locals): string | undefined =>
   locals.coordinatorSession?.subject;
 
@@ -37,8 +58,8 @@ const unauthenticated = () => json({ error: 'coordinator_session_required' }, { 
 
 const invalidTeamName = () => json({ error: 'invalid_team_name' }, { status: 400 });
 
-const rejectCoordinatorTeamErrors = (error: unknown) => {
-  if (error instanceof CoordinatorTeamError) {
+const rejectCoordinatorErrors = (error: unknown) => {
+  if (error instanceof CoordinatorError) {
     return json({ error: error.message }, { status: 400 });
   }
 
@@ -86,7 +107,7 @@ export const POST = async ({ locals, request }) => {
 
     return json(coordinator);
   } catch (error) {
-    return rejectCoordinatorTeamErrors(error);
+    return rejectCoordinatorErrors(error);
   }
 };
 
@@ -116,7 +137,7 @@ export const PUT = async ({ locals, request }) => {
 
     return json(coordinator);
   } catch (error) {
-    return rejectCoordinatorTeamErrors(error);
+    return rejectCoordinatorErrors(error);
   }
 };
 
@@ -148,4 +169,38 @@ export const DELETE = async ({ locals, url }) => {
   });
 
   return json(coordinator);
+};
+
+/** Updates the coordinator's profile. */
+export const PATCH = async ({ locals, request }) => {
+  const subject = sessionSubject(locals);
+
+  if (!subject) {
+    return unauthenticated();
+  }
+
+  const profile = await readProfile(request);
+
+  if (!profile) {
+    return json({ error: 'invalid_coordinator_profile' }, { status: 400 });
+  }
+
+  try {
+    const coordinator = await setCoordinatorProfile(
+      currentCoordinatorRepository(),
+      subject,
+      profile,
+    );
+
+    await currentAuditRepository().record({
+      action: 'coordinator_profile_updated',
+      entityId: subject,
+      entityType: 'coordinator',
+      metadata: { displayName: coordinator.profile?.displayName ?? '' },
+    });
+
+    return json(coordinator);
+  } catch (error) {
+    return rejectCoordinatorErrors(error);
+  }
 };

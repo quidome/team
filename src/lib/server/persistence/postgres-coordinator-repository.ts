@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import type {
   Coordinator,
+  CoordinatorProfile,
   CoordinatorRepository,
 } from '../../application/coordinators/coordinator-repository';
 import { createDatabase } from './database';
@@ -26,7 +27,12 @@ const findTeamId = async (database: Database, teamName: string): Promise<string>
 export const createPostgresCoordinatorRepository = (database: Database): CoordinatorRepository => {
   const findCoordinatorRow = async (subject: string) => {
     const [row] = await database
-      .select({ defaultTeamName: teams.name, id: coordinators.id })
+      .select({
+        defaultTeamName: teams.name,
+        displayName: coordinators.displayName,
+        email: coordinators.email,
+        id: coordinators.id,
+      })
       .from(coordinators)
       .leftJoin(teams, eq(coordinators.defaultTeamId, teams.id))
       .where(eq(coordinators.subject, subject))
@@ -50,9 +56,18 @@ export const createPostgresCoordinatorRepository = (database: Database): Coordin
       .orderBy(asc(teams.name));
     const coordinator: Coordinator = { subject, teamNames: teamRows.map((team) => team.name) };
 
-    return row.defaultTeamName === null
-      ? coordinator
-      : { ...coordinator, defaultTeamName: row.defaultTeamName };
+    if (row.defaultTeamName !== null) {
+      coordinator.defaultTeamName = row.defaultTeamName;
+    }
+
+    if (row.displayName !== null) {
+      coordinator.profile =
+        row.email === null
+          ? { displayName: row.displayName }
+          : { displayName: row.displayName, email: row.email };
+    }
+
+    return coordinator;
   };
 
   const ensureId = async (subject: string): Promise<string> => {
@@ -136,6 +151,17 @@ export const createPostgresCoordinatorRepository = (database: Database): Coordin
       await database
         .update(coordinators)
         .set({ defaultTeamId })
+        .where(eq(coordinators.id, coordinatorId));
+
+      return readStored(subject);
+    },
+
+    async setProfile(subject: string, profile: CoordinatorProfile): Promise<Coordinator> {
+      const coordinatorId = await ensureId(subject);
+
+      await database
+        .update(coordinators)
+        .set({ displayName: profile.displayName, email: profile.email ?? null })
         .where(eq(coordinators.id, coordinatorId));
 
       return readStored(subject);
