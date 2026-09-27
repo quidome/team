@@ -48,3 +48,8 @@ Feature: Coordinator teams
     Given Sam is logged in as a coordinator
     When Sam assigns Avery to a jury place
     Then the duty history shows that Sam made the assignment
+
+  Scenario: Keeping a coordinator profile
+    Given Sam is a coordinator
+    When Sam sets the display name Sam Jansen and the email sam@example.test
+    Then Sam's profile shows the display name Sam Jansen and the email sam@example.test

@@ -50,3 +50,23 @@ Feature: Club schedule sync
     Given the feed lists an unplayed game with the result 0 - 0
     When the coordinator syncs the club schedule
     Then the game has no result
+
+  Scenario: Storing teams with the feed name and an optional short name
+    Given the feed lists the team Blue Drakes M16 1
+    When the coordinator syncs the club schedule
+    Then the team is stored with the feed name Blue Drakes M16 1
+    And the coordinator can give it the short name U16-1
+    And the app shows the short name when one is set
+
+  Scenario: Deriving own teams from the own club
+    Given Blue Drakes is the own club
+    When the coordinator syncs the club schedule
+    Then Blue Drakes teams count as own teams
+    And teams of other clubs count as opponents
+
+  Scenario: Storing a location without a known travel time
+    Given the feed lists the location Sporthal Wolfskamer in Huizen with coordinates
+    When the coordinator syncs the club schedule
+    Then the location is stored with its address and coordinates
+    And its travel time is not set
+    And games at that location show that the travel time is not set
