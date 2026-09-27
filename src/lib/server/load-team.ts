@@ -3,6 +3,7 @@ import { env } from '$env/dynamic/private';
 import { fallbackTeamSeasonContext, type TeamSeasonContext } from '$lib/application/team-context';
 import { readTeam, type TeamPlayer } from '$lib/application/team/read-team';
 import { loadProgram } from '$lib/server/load-program';
+import { currentCoordinatorTeamName } from '$lib/server/coordinator-context';
 import {
   currentCoordinatorSettingsRepository,
   currentMembershipRepository,
@@ -17,9 +18,14 @@ export const currentTeamSeasonContext = async (): Promise<TeamSeasonContext> => 
 
   const settings = await currentCoordinatorSettingsRepository().get();
 
-  return settings
-    ? { seasonStartingYear: settings.seasonStartingYear, teamName: settings.primaryTeamName }
-    : fallbackTeamSeasonContext;
+  if (!settings) {
+    return fallbackTeamSeasonContext;
+  }
+
+  return {
+    seasonStartingYear: settings.seasonStartingYear,
+    teamName: (await currentCoordinatorTeamName()) ?? settings.primaryTeamName,
+  };
 };
 
 export interface TeamPageData {

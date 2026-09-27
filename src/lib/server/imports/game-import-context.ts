@@ -1,9 +1,6 @@
 import type { GameImportContext } from '$lib/application/imports/import-games';
-import {
-  currentCoordinatorSettingsRepository,
-  currentLocationRepository,
-  currentTeamRepository,
-} from '$lib/server/composition-root';
+import { currentCoordinatorTeamName } from '$lib/server/coordinator-context';
+import { currentLocationRepository, currentTeamRepository } from '$lib/server/composition-root';
 
 export const buildGameImportContext = async (): Promise<GameImportContext> => {
   const [teams, locations] = await Promise.all([
@@ -19,5 +16,5 @@ export const buildGameImportContext = async (): Promise<GameImportContext> => {
   };
 };
 
-export const currentImportPrimaryTeamName = async (): Promise<string | undefined> =>
-  (await currentCoordinatorSettingsRepository().get())?.primaryTeamName;
+export const currentImportPrimaryTeamName = (): Promise<string | undefined> =>
+  currentCoordinatorTeamName();

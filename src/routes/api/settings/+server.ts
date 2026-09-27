@@ -1,13 +1,19 @@
 import { json } from '@sveltejs/kit';
 
+import {
+  setDefaultTeam,
+  takeTeamResponsibility,
+} from '$lib/application/coordinators/coordinator-teams';
 import { configureCoordinatorSettings } from '$lib/application/settings/configure-coordinator-settings';
 import type { CoordinatorSettings } from '$lib/application/settings/coordinator-settings-repository';
 import {
   currentAuditRepository,
+  currentCoordinatorRepository,
   currentCoordinatorSettingsRepository,
   currentSeasonRepository,
   currentTeamRepository,
 } from '$lib/server/composition-root';
+import { currentCoordinatorTeamName } from '$lib/server/coordinator-context';
 
 const readSettings = async (request: Request): Promise<CoordinatorSettings | undefined> => {
   try {
@@ -32,9 +38,20 @@ const readSettings = async (request: Request): Promise<CoordinatorSettings | und
   return undefined;
 };
 
-export const GET = async () => json((await currentCoordinatorSettingsRepository().get()) ?? null);
+export const GET = async () => {
+  const [settings, coordinatorTeamName] = await Promise.all([
+    currentCoordinatorSettingsRepository().get(),
+    currentCoordinatorTeamName(),
+  ]);
 
-export const PUT = async ({ request }) => {
+  return json(
+    settings
+      ? { ...settings, primaryTeamName: coordinatorTeamName ?? settings.primaryTeamName }
+      : null,
+  );
+};
+
+export const PUT = async ({ locals, request }) => {
   const input = await readSettings(request);
 
   if (!input) {
@@ -48,6 +65,19 @@ export const PUT = async ({ request }) => {
       currentSeasonRepository(),
       input,
     );
+    const subject = locals.coordinatorSession?.subject;
+
+    if (subject) {
+      const coordinators = currentCoordinatorRepository();
+
+      await takeTeamResponsibility(
+        coordinators,
+        currentTeamRepository(),
+        subject,
+        input.primaryTeamName,
+      );
+      await setDefaultTeam(coordinators, subject, input.primaryTeamName);
+    }
 
     await currentAuditRepository().record({
       action: 'coordinator_settings_updated',

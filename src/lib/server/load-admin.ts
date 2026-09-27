@@ -10,6 +10,7 @@ import {
   currentSeasonRepository,
   currentTeamRepository,
 } from '$lib/server/composition-root';
+import { currentCoordinatorTeamName } from '$lib/server/coordinator-context';
 
 export interface AdminPageData {
   coordinatorSettings: CoordinatorSettings | undefined;
@@ -31,12 +32,17 @@ export const loadAdmin = async (): Promise<AdminPageData> => {
     return { coordinatorSettings: undefined, locations: [], seasons: [], teams: [] };
   }
 
-  const [locations, seasons, teams, coordinatorSettings] = await Promise.all([
+  const [locations, seasons, teams, settings, coordinatorTeamName] = await Promise.all([
     currentLocationRepository().findAll(),
     currentSeasonRepository().findAll(),
     currentTeamRepository().findAllOwnTeams(),
     currentCoordinatorSettingsRepository().get(),
+    currentCoordinatorTeamName(),
   ]);
+  const coordinatorSettings = settings && {
+    ...settings,
+    primaryTeamName: coordinatorTeamName ?? settings.primaryTeamName,
+  };
 
   return { coordinatorSettings, locations, seasons, teams };
 };

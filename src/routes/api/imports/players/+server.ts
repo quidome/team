@@ -22,6 +22,7 @@ import {
   currentPlayerRepository,
   withCurrentImportTransaction,
 } from '$lib/server/composition-root';
+import { currentCoordinatorTeamName } from '$lib/server/coordinator-context';
 
 interface ImportRequest {
   mapping: PlayerImportMapping;
@@ -137,14 +138,17 @@ export const POST = async ({ request }) => {
     return json({ error: 'invalid_player_import' }, { status: 400 });
   }
 
-  const settings = await currentCoordinatorSettingsRepository().get();
+  const [settings, primaryTeamName] = await Promise.all([
+    currentCoordinatorSettingsRepository().get(),
+    currentCoordinatorTeamName(),
+  ]);
 
-  if (!settings) {
+  if (!settings || !primaryTeamName) {
     return json({ error: 'coordinator_settings_not_configured' }, { status: 400 });
   }
 
   const context = {
-    primaryTeamName: settings.primaryTeamName,
+    primaryTeamName,
     seasonStartingYear: settings.seasonStartingYear,
   };
 
