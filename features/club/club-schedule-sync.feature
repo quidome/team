@@ -1,6 +1,9 @@
 Feature: Club schedule sync
   The coordinator keeps the club's games in step with the federation schedule feed.
   Clubs, teams, games, and locations keep their own identity in the app and remember the source IDs they were matched to.
+  The sync stores all games of all club teams. Every sync is a preview first; nothing changes until the coordinator confirms.
+  The feed decides date, start time, teams, location, and result. The app decides travel time, arrival buffer,
+  duties, assignments, attendance, and notes; the sync never changes those.
 
   Scenario: Importing the club's games for a season
     Given the club Blue Drakes is configured with source club ID 37
@@ -22,21 +25,71 @@ Feature: Club schedule sync
     Then first-half and second-half games both belong to U16-1
     And the players and duty history of U16-1 are unchanged
 
+  Scenario: Previewing a sync before applying it
+    Given the feed has 3 new games and 1 moved game compared to the stored games
+    When the coordinator requests a sync preview
+    Then the preview lists 3 new games and 1 moved game with the old and new date and time
+    And no stored game has changed
+
+  Scenario: Applying a confirmed sync
+    Given the coordinator has reviewed a sync preview
+    When the coordinator confirms the sync
+    Then the changes from the preview are stored
+
+  Scenario: Linking a game from an earlier import to the feed
+    Given a game of Blue Drakes M16-1 against Archipel M16-1 on 2026-10-03 was imported from a CSV file
+    And the feed lists Blue Drakes M16 1 against Archipel M16 1 on 2026-10-03 with source game ID 1073142
+    When the coordinator requests a sync preview
+    Then the preview proposes to link the stored game to source game ID 1073142
+    And confirming the sync links the game without adding a duplicate
+
   Scenario: Updating a rescheduled game
     Given a synced game with source game ID 1073150 is scheduled on 2026-10-03 at 16:00
     And the feed now lists that game on 2026-10-10 at 15:00
-    When the coordinator syncs the club schedule
+    When the coordinator confirms the sync
     Then the original occurrence remains stored as cancelled
     And a new scheduled occurrence is stored for the same game
 
+  Scenario: Moving duties and attendance with a rescheduled game
+    Given a synced game has duty places, assigned players, and recorded attendance
+    And the feed moves that game to another date
+    When the coordinator confirms the sync
+    Then the duty places, assigned players, and attendance belong to the new occurrence
+    And the sync report lists the moved game so the coordinator can check the players
+
+  Scenario: Letting the feed win over a local change
+    Given the coordinator changed the start time of a synced game to 16:30
+    And the feed lists that game at 16:00
+    When the coordinator requests a sync preview
+    Then the preview shows the start time change from 16:30 to 16:00
+    And confirming the sync stores 16:00
+
+  Scenario: Keeping app-owned game data during a sync
+    Given a synced game has a travel time, an arrival buffer, and duty places
+    And the feed changes the start time of that game
+    When the coordinator confirms the sync
+    Then the travel time, arrival buffer, and duty places are unchanged
+
+  Scenario: Updating a result
+    Given a synced game has no result
+    And the feed lists the result 57 - 43 for that game
+    When the coordinator confirms the sync
+    Then the game has the result 57 - 43
+
+  Scenario: Keeping games that are not in the feed
+    Given a tournament game was entered by hand or imported from a CSV file
+    And the feed does not list that game
+    When the coordinator confirms the sync
+    Then the game is unchanged and not marked as missing
+
   Scenario: Syncing twice does not duplicate games
     Given the club schedule was synced
-    When the coordinator syncs the club schedule again without feed changes
-    Then no games are added or changed
+    When the coordinator requests a sync preview again without feed changes
+    Then the preview lists no changes
 
   Scenario: Flagging a game that disappeared from the feed
     Given a synced game is no longer listed in the feed
-    When the coordinator syncs the club schedule
+    When the coordinator confirms the sync
     Then the game is kept and marked as missing from the source
     And the coordinator decides whether to cancel it
 
