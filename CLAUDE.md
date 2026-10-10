@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project knowledge
 
-This is the implementation repository for the `team` project (a team coordinator tool). Product, architecture, and planning knowledge is maintained in a separate Obsidian vault, not in this repo — see `AGENTS.md` for the canonical entry points (`projects/team/project.md`, MVP PRD/scope, technical direction, implementation plan). Read `project.md` first when product or architecture context is needed, and don't invent requirements the vault leaves open. Treat the vault as project knowledge and this repo as the implementation; don't copy content between them unnecessarily.
+@AGENTS.md
+
+The sections below describe the old SvelteKit/TypeScript app, which is being replaced.
 
 ## Commands
 

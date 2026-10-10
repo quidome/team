@@ -1,0 +1,86 @@
+# Product vision: team
+
+## The user's problem space
+One coordinator runs one youth team in a club. Each week the same work comes back: which games
+are there, who is at training, who drives to away games, and which players cover the jury and
+referee places that the team must fill. The team talks in a WhatsApp group; the coordinator
+keeps the record. Today the record is a Google Sheet, because the first version of this tool was
+not good enough. Keeping it up to date by hand, and writing the same kinds of messages again and
+again, costs time.
+
+Three groups read what the coordinator produces:
+- **The team and the parents**: when their child plays, when they must drive or do jury duty, and whether the work is shared equally.
+- **The club's referee committee**: which of our players do which duty at the coming weekend's games.
+- **The coordinator**: what happened, and what must still be arranged.
+
+## What this product is
+A small tool for one coordinator. It keeps the games, attendance and duties of one team correct,
+and turns them into text that the coordinator copies into the chat.
+
+It is not:
+- a tool for the whole club, or for several coordinators;
+- a place where parents or players log in;
+- connected to WhatsApp or any other messenger;
+- a replacement for the federation's schedule. It reads that schedule.
+
+## Core values
+1. **Capture fast, keep it correct.** For example, attendance at training takes seconds, on a phone, with one hand. The stored data is the truth and must be right.
+2. **The division of duties is visible and fair, and anyone can check it.** Parents and players can see who did what, so they trust the division.
+
+## Where we are
+- The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
+- The coordinator uses a Google Sheet as a workaround.
+- We start over, with a new backend, probably in Rust.
+- The product is successful when the coordinator stops using the sheet.
+
+## North star
+Each week, the coordinator spends a few minutes in the tool and none in the sheet. Every
+message that goes to the team, the parents or the referee committee comes from the tool,
+correct the first time. No one questions whether the duties are shared fairly, because they can
+see it.
+
+## Where we are going
+First the games come in from the club's game list, so the coordinator never types a schedule.
+Then attendance at training. Then duties and the messages built on them. Each step must be good
+enough to replace that part of the sheet.
+
+## Longer horizon
+Not for now:
+- more coordinators in the club;
+- a page that parents can open without asking the coordinator;
+- past results and statistics from the game list.
+
+These stay ideas until real use shows the need.
+
+## User journeys
+1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because our players do jury duty at those games when we play at home. When a game moves, the tool shows the change.
+2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not.
+3. **Set the duties of a game.** The coordinator sets how many duties a game needs. An away game needs drivers. A home game means jury or referee places at other club games.
+4. **The message for the next game.** Around training, the coordinator copies one message for the team about the next game: time, place, and who drives or does jury duty.
+5. **The message for the referee committee.** Before the weekend, the coordinator copies a message with each game, its start time, and which player (first and last name) does which duty.
+6. **The overview for the parents.** Now and then, the coordinator shares an overview of the coming games and duties, and how many duties each player has done.
+
+## Priorities
+1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
+2. **Attendance at training** – done every week, and the most direct reason to leave the sheet.
+3. **Duties and the message for the next game** – the weekly message is the second thing done every week.
+4. **The message for the referee committee** – built on the same duties.
+5. **The overview for the parents, with duty totals** – makes the fairness visible.
+
+## Principles
+- **The coordinator carries the text to the chat.** The tool only produces text to copy. It never posts.
+- **The schedule comes from the game list, not from typing.**
+- **Duties are given to players.** The child gets the duty, even when a parent drives.
+- **One user changes data.** Readers get text, not accounts.
+- **Small and correct beats complete.** Add a feature only when it replaces work that is done now.
+
+## Open questions
+- Logging in: one user, on a phone, quick and safe. Is the current method (Pocket ID, the user's own login server) right? To decide in the first design.
+- Backend language: Rust (preferred) or Go.
+- Where the data is stored.
+- How the phone screens are built.
+
+## Change log
+| Date | Change |
+|------|--------|
+| 2026-10-07 | Vision created at the restart: one coordinator, three readers, games from the club's game list first |
