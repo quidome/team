@@ -30,7 +30,7 @@ It is not:
 ## Where we are
 - The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
 - The coordinator uses a Google Sheet as a workaround.
-- We start over, with a new backend, probably in Rust.
+- We start over, with a Rust backend and a Svelte front end (see `docs/decisions/`).
 - The product is successful when the coordinator stops using the sheet.
 
 ## North star
@@ -75,12 +75,14 @@ These stay ideas until real use shows the need.
 - **Small and correct beats complete.** Add a feature only when it replaces work that is done now.
 
 ## Open questions
-- Logging in: one user, on a phone, quick and safe. Is the current method (Pocket ID, the user's own login server) right? To decide in the first design.
-- Backend language: Rust (preferred) or Go.
-- Where the data is stored.
-- How the phone screens are built.
+The first design answered the questions about logging in, the backend language, data storage
+and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from the spec of
+`docs/changes/2026-10-10-games-from-game-list/`:
+- The word list calls the game list "the federation's list", but the source appears to be a private site built on the federation's data. Must the meaning change?
+- Is a word needed for the home games of other club teams, where players can get jury and referee duties (the spec says "possible duty games" in plain words)?
 
 ## Change log
 | Date | Change |
 |------|--------|
 | 2026-10-07 | Vision created at the restart: one coordinator, three readers, games from the club's game list first |
+| 2026-10-10 | Open questions answered by the first design: Rust backend, Svelte front end, PostgreSQL, login through Pocket ID (decisions 0001–0004) |

@@ -1,8 +1,8 @@
 ---
 title: Games from the game list
 type: feature
-stage: design
-closure: checks      # set by /design
+stage: implement
+closure: review accept   # epic: each story has its own closure; a fresh agent checks the whole result after story 5
 created: 2026-10-10
 ---
 
@@ -18,3 +18,4 @@ visible until the coordinator marks them as seen.
 | 2026-10-10 | idea | created from the ideas line "Club schedule sync" |
 | 2026-10-10 | discover | vision check done, ready for discovery |
 | 2026-10-10 | design | functional spec approved after two spec reviews |
+| 2026-10-10 | implement | technical spec approved: epic with 5 stories, decisions 0001–0006 |
