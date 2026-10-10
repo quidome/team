@@ -17,3 +17,4 @@ Pocket ID, and a Svelte front end with its look, deployed to the existing cluste
 |------|-------|------|
 | 2026-10-10 | design | created from story 1 of the epic |
 | 2026-10-10 | implement | technical spec approved: 5 steps (step 0 by the coordinator), decisions 0007 and 0008 |
+| 2026-10-10 | implement | steps 0–3 done; branch feat/the-base merged into main |

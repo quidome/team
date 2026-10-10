@@ -242,7 +242,7 @@ In debug builds only, `DEV_AUTH_BYPASS=true` makes `CurrentUser` a fixed user "D
 - Small load: one user. Memory well below 256 MB.
 
 ## Progress
-- [ ] Step 0: coordinator checklist
+- [x] Step 0: coordinator checklist (done by the coordinator, 2026-10-10)
 - [x] Step 1: clean slate, skeleton, database, image (branch `feat/the-base`; merge after step 0)
 - [x] Step 2: login and sessions — code and tests done; login on the cluster still to check after the merge
 - [x] Step 3: front end and look — built and tested; the look waits for the coordinator's approval
