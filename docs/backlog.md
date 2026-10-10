@@ -3,3 +3,4 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Games from the game list](changes/2026-10-10-games-from-game-list/) – implement (epic, 5 stories; story 1: the base)
+   - [The base](changes/2026-10-10-the-base/) – implement (story 1; step 0 by the coordinator first)

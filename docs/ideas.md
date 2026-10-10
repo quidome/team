@@ -7,3 +7,4 @@ Add the date. Remove a line when it becomes a change, or mark it `(rejected: rea
 - 2026-09-27 First-run setup: profile, club, schedule and teams in a few steps (scenarios: features/onboarding/first-run-setup.feature).
 - 2026-09-27 More than one coordinator, each with their own teams (scenarios: features/coordinators/coordinator-teams.feature).
 - 2026-09-20 Deferred in the first version: player accounts, trainer workflows, previous-season reports, notifications, offline use, direct WhatsApp integration (see docs/changes/done/2026-09-20-mvp/scope.md).
+- 2026-10-10 Messages from templates, in a language of the coordinator's choice (the screens stay in English). For the messages change.

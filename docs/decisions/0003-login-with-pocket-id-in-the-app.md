@@ -1,6 +1,6 @@
 # 0003 – Login through Pocket ID, done by the app
 
-**Status**: valid
+**Status**: replaced by 0007
 **Date**: 2026-10-10
 **Change**: [2026-10-10-games-from-game-list](../changes/2026-10-10-games-from-game-list/)
 
