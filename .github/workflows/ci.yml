@@ -53,10 +53,14 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-
 
       - name: Apply migrations
-        run: nix develop path:. --command cargo run --quiet --bin team -- migrate
+        # Compile from the saved query data: the empty database has no tables to check against yet.
+        run: SQLX_OFFLINE=true nix develop path:. --command cargo run --quiet --bin team -- migrate
 
       - name: Run all checks
         run: nix develop path:. --command just check
+
+      - name: Check that release builds ignore the login bypass
+        run: nix develop path:. --command cargo test --release -p team --test release_build
 
   images:
     name: Images

@@ -8,8 +8,10 @@ use clap::{Parser, Subcommand};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
+use team::auth::oidc::Oidc;
+use team::clock::SystemClock;
 use team::config::Config;
-use team::{AppState, app, db};
+use team::{AppState, api, app, db};
 
 #[derive(Parser)]
 #[command(name = "team", about = "Team coordinator tool")]
@@ -24,6 +26,8 @@ enum Command {
     Serve,
     /// Apply database migrations that are not applied yet. Needs only DATABASE_URL.
     Migrate,
+    /// Print the OpenAPI description of the API. Needs no settings.
+    Openapi,
 }
 
 #[tokio::main]
@@ -38,6 +42,13 @@ async fn main() -> anyhow::Result<()> {
     match Cli::parse().command {
         Command::Serve => serve().await,
         Command::Migrate => migrate().await,
+        Command::Openapi => {
+            println!(
+                "{}",
+                api::openapi_json().context("writing the OpenAPI description")?
+            );
+            Ok(())
+        }
     }
 }
 
@@ -45,9 +56,21 @@ async fn serve() -> anyhow::Result<()> {
     let config = Config::from_env().context("reading settings")?;
     let pool = db::lazy_pool(&config.database_url).context("creating the database pool")?;
     let address = SocketAddr::new(config.host, config.port);
+    let oidc = Oidc::new(
+        &config.oidc_issuer_url,
+        &config.oidc_client_id,
+        &config.oidc_client_secret,
+        &config.origin,
+    )
+    .context("setting up the login client")?;
+    if config.dev_auth_bypass {
+        tracing::warn!("DEV_AUTH_BYPASS is on: every request is the user Developer");
+    }
     let state = AppState {
         pool: pool.clone(),
         config: Arc::new(config),
+        oidc: Arc::new(oidc),
+        clock: Arc::new(SystemClock),
     };
 
     let listener = TcpListener::bind(address)

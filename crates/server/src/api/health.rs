@@ -7,11 +7,20 @@ use crate::app::AppState;
 use crate::db;
 
 /// 200 while the process runs.
+#[utoipa::path(get, path = "/api/health/liveness", responses((status = 200, description = "Running")))]
 pub async fn liveness() -> StatusCode {
     StatusCode::OK
 }
 
 /// 200 when the database answers and all migrations are applied; else 503.
+#[utoipa::path(
+    get,
+    path = "/api/health/readiness",
+    responses(
+        (status = 200, description = "Ready"),
+        (status = 503, description = "Database not reachable or a migration is missing"),
+    )
+)]
 pub async fn readiness(State(state): State<AppState>) -> StatusCode {
     match db::check_ready(&state.pool).await {
         Ok(()) => StatusCode::OK,

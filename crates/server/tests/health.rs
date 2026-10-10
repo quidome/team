@@ -7,23 +7,32 @@ mod common;
 use axum::http::{StatusCode, header};
 use sqlx::PgPool;
 
-use common::{body_text, get, test_app};
+use common::{Harness, body_text};
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn liveness_needs_no_login(pool: PgPool) {
-    let response = get(&test_app(pool), "/api/health/liveness").await;
+    let response = Harness::start(pool)
+        .await
+        .get("/api/health/liveness", None)
+        .await;
     assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn readiness_is_ok_when_migrated(pool: PgPool) {
-    let response = get(&test_app(pool), "/api/health/readiness").await;
+    let response = Harness::start(pool)
+        .await
+        .get("/api/health/readiness", None)
+        .await;
     assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[sqlx::test(migrations = false)]
 async fn readiness_fails_without_migrations(pool: PgPool) {
-    let response = get(&test_app(pool), "/api/health/readiness").await;
+    let response = Harness::start(pool)
+        .await
+        .get("/api/health/readiness", None)
+        .await;
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
 
@@ -41,7 +50,10 @@ async fn readiness_fails_with_a_missing_migration(pool: PgPool) {
         .await
         .unwrap();
 
-    let response = get(&test_app(pool), "/api/health/readiness").await;
+    let response = Harness::start(pool)
+        .await
+        .get("/api/health/readiness", None)
+        .await;
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
 
@@ -67,16 +79,19 @@ async fn migrate_twice_applies_nothing_the_second_time(pool: PgPool) {
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn unknown_api_path_without_login_is_unauthenticated(pool: PgPool) {
-    let response = get(&test_app(pool), "/api/does-not-exist").await;
+    let response = Harness::start(pool)
+        .await
+        .get("/api/does-not-exist", None)
+        .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(body_text(response).await, r#"{"error":"unauthenticated"}"#);
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn responses_carry_the_security_headers(pool: PgPool) {
-    let router = test_app(pool);
-    for path in ["/api/health/liveness", "/api/does-not-exist"] {
-        let response = get(&router, path).await;
+    let harness = Harness::start(pool).await;
+    for path in ["/", "/api/health/liveness", "/api/does-not-exist"] {
+        let response = harness.get(path, None).await;
         let headers = response.headers();
         assert_eq!(
             headers[header::CONTENT_SECURITY_POLICY],

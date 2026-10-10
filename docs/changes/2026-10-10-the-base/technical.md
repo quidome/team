@@ -244,7 +244,7 @@ In debug builds only, `DEV_AUTH_BYPASS=true` makes `CurrentUser` a fixed user "D
 ## Progress
 - [ ] Step 0: coordinator checklist
 - [x] Step 1: clean slate, skeleton, database, image (branch `feat/the-base`; merge after step 0)
-- [ ] Step 2: login and sessions (login on the cluster checked)
+- [x] Step 2: login and sessions — code and tests done; login on the cluster still to check after the merge
 - [ ] Step 3: front end and look (look approved)
 - [ ] Step 4: final check on the cluster, `v0.1.0`
 - [ ] All checks pass
@@ -255,5 +255,12 @@ Differences from the epic's technical spec (`../2026-10-10-games-from-game-list/
 - Own `sessions` table instead of tower-sessions (decision 0007).
 - `main` publishes `latest` for quick rollouts; version tags publish fixed images (decision 0008).
 - The coordinator's database steps move before the first merge (the epic had them inside story 1).
+
+Differences from this spec, found during Implement:
+- 2026-10-10, step 1: `team migrate` is compiled with `SQLX_OFFLINE=true` in `just migrate` and in CI. Compiling against a new, empty database fails, because the compile-time query check cannot find the migrations table. Found by the first CI run.
+- 2026-10-10, step 2: the request log writes the method and path only, not the query. The test "logs contain no secrets" found that the default request log wrote the login code from the callback address. This makes the design rule "no codes in logs" true; it adds no behaviour.
+- 2026-10-10, step 2: the fake Pocket ID uses two fixed test-only RSA keys in `crates/server/tests/data/` instead of a key made in each test. Same test, faster, no extra crate.
+- 2026-10-10, step 2: `wiremock` is pinned to 0.6.3; 0.6.5 needs Rust 1.88 (the project uses 1.86).
+- 2026-10-10, step 2: the workspace has no license field. A license was added by mistake in step 1 and removed; choosing a license is the coordinator's decision. `team openapi` leaves the license out.
 
 ## Review findings

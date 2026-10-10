@@ -13,7 +13,7 @@ db-down:
 # Create the database in DATABASE_URL if needed and apply the migrations.
 migrate:
     sqlx database create
-    cargo run --quiet --bin team -- migrate
+    SQLX_OFFLINE=true cargo run --quiet --bin team -- migrate
 
 # Run the server (debug build) with the settings from .env.
 serve:
