@@ -13,8 +13,10 @@ export interface GameOccurrence {
   arrivalBufferMinutes: number;
   date: string;
   locationName: string;
-  startTime: string;
-  travelMinutes: number;
+  /** Not set while the start time is not known yet. */
+  startTime?: string;
+  /** Not set while the travel time to the location is not known. */
+  travelMinutes?: number;
 }
 
 export interface StoredGameFixture {
@@ -31,7 +33,7 @@ export interface StoredGameOccurrence extends GameOccurrence {
   fixtureId: string;
   id: string;
   status: GameOccurrenceStatus;
-  suggestedDepartureTime: string;
+  suggestedDepartureTime?: string;
 }
 
 export interface GameRepository {

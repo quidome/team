@@ -87,7 +87,7 @@ export const PUT = async ({ request }) => {
     metadata: {
       ...(location.address ? { address: location.address } : {}),
       name: location.name,
-      travelMinutes: location.travelMinutes,
+      ...(location.travelMinutes === undefined ? {} : { travelMinutes: location.travelMinutes }),
     },
   });
 
@@ -128,7 +128,9 @@ export const POST = async ({ request }) => {
     metadata: {
       ...(configuredLocation.address ? { address: configuredLocation.address } : {}),
       name: configuredLocation.name,
-      travelMinutes: configuredLocation.travelMinutes,
+      ...(configuredLocation.travelMinutes === undefined
+        ? {}
+        : { travelMinutes: configuredLocation.travelMinutes }),
     },
   });
 

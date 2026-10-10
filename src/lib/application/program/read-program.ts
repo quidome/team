@@ -28,8 +28,11 @@ export const isAttendanceEligible = (event: ProgramEvent, teamName: string): boo
   event.status === 'scheduled' &&
   (event.homeTeamName === teamName || event.awayTeamName === teamName);
 
+/** Events without a known start time sort after the other events of their day. */
+const sortKey = (event: ProgramEvent) => `${event.date}T${event.startTime ?? '~'}`;
+
 const byDateAndTime = (left: ProgramEvent, right: ProgramEvent) =>
-  `${left.date}T${left.startTime}`.localeCompare(`${right.date}T${right.startTime}`);
+  sortKey(left).localeCompare(sortKey(right));
 
 const trainingEvent = (
   occurrence: StoredTrainingSeries['occurrences'][number],

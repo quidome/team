@@ -104,7 +104,7 @@
   const updateGameTravelTime = () => {
     const location = data.locations.find((candidate) => candidate.name === gameForm.locationName);
 
-    if (location) {
+    if (location?.travelMinutes !== undefined) {
       gameForm = { ...gameForm, travelMinutes: String(location.travelMinutes) };
     }
   };
@@ -114,7 +114,7 @@
       (candidate) => candidate.name === rescheduleForm.locationName,
     );
 
-    if (location) {
+    if (location?.travelMinutes !== undefined) {
       rescheduleForm = { ...rescheduleForm, travelMinutes: String(location.travelMinutes) };
     }
   };
@@ -195,7 +195,7 @@
   };
 
   /**
-   * @param {{ id: string; arrivalBufferMinutes: number; date: string; locationName: string; startTime: string; travelMinutes: number }} event
+   * @param {{ id: string; arrivalBufferMinutes: number; date: string; locationName: string; startTime?: string; travelMinutes?: number }} event
    */
   const openReschedule = (event) => {
     rescheduleEventId = event.id;
@@ -203,8 +203,8 @@
       arrivalBufferMinutes: String(event.arrivalBufferMinutes),
       date: event.date,
       locationName: event.locationName,
-      startTime: event.startTime,
-      travelMinutes: String(event.travelMinutes),
+      startTime: event.startTime ?? '',
+      travelMinutes: event.travelMinutes === undefined ? '' : String(event.travelMinutes),
     };
     lifecycleMessage = '';
     lifecycleError = '';
@@ -427,7 +427,7 @@
         <article class="program-row" id={`event-${event.id}`}>
           <div class="program-date">
             <strong>{formatDate(event.date)}</strong>
-            <span>{event.startTime}</span>
+            <span>{event.startTime ?? 'Time not set'}</span>
           </div>
           <div class="program-event">
             {#if event.type === 'game'}
@@ -439,7 +439,12 @@
                   {event.homeTeamName} <span aria-hidden="true">vs</span>
                   {event.awayTeamName}
                 </h2>
-                <p>{event.locationName} · Leave by {event.suggestedDepartureTime}</p>
+                <p>
+                  {event.locationName} ·
+                  {event.suggestedDepartureTime
+                    ? `Leave by ${event.suggestedDepartureTime}`
+                    : 'Departure time not set'}
+                </p>
               </button>
               {#if event.status === 'scheduled'}
                 <div class="event-actions">
@@ -617,7 +622,11 @@
           />
           <datalist id="event-locations">
             {#each data.locations as location (location.name)}
-              <option value={location.name}>{location.travelMinutes} minutes travel</option>
+              <option value={location.name}
+                >{location.travelMinutes === undefined
+                  ? 'Travel time not set'
+                  : `${location.travelMinutes} minutes travel`}</option
+              >
             {/each}
           </datalist>
         </label>

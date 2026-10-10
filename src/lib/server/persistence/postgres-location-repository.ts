@@ -13,11 +13,11 @@ const columns = {
 const toLocation = (row: {
   address: string | null;
   name: string;
-  travelMinutes: number;
+  travelMinutes: number | null;
 }): Location => ({
   ...(row.address ? { address: row.address } : {}),
   name: row.name,
-  travelMinutes: row.travelMinutes,
+  ...(row.travelMinutes === null ? {} : { travelMinutes: row.travelMinutes }),
 });
 
 export const createPostgresLocationRepository = (
@@ -45,7 +45,7 @@ export const createPostgresLocationRepository = (
       .values({
         address: location.address ?? null,
         name: location.name,
-        travelMinutes: location.travelMinutes,
+        travelMinutes: location.travelMinutes ?? null,
       })
       .returning(columns);
 
@@ -62,7 +62,7 @@ export const createPostgresLocationRepository = (
       .set({
         address: location.address ?? null,
         name: location.name,
-        travelMinutes: location.travelMinutes,
+        travelMinutes: location.travelMinutes ?? null,
       })
       .where(eq(locations.name, currentName))
       .returning(columns);

@@ -93,7 +93,7 @@ const conflictFor = (
   fields: conflictFields
     .filter((field) => existing[field] !== imported[field])
     .map((field) => ({
-      existingValue: existing[field],
+      existingValue: existing[field] ?? '',
       field,
       importedValue: imported[field],
     })),
@@ -221,7 +221,9 @@ export const importGames = async (
           }
 
           if (field === 'locationName') mergedRecord.locationName = identity.locationName;
-          if (field === 'travelMinutes') mergedRecord.travelMinutes = identity.travelMinutes;
+          if (field === 'travelMinutes') {
+            mergedRecord.travelMinutes = identity.travelMinutes ?? record.travelMinutes;
+          }
           if (field === 'arrivalBufferMinutes') {
             mergedRecord.arrivalBufferMinutes = identity.arrivalBufferMinutes;
           }

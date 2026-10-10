@@ -1,7 +1,8 @@
 export interface Location {
   address?: string;
   name: string;
-  travelMinutes: number;
+  /** Not set while the travel time is not known. */
+  travelMinutes?: number;
 }
 
 export interface LocationRepository {

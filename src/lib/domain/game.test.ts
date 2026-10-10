@@ -10,4 +10,12 @@ describe('suggested game departure time', () => {
   it('wraps to the previous day when departure crosses midnight', () => {
     expect(suggestDepartureTime('00:15', 20, 30)).toBe('23:25');
   });
+
+  it('Handling a game without a known start time', () => {
+    expect(suggestDepartureTime(undefined, 20, 30)).toBeUndefined();
+  });
+
+  it('Storing a location without a known travel time', () => {
+    expect(suggestDepartureTime('14:30', undefined, 30)).toBeUndefined();
+  });
 });

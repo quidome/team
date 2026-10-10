@@ -139,7 +139,7 @@ export const locations = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     name: text('name').notNull(),
     address: text('address'),
-    travelMinutes: integer('travel_minutes').notNull(),
+    travelMinutes: integer('travel_minutes'),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [uniqueIndex('locations_name_unique').on(table.name)],
@@ -198,9 +198,9 @@ export const gameOccurrences = pgTable('game_occurrences', {
   locationId: uuid('location_id')
     .notNull()
     .references(() => locations.id, { onDelete: 'cascade' }),
-  startTime: text('start_time').notNull(),
+  startTime: text('start_time'),
   status: gameOccurrenceStatus('status').notNull(),
-  travelMinutes: integer('travel_minutes').notNull(),
+  travelMinutes: integer('travel_minutes'),
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 });
 

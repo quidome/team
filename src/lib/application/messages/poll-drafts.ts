@@ -34,6 +34,8 @@ const formatDate = (date: string): string =>
     weekday: 'long',
   }).format(new Date(`${date}T00:00:00.000Z`));
 
+const notKnownYet = 'nog niet bekend';
+
 const renderTemplate = (template: string, values: Record<string, string>): string =>
   template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => values[key] ?? `{{${key}}}`);
 
@@ -55,11 +57,12 @@ export const generatePollDraft = (
     text: renderTemplate(template, {
       date: formatDate(event.date),
       departureLocation,
-      departureTime: options.departureTimeOverride?.trim() || event.suggestedDepartureTime,
+      departureTime:
+        options.departureTimeOverride?.trim() || event.suggestedDepartureTime || notKnownYet,
       location: event.locationName,
       opponent: kind === 'home' ? event.awayTeamName : event.homeTeamName,
       team: options.teamName,
-      time: event.startTime,
+      time: event.startTime ?? notKnownYet,
     }),
   };
 };

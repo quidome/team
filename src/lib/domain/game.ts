@@ -1,8 +1,13 @@
+/** Returns no departure time while the start time or travel time is not known. */
 export const suggestDepartureTime = (
-  startTime: string,
-  travelMinutes: number,
+  startTime: string | undefined,
+  travelMinutes: number | undefined,
   arrivalBufferMinutes: number,
-): string => {
+): string | undefined => {
+  if (startTime === undefined || travelMinutes === undefined) {
+    return undefined;
+  }
+
   const [hours, minutes] = startTime.split(':').map(Number);
   const minutesSinceMidnight = hours * 60 + minutes - travelMinutes - arrivalBufferMinutes;
   const normalizedMinutes = ((minutesSinceMidnight % 1440) + 1440) % 1440;

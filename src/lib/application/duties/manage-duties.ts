@@ -28,8 +28,9 @@ export const correctDutyStatus = (
   status: DutySlotStatus,
 ): Promise<DutyView> => duties.updateSlotStatus(slotId, status);
 
-const occurrenceTimestamp = (date: string, startTime: string): number =>
-  new Date(`${date}T${startTime}:00.000Z`).getTime();
+/** A game without a known start time counts as ending at the end of its day. */
+const occurrenceTimestamp = (date: string, startTime: string | undefined): number =>
+  new Date(`${date}T${startTime ?? '23:59'}:00.000Z`).getTime();
 
 export const completeDueDuties = async (
   duties: DutyRepository,

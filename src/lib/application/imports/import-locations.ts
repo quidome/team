@@ -48,7 +48,7 @@ export const importLocations = async (
       const nextAddress = record.address ?? existing.address;
 
       if (existing.travelMinutes === record.travelMinutes && existing.address === nextAddress) {
-        unchanged.push({ sourceRow: record.sourceRow, travelMinutes: existing.travelMinutes });
+        unchanged.push({ sourceRow: record.sourceRow, travelMinutes: record.travelMinutes });
         continue;
       }
 

@@ -10,7 +10,9 @@ export const buildGameImportContext = async (): Promise<GameImportContext> => {
 
   return {
     knownLocationTravelMinutes: Object.fromEntries(
-      locations.map((location) => [location.name, location.travelMinutes]),
+      locations.flatMap((location) =>
+        location.travelMinutes === undefined ? [] : [[location.name, location.travelMinutes]],
+      ),
     ),
     knownTeamNames: teams.map((team) => team.name),
   };

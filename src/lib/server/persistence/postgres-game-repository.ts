@@ -24,28 +24,34 @@ type ProgramOccurrenceRow = {
   homeTeamName: string;
   id: string;
   locationName: string;
-  startTime: string;
+  startTime: string | null;
   status: 'cancelled' | 'scheduled';
-  travelMinutes: number;
+  travelMinutes: number | null;
 };
 
-const toProgramOccurrence = (row: ProgramOccurrenceRow): StoredGameProgramOccurrence => ({
-  arrivalBufferMinutes: row.arrivalBufferMinutes,
-  awayTeamName: row.awayTeamName,
-  date: row.date,
-  fixtureId: row.fixtureId,
-  homeTeamName: row.homeTeamName,
-  id: row.id,
-  locationName: row.locationName,
-  startTime: row.startTime,
-  status: row.status,
-  suggestedDepartureTime: suggestDepartureTime(
-    row.startTime,
-    row.travelMinutes,
+const toProgramOccurrence = (row: ProgramOccurrenceRow): StoredGameProgramOccurrence => {
+  const startTime = row.startTime ?? undefined;
+  const travelMinutes = row.travelMinutes ?? undefined;
+  const suggestedDepartureTime = suggestDepartureTime(
+    startTime,
+    travelMinutes,
     row.arrivalBufferMinutes,
-  ),
-  travelMinutes: row.travelMinutes,
-});
+  );
+
+  return {
+    arrivalBufferMinutes: row.arrivalBufferMinutes,
+    awayTeamName: row.awayTeamName,
+    date: row.date,
+    fixtureId: row.fixtureId,
+    homeTeamName: row.homeTeamName,
+    id: row.id,
+    locationName: row.locationName,
+    ...(startTime === undefined ? {} : { startTime }),
+    status: row.status,
+    ...(suggestedDepartureTime === undefined ? {} : { suggestedDepartureTime }),
+    ...(travelMinutes === undefined ? {} : { travelMinutes }),
+  };
+};
 
 const withoutFixtureNames = (occurrence: StoredGameProgramOccurrence): StoredGameOccurrence => ({
   arrivalBufferMinutes: occurrence.arrivalBufferMinutes,
@@ -53,10 +59,12 @@ const withoutFixtureNames = (occurrence: StoredGameProgramOccurrence): StoredGam
   fixtureId: occurrence.fixtureId,
   id: occurrence.id,
   locationName: occurrence.locationName,
-  startTime: occurrence.startTime,
+  ...(occurrence.startTime === undefined ? {} : { startTime: occurrence.startTime }),
   status: occurrence.status,
-  suggestedDepartureTime: occurrence.suggestedDepartureTime,
-  travelMinutes: occurrence.travelMinutes,
+  ...(occurrence.suggestedDepartureTime === undefined
+    ? {}
+    : { suggestedDepartureTime: occurrence.suggestedDepartureTime }),
+  ...(occurrence.travelMinutes === undefined ? {} : { travelMinutes: occurrence.travelMinutes }),
 });
 
 const findStoredOccurrence = async (
@@ -199,9 +207,9 @@ export const createPostgresGameRepository = (database: DatabaseConnection): Game
         date: occurrence.date,
         fixtureId,
         locationId: location.id,
-        startTime: occurrence.startTime,
+        startTime: occurrence.startTime ?? null,
         status: 'scheduled',
-        travelMinutes: occurrence.travelMinutes,
+        travelMinutes: occurrence.travelMinutes ?? null,
       })
       .returning({ id: gameOccurrences.id });
 
@@ -209,16 +217,18 @@ export const createPostgresGameRepository = (database: DatabaseConnection): Game
       throw new Error('PostgreSQL did not return the stored game occurrence');
     }
 
+    const suggestedDepartureTime = suggestDepartureTime(
+      occurrence.startTime,
+      occurrence.travelMinutes,
+      occurrence.arrivalBufferMinutes,
+    );
+
     return {
       ...occurrence,
       fixtureId,
       id: storedOccurrence.id,
       status: 'scheduled',
-      suggestedDepartureTime: suggestDepartureTime(
-        occurrence.startTime,
-        occurrence.travelMinutes,
-        occurrence.arrivalBufferMinutes,
-      ),
+      ...(suggestedDepartureTime === undefined ? {} : { suggestedDepartureTime }),
     };
   },
 
@@ -239,8 +249,8 @@ export const createPostgresGameRepository = (database: DatabaseConnection): Game
         arrivalBufferMinutes: occurrence.arrivalBufferMinutes,
         date: occurrence.date,
         locationId: location.id,
-        startTime: occurrence.startTime,
-        travelMinutes: occurrence.travelMinutes,
+        startTime: occurrence.startTime ?? null,
+        travelMinutes: occurrence.travelMinutes ?? null,
       })
       .where(eq(gameOccurrences.id, id))
       .returning({ id: gameOccurrences.id });
