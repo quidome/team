@@ -1,111 +1,83 @@
 # Team
 
-Source repository for the team coordinator tool. The project is starting over: product direction, plans and decisions are in [`docs/`](./docs/) (start with [`docs/vision.md`](./docs/vision.md)). The SvelteKit app described below is the old version and is being replaced.
+A small tool for one youth team coordinator: games from the federation's game list, attendance,
+duties, and messages to copy into the team chat. Product direction, plans and decisions are in
+[`docs/`](./docs/) (start with [`docs/vision.md`](./docs/vision.md)).
+
+The backend is Rust (`crates/`), the front end is Svelte (`web/`), the data is in PostgreSQL. See
+[`docs/decisions/`](./docs/decisions/) for why.
 
 ## Development
 
-Enter the pinned Nix development shell:
+Enter the pinned Nix development shell, start the local database, and apply the migrations:
 
 ```sh
 nix develop path:.
-```
-
-Install JavaScript dependencies:
-
-```sh
-npm install
-```
-
-Run the quality checks:
-
-```sh
-just check
-```
-
-For local persistence work, start the bundled PostgreSQL container, copy `.env.example` to `.env`, then apply migrations:
-
-```sh
-just db-up
 cp .env.example .env
-just db-migrate
-just db-seed
+just db-up
+just migrate
 ```
 
-`just db-seed` adds ten development players and seven sample games, including future home and away fixtures. It is idempotent.
-
-Stop the container when finished with `just db-down`. The database data is kept in the `team-postgres-data` Docker volume.
-
-Create and verify a PostgreSQL backup with explicit destination paths:
+Then:
 
 ```sh
-just db-backup backups/team-$(date +%Y%m%d-%H%M%S).dump
-just db-backup-verify backups/team-20260101-120000.dump
-just db-backup-restore-verify backups/team-20260101-120000.dump
+just serve      # run the server on http://localhost:3000
+just check      # every check: format, clippy, tests, sqlx query data
 ```
 
-`db-backup-verify` checks that the custom-format archive can be read. `db-backup-restore-verify` performs a local restore into a temporary database and removes it afterward. The restore command refuses non-local PostgreSQL hosts; deployment environments should periodically perform an equivalent isolated restore. The Docker volume is not a substitute for tested backups.
+The database tests (`#[sqlx::test]`) create their own databases on the server in `DATABASE_URL`.
+After changing an SQL query, run `just prepare` and commit `.sqlx/`.
 
-Spreadsheet imports use SheetJS `xlsx` 0.20.3 from the official SheetJS CDN. The public npm registry still serves the vulnerable 0.18.5 release, so do not replace the pinned tarball with a normal `xlsx` version range.
+## Database migrations
 
-Run `just audit-high` to fail on newly introduced high or critical dependency advisories. Moderate development-tooling advisories are tracked separately because their suggested fixes are breaking upgrades.
+Migrations are plain SQL files in [`migrations/`](./migrations/), compiled into the binary
+(decision 0004). `team migrate` applies the missing ones under a lock. They only go forward:
 
-For UI-only local development without OIDC, set this in `.env`:
+- never edit a migration that is applied anywhere; a fix is a new file;
+- a breaking change goes in two releases (add the new, later remove the old);
+- the app does not migrate; its readiness check fails while a migration is missing.
 
-```env
-DEV_AUTH_BYPASS=true
-```
+## Images and deployment
 
-This bypass is active only in the Vite development server. Without `DATABASE_URL`, pages use empty in-memory responses; configure PostgreSQL and run migrations for persisted data.
-
-Start the development server:
+`main` publishes `ghcr.io/quidome/team:latest` and `:latest-migration`; a tag `v*` also publishes
+`<version>` and `<version>-migration` (decision 0008). The cluster runs `latest` with
+`pullPolicy: Always`, so a pod restart deploys the newest image:
 
 ```sh
-just dev
+kubectl rollout restart deployment/team -n productivity
 ```
 
-## Production checklist
+The deployment lives in `gitops-lab/applications/productivity/team/` (Argo CD, Helmfile, Vault).
+Never apply it by hand. The image keeps this contract:
 
-Before starting the production server:
+| Item | Value |
+|---|---|
+| Ports and probes | 3000; `GET /api/health/liveness`, `GET /api/health/readiness` |
+| Commands | `runtime`: `team serve`; `migration` (init container): `team migrate` |
+| Security | user and group 1000, read-only root file system |
+| Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET` |
+| Other settings | `ORIGIN`, `SESSION_TTL_SECONDS`, `DEV_AUTH_BYPASS` (ignored by release builds), optional `TEAM_ACCESS_ROLE` (default `team_coordinator`), `HOST`, `PORT`, `WEB_DIR` |
 
-1. Provide `DATABASE_URL`, `ORIGIN`, the Pocket ID OIDC settings, and a random `SESSION_SECRET` of at least 32 characters.
-2. Keep `DEV_AUTH_BYPASS=false` or unset; the bypass is ignored outside Vite development mode.
-3. Confirm production dependencies with `just audit-production`.
-4. Apply migrations with `just db-migrate`.
-5. Build and start with `just serve`.
-6. Run `SMOKE_BASE_URL=https://team.example.test just smoke-production` to verify health and unauthenticated API protection.
-7. Check `/api/health/liveness` and `/api/health/readiness`; readiness returns 503 until PostgreSQL is reachable.
-8. Verify backups with `just db-backup <path>` and `just db-backup-verify <path>`, and periodically test restoring into an isolated database.
+### Switching from the old app (once)
 
-## Container deployment
+Do this **before** the first image of the new app reaches `main` (decision 0006), so the new
+migrations never run against the old database:
 
-Build the production image:
-
-```sh
-docker build --tag team:local .
-```
-
-Run migrations as a separate one-shot job using the migration image target:
-
-```sh
-docker build --target migration --tag team-migration:local .
-docker run --rm --env-file .env team-migration:local
-```
-
-Start the runtime image with the same production environment values:
-
-```sh
-docker run --rm --env-file .env --publish 3000:3000 team:local
-```
-
-Set `SMOKE_BASE_URL` to the externally reachable HTTPS URL and run `just smoke-production` after ingress and Pocket ID are configured.
-
-## GitHub Actions and image publishing
-
-`.github/workflows/container.yml` builds both Docker targets for pull requests. Pushes to `main` and version tags publish the runtime image and the migration image to GHCR:
-
-```text
-ghcr.io/quidome/team:latest
-ghcr.io/quidome/team:latest-migration
-```
-
-The workflow uses the repository-provided `GITHUB_TOKEN`; no application secrets are stored in GitHub Actions. Configure `DATABASE_URL`, OIDC settings, and `SESSION_SECRET` in the eventual deployment platform, not in the image or workflow.
+1. Back up the old database `team` to a file outside the cluster:
+   ```sh
+   kubectl exec -n productivity team-postgresql-0 -- \
+     pg_dump --format=custom --no-owner -U team team > team-old-app.dump
+   ```
+   Check it: `pg_restore --list team-old-app.dump | head`.
+2. Create the new database:
+   ```sh
+   kubectl exec -n productivity team-postgresql-0 -- \
+     psql -U team -d postgres -c 'CREATE DATABASE team_v2 OWNER team'
+   ```
+3. In Vault `kv/productivity/team`, set `DATABASE_URL` to
+   `postgresql://team:<password>@team-postgresql.productivity.svc.cluster.local:5432/team_v2`,
+   then sync through Argo CD.
+4. In Pocket ID, client `team-coordinator`: allow the `groups` scope; make sure you are in the
+   group `team_coordinator`; optionally limit the client to that group.
+5. After the new app works: delete the old database
+   (`psql -U team -d postgres -c 'DROP DATABASE team'`).

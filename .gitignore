@@ -1,9 +1,12 @@
+/target/
 node_modules/
 .svelte-kit/
 build/
 dist/
 coverage/
 backups/
+test-results/
+playwright-report/
 .env
 .env.*
 !.env.example

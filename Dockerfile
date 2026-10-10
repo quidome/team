@@ -1,39 +1,27 @@
-FROM node:22-bookworm-slim AS dependencies
+# syntax=docker/dockerfile:1
 
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
-FROM dependencies AS build
-
+# Build the Rust binary. SQLX_OFFLINE uses the committed .sqlx/ query data, so no database is needed.
+FROM rust:1.86-bookworm AS build
+WORKDIR /src
+ENV SQLX_OFFLINE=true
 COPY . .
-RUN npm run check
-RUN npm run build
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    cargo build --release --locked --bin team \
+    && install -D target/release/team /out/team
 
-FROM build AS migration
-
-CMD ["npm", "run", "db:migrate"]
-
-FROM build AS runtime-dependencies
-
-RUN npm prune --omit=dev
-
-FROM node:22-bookworm-slim AS runtime
-
-ENV HOST=0.0.0.0
-ENV NODE_ENV=production
-ENV PORT=3000
-
+# The app. Runs as user 1000 with a read-only root file system (cluster contract, see README.md).
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-COPY --from=runtime-dependencies --chown=node:node /app/build ./build
-COPY --from=runtime-dependencies --chown=node:node /app/node_modules ./node_modules
-COPY --from=runtime-dependencies --chown=node:node /app/package.json ./package.json
-
-USER node
+COPY --from=build /out/team /app/team
+USER 1000:1000
+ENV HOST=0.0.0.0 PORT=3000
 EXPOSE 3000
+CMD ["/app/team", "serve"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health/liveness').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
-
-CMD ["node", "build"]
+# Runs as an init container before the app on every pod start.
+FROM runtime AS migration
+CMD ["/app/team", "migrate"]

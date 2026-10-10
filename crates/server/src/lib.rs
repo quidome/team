@@ -1,0 +1,10 @@
+//! The team server: settings, database, API and commands (decision 0001).
+
+pub mod api;
+pub mod app;
+pub mod auth;
+pub mod config;
+pub mod db;
+pub mod error;
+
+pub use app::{AppState, app};

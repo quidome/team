@@ -1,0 +1,181 @@
+name: CI
+
+# Checks on every push and pull request; images published from main (latest) and from v* tags
+# (docs/decisions/0008-image-publishing.md).
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: team_v2
+          POSTGRES_PASSWORD: team
+          POSTGRES_USER: team
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U team -d team_v2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://team:team@localhost:5432/team_v2
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Cache Nix store
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Apply migrations
+        run: nix develop path:. --command cargo run --quiet --bin team -- migrate
+
+      - name: Run all checks
+        run: nix develop path:. --command just check
+
+  images:
+    name: Images
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: team_v2
+          POSTGRES_PASSWORD: team
+          POSTGRES_USER: team
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U team -d team_v2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          load: true
+          tags: team:runtime
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build migration image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migration
+          load: true
+          tags: team:migration
+          cache-from: type=gha
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          url=postgresql://team:team@localhost:5432/team_v2
+          docker run --rm --network host --read-only --user 1000:1000 \
+            -e DATABASE_URL="$url" team:migration
+          docker run -d --name team --network host --read-only --user 1000:1000 \
+            -e DATABASE_URL="$url" \
+            -e OIDC_ISSUER_URL=https://id.example.test \
+            -e OIDC_CLIENT_ID=team-coordinator \
+            -e OIDC_CLIENT_SECRET=smoke-test \
+            -e SESSION_SECRET=smoke-test-secret-of-at-least-32-chars \
+            -e ORIGIN=https://team.example.test \
+            team:runtime
+          for path in liveness readiness; do
+            for attempt in $(seq 1 30); do
+              if curl -fsS "http://localhost:3000/api/health/$path"; then break; fi
+              if [ "$attempt" = 30 ]; then docker logs team; exit 1; fi
+              sleep 1
+            done
+            echo " $path ok"
+          done
+          docker rm -f team
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Runtime image tags
+        id: runtime-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Migration image tags
+        id: migration-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: suffix=-migration,onlatest=true
+          tags: |
+            type=ref,event=tag
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Publish runtime image
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          tags: ${{ steps.runtime-meta.outputs.tags }}
+          labels: ${{ steps.runtime-meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Publish migration image
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migration
+          push: true
+          tags: ${{ steps.migration-meta.outputs.tags }}
+          labels: ${{ steps.migration-meta.outputs.labels }}
+          cache-from: type=gha

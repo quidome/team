@@ -4,9 +4,10 @@ This repository contains the `team` project (a team coordinator tool).
 
 ## Status
 
-The project is starting over. The SvelteKit/TypeScript app in this repository is the old
-version; the new backend will probably be written in Rust. The product direction is written in
-`docs/vision.md` (filled with `/vision`). Do not treat the old code as the design to keep.
+The project started over in October 2026. The old SvelteKit/TypeScript app is removed; its
+history is in `docs/changes/done/2026-09-20-mvp/` and its behaviour scenarios are in `features/`
+(reference only). The new product is a Rust backend with a Svelte front end; see `docs/vision.md`
+and `docs/decisions/`.
 
 ## Project knowledge
 

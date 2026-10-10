@@ -1,6 +1,6 @@
 # Technical spec: The base
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-10-the-base
 **Date**: 2026-10-10
@@ -243,7 +243,7 @@ In debug builds only, `DEV_AUTH_BYPASS=true` makes `CurrentUser` a fixed user "D
 
 ## Progress
 - [ ] Step 0: coordinator checklist
-- [ ] Step 1: clean slate, skeleton, database, image
+- [x] Step 1: clean slate, skeleton, database, image (branch `feat/the-base`; merge after step 0)
 - [ ] Step 2: login and sessions (login on the cluster checked)
 - [ ] Step 3: front end and look (look approved)
 - [ ] Step 4: final check on the cluster, `v0.1.0`

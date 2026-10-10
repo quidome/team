@@ -2,82 +2,38 @@ set dotenv-load := true
 
 default: check
 
-# Start the local development server.
-dev:
-    npm run dev -- --host 0.0.0.0
-
-# Build the production bundle.
-build:
-    npm run build
-
-# Run the production Node server after building the application.
-serve: build
-    npm run start
-
 # Start the local PostgreSQL container.
 db-up:
-    docker compose up -d postgres
+    docker compose up -d --wait postgres
 
 # Stop the local PostgreSQL container.
 db-down:
     docker compose down
 
-# Generate PostgreSQL migrations from the Drizzle schema.
-db-generate:
-    npm run db:generate
+# Create the database in DATABASE_URL if needed and apply the migrations.
+migrate:
+    sqlx database create
+    cargo run --quiet --bin team -- migrate
 
-# Apply generated PostgreSQL migrations using DATABASE_URL.
-db-migrate:
-    npm run db:migrate
+# Run the server (debug build) with the settings from .env.
+serve:
+    cargo run --bin team -- serve
 
-# Seed the local database with development players and games.
-db-seed:
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --file scripts/seed-dev.sql
+# Save the sqlx query data in .sqlx/ (run after changing a query; needs a migrated database).
+prepare:
+    cargo sqlx prepare --workspace
 
-# Write a PostgreSQL custom-format backup. Pass a destination path.
-db-backup output="backups/team.sql":
-    mkdir -p "$(dirname \"{{output}}\")"
-    docker compose exec -T postgres pg_dump --format=custom --no-owner postgresql://team:team@localhost:5432/team > "{{output}}"
+# Format all code.
+fmt:
+    cargo fmt
 
-# Verify that a custom-format backup can be inspected by pg_restore.
-db-backup-verify input:
-    pg_restore --list "{{input}}" >/dev/null
-
-# Restore a backup into a temporary local database and remove it afterward.
-db-backup-restore-verify input:
-    node scripts/verify-postgres-backup.mjs "{{input}}"
-
-# Run all local quality checks.
-check: format-check lint typecheck test
-
-# Check formatting without changing files.
-format-check:
-    npm run format:check
-
-# Format the repository.
-format:
-    npm run format
-
-# Run ESLint.
-lint:
-    npm run lint
-
-# Fail when an npm dependency has a high or critical advisory.
-audit-high:
-    npm run audit:high
-
-# Fail when a production dependency has a moderate or higher advisory.
-audit-production:
-    npm run audit:production
-
-# Smoke-test a running production server. Set SMOKE_BASE_URL to override the local URL.
-smoke-production:
-    npm run smoke:production
-
-# Run Svelte and TypeScript checks.
-typecheck:
-    npm run check
-
-# Run the test suite.
+# Run the tests (database tests need DATABASE_URL and `just db-up`).
 test:
-    npm test
+    cargo test --workspace
+
+# Run every check. CI runs this too.
+check:
+    cargo fmt --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace
+    cargo sqlx prepare --workspace --check

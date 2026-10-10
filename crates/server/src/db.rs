@@ -1,0 +1,60 @@
+//! Database pool, migrations and the readiness check (decision 0004).
+
+use std::collections::HashMap;
+use std::time::Duration;
+
+use sqlx::PgPool;
+use sqlx::migrate::Migrator;
+use sqlx::postgres::PgPoolOptions;
+
+/// The SQL files in `migrations/`, compiled into the binary.
+pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
+
+/// A pool that connects on first use, so `team serve` starts even when the database is down;
+/// readiness then reports it.
+pub fn lazy_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(5))
+        .connect_lazy(database_url)
+}
+
+/// Applies the migrations that are not applied yet, under sqlx's lock.
+pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    MIGRATOR.run(pool).await
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum NotReady {
+    #[error("database is not reachable: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("migration {0} is not applied")]
+    MissingMigration(i64),
+    #[error("migration {0} failed")]
+    FailedMigration(i64),
+}
+
+/// Ready when the database answers and every migration in this binary is applied with success.
+/// The app never migrates by itself.
+pub async fn check_ready(pool: &PgPool) -> Result<(), NotReady> {
+    sqlx::query!("SELECT 1 AS one").fetch_one(pool).await?;
+
+    let applied: HashMap<i64, bool> = sqlx::query!("SELECT version, success FROM _sqlx_migrations")
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.version, row.success))
+        .collect();
+
+    for migration in MIGRATOR
+        .iter()
+        .filter(|migration| !migration.migration_type.is_down_migration())
+    {
+        match applied.get(&migration.version) {
+            None => return Err(NotReady::MissingMigration(migration.version)),
+            Some(false) => return Err(NotReady::FailedMigration(migration.version)),
+            Some(true) => {}
+        }
+    }
+    Ok(())
+}

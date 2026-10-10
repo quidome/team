@@ -1,0 +1,4 @@
+# The Nix shell provides this version from the pinned nixpkgs; the Dockerfile uses the same.
+[toolchain]
+channel = "1.86.0"
+components = ["clippy", "rustfmt"]
