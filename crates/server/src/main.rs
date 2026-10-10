@@ -11,6 +11,7 @@ use tracing_subscriber::EnvFilter;
 use team::auth::oidc::Oidc;
 use team::clock::SystemClock;
 use team::config::Config;
+use team::web::Web;
 use team::{AppState, api, app, db};
 
 #[derive(Parser)]
@@ -56,6 +57,7 @@ async fn serve() -> anyhow::Result<()> {
     let config = Config::from_env().context("reading settings")?;
     let pool = db::lazy_pool(&config.database_url).context("creating the database pool")?;
     let address = SocketAddr::new(config.host, config.port);
+    let config_web_dir = config.web_dir.clone();
     let oidc = Oidc::new(
         &config.oidc_issuer_url,
         &config.oidc_client_id,
@@ -71,6 +73,7 @@ async fn serve() -> anyhow::Result<()> {
         config: Arc::new(config),
         oidc: Arc::new(oidc),
         clock: Arc::new(SystemClock),
+        web: Arc::new(Web::load(&config_web_dir)),
     };
 
     let listener = TcpListener::bind(address)

@@ -22,6 +22,7 @@ use sqlx::PgPool;
 use team::auth::oidc::{GroupsClaim, Oidc};
 use team::clock::Clock;
 use team::config::Config;
+use team::web::Web;
 use team::{AppState, app};
 use tower::ServiceExt;
 use url::Url;
@@ -34,6 +35,19 @@ pub const CLIENT_SECRET: &str = "client-secret-for-tests";
 pub const SESSION_SECRET: &str = "0123456789abcdef0123456789abcdef";
 pub const SIGNING_KEY: &str = include_str!("../data/test-signing-key.pem");
 pub const OTHER_KEY: &str = include_str!("../data/test-other-key.pem");
+/// The inline start script of the test front end; its hash must be in the security policy.
+pub const START_SCRIPT: &str = "window.started = true";
+pub const INDEX_HTML: &str = "<!doctype html><html><head><script src=\"/_app/start.js\"></script></head>\
+     <body><div id=\"app\"></div><script>window.started = true</script></body></html>";
+
+/// A small built front end in a temporary folder.
+pub fn front_end() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("index.html"), INDEX_HTML).unwrap();
+    std::fs::create_dir(dir.path().join("_app")).unwrap();
+    std::fs::write(dir.path().join("_app/start.js"), "console.log('start');").unwrap();
+    dir
+}
 
 pub fn config_with(issuer: &str, overrides: &[(&str, &str)]) -> Config {
     let issuer = issuer.to_owned();
@@ -82,6 +96,8 @@ impl Clock for TestClock {
 /// The router with a fake Pocket ID behind it.
 pub struct Harness {
     pub router: Router,
+    /// Kept so the temporary front end lives as long as the harness.
+    pub web_dir: tempfile::TempDir,
     pub clock: Arc<TestClock>,
     pub pocket_id: MockServer,
     pub pool: PgPool,
@@ -123,14 +139,17 @@ impl Harness {
             &config.origin,
         )
         .unwrap();
+        let web_dir = front_end();
         let router = app(AppState {
             pool: pool.clone(),
             config: Arc::new(config),
             oidc: Arc::new(oidc),
             clock: clock.clone(),
+            web: Arc::new(Web::load(web_dir.path())),
         });
         Self {
             router,
+            web_dir,
             clock,
             pocket_id,
             pool,

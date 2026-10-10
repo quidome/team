@@ -1,0 +1,80 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Team",
+    "description": "API of the team coordinator tool.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health/liveness": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "200 while the process runs.",
+        "operationId": "liveness",
+        "responses": {
+          "200": {
+            "description": "Running"
+          }
+        }
+      }
+    },
+    "/api/health/readiness": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "200 when the database answers and all migrations are applied; else 503.",
+        "operationId": "readiness",
+        "responses": {
+          "200": {
+            "description": "Ready"
+          },
+          "503": {
+            "description": "Database not reachable or a migration is missing"
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "The logged-in user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Me": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name to show."
+          }
+        }
+      }
+    }
+  }
+}

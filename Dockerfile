@@ -1,5 +1,13 @@
 # syntax=docker/dockerfile:1
 
+# Build the front end into static files.
+FROM node:22-bookworm-slim AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
 # Build the Rust binary. SQLX_OFFLINE uses the committed .sqlx/ query data, so no database is needed.
 FROM rust:1.86-bookworm AS build
 WORKDIR /src
@@ -17,6 +25,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /out/team /app/team
+COPY --from=web /web/build /app/web
 USER 1000:1000
 ENV HOST=0.0.0.0 PORT=3000
 EXPOSE 3000

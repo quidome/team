@@ -7,5 +7,6 @@ pub mod clock;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod web;
 
 pub use app::{AppState, app};

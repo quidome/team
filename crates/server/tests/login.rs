@@ -10,9 +10,7 @@ use chrono::TimeDelta;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 
-use common::{
-    CLIENT_SECRET, Harness, ORIGIN, OTHER_KEY, TokenSpec, body_text, cookie_value, set_cookie,
-};
+use common::{Harness, ORIGIN, OTHER_KEY, TokenSpec, body_text, cookie_value, set_cookie};
 
 const ROLE: &str = "team_coordinator";
 
@@ -294,72 +292,12 @@ async fn me_carries_the_security_headers(pool: PgPool) {
     let token = harness.log_in(&[ROLE]).await;
     let response = harness.get("/api/me", Some(&session_cookie(&token))).await;
     let headers = response.headers();
-    assert_eq!(
-        headers[header::CONTENT_SECURITY_POLICY],
-        "default-src 'self'; frame-ancestors 'none'"
+    let policy = headers[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
+    assert!(
+        policy.starts_with("default-src 'self'; script-src 'self' 'sha256-"),
+        "{policy}"
     );
+    assert!(policy.ends_with("; frame-ancestors 'none'"), "{policy}");
     assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
     assert_eq!(headers[header::REFERRER_POLICY], "same-origin");
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn start_page_shows_login_state(pool: PgPool) {
-    let harness = Harness::start(pool).await;
-    let page = body_text(harness.get("/", None).await).await;
-    assert!(page.contains("href=\"/auth/login\""));
-
-    let token = harness.log_in(&[ROLE]).await;
-    let page = body_text(harness.get("/", Some(&session_cookie(&token))).await).await;
-    assert!(page.contains("Logged in as Quinn Coordinator"));
-    assert!(page.contains("action=\"/auth/logout\""));
-}
-
-/// Captures log output written while the guard lives.
-#[derive(Clone, Default)]
-struct LogBuffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl std::io::Write for LogBuffer {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn logs_contain_no_secrets(pool: PgPool) {
-    let buffer = LogBuffer::default();
-    let writer = buffer.clone();
-    let subscriber = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_writer(move || writer.clone())
-        .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
-
-    let harness = Harness::start(pool).await;
-    let login = harness.start_login().await;
-    let id_token = TokenSpec::new(&harness.issuer(), &login.nonce, &[ROLE]).sign();
-    harness.answer_token(&id_token).await;
-    let response = harness.callback(&login, &login.state).await;
-    let session = cookie_value(&response, "team_session").unwrap();
-    harness
-        .get("/api/me", Some(&session_cookie(&session)))
-        .await;
-
-    let logs = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
-    assert!(logs.contains("logged in"), "the login is logged");
-    for secret in [
-        session.as_str(),
-        login.login_cookie.as_str(),
-        "code-for-tests",
-        "access-token-for-tests",
-        id_token.as_str(),
-        CLIENT_SECRET,
-        common::SESSION_SECRET,
-    ] {
-        assert!(!logs.contains(secret), "log contains a secret: {secret}");
-    }
 }

@@ -56,8 +56,19 @@ jobs:
         # Compile from the saved query data: the empty database has no tables to check against yet.
         run: SQLX_OFFLINE=true nix develop path:. --command cargo run --quiet --bin team -- migrate
 
+      - name: Install front-end packages
+        run: nix develop path:. --command just web-install
+
       - name: Run all checks
         run: nix develop path:. --command just check
+
+      - name: Keep the look screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: look-screenshots
+          path: web/test-results/look/
+          if-no-files-found: ignore
 
       - name: Check that release builds ignore the login bypass
         run: nix develop path:. --command cargo test --release -p team --test release_build

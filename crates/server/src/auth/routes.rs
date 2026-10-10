@@ -10,8 +10,8 @@ use team_core::may_access;
 
 use super::login_cookie::{self, LoginAttempt};
 use super::oidc::OidcError;
+use super::pages;
 use super::sessions::{self, SessionUser};
-use super::{pages, session_user};
 use crate::app::AppState;
 use crate::error::AppError;
 
@@ -148,13 +148,4 @@ pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> Result<Res
         Redirect::to("/"),
     )
         .into_response())
-}
-
-/// The start page until the Svelte front end exists (step 3 of the base).
-pub async fn start_page(
-    State(state): State<AppState>,
-    jar: CookieJar,
-) -> Result<Response, AppError> {
-    let user = session_user(&state, &jar).await?;
-    Ok(pages::start(user.as_ref().map(|user| user.name.as_str())))
 }

@@ -9,6 +9,7 @@ use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware;
 use axum::routing::{get, post};
 use sqlx::PgPool;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
@@ -18,6 +19,7 @@ use crate::auth;
 use crate::auth::oidc::Oidc;
 use crate::clock::Clock;
 use crate::config::Config;
+use crate::web::Web;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -25,6 +27,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub oidc: Arc<Oidc>,
     pub clock: Arc<dyn Clock>,
+    pub web: Arc<Web>,
 }
 
 /// The log span of a request: method and path only. The query is left out, because the login
@@ -34,6 +37,12 @@ fn request_span(request: &Request<Body>) -> Span {
 }
 
 pub fn app(state: AppState) -> Router {
+    // The policy carries the hash of the front end's start script; it is fixed at start.
+    let content_security_policy = HeaderValue::from_str(&state.web.content_security_policy)
+        .unwrap_or_else(|_| HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"));
+    // The front end: files from WEB_DIR; any other path gets index.html (the app routes it).
+    let front_end = ServeDir::new(&state.web.dir).fallback(ServeFile::new(state.web.index()));
+
     // Everything under /api needs a session by default. New routes go on this router; an unknown
     // /api path also gets 401 without a session, so nothing is open by mistake.
     let protected_api = Router::new()
@@ -55,16 +64,16 @@ pub fn app(state: AppState) -> Router {
         .route("/logout", post(auth::routes::logout));
 
     Router::new()
-        .route("/", get(auth::routes::start_page))
         .nest("/api", api)
         .nest("/auth", auth_routes)
+        .fallback_service(front_end)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_same_origin,
         ))
         .layer(SetResponseHeaderLayer::overriding(
             header::CONTENT_SECURITY_POLICY,
-            HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"),
+            content_security_policy,
         ))
         .layer(SetResponseHeaderLayer::overriding(
             header::X_CONTENT_TYPE_OPTIONS,

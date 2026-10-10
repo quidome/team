@@ -1,4 +1,4 @@
-//! Small HTML pages for login results and, until the front end exists, the start page.
+//! Small HTML pages for login results.
 
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
@@ -9,20 +9,6 @@ fn page(title: &str, body: &str) -> Html<String> {
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
          <title>{title} · Team</title></head><body><main>{body}</main></body></html>"
     ))
-}
-
-/// Escapes text for HTML (the name comes from the login server).
-pub fn escape(text: &str) -> String {
-    text.chars()
-        .map(|character| match character {
-            '&' => "&amp;".to_owned(),
-            '<' => "&lt;".to_owned(),
-            '>' => "&gt;".to_owned(),
-            '"' => "&quot;".to_owned(),
-            '\'' => "&#39;".to_owned(),
-            other => other.to_string(),
-        })
-        .collect()
 }
 
 pub fn login_failed() -> Response {
@@ -57,30 +43,4 @@ pub fn login_unavailable() -> Response {
         ),
     )
         .into_response()
-}
-
-/// The start page of step 2 of the base; the Svelte front end replaces it.
-pub fn start(name: Option<&str>) -> Response {
-    let body = match name {
-        Some(name) => format!(
-            "<h1>Team</h1><p>Logged in as {}</p>\
-             <form method=\"post\" action=\"/auth/logout\"><button type=\"submit\">Log out</button></form>",
-            escape(name)
-        ),
-        None => "<h1>Team</h1><p><a href=\"/auth/login\">Log in</a></p>".to_owned(),
-    };
-    page("Team", &body).into_response()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn escapes_html() {
-        assert_eq!(
-            escape("<script>alert('x') & \"y\"</script>"),
-            "&lt;script&gt;alert(&#39;x&#39;) &amp; &quot;y&quot;&lt;/script&gt;"
-        );
-    }
 }

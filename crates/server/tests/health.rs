@@ -93,10 +93,14 @@ async fn responses_carry_the_security_headers(pool: PgPool) {
     for path in ["/", "/api/health/liveness", "/api/does-not-exist"] {
         let response = harness.get(path, None).await;
         let headers = response.headers();
-        assert_eq!(
-            headers[header::CONTENT_SECURITY_POLICY],
-            "default-src 'self'; frame-ancestors 'none'",
-            "{path}"
+        let policy = headers[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
+        assert!(
+            policy.starts_with("default-src 'self'; script-src 'self' 'sha256-"),
+            "{path}: {policy}"
+        );
+        assert!(
+            policy.ends_with("; frame-ancestors 'none'"),
+            "{path}: {policy}"
         );
         assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff", "{path}");
         assert_eq!(headers[header::REFERRER_POLICY], "same-origin", "{path}");

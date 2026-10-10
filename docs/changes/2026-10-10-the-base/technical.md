@@ -245,7 +245,7 @@ In debug builds only, `DEV_AUTH_BYPASS=true` makes `CurrentUser` a fixed user "D
 - [ ] Step 0: coordinator checklist
 - [x] Step 1: clean slate, skeleton, database, image (branch `feat/the-base`; merge after step 0)
 - [x] Step 2: login and sessions — code and tests done; login on the cluster still to check after the merge
-- [ ] Step 3: front end and look (look approved)
+- [x] Step 3: front end and look — built and tested; the look waits for the coordinator's approval
 - [ ] Step 4: final check on the cluster, `v0.1.0`
 - [ ] All checks pass
 
@@ -262,5 +262,9 @@ Differences from this spec, found during Implement:
 - 2026-10-10, step 2: the fake Pocket ID uses two fixed test-only RSA keys in `crates/server/tests/data/` instead of a key made in each test. Same test, faster, no extra crate.
 - 2026-10-10, step 2: `wiremock` is pinned to 0.6.3; 0.6.5 needs Rust 1.88 (the project uses 1.86).
 - 2026-10-10, step 2: the workspace has no license field. A license was added by mistake in step 1 and removed; choosing a license is the coordinator's decision. `team openapi` leaves the license out.
-
-## Review findings
+- 2026-10-10, step 3: the security policy is built at start from `index.html`: `script-src 'self'` plus the SHA-256 hash of SvelteKit's one inline start script, and `style-src 'self' 'unsafe-inline'` because SvelteKit sets a `style` attribute on its page-change announcer for screen readers. The design had only `default-src 'self'; frame-ancestors 'none'`, which blocks the app from starting. Scripts stay strict; inline styles cannot run code.
+- 2026-10-10, step 3: SvelteKit 3 is the current version: imports from the library folder use `#lib/…` with a `.js` ending, and the project uses TypeScript 6. openapi-typescript still needs TypeScript 5, so `npm run api-types` runs it through `npx` at a pinned version (7.13.0) instead of as a project package.
+- 2026-10-10, step 3: shadcn-svelte's `init` command cannot run without questions, so `web/components.json` and `src/lib/utils.ts` are written by hand as in its manual installation; parts are added with `shadcn-svelte add`.
+- 2026-10-10, step 3: the orange of the theme is darker in light mode, and a game that left the game list keeps full colour (grey background, crossed-out names, its own red label). The accessibility check found too little contrast in the first version.
+- 2026-10-10, step 3: the browser test for logout checks that the button posts to `/auth/logout` and returns to the start page. With the development login bypass the user stays logged in, so "the session really ends" is tested in the Rust test `logout_ends_the_session` instead.
+- 2026-10-10, step 3: the test "logs contain no secrets" has its own file (`tests/logs.rs`): tracing caches per process which log lines are on, and tests running at the same time made it fail now and then.
