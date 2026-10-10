@@ -59,11 +59,9 @@ SvelteKit (Svelte 5) app using a hexagonal/ports-and-adapters layering under `sr
 6. **`src/lib/server/load-*.ts`** — page-data assembly functions (`load-team.ts`, `load-program.ts`, `load-admin.ts`, `load-duties.ts`, `load-history.ts`, `load-messages.ts`, `load-home.ts`) that call use cases via the composition root and shape data for routes. These are what `+page.server.ts` files call into.
 7. **`src/routes/`** — SvelteKit routes. `+page.server.ts` loaders delegate to `src/lib/server/load-*.ts`; `src/routes/api/**/+server.ts` are the JSON API endpoints, generally backed by the same application-layer use cases.
 
-New functionality generally means: add/extend domain logic → define or extend a repository port in `application/` → implement the use case against the port → add both an in-memory adapter (for tests) and a Postgres adapter (for production) → wire the new repository into `composition-root.ts` → expose it through a `load-*.ts` function and/or an API route.
-
 ### Behavior scenarios (`features/`)
 
-User-visible behavior is documented as Gherkin-style `.feature` files under `features/<area>/`. Each scenario should have automated test(s) with matching names runnable via `npm test`. Write the scenario before implementing it. Keep scenarios independent of SvelteKit/database/identity-provider specifics — adapter-level tests cover those integrations separately.
+The Gherkin-style `.feature` files under `features/<area>/` describe the old app's behavior; its tests are named after them. They are reference only: new behavior goes through the product way of working (see `AGENTS.md`).
 
 ### Auth and sessions
 

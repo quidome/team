@@ -1,6 +1,6 @@
 # Team
 
-Source repository for the team coordinator tool. Product and architecture knowledge is maintained in the development Obsidian vault; see [`AGENTS.md`](./AGENTS.md) for the project links.
+Source repository for the team coordinator tool. The project is starting over: product direction, plans and decisions are in [`docs/`](./docs/) (start with [`docs/vision.md`](./docs/vision.md)). The SvelteKit app described below is the old version and is being replaced.
 
 ## Development
 
