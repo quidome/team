@@ -1,7 +1,7 @@
 ---
 title: Games from the game list
 type: feature
-stage: discover
+stage: design
 closure: checks      # set by /design
 created: 2026-10-10
 ---
@@ -17,3 +17,4 @@ visible until the coordinator marks them as seen.
 |------|-------|------|
 | 2026-10-10 | idea | created from the ideas line "Club schedule sync" |
 | 2026-10-10 | discover | vision check done, ready for discovery |
+| 2026-10-10 | design | functional spec approved after two spec reviews |
