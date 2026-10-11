@@ -1,21 +1,54 @@
 name: CI
 
-# Checks on every push and pull request; images published from main (latest) and from v* tags
-# (docs/decisions/0008-image-publishing.md).
+# Stages (docs/decisions/0009-pipeline-stages-and-release-by-renaming.md):
+#   check    every pull request and push to main
+#   build    push to main, and pull requests that change the image inputs; at the same time as check
+#   publish  push to main, after check and build passed: latest -> sha-<commit>
+# Releases are in release.yml.
 on:
   pull_request:
   push:
-    branches:
-      - '**'
-    tags:
-      - 'v*'
+    branches: [main]
+
+# A newer push to the same pull request or to main stops the older run, so an older run never
+# moves latest after a newer one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql://team:team@localhost:5432/team_v2
+  IMAGE: ghcr.io/${{ github.repository }}
+  SQLX_CLI_VERSION: 0.8.6
+  ACTIONLINT_VERSION: 1.7.8
 
 jobs:
-  check:
-    name: Checks
+  changes:
+    name: Changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    outputs:
+      image: ${{ steps.files.outputs.image }}
+    steps:
+      - name: Do the image inputs change?
+        id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          if gh pr diff "$PR" --name-only -R "$GITHUB_REPOSITORY" \
+            | grep -qxE 'Dockerfile|\.dockerignore|Cargo\.lock|web/package-lock\.json'; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  check:
+    name: Check
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
@@ -30,52 +63,99 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      DATABASE_URL: postgresql://team:team@localhost:5432/team_v2
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
-
-      - name: Cache Nix store
-        uses: DeterminateSystems/magic-nix-cache-action@v8
+      - name: Set up Rust (from rust-toolchain.toml)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
 
       - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Cache sqlx-cli
+        id: sqlx-cli
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          path: ~/.cargo/bin/sqlx
+          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-${{ runner.os }}
 
-      - name: Apply migrations
-        # Compile from the saved query data: the empty database has no tables to check against yet.
-        run: SQLX_OFFLINE=true nix develop path:. --command cargo run --quiet --bin team -- migrate
+      - name: Install sqlx-cli
+        if: steps.sqlx-cli.outputs.cache-hit != 'true'
+        run: >-
+          cargo install sqlx-cli --version "$SQLX_CLI_VERSION" --locked
+          --no-default-features --features rustls,postgres
+
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSfL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION" "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: Install front-end packages
-        run: nix develop path:. --command just web-install
+        run: just web-install
+
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(jq -r '.packages["node_modules/@playwright/test"].version' web/package-lock.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.playwright.outputs.version }}-${{ runner.os }}
+
+      - name: Install Playwright browser
+        working-directory: web
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install chromium
+          fi
+          npx playwright install-deps chromium
+
+      - name: Save Playwright browser
+        if: github.ref == 'refs/heads/main' && steps.playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.playwright.outputs.version }}-${{ runner.os }}
+
+      - name: Apply migrations
+        run: sqlx migrate run --source migrations
 
       - name: Run all checks
-        run: nix develop path:. --command just check
+        run: just lint-ci api-types-check check-rust check-web e2e check-sqlx
 
-      - name: Keep the look screenshots
-        if: always()
+      - name: Keep the browser test results
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: look-screenshots
-          path: web/test-results/look/
+          name: browser-test-results
+          path: web/test-results/
           if-no-files-found: ignore
 
-      - name: Check that release builds ignore the login bypass
-        run: nix develop path:. --command cargo test --release -p team --test release_build
-
-  images:
-    name: Images
-    needs: check
+  build:
+    name: Build
+    needs: changes
+    if: >-
+      always() && !cancelled() && needs.changes.result != 'failure' &&
+      (github.event_name == 'push' || needs.changes.outputs.image == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -84,19 +164,28 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: team_v2
+          POSTGRES_DB: postgres
           POSTGRES_PASSWORD: team
           POSTGRES_USER: team
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U team -d team_v2"
+          --health-cmd "pg_isready -U team -d postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Commit tag
+        id: tag
+        run: echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -108,8 +197,11 @@ jobs:
           target: runtime
           load: true
           tags: team:runtime
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=image
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,scope=image,mode=max' || '' }}
 
       - name: Build migration image
         uses: docker/build-push-action@v6
@@ -118,79 +210,54 @@ jobs:
           target: migration
           load: true
           tags: team:migration
-          cache-from: type=gha
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=image
 
       - name: Smoke test
-        run: |
-          set -euo pipefail
-          url=postgresql://team:team@localhost:5432/team_v2
-          docker run --rm --network host --read-only --user 1000:1000 \
-            -e DATABASE_URL="$url" team:migration
-          docker run -d --name team --network host --read-only --user 1000:1000 \
-            -e DATABASE_URL="$url" \
-            -e OIDC_ISSUER_URL=https://id.example.test \
-            -e OIDC_CLIENT_ID=team-coordinator \
-            -e OIDC_CLIENT_SECRET=smoke-test \
-            -e SESSION_SECRET=smoke-test-secret-of-at-least-32-chars \
-            -e ORIGIN=https://team.example.test \
-            team:runtime
-          for path in liveness readiness; do
-            for attempt in $(seq 1 30); do
-              if curl -fsS "http://localhost:3000/api/health/$path"; then break; fi
-              if [ "$attempt" = 30 ]; then docker logs team; exit 1; fi
-              sleep 1
-            done
-            echo " $path ok"
-          done
-          docker rm -f team
+        run: just smoke team:runtime team:migration
 
       - name: Log in to GHCR
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Runtime image tags
-        id: runtime-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=tag
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Push the commit images
+        if: github.event_name == 'push'
+        env:
+          SHA_TAG: ${{ steps.tag.outputs.sha }}
+        run: |
+          docker tag team:runtime "$IMAGE:$SHA_TAG"
+          docker tag team:migration "$IMAGE:$SHA_TAG-migration"
+          docker push "$IMAGE:$SHA_TAG"
+          docker push "$IMAGE:$SHA_TAG-migration"
 
-      - name: Migration image tags
-        id: migration-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: suffix=-migration,onlatest=true
-          tags: |
-            type=ref,event=tag
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+  publish:
+    name: Publish
+    needs: [check, build]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Publish runtime image
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-        uses: docker/build-push-action@v6
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          context: .
-          target: runtime
-          push: true
-          tags: ${{ steps.runtime-meta.outputs.tags }}
-          labels: ${{ steps.runtime-meta.outputs.labels }}
-          cache-from: type=gha
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish migration image
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: migration
-          push: true
-          tags: ${{ steps.migration-meta.outputs.tags }}
-          labels: ${{ steps.migration-meta.outputs.labels }}
-          cache-from: type=gha
+      - name: Name the commit images latest
+        run: |
+          sha="sha-${GITHUB_SHA::7}"
+          docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:$sha"
+          docker buildx imagetools create -t "$IMAGE:latest-migration" "$IMAGE:$sha-migration"
+          docker buildx imagetools inspect "$IMAGE:latest" --format '{{json .Manifest.Digest}}'
