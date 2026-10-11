@@ -37,6 +37,9 @@
               # Database client and tools
               postgresql
               just
+              # Checks for the GitHub workflows and shell scripts
+              actionlint
+              shellcheck
               git
               jq
             ] ++ browserPackages;

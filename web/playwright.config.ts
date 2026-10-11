@@ -13,7 +13,6 @@ function server(port: number, bypass: boolean) {
 		timeout: 300_000,
 		env: {
 			DATABASE_URL: database,
-			SQLX_OFFLINE: 'true',
 			OIDC_ISSUER_URL: 'https://id.example.test',
 			OIDC_CLIENT_ID: 'team-coordinator',
 			OIDC_CLIENT_SECRET: 'e2e',

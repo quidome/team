@@ -1,6 +1,6 @@
 # Technical spec: Fast release pipeline
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-11-fast-release-pipeline
 **Date**: 2026-10-11
@@ -173,12 +173,14 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
 - Expected: push to `main` about 4 minutes instead of 7–20; tag under 30 seconds instead of 12 minutes.
 
 ## Progress
-- [ ] Step 1: local parts
+- [x] Step 1: local parts (2026-10-11; first image build with cargo-chef 198 s with smoke test; rebuild after a code-only change 27 s)
 - [ ] Step 2: workflows and pull request (runs 1–3)
 - [ ] Step 3: merge and release (runs 4–7)
 - [ ] Step 4: documents
 - [ ] All checks pass
 
 ## Deviations
+- 2026-10-11, step 1: `cargo sqlx prepare --check` is its own recipe `check-sqlx` and runs last in `just check`. sqlx-cli forces the next compile of the `team` package; in its old place the browser tests compiled `team` again in the same run. Now `team` compiles once per `just check` run (in `cargo test`).
+- 2026-10-11, step 1: in the first cache test the cargo-chef library step ran again although its input (`recipe.json`) was the same. Two clean repeats were cached (a code-only rebuild took 27 s). The cause was not found; runs 4–5 on GitHub check the cache again.
 
 ## Review findings

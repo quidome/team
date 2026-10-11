@@ -38,7 +38,7 @@ dev:
 
 # Generate the API description and the front-end API types from the Rust code.
 api-types:
-    SQLX_OFFLINE=true cargo run --quiet --bin team -- openapi > web/openapi.json
+    cargo run --quiet --bin team -- openapi > web/openapi.json
     cd web && npm run -s api-types
 
 # Save the sqlx query data in .sqlx/ (run after changing a query; needs a migrated database).
@@ -53,12 +53,43 @@ fmt:
 test:
     cargo test --workspace
 
-# Run every check. CI runs this too. Needs `just db-up`, `just migrate` and `just web-install`.
-check: api-types
+# Run every check. GitHub runs the same recipes (decision 0009). Needs `just db-up`,
+# `just migrate` and `just web-install`.
+check: lint-ci api-types-check check-rust check-web e2e check-sqlx
+
+# Check the GitHub workflows and the shell scripts.
+lint-ci:
+    actionlint
+    shellcheck scripts/*.sh
+
+# Check that the committed API description and types match the Rust code.
+api-types-check: api-types
     git diff --exit-code -- web/openapi.json web/src/lib/api/schema.d.ts
+
+# Rust: format, lints, tests.
+check-rust:
     cargo fmt --check
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
+
+# The saved sqlx query data (.sqlx/) matches the queries. Runs last: sqlx-cli forces the next
+# compile of the team package, so anything after it would compile again.
+check-sqlx:
     cargo sqlx prepare --workspace --check
+
+# Front end: types, lint and format, build.
+check-web:
     cd web && npm run check && npm run lint && npm run build
+
+# Browser tests against the real server (after `check-web` built the front end).
+e2e:
     cd web && npx playwright test
+
+# Build both images locally.
+images:
+    docker build --target runtime -t team:runtime .
+    docker build --target migration -t team:migration .
+
+# Smoke test of built images (after `just images`); needs `just db-up`.
+smoke runtime="team:runtime" migration="team:migration":
+    scripts/smoke-test.sh {{runtime}} {{migration}}
