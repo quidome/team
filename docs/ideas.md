@@ -10,3 +10,4 @@ Add the date. Remove a line when it becomes a change, or mark it `(rejected: rea
 - 2026-10-10 Messages from templates, in a language of the coordinator's choice (the screens stay in English). For the messages change.
 - 2026-10-11 Clean up old images in the registry: `build-…` and `sha-…` images are never removed (technical debt in docs/architecture.md).
 - 2026-10-11 Automatic dependency updates (for example Renovate, as in gitops-lab) for Cargo, npm and the GitHub actions; then the actions can be pinned to exact commits at no extra cost.
+- 2026-10-11 Read an earlier season again on request, for example to fill 2025-2026 after the start (left out of story 2, choose club and team).
