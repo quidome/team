@@ -50,13 +50,13 @@ mod tests {
 
     #[test]
     fn a_summer_evening_is_already_the_next_day_in_the_netherlands() {
-        // 22:00 UTC on 31 July is 00:00 on 1 August in Dutch summer time.
+        // 22:00 UTC on 30 June is 00:00 on 1 July in Dutch summer time.
         assert_eq!(
-            current_season(&at(2027, 7, 31, 21, 59)).to_string(),
+            current_season(&at(2027, 6, 30, 21, 59)).to_string(),
             "2026-2027"
         );
         assert_eq!(
-            current_season(&at(2027, 7, 31, 22, 0)).to_string(),
+            current_season(&at(2027, 6, 30, 22, 0)).to_string(),
             "2027-2028"
         );
     }

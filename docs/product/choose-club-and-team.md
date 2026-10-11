@@ -12,7 +12,7 @@ number: the club is found by name, and the team is chosen from the club's own te
 - The coordinator types part of the club name and taps "Search". Upper or lower case is not important. Each result shows the club name and the town (the name only when the game list has no town for the club).
 - After a tap on the club, the tool reads the club's games of the current season and shows the club's own teams, not the opponents, with short names (for example "M16 1" for "Blue Drakes M16 1"). A tap on a team saves the choice.
 - The start page then shows the club and team (for example "Blue Drakes M16 1") and the season, with "Change". "Change" opens the teams of the same club; "Other club" goes back to the search.
-- **New season.** A season starts on 1 August (Dutch time) and is written as "2026-2027". In a new season the tool keeps the club and asks for the team again, because a youth team moves up an age group. It shows last season's team (for example "In 2026-2027 the team was Blue Drakes M16 1").
+- **New season.** A season starts on 1 July (Dutch time), as the NBB (the Dutch basketball federation) counts it, and is written as "2026-2027". In a new season the tool keeps the club and asks for the team again, because a youth team moves up an age group. It shows last season's team (for example "In 2026-2027 the team was Blue Drakes M16 1").
 - **No games yet.** In summer the new season can still be empty. The tool then says that the club has no games for the season yet. A club that is not kept yet can be saved without a team ("Save club"); a kept club needs nothing. The team is chosen on the start page when games appear.
 - The choice of each season is kept. A change in the same season replaces that season's choice; earlier seasons are not changed.
 
