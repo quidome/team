@@ -75,8 +75,8 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 | # | Story | Type | Scope | Depends on | Expected closure | Status |
 |---|---|---|---|---|---|---|
 | 1 | [The base](../done/2026-10-10-the-base/) | technical | Remove the old app (keep `features/`, `docs/`); Rust workspace (`core`, `server`); Nix shell with Rust, sqlx-cli, Node for the front end, PostgreSQL; `team serve` and `team migrate`; health checks; login with Pocket ID, sessions, allowed users; first migration; Svelte app with style kit (colours, fonts, light and dark) and one page after login; OpenAPI types; Dockerfile with `runtime` and `migration` targets to the existing contract; `just check` and GitHub checks; written steps for the coordinator: back up `team`, create the new database, point `DATABASE_URL` to it, delete `team` after story 1 works. Ends with a real deployment and a login on the phone. The coordinator approves the look. | – | review build | done (v0.1.0) |
-| 2 | Choose club and team | feature | Spec story 1: club search on the club list, team choice from own teams, change later, new season. Reader for the club list; `selection` table; season rule in core. | 1 | checks | open |
-| 3 | Read on demand, and the schedule | feature | Spec stories 2 and 3: reader for club games, strict parsing, storage of games and readings, comparing (counts only), guard and "really gone", lock, transaction; schedule screen with filter, past games, crossed-out games, last reading. Confirms outgoing traffic on the cluster. May split in its own design. | 2 | review build + accept | open |
+| 2 | [Choose club and team](../2026-10-11-choose-club-and-team/) | feature | Spec story 1: club search on the club list, team choice from own teams, change later, new season. Reader for the club list and (moved from story 3) the strict reading of a full game; `followed_teams` table, one row for each season; season rule in core. | 1 | review build | implement |
+| 3 | Read on demand, and the schedule | feature | Spec stories 2 and 3: storage of games and readings, comparing (counts only), guard and "really gone", lock, transaction; schedule screen with filter, past games, crossed-out games, last reading. Confirms outgoing traffic on the cluster. May split in its own design. | 2 | review build + accept | open |
 | 4 | The list of changes | feature | Spec story 4: keep changes (all seven kinds, into/out of the schedule), one open change per game, seen one and all, summary line, filter. Sets the summary threshold. | 3 | review build + accept | open |
 | 5 | The nightly reading | feature | Spec story 5: `team read-game-list`; failures and "may be out of date"; a ready change for `gitops-lab`: CronJob template in the team chart, same image and secrets, pods with both team labels, checked with `helm lint` and `helm template`, promoted through Argo CD. | 4 | checks | open |
 
@@ -127,6 +127,12 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
+- 2026-10-11, from the design of story 2 ([Choose club and team](../2026-10-11-choose-club-and-team/technical.md)), agreed by the coordinator:
+  - The strict reading of a full game and its tests (real data parses to 71 games, 00:00, a format error names the field) move from story 3 to story 2.
+  - The test "change of team removes unseen changes and records none" moves from story 2 to story 4. Story 2 stores the time of each choice (`chosen_at`) for it.
+  - The `selection` table is `followed_teams`: one row for each season; the newest season is the current choice. Earlier seasons stay.
+  - Story 2's closure is `review build` instead of `checks`.
+  - Input for story 3: keep games of every season (for example 2025-2026 and 2026-2027): store games for each club and season, and a reading never changes another season. Store places (the source's `loc_id`, hall, town) as their own table. Decide which game id is the key: the source's `id` or the game number `nr` (story 2 reads both).
 From the design of story 1 ([The base](../done/2026-10-10-the-base/technical.md), 2026-10-10), all technical:
 - Access by the Pocket ID role `team_coordinator` instead of an `allowed_users` table; own `sessions` table instead of tower-sessions (decision 0007 replaces 0003). The stored data above has no `allowed_users` table.
 - `main` publishes `latest` for quick rollouts; version tags publish fixed images (decision 0008).
