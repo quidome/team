@@ -126,6 +126,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 - [ ] Epic review accept
 
 ## Deviations
+- 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
 From the design of story 1 ([The base](../2026-10-10-the-base/technical.md), 2026-10-10), all technical:
 - Access by the Pocket ID role `team_coordinator` instead of an `allowed_users` table; own `sessions` table instead of tower-sessions (decision 0007 replaces 0003). The stored data above has no `allowed_users` table.
 - `main` publishes `latest` for quick rollouts; version tags publish fixed images (decision 0008).

@@ -268,3 +268,6 @@ Differences from this spec, found during Implement:
 - 2026-10-10, step 3: the orange of the theme is darker in light mode, and a game that left the game list keeps full colour (grey background, crossed-out names, its own red label). The accessibility check found too little contrast in the first version.
 - 2026-10-10, step 3: the browser test for logout checks that the button posts to `/auth/logout` and returns to the start page. With the development login bypass the user stays logged in, so "the session really ends" is tested in the Rust test `logout_ends_the_session` instead.
 - 2026-10-10, step 3: the test "logs contain no secrets" has its own file (`tests/logs.rs`): tracing caches per process which log lines are on, and tests running at the same time made it fail now and then.
+- 2026-10-11 (from the fast release pipeline change): the pipeline is now described by decision 0010, which replaces 0008 and 0009. The release build test `release_build.rs` is gone: `dev_bypass.rs` checks the debug case, and `scripts/smoke-test.sh` checks on the real image that a release build ignores `DEV_AUTH_BYPASS`.
+
+## Review findings

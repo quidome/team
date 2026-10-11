@@ -1,7 +1,7 @@
 //! The login bypass works in debug builds (decision 0007).
 //!
 //! That a release build ignores it is checked on the real image by `scripts/smoke-test.sh`
-//! (decision 0009).
+//! (decision 0010).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

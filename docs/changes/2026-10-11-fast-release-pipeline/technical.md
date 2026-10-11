@@ -195,3 +195,78 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
 - 2026-10-11, step 3: `latest` and `v...` have their own fingerprint (digest): `docker buildx imagetools create` puts a list around the image. The list holds exactly one entry, the digest of the tested `sha-<7>` image. The test plan expected equal digests; the check is now on the entry in the list.
 - 2026-10-11, step 3: GitHub runs the workflow files of the tagged commit. The first try of run 7 tagged an old commit, which started the old workflow ("Container"); it was cancelled before it published anything. Run 7 was then done on an empty commit made from `main` on a short-lived branch. Consequence for releases: tag only commits on `main` (the README says so in step 4).
 - 2026-10-11, step 3: run 5 (code-only push to `main`) is moved to the next real code change; no change was made only for the test.
+- 2026-10-11, review: `scripts/smoke-test.sh` always uses its own database `team_smoke` on `localhost:5432` (role team/team), made and dropped by the script; it does not read `DATABASE_URL` as the design said. A fixed, separate database cannot clash with the developer's own data.
+- 2026-10-11, review: decision 0010 replaces 0009 after finding R1: Build pushes `build-<7>`, Publish makes `sha-<7>` and `latest`.
+
+## Review findings
+Build review, 2026-10-11, fresh agent. Read: the diff `5b03610..d29d1b2` (the working tree was
+clean), this change folder, decisions 0008 and 0009, `CLAUDE.md`, `README.md`. Ran: `just lint-ci`
+(passes), `gh run list` / `gh run view`, `docker buildx imagetools inspect` on GHCR. Did not run
+`just check` or the image build.
+
+- **R1 – A release can name an image that did not pass Check (medium).** Build and Check run at the
+  same time, and Build pushes `sha-<7>` as soon as its own smoke test passes, before Check is done
+  and also when Check fails or the run is cancelled. Release only asks "does `sha-<7>` exist?", so
+  "exists" is taken for "main passed". Decision 0009 ("the release is exactly what ran on `main`")
+  and the error text ("Wait until the run on main has passed") promise more than the check gives.
+  Seen on GitHub: run 38127911590 (`a9b5906`) pushed `sha-a9b5906` at 09:22:51, Check finished at
+  09:24:02 and Publish was skipped, yet `sha-a9b5906` exists in GHCR, so a tag on it would release
+  (checked with `gh run view` and `imagetools inspect`). The README step "wait for green" is the
+  only guard. Ways out (the coordinator chooses; a change to 0009's mechanism): let Release check
+  that the CI run for that commit passed (`gh run list --commit`/check runs), or let Publish add a
+  marker that Release looks for, or push `sha-<7>` only after Check (costs time). Checked by a
+  trace of `ci.yml`/`release.yml` and the run above.
+  - 2026-10-11: fixed (coordinator chose separate names). Build pushes `build-<7>`; Publish, only after Check and Build passed, names it `sha-<7>` and `latest`; Release checks `sha-<7>`. Decision 0010 replaces 0009. The untested `sha-a9b5906` entries are deleted (see the line below R7).
+- **R2 – Runtime and migration can be published or released out of step (medium, sibling of R1).**
+  Publish moves `latest` first and `latest-migration` second; if the second command fails, the
+  cluster pulls a new app with the old migration image at the next pod start. Release checks only
+  `$IMAGE:$sha`, not `$sha-migration`; Build pushes the runtime image first, so a failed migration
+  push leaves a `sha-<7>` that passes the Release check, and Release then makes `<tag>` and fails
+  on `<tag>-migration`. Suggest: check both images before naming anything, and name the migration
+  image first. Checked by a trace; not reproduced.
+  - 2026-10-11: fixed. Publish and Release check both images before any name moves, and rename the migration image first (decision 0010).
+- **R3 – The `changes` job fails open (medium).** When `gh pr diff` fails (API error, or a diff
+  GitHub refuses as too large), `grep` sees nothing and the job writes `image=false` and succeeds;
+  Build is skipped without a sign. The `needs.changes.result != 'failure'` guard in Build can then
+  never help. It works today because the repository is public (`gh repo view`: PUBLIC) and the
+  diffs are small. Suggest: run `gh pr diff` on its own and fail the job when it fails (or compare
+  with `git diff` against the base). Checked by a trace of the step.
+  - 2026-10-11: fixed. The `changes` job reads the file list in its own command, so a `gh pr diff` failure fails the job.
+- **R4 – The list of image inputs misses some (low; touches decision 0009).** A pull request that
+  changes only `rust-toolchain.toml` (rustup in the build stage reads it after `COPY . .`),
+  `scripts/smoke-test.sh` or the Build job in `.github/workflows/ci.yml` does not build or smoke
+  the image; the first test is on `main`, where a failure blocks Publish but not the merge. Search:
+  the `grep -qxE` pattern in `ci.yml` against the inputs in `Dockerfile` and the Build job.
+  - 2026-10-11: fixed. Added `rust-toolchain.toml`, `scripts/smoke-test.sh` and `.github/workflows/ci.yml` to the image inputs (decision 0010).
+- **R5 – Open change documents still describe the old pipeline (low).** The base is still open
+  (`stage: implement`, `closure: review build`) and its `technical.md` lists
+  `cargo test --release --test release_build` as a test (lines 178, 225) and decision 0008 for
+  publishing (lines 23, 148, 196, 256); the epic's `technical.md` line 131 cites 0008. The base's
+  build review will look for a test this change removed. Suggest a log line or deviation in the
+  base that points to `dev_bypass.rs`, the smoke test and 0009. Search: `git grep -E
+  "0008|release_build|cargo test --release"` outside `done/`.
+  - 2026-10-11: fixed. The base and the epic have a note that points to `dev_bypass.rs`, the smoke test and decision 0010.
+- **R6 – Undocumented differences from this spec (low).** (a) The sqlx-cli cache uses
+  `actions/cache@v4`, which also saves on pull requests; the spec says caches are saved on `main`
+  only (the Rust and Playwright caches do follow it). (b) `scripts/smoke-test.sh` always uses
+  `team_smoke` on `localhost:5432` and ignores `DATABASE_URL`; the spec says it reads
+  `DATABASE_URL` with that default. (c) The container names `team-smoke`/`team-smoke-bypass` are
+  fixed, so a run killed without its trap blocks the next local run until the containers are
+  removed by hand. None is a bug for CI; (a) and (b) belong under Deviations. Checked by reading.
+  - 2026-10-11: fixed. (a) sqlx-cli cache saved on `main` only (restore and save steps). (b) recorded under Deviations. (c) the smoke script removes leftover `team-smoke` containers at its start (tested with a leftover container).
+- **R7 – The Rust build image no longer names its Debian release (low).** The old build stage was
+  `rust:1.86-bookworm`, matching `debian:bookworm-slim` for the runtime; the new
+  `lukemathwalker/cargo-chef:latest-rust-1.86` is a moving tag that does not say the distribution.
+  Today it is Debian 12 (checked: `/etc/debian_version` = 12.10), so the glibc matches. If that tag
+  is ever rebuilt on a newer Debian, the binary may not start on the runtime image; the smoke test
+  would catch it on `main`. A tag with `bookworm` in it, if cargo-chef publishes one, keeps the
+  match explicit (not checked).
+  - 2026-10-11: fixed. Build stage uses `lukemathwalker/cargo-chef:latest-rust-1.86-bookworm`; the image builds and runs on Debian 12.15.
+
+
+Checked and true: Release `v0.1.1` holds exactly `sha-30c9313` (digest `29f27889…`) and
+`v0.1.1-migration` its migration image; `latest` and `latest-migration` hold exactly the
+`sha-d29d1b2` images; run 7 (`v0.0.0-not-on-main`) failed and the old "Container" workflow run was
+cancelled; Publish ran on the last `main` run after Check and Build. The smoke test's 401 check can
+fail (it waits for 401 and fails on a timeout if the bypass answers 200). `README.md`, `CLAUDE.md`
+and decision 0009 match the workflows, apart from R1's promise.

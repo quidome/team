@@ -53,7 +53,7 @@ fmt:
 test:
     cargo test --workspace
 
-# Run every check. GitHub runs the same recipes (decision 0009). Needs `just db-up`,
+# Run every check. GitHub runs the same recipes (decision 0010). Needs `just db-up`,
 # `just migrate` and `just web-install`.
 check: lint-ci api-types-check check-rust check-web e2e check-sqlx
 

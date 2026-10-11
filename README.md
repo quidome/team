@@ -39,13 +39,13 @@ Migrations are plain SQL files in [`migrations/`](./migrations/), compiled into 
 
 ## Images and deployment
 
-The pipeline (decision 0009) has four stages:
+The pipeline (decision 0010) has four stages. `sha-<commit>` exists only for commits that passed everything:
 
 | Stage | When | What |
 |---|---|---|
 | Check | every pull request and push to `main` | the same recipes as `just check` |
-| Build | push to `main`, and pull requests that change `Dockerfile`, `.dockerignore`, `Cargo.lock` or `web/package-lock.json` | builds both images, runs `just smoke`; on `main` pushes `sha-<commit>` and `sha-<commit>-migration` |
-| Publish | push to `main`, after Check and Build passed | names those images `latest` and `latest-migration` |
+| Build | push to `main`, and pull requests that change `Dockerfile`, `.dockerignore`, `Cargo.lock`, `rust-toolchain.toml`, `web/package-lock.json`, `scripts/smoke-test.sh` or `.github/workflows/ci.yml` | builds both images, runs `just smoke`; on `main` pushes `build-<commit>` and `build-<commit>-migration` |
+| Publish | push to `main`, after Check and Build passed | names those images `sha-<commit>` and `latest` (migration first) |
 | Release | tag `v*` | names the `sha-<commit>` images of the tagged commit `<tag>` and `<tag>-migration`; nothing is built |
 
 The cluster runs `latest` with `pullPolicy: Always`, so a pod restart deploys the newest image:

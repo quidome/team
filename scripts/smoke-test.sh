@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test of the built images (decision 0009): migrations, health, the front end, and that the
+# Smoke test of the built images (decision 0010): migrations, health, the front end, and that the
 # login bypass is off in the release build. Used by `just smoke` and by the Build job in CI.
 #
 # Usage: scripts/smoke-test.sh RUNTIME_IMAGE MIGRATION_IMAGE
@@ -59,6 +59,9 @@ expect_status() {
     done
     fail "$url gave $status, expected $expected"
 }
+
+# Containers left by an interrupted earlier run would block the fixed names below.
+docker rm -f team-smoke team-smoke-bypass >/dev/null 2>&1 || true
 
 psql "$admin_url" -qc 'DROP DATABASE IF EXISTS team_smoke' -c 'CREATE DATABASE team_smoke' >/dev/null \
     || fail "cannot create the database team_smoke"

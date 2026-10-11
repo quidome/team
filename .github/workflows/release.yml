@@ -1,7 +1,8 @@
 name: Release
 
-# A release names the images that main already built and tested for the tagged commit; nothing is
-# built (docs/decisions/0009-pipeline-stages-and-release-by-renaming.md).
+# A release names the images that main already checked, built and tested for the tagged commit
+# (sha-<commit>, made by Publish only after Check and Build passed); nothing is
+# built (docs/decisions/0010-release-only-checked-images.md).
 on:
   push:
     tags: ['v*']
@@ -31,11 +32,15 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}
         run: |
-          sha="sha-${GITHUB_SHA::7}"
-          if ! docker buildx imagetools inspect "$IMAGE:$sha" >/dev/null 2>&1; then
-            echo "::error::No image for commit ${GITHUB_SHA::7}. Wait until the run on main has passed, then tag again."
-            exit 1
-          fi
-          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME" "$IMAGE:$sha"
-          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME-migration" "$IMAGE:$sha-migration"
+          # sha-<commit> exists only when Check and Build both passed on main (Publish makes it).
+          sha="$IMAGE:sha-${GITHUB_SHA::7}"
+          for name in "$sha" "$sha-migration"; do
+            if ! docker buildx imagetools inspect "$name" >/dev/null 2>&1; then
+              echo "::error::No checked image for commit ${GITHUB_SHA::7} ($name). Wait until the run on main has passed, then tag again."
+              exit 1
+            fi
+          done
+          # Migration first, as in Publish.
+          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME-migration" "$sha-migration"
+          docker buildx imagetools create -t "$IMAGE:$GITHUB_REF_NAME" "$sha"
           docker buildx imagetools inspect "$IMAGE:$GITHUB_REF_NAME" --format '{{json .Manifest.Digest}}'

@@ -1,6 +1,6 @@
 # 0009 – Pipeline stages, and release by renaming the tested image
 
-**Status**: valid
+**Status**: replaced by 0010
 **Date**: 2026-10-11
 **Change**: [2026-10-11-fast-release-pipeline](../changes/2026-10-11-fast-release-pipeline/)
 

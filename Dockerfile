@@ -9,8 +9,8 @@ COPY web/ ./
 RUN npm run build
 
 # Plan and build the Rust binary with cargo-chef: the libraries are compiled in their own layer,
-# which the layer cache keeps while Cargo.lock does not change (decision 0009).
-FROM lukemathwalker/cargo-chef:latest-rust-1.86 AS chef
+# which the layer cache keeps while Cargo.lock does not change (decision 0010).
+FROM lukemathwalker/cargo-chef:latest-rust-1.86-bookworm AS chef
 WORKDIR /src
 
 FROM chef AS plan

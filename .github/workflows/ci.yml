@@ -1,9 +1,11 @@
 name: CI
 
-# Stages (docs/decisions/0009-pipeline-stages-and-release-by-renaming.md):
+# Stages (docs/decisions/0010-release-only-checked-images.md):
 #   check    every pull request and push to main
-#   build    push to main, and pull requests that change the image inputs; at the same time as check
-#   publish  push to main, after check and build passed: latest -> sha-<commit>
+#   build    push to main, and pull requests that change the image inputs; at the same time as check;
+#            on main it pushes build-<commit> (built and smoke-tested, not yet checked)
+#   publish  push to main, after check and build passed: names build-<commit> sha-<commit> and latest,
+#            so sha-<commit> exists only for commits that passed everything
 # Releases are in release.yml.
 on:
   pull_request:
@@ -39,8 +41,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.number }}
         run: |
-          if gh pr diff "$PR" --name-only -R "$GITHUB_REPOSITORY" \
-            | grep -qxE 'Dockerfile|\.dockerignore|Cargo\.lock|web/package-lock\.json'; then
+          # Fails the job when the file list cannot be read, instead of skipping Build silently.
+          files=$(gh pr diff "$PR" --name-only -R "$GITHUB_REPOSITORY")
+          inputs='Dockerfile|\.dockerignore|Cargo\.lock|rust-toolchain\.toml|web/package-lock\.json|scripts/smoke-test\.sh|\.github/workflows/ci\.yml'
+          if grep -qxE "$inputs" <<< "$files"; then
             echo "image=true" >> "$GITHUB_OUTPUT"
           else
             echo "image=false" >> "$GITHUB_OUTPUT"
@@ -84,7 +88,7 @@ jobs:
 
       - name: Cache sqlx-cli
         id: sqlx-cli
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cargo/bin/sqlx
           key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-${{ runner.os }}
@@ -94,6 +98,13 @@ jobs:
         run: >-
           cargo install sqlx-cli --version "$SQLX_CLI_VERSION" --locked
           --no-default-features --features rustls,postgres
+
+      - name: Save sqlx-cli
+        if: github.ref == 'refs/heads/main' && steps.sqlx-cli.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cargo/bin/sqlx
+          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-${{ runner.os }}
 
       - name: Install actionlint
         run: |
@@ -179,9 +190,6 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Commit tag
-        id: tag
-        run: echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Install just
         uses: taiki-e/install-action@v2
@@ -227,15 +235,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push the commit images
+      - name: Push the built images (build-<commit>)
         if: github.event_name == 'push'
-        env:
-          SHA_TAG: ${{ steps.tag.outputs.sha }}
         run: |
-          docker tag team:runtime "$IMAGE:$SHA_TAG"
-          docker tag team:migration "$IMAGE:$SHA_TAG-migration"
-          docker push "$IMAGE:$SHA_TAG"
-          docker push "$IMAGE:$SHA_TAG-migration"
+          tag="build-${GITHUB_SHA::7}"
+          docker tag team:runtime "$IMAGE:$tag"
+          docker tag team:migration "$IMAGE:$tag-migration"
+          docker push "$IMAGE:$tag"
+          docker push "$IMAGE:$tag-migration"
 
   publish:
     name: Publish
@@ -259,9 +266,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Name the commit images latest
+      - name: Name the checked images sha-<commit> and latest
         run: |
-          sha="sha-${GITHUB_SHA::7}"
-          docker buildx imagetools create -t "$IMAGE:latest" "$IMAGE:$sha"
-          docker buildx imagetools create -t "$IMAGE:latest-migration" "$IMAGE:$sha-migration"
+          build="$IMAGE:build-${GITHUB_SHA::7}"
+          sha="$IMAGE:sha-${GITHUB_SHA::7}"
+          # Both images must exist before any name moves (app and migration stay in step).
+          docker buildx imagetools inspect "$build" >/dev/null
+          docker buildx imagetools inspect "$build-migration" >/dev/null
+          # Migration first: if the app step fails, old app code runs on forward-only migrations,
+          # which decision 0004 keeps compatible.
+          docker buildx imagetools create -t "$sha-migration" -t "$IMAGE:latest-migration" "$build-migration"
+          docker buildx imagetools create -t "$sha" -t "$IMAGE:latest" "$build"
           docker buildx imagetools inspect "$IMAGE:latest" --format '{{json .Manifest.Digest}}'
