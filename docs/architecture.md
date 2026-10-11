@@ -38,6 +38,7 @@ start during active development.
 - Everything under `/api` needs a session, except `/api/health/liveness` and `/api/health/readiness`. Unknown `/api` paths give 401 without a session and 404 with one; they never get the front end.
 - One fallback decides every other path: unknown `/auth` paths give 404; built files (under `/_app/`, or a name with an extension) give the file or 404; any other path gives the file or `index.html`.
 - Every changing request (`POST`, `PUT`, `PATCH`, `DELETE`) to `/api` or `/auth` needs `Origin` equal to `ORIGIN`.
+- Cache rule on every front-end file: files under `/_app/immutable/` (hash in the name) get `Cache-Control: public, max-age=31536000, immutable`; every other file, `index.html` first, gets `no-cache`, so a new release shows at the next page load.
 - Security headers on every answer (decision 0011): a Content-Security-Policy that allows only our own files plus the hash of the front end's start script, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
 - The request log has method and path only; logs never contain cookies, codes, tokens or secrets.
 

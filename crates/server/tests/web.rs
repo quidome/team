@@ -124,3 +124,36 @@ async fn changing_requests_to_api_and_auth_roots_need_our_origin(pool: PgPool) {
         );
     }
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn index_html_and_other_files_are_checked_each_time(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    for path in ["/", "/choose", "/_app/start.js", "/_app/missing.js"] {
+        let response = harness.get(path, None).await;
+        assert_eq!(
+            response.headers()[header::CACHE_CONTROL],
+            "no-cache",
+            "{path}"
+        );
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn hashed_files_are_kept_for_a_year(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    let immutable = harness.web_dir.path().join("_app/immutable");
+    std::fs::create_dir(&immutable).unwrap();
+    std::fs::write(immutable.join("start.Ab12Cd.js"), "console.log('start');").unwrap();
+
+    let response = harness.get("/_app/immutable/start.Ab12Cd.js", None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()[header::CACHE_CONTROL],
+        "public, max-age=31536000, immutable"
+    );
+
+    // A missing hashed file must not be kept.
+    let response = harness.get("/_app/immutable/gone.Zz99.js", None).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-cache");
+}

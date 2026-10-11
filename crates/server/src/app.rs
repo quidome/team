@@ -71,9 +71,24 @@ async fn fallback(State(state): State<AppState>, jar: CookieJar, request: Reques
             .await
     };
     match served {
-        Ok(response) => response.map(Body::new),
+        Ok(response) => with_cache_rule(&path, response.map(Body::new)),
         Err(error) => AppError::Internal(error.into()).into_response(),
     }
+}
+
+/// Files under `/_app/immutable/` have a hash in their name, so a new release has new names: the
+/// browser may keep them for a year. Every other front-end file (`index.html` first) must be
+/// checked with the server each time, so a new release shows at the next page load.
+fn with_cache_rule(path: &str, mut response: Response) -> Response {
+    let rule = if path.starts_with("/_app/immutable/") && response.status().is_success() {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(rule));
+    response
 }
 
 pub fn app(state: AppState) -> Router {
