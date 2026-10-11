@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-11
-**Change**: [2026-10-11-fast-release-pipeline](../changes/2026-10-11-fast-release-pipeline/)
+**Change**: [2026-10-11-fast-release-pipeline](../changes/done/2026-10-11-fast-release-pipeline/)
 
 Replaces 0009. It keeps the stages of 0009 (Check, Build, Publish, Release; no Nix in GitHub;
 images on pull requests only when image inputs change; release by renaming) and changes which

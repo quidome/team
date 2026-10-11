@@ -2,7 +2,7 @@
 
 **Status**: replaced by 0010
 **Date**: 2026-10-11
-**Change**: [2026-10-11-fast-release-pipeline](../changes/2026-10-11-fast-release-pipeline/)
+**Change**: [2026-10-11-fast-release-pipeline](../changes/done/2026-10-11-fast-release-pipeline/)
 
 Replaces 0008. It keeps from 0008: `main` publishes `latest` and `latest-migration`, the cluster
 pulls `latest` at every pod start during active development, and `main` must always be safe to

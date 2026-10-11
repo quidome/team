@@ -1,6 +1,6 @@
 # Technical spec: Fast release pipeline
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-11-fast-release-pipeline
 **Date**: 2026-10-11
@@ -183,7 +183,7 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
   - run 6: release `v0.1.1` in 16 s; points to exactly `sha-30c9313`
   - run 7: a tag on a commit not on `main` failed with "No image for commit ..."; nothing published
 - [x] Step 4: documents (README release steps and pipeline table, CLAUDE.md recipes)
-- [ ] All checks pass
+- [x] All checks pass (main run b66d094)
 
 ## Deviations
 - 2026-10-11, step 1: `cargo sqlx prepare --check` is its own recipe `check-sqlx` and runs last in `just check`. sqlx-cli forces the next compile of the `team` package; in its old place the browser tests compiled `team` again in the same run. Now `team` compiles once per `just check` run (in `cargo test`).
