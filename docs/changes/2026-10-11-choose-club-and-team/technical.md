@@ -1,6 +1,6 @@
 # Technical spec: Choose club and team
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-11-choose-club-and-team
 **Date**: 2026-10-11
@@ -265,11 +265,11 @@ needs a session).
 - Load: one search reads about 90 KB from the source; a team list or a save reads the club list and one season (about 75–125 KB). A few times per season.
 
 ## Progress
-- [ ] Step 1: core rules
-- [ ] Step 2: reader of the source
-- [ ] Step 3: storage and API
-- [ ] Step 4: front end
-- [ ] All checks pass
+- [x] Step 1: core rules
+- [x] Step 2: reader of the source
+- [x] Step 3: storage and API
+- [x] Step 4: front end
+- [x] All checks pass
 
 ## Deviations
 From the epic's technical spec (none from the functional spec):
@@ -277,9 +277,130 @@ From the epic's technical spec (none from the functional spec):
 - The epic test "a change of team removes unseen changes and records none" moves to story 4; story 2 stores `chosen_at` for it (coordinator, 2026-10-11).
 - The epic outline's `selection` table is `followed_teams`, one row for each season (coordinator, 2026-10-11). The API keeps the name `/api/selection`.
 
+From Implement:
+- 2026-10-11, step 2: `Source::new` and `Source::with_timeout` also take the tool's own address (`ORIGIN`), because the spec puts it in the User-Agent; the spec's signature left the parameter out. The base address must be the root of the source's site (paths are joined to it).
+- 2026-10-11, step 3: `ChoiceState::Chosen` holds `{ season, club, team }` with a team that is always there, instead of a `FollowedTeam` whose team may be empty. The API then has no branch for a case that cannot happen.
+- 2026-10-11, step 3: `AppError` does not log source errors; the reader already logs them with the club and season.
+- 2026-10-11, step 4: the browser test setup migrates the fresh database with `sqlx migrate run` (as the GitHub Check stage does), not with `cargo run -- migrate`: Playwright starts the test servers before the setup, so they compile from `.sqlx/` (`SQLX_OFFLINE`) and connect on first use.
+- 2026-10-11, step 4: the front-end type check found that the OpenAPI description of step 3 put `search` of `GET /api/clubs` in the path instead of the query; fixed (`#[into_params(parameter_in = Query)]`).
+- 2026-10-11, step 4: the start page has no "Hello, <name>" heading any more; the name stays in the header. When the club is already saved without a team, the start page says so and offers no second "Save club" (seen on the phone screenshot; the browser test covers it).
+- 2026-10-11, review fixes: `choice_state` takes the choice of the current season and the newest earlier choice instead of the latest row and the season; `followed_teams` has `for_season` and `newest_before` instead of `latest`; the team rule is the core function `choose_team`; `last` in the API also holds the club.
+
 The design reads the functional spec more strictly than written, within its words:
 - "Each result shows the club name and town": 29 clubs have no town in the source; they show the name only.
 - "The coordinator can save the club" in summer: saving a club without a team is allowed only when the season has no own teams.
 - "Nothing is saved" when the source fails: also when the source answers with data the tool does not understand.
 
 ## Review findings
+
+### Build review (2026-10-11)
+Fresh agent; input: mode `build` and this change folder. Read: the diff against `main` (committed
+and not), this folder, `docs/architecture.md`, the valid decision records, `CLAUDE.md`.
+Ran: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace` (all pass, 1 ignored
+live test), `just check-web`, `just e2e` (15 passed), `just api-types-check`, `just check-sqlx`,
+`just lint-ci`: all pass, so "All checks pass" is true. No test was found that cannot fail.
+
+- **R1 – a product rule in the server (pattern).** `PUT /api/selection` decides in
+  `api/selection.rs` that the team must be an own team (`not_an_own_team`) and that a team may be
+  left out only when the season has no own teams (`team_required`). That is the rule of story
+  item 8 as Design read it strictly, and `architecture.md` says new rules go in `crates/core`
+  first. It is testable there without I/O (for example `fn choose(club, teams, team: Option<TeamNumber>) -> Result<Option<Team>, ChoiceError>`);
+  now it is covered only by the router test. Checked: trace of `selection::save`.
+  - 2026-10-11: fixed: the rule is the core function `choose_team(own_teams, team) -> Result<Option<Team>, TeamChoiceError>` with three unit tests; `api/selection.rs` only maps its errors to the 400 codes.
+- **R2 – the new season in summer drops last season (bug against the intent).** On 1 August the
+  new season usually has no games yet (item 8), so the new-season path is mostly this path:
+  the start page shows "A new season started" and `ChooseTeam` with `clubSaved = false`
+  (`+page.svelte` sets it only for `no_games_yet`), so the coordinator sees "Save club" for a
+  club that is already kept. Pressing it saves a new-season row with no team; `latest` then
+  returns that row and `choice_state` gives `NoGamesYet` with `last: None`. The message "a new
+  season started" and last season's team disappear from the API, while story 3 needs exactly
+  that link "until then" (item 6). The old row stays in the table, so no data is lost, but
+  nothing reads it. Options: offer no "Save club" for `new_season` (the club is kept), or let
+  the state also look at the newest row with a team. Checked: trace (`+page.svelte`,
+  `ChooseTeam.svelte`, `followed_teams::latest`, `choice_state`); not run, because the browser
+  test cannot set the server clock and no router test saves a club without a team in a new season.
+  - 2026-10-11: fixed in two places. Core: `choice_state(this_season, earlier)` takes the row of the current season and the newest earlier row, and gives the earlier choice as `last` also in `no_games_yet`, so a save for an empty new season keeps last season's team (core test, and the router test `saving_the_club_for_an_empty_new_season_keeps_last_season`). Screen: in every `team_needed` state the club is kept, so the start page and `/choose` offer no "Save club" for it (`clubKept`).
+- **R3 – sibling of the step-4 fix on `/choose`.** `choose/+page.svelte` passes `club` but not
+  `clubSaved`, so in state `team_needed`/`no_games_yet` the page `/choose` offers "Save club"
+  again – the screen problem the step-4 deviation fixed on `/`. Reachable with the browser's Back
+  button right after "Save club" (it went `/choose` → `/`), or by typing the address. Harmless
+  (the save is an upsert of the same row) but confusing. The two `+page.ts` loaders are also the
+  same code twice. Checked: trace.
+  - 2026-10-11: fixed: `/choose` passes `clubKept` in the state `team_needed`; the browser test opens `/choose` after the save and checks that there is no "Save club". The two `+page.ts` loaders call one function `loadPageSelection` in `client.ts`.
+- **R4 – "choose the team again" when no team was chosen.** A club saved without a team in
+  season N gives `NewSeason` in season N+1 with `last.team = null`; the page then says "choose
+  the team again" with no last team. Small wording issue. Checked: trace of `choice_state` and
+  `+page.svelte`.
+  - 2026-10-11: fixed: with no last team the start page says "A new season started: choose the team."; "again" only when a last team exists. The last team shows with its own club (`last.club` added to the API).
+- **R5 – a newest row later than the current season.** `choice_state` handles only
+  `latest.season < current`. When the newest row is of a later season (the clock went back, or a
+  wrong clock), it gives `Chosen` and the API labels it with the current season; a `PUT` then
+  writes the current-season row, but `GET` keeps returning the later row, so the save seems
+  ignored. Low risk (needs a wrong clock); no core test for it. Checked: trace.
+  - 2026-10-11: fixed: storage reads the row of the current season (`for_season`) and the newest row before it (`newest_before`), never a later row; router test `a_choice_of_a_later_season_does_not_hide_the_current_season`.
+- **R6 – browser tests share one database in parallel.** `logged-in.e2e.ts` and `choose.e2e.ts`
+  are in the same project and run in parallel workers on `team_e2e` (seen in the run: 3 workers,
+  interleaved). Nothing in `logged-in.e2e.ts` depends on the saved choice now (its comment says
+  so), but a later start-page assertion there would be flaky. Consider `workers: 1` for that
+  project or a note in `architecture.md`. Checked: run of `just e2e`.
+  - 2026-10-11: fixed: the choose tests are their own Playwright project `choose`; the project `logged-in` depends on it, so it runs after them. The logged-out tests do not touch the choice.
+- **R7 – new files are not in git yet.** The new sources, `migrations/0002_followed_teams.sql`,
+  the two `.sqlx/query-*.json` files and the test data are untracked; `check-sqlx` and the tests
+  pass locally only because they are on disk. Commit them all. Checked: `git status`.
+  - 2026-10-11: not fixed yet: the files are committed when the coordinator asks for a commit (`just check` passes with them on disk).
+- **R8 – documents that are now false or incomplete (for Close).** `architecture.md`: core
+  "Now: the access rule `may_access`"; the server module list (no `source/`, `followed_teams.rs`,
+  `current_season` in `clock.rs`); "AppError turns them into 401, 403, 404 or 500" (now also 400
+  and 502); browser tests now use a fresh `team_e2e` database and a fake source. `CLAUDE.md`
+  "Architecture" lists the server modules without `source/` and `followed_teams.rs`.
+  `docs/product/` has no page for choosing the club and team. Checked: reading `architecture.md`,
+  `CLAUDE.md` and `docs/product/`; search for `team_v2|team_e2e` in the repository.
+  - 2026-10-11: not fixed here: the living documents are updated by `/close`.
+
+Checked with no finding: decision 0001 (core uses `chrono` without the clock feature; no clock is
+read in core), 0004 (new forward-only migration), 0007 (all four routes on the protected router;
+401 test), `Origin` on `PUT` (403 test); no `unwrap`/`expect` outside tests (clippy); logs hold
+club number, season and error kind only, the search text is not logged; the source is read
+before the database is touched on `PUT`; names come from the source, not the browser.
+
+### Accept review (2026-10-11)
+Fresh agent; input: mode `accept` and this change folder (no other arguments were given). This is
+a technical spec for story 2 of an epic, so the yardstick is story 1 of the epic's
+`functional.md` and its `idea.md`, plus the objective here. Read: those, this folder, the diff
+against `main` (committed and not). Note: this file was read in one piece, so **Deviations** and
+the build review were seen before the own view was complete; each point below was checked
+against the code or a run, not taken from them.
+Ran: `just e2e` after `just web-build` (15 passed); the real server (debug, login bypass) on a
+scratch database `team_accept_review` (dropped afterwards) with `web/e2e/fake-source.mjs`,
+rows put in by hand to act as last season, and `curl` on the API (runs (1)–(3) below).
+
+| # | Criterion or open point | Built | Sort |
+|---|---|---|---|
+| A1 | Before a choice, only this step | Start page shows only the search; no sample link. `/sample` still opens by address (temporary page, story 3 removes it). Checked: e2e "first visit", reading `+page.svelte`. | faithful adaptation |
+| A2 | Search by part of the name; result shows name and town | Yes; the 29 clubs with no town show the name only. Checked: e2e, run (search "giants"). | faithful adaptation |
+| A3 | The club's own teams, not opponents; the example | Exactly M16 1, M16 2, M18 1, MSE 1, X12 1, X14 1. Buttons show the short name, as the spec's own example does (not the "short names" kept out of scope, which are for drives). Checked: e2e. | faithful adaptation |
+| A4 | No club found, search again | Yes. Checked: e2e. | matches |
+| A5 | Change club or team later | "Change" on the start page; `/choose` opens at the club's teams, "Other club" goes back to the search. The current team is not marked in the list. Checked: e2e "changes the team later", reading `ChooseTeam.svelte`. | neutral drift (the unmarked current team) |
+| A6 | After a change: new games with no changes, old unseen changes removed | Not in this story (moved to story 4 by the coordinator); `chosen_at` is stored for it. Checked: reading the migration and `followed_teams.rs`. | faithful adaptation |
+| A7 | New season: keep the club, ask the team again, show last season's games and say a new choice is needed until then | **When the new season already has games**: works. Run (1): last-season row Blue Drakes M16 1 gives `team_needed`, `new_season`, `last` 2025-2026 M16 1. **When the new season is still empty, which is the normal case on 1 August** (item 8 of the spec says so): the start page passes `clubSaved` only for `no_games_yet`, so it shows "has no games yet. Save the club now" and a "Save club" button for a club that is already kept. Run (2), club 1067 with a 2025-2026 row: `GET` gives `new_season` with last season's team; the `PUT` that "Save club" sends returns `no_games_yet`, `last: null`, and every later `GET` the same. "A new season started" and last season's team are gone from the screen and the API, so story 3 has no way to "show the games of the last season until then" from the selection. The 2025-2026 row stays in the table (no data lost). Same cause as R2. | **concerning deviation** |
+| A8 | Source cannot be reached: say so, try again, nothing saved | Message "The game list cannot be reached. Please try again." with "Try again", which repeats the last action. Run (3): source stopped, `PUT` gives 502 `source_unavailable`, `GET` unchanged. Also for data the tool does not understand. | matches (format case: faithful adaptation) |
+| A9 | Summer: club found, no games; save the club, team later | Message, "Save club", then the start page says the club is saved and offers the teams when games appear. Checked: e2e. On `/choose` the same state still offers "Save club" again (R3); harmless upsert. | matches; `/choose` sibling: neutral drift |
+| A10 | Seasons kept (coordinator, 2026-10-11) | Run (2): after the save the table holds 2025-2026 and 2026-2027 rows for the club, the old one unchanged. | matches |
+| A11 | Open point: saving without a team | Allowed only when the season has no own teams. Within the spec's words. | faithful adaptation |
+| A12 | Open point: reading politely | While a team is needed, each opening of the start page reads the club list and the club's season from the source (the team list loads on mount). With weekly use this is a few requests; worth knowing for story 5. Checked: reading `ChooseTeam.svelte` `onMount`. | neutral drift |
+| A13 | Wording when no team was ever chosen | A club saved without a team in season N says "choose the team again" in season N+1 with no last team (R4). Checked: reading `+page.svelte`. | neutral drift |
+
+**Verdict: needs correction**, for A7 only. The spec is clear here ("keeps the club", "until the
+coordinator chooses … says that a new choice is needed"), so the correction is in the build, not
+in Discover: in the `new_season` state with an empty season, do not offer "Save club" (the club
+is already kept; say it has no games for the new season yet and that the team is chosen when
+games appear), or otherwise keep `new_season` and last season's team until a team is chosen.
+A test should cover the empty-new-season case (no router or browser test does now). After that
+fix the result is **accepted with notes** (A5, A9, A12, A13).
+
+Answers to the accept review (2026-10-11):
+- A7: fixed with R2 (core keeps `last` after a save for an empty new season; no "Save club" for a kept club; router test for the empty new season).
+- A9: fixed with R3.
+- A13: fixed with R4.
+- A5: not fixed: marking the current team in the list is not asked for by the spec.
+- A12: not fixed: while a team is needed, each visit reads the source twice; with weekly use these are a few requests. Noted for story 5, which adds the nightly reading.

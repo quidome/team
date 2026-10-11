@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import ChooseTeam from '#lib/components/ChooseTeam.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import type { PageProps } from './$types';
 
@@ -9,16 +12,54 @@
 	<title>Team</title>
 </svelte:head>
 
-{#if data.me}
+{#if data.selection?.state === 'not_chosen'}
+	<section class="space-y-5">
+		<div>
+			<h1 class="text-2xl font-semibold tracking-tight">Choose your club and team</h1>
+			<p class="mt-1 text-sm text-muted-foreground">
+				The tool reads your team's games from the game list.
+			</p>
+		</div>
+		<ChooseTeam onSaved={invalidateAll} />
+	</section>
+{:else if data.selection?.state === 'team_needed'}
+	<section class="space-y-5">
+		<div>
+			<h1 class="text-2xl font-semibold tracking-tight">Choose your team</h1>
+			{#if data.selection.reason === 'new_season'}
+				<p class="mt-1 text-sm" data-testid="new-season">
+					A new season started: choose the team{data.selection.last?.team ? ' again' : ''}.
+				</p>
+			{/if}
+			{#if data.selection.last?.team}
+				<p class="mt-1 text-sm text-muted-foreground" data-testid="last-season">
+					In {data.selection.last.season} the team was {data.selection.last.club.name}
+					{data.selection.last.team.name}.
+				</p>
+			{/if}
+		</div>
+		<ChooseTeam club={data.selection.club} clubKept onSaved={invalidateAll} />
+	</section>
+{:else if data.selection?.state === 'chosen'}
 	<section class="space-y-6">
-		<h1 class="text-2xl font-semibold tracking-tight">Hello, {data.me.name}</h1>
+		<div class="rounded-xl border bg-card p-5 shadow-xs">
+			<p class="text-sm text-muted-foreground">Your team · {data.selection.season}</p>
+			<h1 class="mt-1 text-2xl font-semibold tracking-tight" data-testid="chosen-team">
+				{data.selection.club.name}
+				{data.selection.team.name}
+			</h1>
+			{#if data.selection.club.town}
+				<p class="text-sm text-muted-foreground">{data.selection.club.town}</p>
+			{/if}
+			<Button href={resolve('/choose')} variant="outline" class="mt-4">Change</Button>
+		</div>
 		<div class="rounded-xl border bg-card p-5 shadow-xs">
 			<h2 class="font-medium">Your schedule comes here</h2>
 			<p class="mt-1 text-sm text-muted-foreground">
-				Soon the tool reads the club's games from the game list. Until then, a sample shows how the
-				schedule will look.
+				Soon the tool shows your team's games. Until then, a sample shows how the schedule will
+				look.
 			</p>
-			<Button href="/sample" class="mt-4">See the sample schedule</Button>
+			<Button href={resolve('/sample')} class="mt-4">See the sample schedule</Button>
 		</div>
 	</section>
 {:else}

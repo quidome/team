@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { expectAccessible, expectNoHorizontalScroll, watchConsole } from './helpers';
 
-test('after login, the start page shows the name and a logout action', async ({ page }) => {
+test('after login, the header shows the name and a logout action', async ({ page }) => {
+	// What the start page shows below the header depends on the saved choice (choose.e2e.ts).
 	const errors = watchConsole(page);
 	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Hello, Developer' })).toBeVisible();
 	await expect(page.getByTestId('user-name')).toHaveText('Developer');
 	await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
 	await expectAccessible(page);
@@ -21,7 +21,7 @@ test('log out posts to the server and returns to the start page', async ({ page 
 	// The development user is always logged in, so the page shows the name again; that the
 	// session really ends is tested in the Rust tests (logout_ends_the_session).
 	await expect(page).toHaveURL('/');
-	await expect(page.getByRole('heading', { name: 'Hello, Developer' })).toBeVisible();
+	await expect(page.getByTestId('user-name')).toHaveText('Developer');
 });
 
 test.describe('sample page', () => {

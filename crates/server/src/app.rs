@@ -17,12 +17,13 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
-use crate::api::{health, me};
+use crate::api::{clubs, health, me, selection};
 use crate::auth;
 use crate::auth::oidc::Oidc;
 use crate::clock::Clock;
 use crate::config::Config;
 use crate::error::AppError;
+use crate::source::Source;
 use crate::web::Web;
 
 #[derive(Clone)]
@@ -32,6 +33,7 @@ pub struct AppState {
     pub oidc: Arc<Oidc>,
     pub clock: Arc<dyn Clock>,
     pub web: Arc<Web>,
+    pub source: Arc<Source>,
 }
 
 /// The log span of a request: method and path only. The query is left out, because the login
@@ -83,6 +85,9 @@ pub fn app(state: AppState) -> Router {
     // /api path also gets 401 without a session, so nothing is open by mistake.
     let protected_api = Router::new()
         .route("/me", get(me::me))
+        .route("/selection", get(selection::get).put(selection::save))
+        .route("/clubs", get(clubs::search))
+        .route("/clubs/{number}/teams", get(clubs::teams))
         .fallback(|| async { StatusCode::NOT_FOUND })
         .layer(middleware::from_fn_with_state(
             state.clone(),

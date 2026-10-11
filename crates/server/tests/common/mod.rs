@@ -22,6 +22,7 @@ use sqlx::PgPool;
 use team::auth::oidc::{GroupsClaim, Oidc};
 use team::clock::Clock;
 use team::config::Config;
+use team::source::Source;
 use team::web::Web;
 use team::{AppState, app};
 use tower::ServiceExt;
@@ -81,6 +82,10 @@ impl TestClock {
         Arc::new(Self(Mutex::new(Utc::now())))
     }
 
+    pub fn set(&self, at: DateTime<Utc>) {
+        *self.0.lock().unwrap() = at;
+    }
+
     pub fn advance(&self, delta: TimeDelta) {
         let mut now = self.0.lock().unwrap();
         *now += delta;
@@ -100,6 +105,8 @@ pub struct Harness {
     pub web_dir: tempfile::TempDir,
     pub clock: Arc<TestClock>,
     pub pocket_id: MockServer,
+    /// The fake game list source; each test mounts the answers it needs.
+    pub source: MockServer,
     pub pool: PgPool,
 }
 
@@ -130,7 +137,9 @@ impl Harness {
             .mount(&pocket_id)
             .await;
 
-        let config = config_with(&issuer, overrides);
+        let source = MockServer::start().await;
+        let mut config = config_with(&issuer, overrides);
+        config.game_list_url = Url::parse(&source.uri()).unwrap();
         let clock = TestClock::new();
         let oidc = Oidc::new(
             &config.oidc_issuer_url,
@@ -139,6 +148,7 @@ impl Harness {
             &config.origin,
         )
         .unwrap();
+        let reader = Source::new(config.game_list_url.clone(), &config.origin).unwrap();
         let web_dir = front_end();
         let router = app(AppState {
             pool: pool.clone(),
@@ -146,12 +156,14 @@ impl Harness {
             oidc: Arc::new(oidc),
             clock: clock.clone(),
             web: Arc::new(Web::load(web_dir.path())),
+            source: Arc::new(reader),
         });
         Self {
             router,
             web_dir,
             clock,
             pocket_id,
+            source,
             pool,
         }
     }

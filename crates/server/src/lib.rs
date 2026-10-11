@@ -7,6 +7,8 @@ pub mod clock;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod followed_teams;
+pub mod source;
 pub mod web;
 
 pub use app::{AppState, app};
