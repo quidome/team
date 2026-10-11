@@ -216,7 +216,7 @@ clean), this change folder, decisions 0008 and 0009, `CLAUDE.md`, `README.md`. R
   that the CI run for that commit passed (`gh run list --commit`/check runs), or let Publish add a
   marker that Release looks for, or push `sha-<7>` only after Check (costs time). Checked by a
   trace of `ci.yml`/`release.yml` and the run above.
-  - 2026-10-11: fixed (coordinator chose separate names). Build pushes `build-<7>`; Publish, only after Check and Build passed, names it `sha-<7>` and `latest`; Release checks `sha-<7>`. Decision 0010 replaces 0009. The untested `sha-a9b5906` entries are deleted (see the line below R7).
+  - 2026-10-11: fixed (coordinator chose separate names). Build pushes `build-<7>`; Publish, only after Check and Build passed, names it `sha-<7>` and `latest`; Release checks `sha-<7>`. Decision 0010 replaces 0009. The untested `sha-a9b5906` entries are **not deleted yet**: the `gh` login has no `delete:packages` permission, and the coordinator postponed it (backlog line). Until then, a tag on commit `a9b5906` would release that untested image.
 - **R2 – Runtime and migration can be published or released out of step (medium, sibling of R1).**
   Publish moves `latest` first and `latest-migration` second; if the second command fails, the
   cluster pulls a new app with the old migration image at the next pod start. Release checks only
