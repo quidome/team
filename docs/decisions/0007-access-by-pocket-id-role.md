@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-10
-**Change**: [2026-10-10-the-base](../changes/2026-10-10-the-base/)
+**Change**: [2026-10-10-the-base](../changes/done/2026-10-10-the-base/)
 
 Replaces 0003. It keeps what 0003 decided about login in the app, and changes how access is
 decided and how sessions are stored.

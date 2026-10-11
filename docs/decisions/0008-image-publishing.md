@@ -2,7 +2,7 @@
 
 **Status**: replaced by 0009
 **Date**: 2026-10-10
-**Change**: [2026-10-10-the-base](../changes/2026-10-10-the-base/)
+**Change**: [2026-10-10-the-base](../changes/done/2026-10-10-the-base/)
 
 ## Context
 The cluster runs `ghcr.io/quidome/team:latest` and `:latest-migration` with `pullPolicy: Always`,

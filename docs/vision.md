@@ -30,7 +30,7 @@ It is not:
 ## Where we are
 - The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
 - The coordinator uses a Google Sheet as a workaround.
-- We start over, with a Rust backend and a Svelte front end (see `docs/decisions/`).
+- The base of the new product runs on the cluster (v0.1.0, October 2026): login through Pocket ID, a start page, and a sample schedule with example games. Games from the game list come next. The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
 ## North star
@@ -86,3 +86,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 |------|--------|
 | 2026-10-07 | Vision created at the restart: one coordinator, three readers, games from the club's game list first |
 | 2026-10-10 | Open questions answered by the first design: Rust backend, Svelte front end, PostgreSQL, login through Pocket ID (decisions 0001–0004) |
+| 2026-10-11 | Where we are: the base of the new product runs on the cluster (v0.1.0); games from the game list come next |

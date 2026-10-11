@@ -74,7 +74,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 | # | Story | Type | Scope | Depends on | Expected closure | Status |
 |---|---|---|---|---|---|---|
-| 1 | [The base](../2026-10-10-the-base/) | technical | Remove the old app (keep `features/`, `docs/`); Rust workspace (`core`, `server`); Nix shell with Rust, sqlx-cli, Node for the front end, PostgreSQL; `team serve` and `team migrate`; health checks; login with Pocket ID, sessions, allowed users; first migration; Svelte app with style kit (colours, fonts, light and dark) and one page after login; OpenAPI types; Dockerfile with `runtime` and `migration` targets to the existing contract; `just check` and GitHub checks; written steps for the coordinator: back up `team`, create the new database, point `DATABASE_URL` to it, delete `team` after story 1 works. Ends with a real deployment and a login on the phone. The coordinator approves the look. | – | review build | open |
+| 1 | [The base](../done/2026-10-10-the-base/) | technical | Remove the old app (keep `features/`, `docs/`); Rust workspace (`core`, `server`); Nix shell with Rust, sqlx-cli, Node for the front end, PostgreSQL; `team serve` and `team migrate`; health checks; login with Pocket ID, sessions, allowed users; first migration; Svelte app with style kit (colours, fonts, light and dark) and one page after login; OpenAPI types; Dockerfile with `runtime` and `migration` targets to the existing contract; `just check` and GitHub checks; written steps for the coordinator: back up `team`, create the new database, point `DATABASE_URL` to it, delete `team` after story 1 works. Ends with a real deployment and a login on the phone. The coordinator approves the look. | – | review build | done (v0.1.0) |
 | 2 | Choose club and team | feature | Spec story 1: club search on the club list, team choice from own teams, change later, new season. Reader for the club list; `selection` table; season rule in core. | 1 | checks | open |
 | 3 | Read on demand, and the schedule | feature | Spec stories 2 and 3: reader for club games, strict parsing, storage of games and readings, comparing (counts only), guard and "really gone", lock, transaction; schedule screen with filter, past games, crossed-out games, last reading. Confirms outgoing traffic on the cluster. May split in its own design. | 2 | review build + accept | open |
 | 4 | The list of changes | feature | Spec story 4: keep changes (all seven kinds, into/out of the schedule), one open change per game, seen one and all, summary line, filter. Sets the summary threshold. | 3 | review build + accept | open |
@@ -118,7 +118,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 - Load is tiny: one user, a few hundred games per season, one reading a night plus taps. The source is read politely.
 
 ## Progress
-- [ ] Story 1: the base
+- [x] Story 1: the base (closed 2026-10-11)
 - [ ] Story 2: choose club and team
 - [ ] Story 3: read on demand, and the schedule
 - [ ] Story 4: the list of changes
@@ -127,7 +127,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
-From the design of story 1 ([The base](../2026-10-10-the-base/technical.md), 2026-10-10), all technical:
+From the design of story 1 ([The base](../done/2026-10-10-the-base/technical.md), 2026-10-10), all technical:
 - Access by the Pocket ID role `team_coordinator` instead of an `allowed_users` table; own `sessions` table instead of tower-sessions (decision 0007 replaces 0003). The stored data above has no `allowed_users` table.
 - `main` publishes `latest` for quick rollouts; version tags publish fixed images (decision 0008).
 - The coordinator's database steps happen before the first merge of story 1.

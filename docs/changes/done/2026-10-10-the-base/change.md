@@ -1,7 +1,7 @@
 ---
 title: The base
 type: technical
-stage: implement
+stage: done
 closure: review build   # login, sessions and publishing: a fresh review of the diff
 created: 2026-10-10
 ---
@@ -20,3 +20,4 @@ Pocket ID, and a Svelte front end with its look, deployed to the existing cluste
 | 2026-10-10 | implement | steps 0–3 done; branch feat/the-base merged into main |
 | 2026-10-11 | implement | step 4 done: look approved on the cluster, v0.1.0 released |
 | 2026-10-11 | implement | build review: 6 findings, all fixed (R5: keys fetched again on a signature failure, chosen by the coordinator) |
+| 2026-10-11 | done | closed: architecture (layers, login, request rules, patterns, debt), product doc login.md, decision 0011, vision "where we are" |
