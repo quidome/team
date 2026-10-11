@@ -76,7 +76,8 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 |---|---|---|---|---|---|---|
 | 1 | [The base](../done/2026-10-10-the-base/) | technical | Remove the old app (keep `features/`, `docs/`); Rust workspace (`core`, `server`); Nix shell with Rust, sqlx-cli, Node for the front end, PostgreSQL; `team serve` and `team migrate`; health checks; login with Pocket ID, sessions, allowed users; first migration; Svelte app with style kit (colours, fonts, light and dark) and one page after login; OpenAPI types; Dockerfile with `runtime` and `migration` targets to the existing contract; `just check` and GitHub checks; written steps for the coordinator: back up `team`, create the new database, point `DATABASE_URL` to it, delete `team` after story 1 works. Ends with a real deployment and a login on the phone. The coordinator approves the look. | – | review build | done (v0.1.0) |
 | 2 | [Choose club and team](../done/2026-10-11-choose-club-and-team/) | feature | Spec story 1: club search on the club list, team choice from own teams, change later, new season. Reader for the club list and (moved from story 3) the strict reading of a full game; `followed_teams` table, one row for each season; season rule in core. | 1 | review build + accept | done |
-| 3 | Read on demand, and the schedule | feature | Spec stories 2 and 3: storage of games and readings, comparing (counts only), guard and "really gone", lock, transaction; schedule screen with filter, past games, crossed-out games, last reading. Confirms outgoing traffic on the cluster. May split in its own design. | 2 | review build + accept | open |
+| 3a | [Read on demand](../2026-10-11-read-on-demand/) | feature | Spec story 2 and the reading parts of stories 3 and 4: storage of places, games and readings (season as start year), comparing (all kinds, counts only), guard and "really gone", lock, transaction; read action with result line on the start page. | 2 | review build + accept | implement |
+| 3b | The schedule | feature | Spec story 3: schedule screen with filter, past games, crossed-out games, last reading, last season's games; removes the sample page. | 3a | review build + accept | open |
 | 4 | The list of changes | feature | Spec story 4: keep changes (all seven kinds, into/out of the schedule), one open change per game, seen one and all, summary line, filter. Sets the summary threshold. | 3 | review build + accept | open |
 | 5 | The nightly reading | feature | Spec story 5: `team read-game-list`; failures and "may be out of date"; a ready change for `gitops-lab`: CronJob template in the team chart, same image and secrets, pods with both team labels, checked with `helm lint` and `helm template`, promoted through Argo CD. | 4 | checks | open |
 
@@ -120,13 +121,15 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 ## Progress
 - [x] Story 1: the base (closed 2026-10-11)
 - [x] Story 2: choose club and team (closed 2026-10-11)
-- [ ] Story 3: read on demand, and the schedule
+- [ ] Story 3a: read on demand
+- [ ] Story 3b: the schedule
 - [ ] Story 4: the list of changes
 - [ ] Story 5: the nightly reading
 - [ ] Epic review accept
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
+- 2026-10-11, from the design of story 3a ([Read on demand](../2026-10-11-read-on-demand/technical.md)), agreed by the coordinator: story 3 is split into 3a (read on demand) and 3b (the schedule); a season is stored as its start year (`season_year`, decision 0014); dates and start times are stored as Dutch local `date` and `time`, not `timestamptz`; the source's `id` is the game key and `nr` is stored too; "really gone" reads the source again with the guard off.
 - 2026-10-11: the season starts on 1 July, not 1 August. The coordinator: the NBB counts the season from 1 July to 30 June. Fixed in the code of story 2 as a small fix.
 - 2026-10-11, from the design of story 2 ([Choose club and team](../done/2026-10-11-choose-club-and-team/technical.md)), agreed by the coordinator:
   - The strict reading of a full game and its tests (real data parses to 71 games, 00:00, a format error names the field) move from story 3 to story 2.
