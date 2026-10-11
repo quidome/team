@@ -174,9 +174,15 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
 
 ## Progress
 - [x] Step 1: local parts (2026-10-11; first image build with cargo-chef 198 s with smoke test; rebuild after a code-only change 27 s)
-- [ ] Step 2: workflows and pull request (runs 1–3)
-- [ ] Step 3: merge and release (runs 4–7)
-- [ ] Step 4: documents
+- [x] Step 2: workflows and pull request #1 (2026-10-11): run 2 cancelled the older run; run 3 built and smoke-tested the images without pushing (cold caches: Check 5:03, Build 2:34)
+- [x] Step 3: merge and release (2026-10-11):
+  - run 4 (first try): Publish skipped, `latest` unchanged; fixed by pull request #2
+  - run 1 (pull request #2, workflow only): no image built; whole run 2:00 with warm caches (Check 1:57)
+  - run 4: whole run 2:45 (Check 2:13, Build 0:49 with the image cache, Publish 0:25); `latest` points to exactly `sha-30c9313`
+  - run 5: not run; there was no real code change to push. Measured at the next code change (story 2 of the epic); locally a code-only rebuild took 27 s
+  - run 6: release `v0.1.1` in 16 s; points to exactly `sha-30c9313`
+  - run 7: a tag on a commit not on `main` failed with "No image for commit ..."; nothing published
+- [x] Step 4: documents (README release steps and pipeline table, CLAUDE.md recipes)
 - [ ] All checks pass
 
 ## Deviations
@@ -185,3 +191,7 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
 - 2026-10-11, step 2: test run 1 (a pull request without image changes) moves to step 4: this pull request changes the Dockerfile, so its runs build the image (run 3). The documents of step 4 go through their own pull request.
 - 2026-10-11, step 2: the Build job pushes the images it loaded and smoke-tested (`docker tag` and `docker push`) instead of a second `build-push` with `push: true`. What is pushed is exactly what was tested.
 - 2026-10-11, step 2: the Rust cache uses `Swatinem/rust-cache@v2` directly (with `save-if` on `main`); the cache inside `setup-rust-toolchain` is switched off, because it cannot be limited to `main`.
+- 2026-10-11, step 3: Publish did not run on the first `main` run: on a push the `changes` job is skipped, and GitHub then skips every job that needs it, also indirectly. Publish now has an explicit condition (`always() && !cancelled()`, push, Check and Build passed), which is the behaviour the spec asked for. Fixed through pull request #2.
+- 2026-10-11, step 3: `latest` and `v...` have their own fingerprint (digest): `docker buildx imagetools create` puts a list around the image. The list holds exactly one entry, the digest of the tested `sha-<7>` image. The test plan expected equal digests; the check is now on the entry in the list.
+- 2026-10-11, step 3: GitHub runs the workflow files of the tagged commit. The first try of run 7 tagged an old commit, which started the old workflow ("Container"); it was cancelled before it published anything. Run 7 was then done on an empty commit made from `main` on a short-lived branch. Consequence for releases: tag only commits on `main` (the README says so in step 4).
+- 2026-10-11, step 3: run 5 (code-only push to `main`) is moved to the next real code change; no change was made only for the test.

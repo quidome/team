@@ -39,13 +39,35 @@ Migrations are plain SQL files in [`migrations/`](./migrations/), compiled into 
 
 ## Images and deployment
 
-`main` publishes `ghcr.io/quidome/team:latest` and `:latest-migration`; a tag `v*` also publishes
-`<version>` and `<version>-migration` (decision 0008). The cluster runs `latest` with
-`pullPolicy: Always`, so a pod restart deploys the newest image:
+The pipeline (decision 0009) has four stages:
+
+| Stage | When | What |
+|---|---|---|
+| Check | every pull request and push to `main` | the same recipes as `just check` |
+| Build | push to `main`, and pull requests that change `Dockerfile`, `.dockerignore`, `Cargo.lock` or `web/package-lock.json` | builds both images, runs `just smoke`; on `main` pushes `sha-<commit>` and `sha-<commit>-migration` |
+| Publish | push to `main`, after Check and Build passed | names those images `latest` and `latest-migration` |
+| Release | tag `v*` | names the `sha-<commit>` images of the tagged commit `<tag>` and `<tag>-migration`; nothing is built |
+
+The cluster runs `latest` with `pullPolicy: Always`, so a pod restart deploys the newest image:
 
 ```sh
 kubectl rollout restart deployment/team -n productivity
 ```
+
+### Making a release
+
+1. Merge into `main` and wait until the CI run on `main` is green.
+2. Restart the pod and check the app on the cluster.
+3. Tag that commit and push the tag:
+   ```sh
+   git tag -a v0.1.2 -m "v0.1.2: <what changed>"
+   git push origin v0.1.2
+   ```
+   The release run takes seconds. It fails with "No image for commit …" when `main` has not
+   passed for that commit.
+
+Tag only commits on `main`. GitHub runs the workflow files of the tagged commit, so a tag on an
+old commit can run an old workflow.
 
 The deployment lives in `gitops-lab/applications/productivity/team/` (Argo CD, Helmfile, Vault).
 Never apply it by hand. The image keeps this contract:

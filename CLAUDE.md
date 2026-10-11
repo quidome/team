@@ -12,7 +12,9 @@ Enter the pinned Nix dev shell first: `nix develop path:.` (Rust, sqlx-cli, Node
 
 - Local database: `just db-up` / `just db-down` (PostgreSQL from `compose.yaml`); `just migrate` creates the database in `DATABASE_URL` and applies migrations
 - Run the server: `just serve` (settings from `.env`, see `.env.example`)
-- All checks: `just check` (`cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo sqlx prepare --workspace --check`)
+- All checks: `just check` = `lint-ci` (actionlint, shellcheck), `api-types-check`, `check-rust` (fmt, clippy `-D warnings`, tests), `check-web` (svelte-check, lint, build), `e2e` (Playwright), `check-sqlx` (last: it forces the next compile). CI runs the same recipes.
+- Images: `just images`, then `just smoke` (needs `just db-up`)
+- Front end: `just web-install` once; `just dev` for the Rust server (logged in as Developer) plus the Vite dev server on port 5173
 - One test: `cargo test -p team --test health readiness`
 - After changing an SQL query: `just prepare`, commit `.sqlx/`
 
@@ -23,10 +25,10 @@ Database tests use `#[sqlx::test]` and need `DATABASE_URL` pointing at a running
 See `docs/architecture.md` and `docs/decisions/`. In short:
 
 - `crates/core` (`team_core`): product rules only. No network, database or web crates (decision 0001).
-- `crates/server` (`team`): settings (`config.rs`), database and migrations (`db.rs`), router (`app.rs`, built by `app(state)` so tests call it directly), API (`api/`), login (`auth.rs`), and the binary (`main.rs`: `serve`, `migrate`).
+- `crates/server` (`team`): settings (`config.rs`), database and migrations (`db.rs`), router (`app.rs`, built by `app(state)` so tests call it directly), API (`api/`), login and sessions (`auth/`), the front-end files and security policy (`web.rs`), and the binary (`main.rs`: `serve`, `migrate`, `openapi`).
 - `migrations/`: forward-only SQL files, compiled in (decision 0004).
 - Everything under `/api` needs a session by default; only the two health routes are outside (decision 0007).
-- Images: `Dockerfile` targets `runtime` and `migration`; `main` publishes `latest` (decision 0008). The cluster contract is in `README.md`.
+- Images: `Dockerfile` (cargo-chef) targets `runtime` and `migration`. CI stages Check, Build, Publish, Release (decision 0009): `main` publishes `latest` by renaming the tested `sha-<commit>` image; a `v*` tag renames it again. Release steps and the cluster contract are in `README.md`.
 
 ## Rules
 
