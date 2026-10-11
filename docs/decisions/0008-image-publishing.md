@@ -1,6 +1,6 @@
 # 0008 – Image publishing: latest from main, fixed versions from tags
 
-**Status**: valid
+**Status**: replaced by 0009
 **Date**: 2026-10-10
 **Change**: [2026-10-10-the-base](../changes/2026-10-10-the-base/)
 
