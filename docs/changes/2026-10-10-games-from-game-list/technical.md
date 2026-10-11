@@ -53,7 +53,7 @@ Shared rules every story keeps:
 - **Time**: source times are read as Europe/Amsterdam and stored as `timestamptz`; 00:00 becomes "no start time"; "0 - 0" is ignored.
 - **Errors**: `thiserror` enums in core and server parts; `anyhow` context only in `main`/commands; no `unwrap`/`expect` outside tests.
 - **Guard thresholds**: a reading is held back when it has no games, or fewer than half of the games of the last good reading for the same season.
-- **Season**: a season starts on 1 August (`2026-2027` until 31 July 2027).
+- **Season**: a season starts on 1 July, as the NBB counts it (`2026-2027` until 30 June 2027; changed from 1 August on 2026-10-11, see Deviations).
 - **Login**: OpenID Connect against Pocket ID, done by the server (authorization code flow with PKCE); server-side sessions in PostgreSQL (tower-sessions); cookie `HttpOnly`, `Secure`, `SameSite=Lax`; the browser never holds a token. An allowed users list (Pocket ID subject) fills from a setting. `DEV_AUTH_BYPASS` works only in debug builds.
 - **Migrations**: plain SQL files, forward-only, applied by `team migrate` under sqlx's lock, with checksums; the app does not migrate, and readiness fails if a known migration is missing. Breaking schema changes go in two releases (add, later remove). Queries checked at compile time with the `.sqlx/` offline data in the repository.
 
@@ -90,7 +90,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 | Nightly reading as a Kubernetes CronJob, one reading at a time by a database lock | Cluster-native, visible, retried; lock covers overlap with readings on demand | 0005 |
 | New database for the new app; old one deleted after it works | Every step can be undone until the last; no old tables in the new app | 0006 |
 | Guard thresholds: no games, or fewer than half of the last good reading | Spec asks for a guard; coordinator accepted the default | no (design detail) |
-| Season starts on 1 August | Spec needs a current season; coordinator accepted the default | no (design detail) |
+| Season starts on 1 July (was 1 August until 2026-10-11) | Spec needs a current season; the NBB counts the season from 1 July to 30 June (coordinator, 2026-10-11) | no (design detail) |
 | A tap during a running reading waits for the result | Simpler for the coordinator than a "try again" error | no (design detail) |
 | Keep the deployment contract of the old app | The cluster change for story 1 is only the image | no |
 
@@ -106,7 +106,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 - **Checks** (`just check`, also on GitHub): `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo sqlx prepare --check`; `svelte-check`, formatter, linter, browser tests (Playwright on a phone-sized screen); generated API types equal to the committed types.
 - **New tests per story**:
   - Story 1: no login → 401 on `/api/*`; health open; full login with a fake OpenID Connect server → session → `/api/me`; not on the allowed list → 403; wrong `state` refused; cookie flags; release build ignores `DEV_AUTH_BYPASS`; `team migrate` on an empty database, again is a no-op, readiness fails when a migration is missing; phone-sized page after login.
-  - Story 2: "drakes" finds "Blue Drakes, Woerden"; no match is an empty result; only own teams (M16 1, M16 2, M18 1, MSE 1, X12 1, X14 1); 31 July 2027 → 2026-2027, 1 August 2027 → 2027-2028; new season asks for the team; change of team removes unseen changes and records none.
+  - Story 2: "drakes" finds "Blue Drakes, Woerden"; no match is an empty result; only own teams (M16 1, M16 2, M18 1, MSE 1, X12 1, X14 1); 30 June 2027 → 2026-2027, 1 July 2027 → 2027-2028; new season asks for the team; change of team removes unseen changes and records none.
   - Story 3: real data parses to 71 games; 00:00 → no start time; "0 - 0" → no result; games on 25 October 2026 and in January keep their time; unknown or missing field → format error naming the field, reading failed, nothing changed; filter on real data (team: the 10 M16 1 games; duty: home games of other club teams; no away games of other club teams); same data twice → no change; guard (empty, below half, "really gone", later good reading clears the warning); failure halfway rolls back; two readings at once record each change once.
   - Story 4: one test per kind of change; into/out of the schedule shows the reason; two changes before seen → last seen to now; first reading records nothing; summary line opens to all new games; seen one, seen all; filter on changes.
   - Story 5: no selection → nothing and exit 0; with a selection the same result as on demand; failure shows last good reading; three failures show "may be out of date since …"; CronJob change passes `helm lint`/`helm template` and has both team labels.
@@ -127,6 +127,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
+- 2026-10-11: the season starts on 1 July, not 1 August. The coordinator: the NBB counts the season from 1 July to 30 June. Fixed in the code of story 2 as a small fix.
 - 2026-10-11, from the design of story 2 ([Choose club and team](../done/2026-10-11-choose-club-and-team/technical.md)), agreed by the coordinator:
   - The strict reading of a full game and its tests (real data parses to 71 games, 00:00, a format error names the field) move from story 3 to story 2.
   - The test "change of team removes unseen changes and records none" moves from story 2 to story 4. Story 2 stores the time of each choice (`chosen_at`) for it.
@@ -140,7 +141,7 @@ From the design of story 1 ([The base](../done/2026-10-10-the-base/technical.md)
 
 The design reads these points more strictly than the spec, within its words:
 - "Far fewer games" is fixed as: no games, or fewer than half of the games of the last good reading for the same season.
-- The current season is fixed to start on 1 August.
+- The current season is fixed to start on 1 July (1 August until 2026-10-11).
 - A reading on demand during a running reading waits and then shows its result.
 
 ## Review findings

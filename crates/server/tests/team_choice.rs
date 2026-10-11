@@ -306,14 +306,14 @@ async fn a_change_in_the_same_season_replaces_the_choice(pool: PgPool) {
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_new_season_asks_for_the_team_again_and_keeps_last_season(pool: PgPool) {
-    // 23:59 Dutch summer time on 31 July 2027: still season 2026-2027.
-    let (harness, cookie) = start_at(pool, utc(2027, 7, 31, 21, 59)).await;
+    // 23:59 Dutch summer time on 30 June 2027: still season 2026-2027.
+    let (harness, cookie) = start_at(pool, utc(2027, 6, 30, 21, 59)).await;
     let (status, body) = put_selection(&harness, &cookie, json!({ "club": 37, "team": 184 })).await;
     assert_eq!(status, 200);
     assert_eq!(body["season"], "2026-2027");
 
-    // 00:00 Dutch summer time on 1 August 2027: season 2027-2028.
-    harness.clock.set(utc(2027, 7, 31, 22, 0));
+    // 00:00 Dutch summer time on 1 July 2027: season 2027-2028.
+    harness.clock.set(utc(2027, 6, 30, 22, 0));
     let (_, body) = get_json(&harness, "/api/selection", &cookie).await;
     assert_eq!(
         body,
@@ -343,12 +343,12 @@ async fn a_new_season_asks_for_the_team_again_and_keeps_last_season(pool: PgPool
             (
                 "2026-2027".to_owned(),
                 Some("M16 1".to_owned()),
-                utc(2027, 7, 31, 21, 59)
+                utc(2027, 6, 30, 21, 59)
             ),
             (
                 "2027-2028".to_owned(),
                 Some("M18 1".to_owned()),
-                utc(2027, 7, 31, 22, 0)
+                utc(2027, 6, 30, 22, 0)
             ),
         ]
     );
@@ -373,7 +373,7 @@ async fn insert_choice(pool: &PgPool, season: &str, club: (i64, &str), team: Opt
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn saving_the_club_for_an_empty_new_season_keeps_last_season(pool: PgPool) {
-    // Green Giants has no games in the new season (the normal case on 1 August).
+    // Green Giants has no games in the new season (the normal case on 1 July).
     insert_choice(
         &pool,
         "2026-2027",
@@ -381,7 +381,7 @@ async fn saving_the_club_for_an_empty_new_season_keeps_last_season(pool: PgPool)
         Some((5, "M16 1")),
     )
     .await;
-    let (harness, cookie) = start_at(pool, utc(2027, 8, 1, 10, 0)).await;
+    let (harness, cookie) = start_at(pool, utc(2027, 7, 1, 10, 0)).await;
     let last = json!({
         "season": "2026-2027",
         "club": { "number": GIANTS, "name": "Green Giants", "town": null },

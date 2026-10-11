@@ -1,12 +1,13 @@
-//! The season: a season starts on 1 August and is written as "2026-2027".
+//! The season: a season starts on 1 July (as the NBB, the Dutch basketball federation, counts it)
+//! and is written as "2026-2027".
 
 use std::fmt;
 use std::str::FromStr;
 
 use chrono::{Datelike, NaiveDate};
 
-/// The month in which a new season starts (August).
-const FIRST_MONTH: u32 = 8;
+/// The month in which a new season starts (July).
+const FIRST_MONTH: u32 = 7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Season {
@@ -67,13 +68,13 @@ mod tests {
     }
 
     #[test]
-    fn the_last_day_of_july_is_still_the_old_season() {
-        assert_eq!(Season::of(date(2027, 7, 31)).to_string(), "2026-2027");
+    fn the_last_day_of_june_is_still_the_old_season() {
+        assert_eq!(Season::of(date(2027, 6, 30)).to_string(), "2026-2027");
     }
 
     #[test]
-    fn the_first_of_august_starts_a_new_season() {
-        assert_eq!(Season::of(date(2027, 8, 1)).to_string(), "2027-2028");
+    fn the_first_of_july_starts_a_new_season() {
+        assert_eq!(Season::of(date(2027, 7, 1)).to_string(), "2027-2028");
     }
 
     #[test]
