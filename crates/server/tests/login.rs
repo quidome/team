@@ -301,3 +301,56 @@ async fn me_carries_the_security_headers(pool: PgPool) {
     assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
     assert_eq!(headers[header::REFERRER_POLICY], "same-origin");
 }
+
+async fn key_set_requests(harness: &Harness) -> usize {
+    harness
+        .pocket_id
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|request| request.url.path() == "/jwks")
+        .count()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn login_works_after_pocket_id_changes_its_signing_key(pool: PgPool) {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let harness = Harness::start(pool.clone()).await;
+    harness.log_in(&[ROLE]).await;
+    let fetched_before = key_set_requests(&harness).await;
+
+    // Pocket ID now signs with another key and publishes only that key.
+    Mock::given(method("GET"))
+        .and(path("/jwks"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(common::jwks_for(OTHER_KEY)))
+        .with_priority(1)
+        .mount(&harness.pocket_id)
+        .await;
+    let login = harness.start_login().await;
+    let mut spec = TokenSpec::new(&harness.issuer(), &login.nonce, &[ROLE]);
+    spec.key = OTHER_KEY;
+    harness.answer_token(&spec.sign()).await;
+
+    let response = harness.callback(&login, &login.state).await;
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert!(cookie_value(&response, "team_session").is_some());
+    assert_eq!(key_set_requests(&harness).await, fetched_before + 1);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_wrong_signature_still_fails_after_fetching_the_keys_again(pool: PgPool) {
+    let harness = Harness::start(pool.clone()).await;
+    let login = harness.start_login().await;
+    let fetched_before = key_set_requests(&harness).await;
+    let mut spec = TokenSpec::new(&harness.issuer(), &login.nonce, &[ROLE]);
+    spec.key = OTHER_KEY; // Pocket ID still publishes only the first key.
+    harness.answer_token(&spec.sign()).await;
+
+    let response = harness.callback(&login, &login.state).await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(session_count(&pool).await, 0);
+    assert_eq!(key_set_requests(&harness).await, fetched_before + 1);
+}

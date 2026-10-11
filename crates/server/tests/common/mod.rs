@@ -241,7 +241,12 @@ fn signing_key(pem: &str) -> CoreRsaPrivateSigningKey {
 }
 
 fn jwks() -> serde_json::Value {
-    serde_json::json!({ "keys": [signing_key(SIGNING_KEY).as_verification_key()] })
+    jwks_for(SIGNING_KEY)
+}
+
+/// The key set that the fake Pocket ID publishes, for one private key.
+pub fn jwks_for(pem: &str) -> serde_json::Value {
+    serde_json::json!({ "keys": [signing_key(pem).as_verification_key()] })
 }
 
 /// An ID token to sign; tests change fields to make it wrong.

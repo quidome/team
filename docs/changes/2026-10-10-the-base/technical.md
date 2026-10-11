@@ -1,6 +1,6 @@
 # Technical spec: The base
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-10-the-base
 **Date**: 2026-10-10
@@ -246,8 +246,8 @@ In debug builds only, `DEV_AUTH_BYPASS=true` makes `CurrentUser` a fixed user "D
 - [x] Step 1: clean slate, skeleton, database, image (branch `feat/the-base`; merge after step 0)
 - [x] Step 2: login and sessions (login on the cluster checked by the coordinator, 2026-10-11)
 - [x] Step 3: front end and look (look approved by the coordinator, 2026-10-11)
-- [ ] Step 4: final check on the cluster, `v0.1.0`
-- [ ] All checks pass
+- [x] Step 4: final check on the cluster (coordinator, 2026-10-11), `v0.1.0` tagged on `d21dd8f`; the old database `team` is still to be deleted when the coordinator decides
+- [x] All checks pass (after the review fixes)
 
 ## Deviations
 Differences from the epic's technical spec (`../2026-10-10-games-from-game-list/technical.md`), all technical, none change behaviour from its functional spec:
@@ -271,3 +271,83 @@ Differences from this spec, found during Implement:
 - 2026-10-11 (from the fast release pipeline change): the pipeline is now described by decision 0010, which replaces 0008 and 0009. The release build test `release_build.rs` is gone: `dev_bypass.rs` checks the debug case, and `scripts/smoke-test.sh` checks on the real image that a release build ignores `DEV_AUTH_BYPASS`.
 
 ## Review findings
+
+### Build review – 2026-10-11 (fresh agent, `/review build`)
+Input: the change's commits `8efe877..HEAD` on `main` (the change is merged, so the diff against
+`main` is empty; the pipeline change's commits read only as context), this folder,
+`docs/architecture.md`, decisions 0001, 0002, 0004–0007, 0010, and `CLAUDE.md`.
+Ran: `cargo test --workspace` (43 tests, all pass, with `SQLX_OFFLINE=true` against `team_v2`),
+`cargo fmt --check`, `cargo clippy --all-targets -D warnings`, `team openapi` diffed against
+`web/openapi.json` (same), `npm run check`, `npm run lint` – all clean. Not run: Playwright,
+the image build and the smoke test. Also ran a debug `team serve` locally and probed it with curl.
+
+**R1 – `expect` in library code, with the lint switched off (project rule).**
+`crates/server/src/auth/login_cookie.rs:37-38` and `:43-44` use `#[allow(clippy::expect_used)]`
+with `.expect(…)`. `CLAUDE.md`: "No `unwrap`/`expect` outside tests (clippy denies them)". The
+allow switches off the lint that enforces the rule, so `just check` cannot see it. Both cases
+can return an error instead: `encode` can return `Result` (the caller already handles
+`AppError`), and the HMAC key error can map to a `LoginCookieError`. Checked: search
+`allow(clippy` and `expect(` in `crates/*/src`; these are the only hits outside tests.
+- 2026-10-11: fixed. `mac` and `encode` return `Result` with a new `LoginCookieError::Signing`; `/auth/login` shows "Login is not available now" on it. The `allow(clippy::expect_used)` lines are gone.
+
+**R2 – `anyhow` in library code (project rule).**
+`crates/server/src/error.rs:13` `AppError::Internal(#[from] anyhow::Error)`; it is used in
+`auth/mod.rs:49` and `auth/routes.rs:120, 126, 143` (`error.into()`). `CLAUDE.md`: "`thiserror`
+enums in library code, `anyhow` only in `main.rs`". Every later story copies this error type, so
+fix it now: for example `Internal(#[from] sqlx::Error)` plus a variant for the TTL conversion.
+Checked: search `anyhow` in `crates/*/src`.
+- 2026-10-11: fixed. `AppError::Internal` holds `Box<dyn std::error::Error + Send + Sync>`; `anyhow` is used only in `main.rs`.
+
+**R3 – The login bypass is compiled into release builds; it is only switched off (decision 0007, design).**
+The design says "The code does not exist in release builds", and 0007 says "`DEV_AUTH_BYPASS`
+exists only in debug builds". The code uses `cfg!(debug_assertions)` as a value
+(`config.rs:99`), so `dev_user()` and the bypass branch in `session_user` (`auth/mod.rs:41-58`)
+are in the release binary. `Config.dev_auth_bypass` is a `pub` field, so any code that builds
+`Config` directly (a later command, or a helper) turns the bypass on in a release build. The smoke
+test only checks the setting path. This is not listed under Deviations. Fix: put
+`#[cfg(debug_assertions)]` on the bypass branch and `dev_user`, so a release build cannot reach
+it however `Config` is built. Checked: trace and search `debug_assertions|dev_auth_bypass`.
+- 2026-10-11: fixed. `Config::dev_auth_bypass`, the bypass check, `dev_user` and the start-up warning exist only with `cfg(debug_assertions)`; a release build cannot contain the bypass. `clippy --release` passes; `tests/dev_bypass.rs` is debug-only; the smoke test still checks the real image.
+
+**R4 – `/api/` (trailing slash) is served the front end instead of 401 (bug against the design, low impact).**
+Run against a local `team serve`: `GET /api/` → 200 `text/html` (`index.html`). The design:
+"Any other `/api` path without login is 401, also when it does not exist", and the test plan:
+"`/api/...` never gets `index.html`". Nothing private leaks (`index.html` is public). But the
+guarantee "nothing under `/api` is open by mistake" has a hole, and
+`api_paths_never_get_index_html` only tries `/api/does-not-exist`. Other cases, run the same way:
+- `GET /api` → 401, `/api//me` and `/api/me/` → 401, `/API/me` and `/%61pi/me` → `index.html` (not the API; fine).
+- The origin rule checks `path.starts_with("/api/")` (`auth/mod.rs:85`), so `POST /api` skips it (401, not 403). There is no route there now, so this is harmless; it falls out with the R4 fix.
+- `GET /auth` and `GET /auth/unknown` → 200 `index.html`. The design gives `index.html` only to non-`/auth` paths. Give the `/auth` router a 404 fallback.
+- A missing built file (`/_app/immutable/missing.js`, `/favicon.ico`) → 200 `text/html`. An old open tab after a deploy gets HTML for a removed script (blocked by `nosniff`). This is acceptable for one user; it is a note, not a fix.
+- 2026-10-11: fixed. One fallback decides by path: `/api` and below give 401 without a session, else 404; `/auth` and below give 404; built files (under `/_app/` or with an extension) give the file or 404; other paths give the file or `index.html`. The `Origin` rule covers `/api` and `/auth` themselves (`is_under`). New tests in `tests/web.rs` and a unit test for `is_under`.
+
+**R5 – Pocket ID's keys are kept until the pod restarts (design risk, not run).**
+`auth/oidc.rs:83, 113-128`: discovery and the signing keys are fetched once into a `OnceCell` and
+never fetched again. When Pocket ID rotates its signing key, every login fails the signature
+check. The user sees "Login failed, try again" (400), and trying again never helps until the pod
+restarts. The design chose "fetched at the first login and kept" without weighing this. Options:
+fetch the keys again once when the ID token's key id is unknown or its signature fails, or record
+it as known debt in `architecture.md` at Close. Checked: trace only.
+- 2026-10-11: fixed (coordinator chose (a)). The login client keeps Pocket ID's description and keys in a replaceable cache; when an ID token fails only on its signature, it fetches them again once and checks the same token again. Tests: login works after a key change with one extra key fetch; a wrong signature still fails after that one fetch.
+
+**R6 – The change documents are stale (docs made false).**
+Release tag `v0.1.0` exists on `d21dd8f` (and `v0.1.1` on `30c9313`), checked with `git tag` and
+`git ls-remote --tags`. `docs/backlog.md` says "steps 0–4 done, v0.1.0 released". But this file
+still has **Status**: in progress, step 4 and "All checks pass" are not checked, and the log in
+`change.md` stops at "steps 0–3 done". Update these before `/close`. Also, the README comment for
+`just check` ("format, clippy, tests, sqlx query data") leaves out the front-end checks, browser
+tests and workflow lint that the recipe now runs (`Justfile:58`).
+- 2026-10-11: fixed. Status, step 4, "All checks pass" and the log in `change.md` are updated; the README describes the full `just check`.
+
+**Checked and true** (claims in this file):
+- The request log has only method and path. Seen in `app.rs:35` and in the live log.
+- The security policy allows exactly the start script's hash. Covered by `policy_allows_exactly_the_start_script` and seen in the live header.
+- `openapi-typescript` is pinned to 7.13.0 (`web/package.json`).
+- `wiremock` 0.6.3 is pinned only through `Cargo.lock` (`Cargo.toml` says `0.6`). With resolver 3 and `rust-version = 1.86`, `cargo update` keeps a compatible version, so this is acceptable.
+- The tests that could pass with nothing checked do not: `logs_contain_no_secrets` asserts that "logged in" is in the captured log, and the logout browser test would fail on a 403 page.
+- The access rule is in `team_core` with no I/O (decision 0001).
+- Sessions store only the hash. Covered by `good_login_gives_a_session_and_me`.
+
+**Verdict:** no blocking bug. R1–R3 break the project's own rules and decision 0007, so fix them
+before Close. R4 is a small fix with a test. R5 needs a decision (fix, or record as debt). R6 is
+a document update.

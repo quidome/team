@@ -9,8 +9,9 @@ use serde_json::json;
 pub enum AppError {
     #[error("login required")]
     Unauthenticated,
+    /// Any failure the client cannot fix; the cause goes to the log only.
     #[error("internal error: {0}")]
-    Internal(#[from] anyhow::Error),
+    Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl IntoResponse for AppError {

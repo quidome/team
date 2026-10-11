@@ -69,3 +69,58 @@ async fn policy_allows_exactly_the_start_script(pool: PgPool) {
         .as_str()
     );
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn api_root_paths_need_login(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    for path in ["/api", "/api/"] {
+        let response = harness.get(path, None).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{path}");
+        assert!(!body_text(response).await.contains("<html"), "{path}");
+    }
+    let token = harness.log_in(&["team_coordinator"]).await;
+    for path in ["/api", "/api/"] {
+        let response = harness
+            .get(path, Some(&format!("team_session={token}")))
+            .await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn unknown_auth_paths_are_not_found(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    for path in ["/auth", "/auth/", "/auth/unknown"] {
+        let response = harness.get(path, None).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+        assert!(!body_text(response).await.contains("<html"), "{path}");
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn missing_built_files_are_not_found(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    for path in ["/_app/missing.js", "/_app/immutable/x", "/missing.png"] {
+        let response = harness.get(path, None).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn changing_requests_to_api_and_auth_roots_need_our_origin(pool: PgPool) {
+    use axum::body::Body;
+    use axum::http::Request;
+
+    let harness = Harness::start(pool).await;
+    for path in ["/api", "/api/", "/auth", "/auth/"] {
+        let request = Request::post(path)
+            .header(header::ORIGIN, "https://evil.example.test")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            harness.send(request).await.status(),
+            StatusCode::FORBIDDEN,
+            "{path}"
+        );
+    }
+}

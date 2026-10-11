@@ -30,26 +30,26 @@ pub enum LoginCookieError {
     BadSignature,
     #[error("login cookie is too old")]
     Expired,
+    #[error("cannot sign the login cookie: {0}")]
+    Signing(String),
 }
 
-fn mac(secret: &str) -> Hmac<Sha256> {
-    // HMAC accepts keys of any length, so this cannot fail.
-    #[allow(clippy::expect_used)]
-    Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC accepts any key length")
+fn mac(secret: &str) -> Result<Hmac<Sha256>, LoginCookieError> {
+    Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+        .map_err(|error| LoginCookieError::Signing(error.to_string()))
 }
 
-pub fn encode(attempt: &LoginAttempt, secret: &str) -> String {
-    // Serializing a struct of strings and an integer cannot fail.
-    #[allow(clippy::expect_used)]
-    let payload = serde_json::to_vec(attempt).expect("login attempt serializes");
-    let mut signer = mac(secret);
+pub fn encode(attempt: &LoginAttempt, secret: &str) -> Result<String, LoginCookieError> {
+    let payload = serde_json::to_vec(attempt)
+        .map_err(|error| LoginCookieError::Signing(error.to_string()))?;
+    let mut signer = mac(secret)?;
     signer.update(&payload);
     let signature = signer.finalize().into_bytes();
-    format!(
+    Ok(format!(
         "{}.{}",
         URL_SAFE_NO_PAD.encode(payload),
         URL_SAFE_NO_PAD.encode(signature)
-    )
+    ))
 }
 
 pub fn decode(
@@ -65,7 +65,7 @@ pub fn decode(
         .decode(signature)
         .map_err(|_| LoginCookieError::Malformed)?;
 
-    let mut verifier = mac(secret);
+    let mut verifier = mac(secret)?;
     verifier.update(&payload);
     verifier
         .verify_slice(&signature)
@@ -99,14 +99,14 @@ mod tests {
     #[test]
     fn round_trips() {
         let now = Utc::now();
-        let value = encode(&attempt(now), SECRET);
+        let value = encode(&attempt(now), SECRET).unwrap();
         assert_eq!(decode(&value, SECRET, now), Ok(attempt(now)));
     }
 
     #[test]
     fn refuses_a_changed_payload() {
         let now = Utc::now();
-        let value = encode(&attempt(now), SECRET);
+        let value = encode(&attempt(now), SECRET).unwrap();
         let (_, signature) = value.split_once('.').unwrap();
         let mut other = attempt(now);
         other.state = "forged".to_owned();
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn refuses_another_secret() {
         let now = Utc::now();
-        let value = encode(&attempt(now), SECRET);
+        let value = encode(&attempt(now), SECRET).unwrap();
         assert_eq!(
             decode(&value, "another-secret-another-secret-xx", now),
             Err(LoginCookieError::BadSignature)
@@ -132,7 +132,7 @@ mod tests {
     fn refuses_an_attempt_older_than_ten_minutes() {
         // The cookie keeps whole seconds.
         let start = DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap();
-        let value = encode(&attempt(start), SECRET);
+        let value = encode(&attempt(start), SECRET).unwrap();
         assert!(decode(&value, SECRET, start + TimeDelta::minutes(10)).is_ok());
         assert_eq!(
             decode(

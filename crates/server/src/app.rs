@@ -4,11 +4,14 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::Request;
+use axum::extract::{Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use axum_extra::extract::CookieJar;
 use sqlx::PgPool;
+use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
@@ -19,6 +22,7 @@ use crate::auth;
 use crate::auth::oidc::Oidc;
 use crate::clock::Clock;
 use crate::config::Config;
+use crate::error::AppError;
 use crate::web::Web;
 
 #[derive(Clone)]
@@ -36,12 +40,44 @@ fn request_span(request: &Request<Body>) -> Span {
     tracing::info_span!("request", method = %request.method(), path = %request.uri().path())
 }
 
+/// Every path that no route matched:
+/// - `/api` and below: 401 without a session, else 404 (never the front end);
+/// - `/auth` and below: 404;
+/// - built files (under `/_app/`, or a name with an extension): the file, or 404;
+/// - any other path: the file if it exists, else `index.html` (the app routes it).
+async fn fallback(State(state): State<AppState>, jar: CookieJar, request: Request) -> Response {
+    let path = request.uri().path().to_owned();
+    if auth::is_under(&path, "/api") {
+        return match auth::session_user(&state, &jar).await {
+            Ok(Some(_)) => StatusCode::NOT_FOUND.into_response(),
+            Ok(None) => AppError::Unauthenticated.into_response(),
+            Err(error) => error.into_response(),
+        };
+    }
+    if auth::is_under(&path, "/auth") {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let last_segment = path.rsplit('/').next().unwrap_or_default();
+    let is_built_file = path.starts_with("/_app/") || last_segment.contains('.');
+    let files = ServeDir::new(&state.web.dir);
+    let served = if is_built_file {
+        files.oneshot(request).await
+    } else {
+        files
+            .fallback(ServeFile::new(state.web.index()))
+            .oneshot(request)
+            .await
+    };
+    match served {
+        Ok(response) => response.map(Body::new),
+        Err(error) => AppError::Internal(error.into()).into_response(),
+    }
+}
+
 pub fn app(state: AppState) -> Router {
     // The policy carries the hash of the front end's start script; it is fixed at start.
     let content_security_policy = HeaderValue::from_str(&state.web.content_security_policy)
         .unwrap_or_else(|_| HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'"));
-    // The front end: files from WEB_DIR; any other path gets index.html (the app routes it).
-    let front_end = ServeDir::new(&state.web.dir).fallback(ServeFile::new(state.web.index()));
 
     // Everything under /api needs a session by default. New routes go on this router; an unknown
     // /api path also gets 401 without a session, so nothing is open by mistake.
@@ -66,7 +102,7 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .nest("/api", api)
         .nest("/auth", auth_routes)
-        .fallback_service(front_end)
+        .fallback(fallback)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_same_origin,

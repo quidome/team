@@ -47,7 +47,13 @@ pub async fn login(State(state): State<AppState>, jar: CookieJar) -> Response {
                 pkce_verifier: started.pkce_verifier,
                 created_at: state.clock.now().timestamp(),
             };
-            let value = login_cookie::encode(&attempt, &state.config.session_secret);
+            let value = match login_cookie::encode(&attempt, &state.config.session_secret) {
+                Ok(value) => value,
+                Err(error) => {
+                    tracing::error!(%error, "cannot start a login");
+                    return pages::login_unavailable();
+                }
+            };
             (
                 jar.add(login_cookie(value)),
                 Redirect::to(started.authorize_url.as_str()),

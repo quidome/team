@@ -30,7 +30,8 @@ pub struct Config {
     pub host: IpAddr,
     pub port: u16,
     pub web_dir: PathBuf,
-    /// Only ever true in debug builds (decision 0007).
+    /// Exists only in debug builds, so a release build cannot contain the bypass (decision 0007).
+    #[cfg(debug_assertions)]
     pub dev_auth_bypass: bool,
 }
 
@@ -46,7 +47,6 @@ impl std::fmt::Debug for Config {
             .field("host", &self.host)
             .field("port", &self.port)
             .field("web_dir", &self.web_dir)
-            .field("dev_auth_bypass", &self.dev_auth_bypass)
             .finish_non_exhaustive()
     }
 }
@@ -96,8 +96,8 @@ impl Config {
 
         let dev_auth_bypass_setting =
             optional("DEV_AUTH_BYPASS").is_some_and(|value| value == "true");
-        let dev_auth_bypass = cfg!(debug_assertions) && dev_auth_bypass_setting;
-        if dev_auth_bypass_setting && !dev_auth_bypass {
+        #[cfg(not(debug_assertions))]
+        if dev_auth_bypass_setting {
             tracing::warn!(
                 "DEV_AUTH_BYPASS is set but ignored: release builds always require login"
             );
@@ -116,7 +116,8 @@ impl Config {
             host,
             port,
             web_dir: optional("WEB_DIR").map_or_else(|| PathBuf::from("/app/web"), PathBuf::from),
-            dev_auth_bypass,
+            #[cfg(debug_assertions)]
+            dev_auth_bypass: dev_auth_bypass_setting,
         })
     }
 }
@@ -176,6 +177,7 @@ mod tests {
         assert_eq!(config.session_ttl, Duration::from_secs(28_800));
         assert_eq!(config.access_role, "team_coordinator");
         assert_eq!(config.web_dir, PathBuf::from("/app/web"));
+        #[cfg(debug_assertions)]
         assert!(!config.dev_auth_bypass);
         Ok(())
     }

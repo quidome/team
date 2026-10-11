@@ -65,6 +65,7 @@ async fn serve() -> anyhow::Result<()> {
         &config.origin,
     )
     .context("setting up the login client")?;
+    #[cfg(debug_assertions)]
     if config.dev_auth_bypass {
         tracing::warn!("DEV_AUTH_BYPASS is on: every request is the user Developer");
     }

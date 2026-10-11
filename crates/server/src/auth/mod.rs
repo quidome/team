@@ -38,6 +38,7 @@ pub async fn session_user(
     state: &AppState,
     jar: &CookieJar,
 ) -> Result<Option<SessionUser>, AppError> {
+    #[cfg(debug_assertions)]
     if state.config.dev_auth_bypass {
         return Ok(Some(dev_user()));
     }
@@ -49,7 +50,8 @@ pub async fn session_user(
         .map_err(|error| AppError::Internal(error.into()))
 }
 
-/// The fixed user for `DEV_AUTH_BYPASS`. `Config` only allows the bypass in debug builds.
+/// The fixed user for `DEV_AUTH_BYPASS`. Only compiled in debug builds (decision 0007).
+#[cfg(debug_assertions)]
 fn dev_user() -> SessionUser {
     SessionUser {
         subject: "dev".to_owned(),
@@ -71,6 +73,12 @@ pub async fn require_session(
     Ok(next.run(request).await)
 }
 
+/// True for `prefix` itself and every path below it (`/api`, `/api/`, `/api/me`; not `/apis`).
+pub fn is_under(path: &str, prefix: &str) -> bool {
+    path.strip_prefix(prefix)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 /// Every request that changes something under `/api` or `/auth` must come from our own origin.
 pub async fn require_same_origin(
     State(state): State<AppState>,
@@ -82,7 +90,7 @@ pub async fn require_same_origin(
         Method::GET | Method::HEAD | Method::OPTIONS
     );
     let path = request.uri().path();
-    let guarded = path.starts_with("/api/") || path.starts_with("/auth/");
+    let guarded = is_under(path, "/api") || is_under(path, "/auth");
     if changes_data && guarded {
         let expected = state.config.origin.origin().ascii_serialization();
         let origin = request
@@ -94,4 +102,19 @@ pub async fn require_same_origin(
         }
     }
     next.run(request).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_under;
+
+    #[test]
+    fn is_under_matches_the_prefix_and_paths_below_it() {
+        for path in ["/api", "/api/", "/api/me", "/api/health/liveness"] {
+            assert!(is_under(path, "/api"), "{path}");
+        }
+        for path in ["/apis", "/api-docs", "/", "/sample", "/auth"] {
+            assert!(!is_under(path, "/api"), "{path}");
+        }
+    }
 }

@@ -3,6 +3,8 @@
 //! That a release build ignores it is checked on the real image by `scripts/smoke-test.sh`
 //! (decision 0010).
 
+// The bypass code exists only in debug builds, so this whole test file does too.
+#![cfg(debug_assertions)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod common;
@@ -12,7 +14,6 @@ use sqlx::PgPool;
 
 use common::{Harness, body_text};
 
-#[cfg(debug_assertions)]
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn dev_auth_bypass_works_in_debug_builds(pool: PgPool) {
     let harness = Harness::start_with(pool, &[("DEV_AUTH_BYPASS", "true")]).await;

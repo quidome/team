@@ -22,7 +22,8 @@ Then:
 
 ```sh
 just serve      # run the server on http://localhost:3000
-just check      # every check: format, clippy, tests, sqlx query data
+just check      # every check (as CI): workflow and script lint, API types, Rust fmt/clippy/tests,
+                # front-end check/lint/build, browser tests, sqlx query data
 ```
 
 The database tests (`#[sqlx::test]`) create their own databases on the server in `DATABASE_URL`.

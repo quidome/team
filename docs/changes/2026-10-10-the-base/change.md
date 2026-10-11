@@ -18,3 +18,5 @@ Pocket ID, and a Svelte front end with its look, deployed to the existing cluste
 | 2026-10-10 | design | created from story 1 of the epic |
 | 2026-10-10 | implement | technical spec approved: 5 steps (step 0 by the coordinator), decisions 0007 and 0008 |
 | 2026-10-10 | implement | steps 0–3 done; branch feat/the-base merged into main |
+| 2026-10-11 | implement | step 4 done: look approved on the cluster, v0.1.0 released |
+| 2026-10-11 | implement | build review: 6 findings, all fixed (R5: keys fetched again on a signature failure, chosen by the coordinator) |

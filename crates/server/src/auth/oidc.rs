@@ -13,8 +13,11 @@ use openidconnect::{
     StandardTokenResponse,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use team_core::Identity;
-use tokio::sync::OnceCell;
+
+use openidconnect::ClaimsVerificationError;
+use tokio::sync::RwLock;
 use url::Url;
 
 /// The `groups` claim that Pocket ID adds with the `groups` scope.
@@ -79,8 +82,9 @@ pub struct Oidc {
     client_secret: ClientSecret,
     redirect: RedirectUrl,
     http: reqwest::Client,
-    /// The issuer's description and keys, fetched at the first login and kept.
-    client: OnceCell<GroupsClient>,
+    /// The issuer's description and signing keys: fetched at the first login and kept, and
+    /// fetched again when an ID token's signature does not match the kept keys (key rotation).
+    client: RwLock<Option<Arc<GroupsClient>>>,
 }
 
 impl Oidc {
@@ -106,25 +110,33 @@ impl Oidc {
             client_secret: ClientSecret::new(client_secret.to_owned()),
             redirect: RedirectUrl::from_url(redirect),
             http,
-            client: OnceCell::new(),
+            client: RwLock::new(None),
         })
     }
 
-    async fn client(&self) -> Result<&GroupsClient, OidcError> {
-        self.client
-            .get_or_try_init(|| async {
-                let metadata =
-                    CoreProviderMetadata::discover_async(self.issuer.clone(), &self.http)
-                        .await
-                        .map_err(|error| OidcError::Unavailable(error.to_string()))?;
-                Ok(Client::from_provider_metadata(
-                    metadata,
-                    self.client_id.clone(),
-                    Some(self.client_secret.clone()),
-                )
-                .set_redirect_uri(self.redirect.clone()))
-            })
+    /// The kept client, fetched on first use.
+    async fn client(&self) -> Result<Arc<GroupsClient>, OidcError> {
+        if let Some(client) = self.client.read().await.as_ref() {
+            return Ok(Arc::clone(client));
+        }
+        self.refresh().await
+    }
+
+    /// Fetches the issuer's description and keys again, and keeps the result.
+    async fn refresh(&self) -> Result<Arc<GroupsClient>, OidcError> {
+        let metadata = CoreProviderMetadata::discover_async(self.issuer.clone(), &self.http)
             .await
+            .map_err(|error| OidcError::Unavailable(error.to_string()))?;
+        let client = Arc::new(
+            Client::from_provider_metadata(
+                metadata,
+                self.client_id.clone(),
+                Some(self.client_secret.clone()),
+            )
+            .set_redirect_uri(self.redirect.clone()),
+        );
+        *self.client.write().await = Some(Arc::clone(&client));
+        Ok(client)
     }
 
     pub async fn start(&self) -> Result<StartedLogin, OidcError> {
@@ -173,9 +185,19 @@ impl Oidc {
             .extra_fields()
             .id_token()
             .ok_or_else(|| OidcError::Invalid("no ID token in the answer".to_owned()))?;
-        let claims = id_token
-            .claims(&client.id_token_verifier(), &Nonce::new(nonce))
-            .map_err(|error| OidcError::Invalid(error.to_string()))?;
+        let nonce = Nonce::new(nonce);
+        let claims = match id_token.claims(&client.id_token_verifier(), &nonce) {
+            Ok(claims) => claims,
+            // The login server may have a new signing key: fetch the keys again, once.
+            Err(ClaimsVerificationError::SignatureVerification(first)) => {
+                tracing::info!(error = %first, "ID token signature not verified; fetching the keys again");
+                let refreshed = self.refresh().await?;
+                id_token
+                    .claims(&refreshed.id_token_verifier(), &nonce)
+                    .map_err(|error| OidcError::Invalid(error.to_string()))?
+            }
+            Err(error) => return Err(OidcError::Invalid(error.to_string())),
+        };
 
         let subject = claims.subject().as_str().to_owned();
         let name = claims
