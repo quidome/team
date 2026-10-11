@@ -120,7 +120,6 @@
 									>
 										<span class="block font-medium">{game.home}</span>
 										<span class="block font-medium">
-											<span class="text-muted-foreground" aria-hidden="true">–</span>
 											<span class="sr-only">against</span>
 											{game.away}
 										</span>
