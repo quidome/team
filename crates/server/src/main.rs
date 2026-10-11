@@ -11,6 +11,7 @@ use tracing_subscriber::EnvFilter;
 use team::auth::oidc::Oidc;
 use team::clock::SystemClock;
 use team::config::Config;
+use team::source::Source;
 use team::web::Web;
 use team::{AppState, api, app, db};
 
@@ -65,6 +66,8 @@ async fn serve() -> anyhow::Result<()> {
         &config.origin,
     )
     .context("setting up the login client")?;
+    let source = Source::new(config.game_list_url.clone(), &config.origin)
+        .context("setting up the game list reader")?;
     #[cfg(debug_assertions)]
     if config.dev_auth_bypass {
         tracing::warn!("DEV_AUTH_BYPASS is on: every request is the user Developer");
@@ -75,6 +78,7 @@ async fn serve() -> anyhow::Result<()> {
         oidc: Arc::new(oidc),
         clock: Arc::new(SystemClock),
         web: Arc::new(Web::load(&config_web_dir)),
+        source: Arc::new(source),
     };
 
     let listener = TcpListener::bind(address)

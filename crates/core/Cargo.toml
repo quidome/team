@@ -8,6 +8,9 @@ publish.workspace = true
 # The core holds the product rules and has no I/O: do not add network, database or web crates here
 # (docs/decisions/0001-rust-workspace-with-pure-core.md).
 [dependencies]
+# Dates and times only: no clock is read here.
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+thiserror = "2"
 
 [lints]
 workspace = true

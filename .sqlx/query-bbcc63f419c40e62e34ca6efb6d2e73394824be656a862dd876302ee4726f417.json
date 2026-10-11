@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT season, club_number, club_name, club_town, team_number, team_name\n         FROM followed_teams WHERE season = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "season",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "club_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "club_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "club_town",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "team_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bbcc63f419c40e62e34ca6efb6d2e73394824be656a862dd876302ee4726f417"
+}

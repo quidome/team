@@ -6,6 +6,87 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/clubs": {
+      "get": {
+        "tags": [
+          "clubs"
+        ],
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Part of the club name. Upper or lower case is not important.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clubs whose name contains the search, sorted by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClubView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "502": {
+            "description": "The game list cannot be reached or is not understood"
+          }
+        }
+      }
+    },
+    "/api/clubs/{number}/teams": {
+      "get": {
+        "tags": [
+          "clubs"
+        ],
+        "operationId": "teams",
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "description": "The source's club number",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The club's own teams in the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClubTeams"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "The club is not in the club list"
+          },
+          "502": {
+            "description": "The game list cannot be reached or is not understood"
+          }
+        }
+      }
+    },
     "/api/health/liveness": {
       "get": {
         "tags": [
@@ -59,10 +140,140 @@
           }
         }
       }
+    },
+    "/api/selection": {
+      "get": {
+        "tags": [
+          "selection"
+        ],
+        "operationId": "get",
+        "responses": {
+          "200": {
+            "description": "The state of the choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "selection"
+        ],
+        "operationId": "save",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the state of the choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Selection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`unknown_club`, `not_an_own_team` or `team_required`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "502": {
+            "description": "The game list cannot be reached or is not understood; nothing is saved"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ClubTeams": {
+        "type": "object",
+        "required": [
+          "season",
+          "teams"
+        ],
+        "properties": {
+          "season": {
+            "type": "string",
+            "description": "The current season, for example \"2026-2027\"."
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamView"
+            },
+            "description": "The club's own teams in the current season; empty when the season has no games yet."
+          }
+        }
+      },
+      "ClubView": {
+        "type": "object",
+        "required": [
+          "number",
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's club number."
+          },
+          "town": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` when the source has no town for the club."
+          }
+        }
+      },
+      "LastChoice": {
+        "type": "object",
+        "description": "The choice of an earlier season.",
+        "required": [
+          "season",
+          "club"
+        ],
+        "properties": {
+          "club": {
+            "$ref": "#/components/schemas/ClubView"
+          },
+          "season": {
+            "type": "string"
+          },
+          "team": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TeamView"
+              }
+            ]
+          }
+        }
+      },
       "Me": {
         "type": "object",
         "required": [
@@ -72,6 +283,139 @@
           "name": {
             "type": "string",
             "description": "The name to show."
+          }
+        }
+      },
+      "Reason": {
+        "type": "string",
+        "description": "Why a team must be chosen.",
+        "enum": [
+          "no_games_yet",
+          "new_season"
+        ]
+      },
+      "SaveSelection": {
+        "type": "object",
+        "required": [
+          "club"
+        ],
+        "properties": {
+          "club": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's club number."
+          },
+          "team": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The source's team number; leave it out only when the season has no games yet."
+          }
+        }
+      },
+      "Selection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "season",
+              "state"
+            ],
+            "properties": {
+              "season": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "not_chosen"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "season",
+              "club",
+              "reason",
+              "state"
+            ],
+            "properties": {
+              "club": {
+                "$ref": "#/components/schemas/ClubView"
+              },
+              "last": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LastChoice",
+                    "description": "The choice of the newest earlier season, if any (for example last season's team)."
+                  }
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/Reason"
+              },
+              "season": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "team_needed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "season",
+              "club",
+              "team",
+              "state"
+            ],
+            "properties": {
+              "club": {
+                "$ref": "#/components/schemas/ClubView"
+              },
+              "season": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "chosen"
+                ]
+              },
+              "team": {
+                "$ref": "#/components/schemas/TeamView"
+              }
+            }
+          }
+        ],
+        "description": "The state of the choice. `season` is always the current season."
+      },
+      "TeamView": {
+        "type": "object",
+        "required": [
+          "number",
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The short name, for example \"M16 1\"."
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's team number."
           }
         }
       }

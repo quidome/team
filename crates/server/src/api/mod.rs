@@ -1,14 +1,24 @@
 //! The JSON API under `/api`, and its OpenAPI description.
 
+pub mod clubs;
 pub mod health;
 pub mod me;
+pub mod selection;
 
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Team", description = "API of the team coordinator tool."),
-    paths(health::liveness, health::readiness, me::me)
+    paths(
+        health::liveness,
+        health::readiness,
+        me::me,
+        selection::get,
+        selection::save,
+        clubs::search,
+        clubs::teams
+    )
 )]
 pub struct ApiDoc;
 

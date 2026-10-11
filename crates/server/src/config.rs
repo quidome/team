@@ -7,6 +7,7 @@ use std::time::Duration;
 use url::Url;
 
 const MIN_SESSION_SECRET_LEN: usize = 32;
+const DEFAULT_GAME_LIST_URL: &str = "https://db.basketball.nl";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ConfigError {
@@ -30,6 +31,8 @@ pub struct Config {
     pub host: IpAddr,
     pub port: u16,
     pub web_dir: PathBuf,
+    /// The root of the game list source's site.
+    pub game_list_url: Url,
     /// Exists only in debug builds, so a release build cannot contain the bypass (decision 0007).
     #[cfg(debug_assertions)]
     pub dev_auth_bypass: bool,
@@ -47,6 +50,7 @@ impl std::fmt::Debug for Config {
             .field("host", &self.host)
             .field("port", &self.port)
             .field("web_dir", &self.web_dir)
+            .field("game_list_url", &self.game_list_url.as_str())
             .finish_non_exhaustive()
     }
 }
@@ -116,6 +120,10 @@ impl Config {
             host,
             port,
             web_dir: optional("WEB_DIR").map_or_else(|| PathBuf::from("/app/web"), PathBuf::from),
+            game_list_url: parse_url(
+                "GAME_LIST_URL",
+                &optional("GAME_LIST_URL").unwrap_or_else(|| DEFAULT_GAME_LIST_URL.to_owned()),
+            )?,
             #[cfg(debug_assertions)]
             dev_auth_bypass: dev_auth_bypass_setting,
         })
@@ -177,6 +185,7 @@ mod tests {
         assert_eq!(config.session_ttl, Duration::from_secs(28_800));
         assert_eq!(config.access_role, "team_coordinator");
         assert_eq!(config.web_dir, PathBuf::from("/app/web"));
+        assert_eq!(config.game_list_url.as_str(), "https://db.basketball.nl/");
         #[cfg(debug_assertions)]
         assert!(!config.dev_auth_bypass);
         Ok(())
@@ -208,6 +217,18 @@ mod tests {
             error,
             Some(ConfigError::Invalid {
                 name: "SESSION_TTL_SECONDS",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn refuses_a_game_list_url_that_is_not_a_url() {
+        let error = settings(&[("GAME_LIST_URL", Some("db.basketball.nl"))]).err();
+        assert!(matches!(
+            error,
+            Some(ConfigError::Invalid {
+                name: "GAME_LIST_URL",
                 ..
             })
         ));
