@@ -182,5 +182,6 @@ Needs `DATABASE_URL` (default `postgresql://team:team@localhost:5432/team_smoke`
 ## Deviations
 - 2026-10-11, step 1: `cargo sqlx prepare --check` is its own recipe `check-sqlx` and runs last in `just check`. sqlx-cli forces the next compile of the `team` package; in its old place the browser tests compiled `team` again in the same run. Now `team` compiles once per `just check` run (in `cargo test`).
 - 2026-10-11, step 1: in the first cache test the cargo-chef library step ran again although its input (`recipe.json`) was the same. Two clean repeats were cached (a code-only rebuild took 27 s). The cause was not found; runs 4–5 on GitHub check the cache again.
-
-## Review findings
+- 2026-10-11, step 2: test run 1 (a pull request without image changes) moves to step 4: this pull request changes the Dockerfile, so its runs build the image (run 3). The documents of step 4 go through their own pull request.
+- 2026-10-11, step 2: the Build job pushes the images it loaded and smoke-tested (`docker tag` and `docker push`) instead of a second `build-push` with `push: true`. What is pushed is exactly what was tested.
+- 2026-10-11, step 2: the Rust cache uses `Swatinem/rust-cache@v2` directly (with `save-if` on `main`); the cache inside `setup-rust-toolchain` is switched off, because it cannot be limited to `main`.
