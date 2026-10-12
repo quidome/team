@@ -17,7 +17,7 @@ pub use comparison::{
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
-pub use schedule::{ScheduleReason, in_schedule};
+pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
 pub use season::{Season, SeasonError};
 pub use team_choice::{
     ChoiceState, FollowedTeam, Team, TeamChoiceError, TeamNeededReason, choice_state, choose_team,

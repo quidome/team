@@ -15,7 +15,14 @@
 	} from '#lib/api/client.js';
 	import { dutchTime, resultLine } from '#lib/reading.js';
 
-	let { readings }: { readings: LatestReadings } = $props();
+	let {
+		readings,
+		onRead
+	}: {
+		readings: LatestReadings;
+		/** Called after a good reading, for example to show the new schedule. */
+		onRead?: () => void | Promise<void>;
+	} = $props();
 
 	let latest = $state<Reading | null>(untrack(() => readings.latest ?? null));
 	let lastGood = $state(untrack(() => readings.last_good ?? null));
@@ -36,6 +43,7 @@
 			if (reading.result === 'good' && reading.games_read != null) {
 				lastGood = { finished_at: reading.finished_at, games_read: reading.games_read };
 				held = null;
+				await onRead?.();
 			}
 			if (reading.result === 'held_back') held = reading;
 		} catch (failure) {

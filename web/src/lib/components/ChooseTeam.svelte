@@ -1,6 +1,7 @@
 <!--
 	The choose step: search the club by name, then choose one of its own teams. Starts at the team
-	choice when `club` is given (a new season, or a change of team).
+	choice when `club` is given (a new season, or a change of team). A saved team starts the first
+	reading of the game list, so the schedule shows at once (story 3b).
 -->
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
@@ -8,6 +9,7 @@
 	import {
 		ApiError,
 		loadTeams,
+		readNow,
 		saveSelection,
 		searchClubs,
 		type ClubTeams,
@@ -68,7 +70,15 @@
 		const current = chosenClub;
 		if (!current) return;
 		void attempt(async () => {
-			await saveSelection(current.number, team);
+			const saved = await saveSelection(current.number, team);
+			if (saved.state === 'chosen') {
+				try {
+					await readNow();
+				} catch {
+					// The choice is saved. A failed reading is recorded and shown by the "Game list" card;
+					// when even the request fails, the coordinator can read again there.
+				}
+			}
 			await onSaved();
 		});
 	}

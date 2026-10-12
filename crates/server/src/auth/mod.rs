@@ -113,7 +113,7 @@ mod tests {
         for path in ["/api", "/api/", "/api/me", "/api/health/liveness"] {
             assert!(is_under(path, "/api"), "{path}");
         }
-        for path in ["/apis", "/api-docs", "/", "/sample", "/auth"] {
+        for path in ["/apis", "/api-docs", "/", "/choose", "/auth"] {
             assert!(!is_under(path, "/api"), "{path}");
         }
     }

@@ -9,7 +9,9 @@ use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
 use team::auth::oidc::Oidc;
-use team::clock::SystemClock;
+#[cfg(debug_assertions)]
+use team::clock::ShiftedClock;
+use team::clock::{Clock, SystemClock};
 use team::config::Config;
 use team::source::Source;
 use team::web::Web;
@@ -72,11 +74,21 @@ async fn serve() -> anyhow::Result<()> {
     if config.dev_auth_bypass {
         tracing::warn!("DEV_AUTH_BYPASS is on: every request is the user Developer");
     }
+    #[cfg(debug_assertions)]
+    let clock: Arc<dyn Clock> = match config.dev_now {
+        Some(start) => {
+            tracing::warn!(%start, "DEV_NOW is set: the clock is shifted");
+            Arc::new(ShiftedClock::starting_at(start))
+        }
+        None => Arc::new(SystemClock),
+    };
+    #[cfg(not(debug_assertions))]
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let state = AppState {
         pool: pool.clone(),
         config: Arc::new(config),
         oidc: Arc::new(oidc),
-        clock: Arc::new(SystemClock),
+        clock,
         web: Arc::new(Web::load(&config_web_dir)),
         source: Arc::new(source),
     };

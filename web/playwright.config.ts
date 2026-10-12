@@ -4,6 +4,8 @@ import { e2eDatabase } from './e2e/database';
 // The tests run against the real Rust server with the built front end (`npm run build` first).
 // One server uses the debug-only login bypass (logged in as "Developer"), one does not. Both use
 // a fresh database (`e2e/global-setup.ts`) and a fake game list source (`e2e/fake-source.mjs`).
+// The server's clock starts on 12 October 2026 (debug-only `DEV_NOW`), so which games are coming
+// or past does not depend on the real date.
 const fakeSourcePort = 4102;
 
 function server(port: number, bypass: boolean) {
@@ -26,7 +28,8 @@ function server(port: number, bypass: boolean) {
 			PORT: String(port),
 			WEB_DIR: 'web/build',
 			DEV_AUTH_BYPASS: String(bypass),
-			GAME_LIST_URL: `http://127.0.0.1:${fakeSourcePort}`
+			GAME_LIST_URL: `http://127.0.0.1:${fakeSourcePort}`,
+			DEV_NOW: '2026-10-12T10:00:00Z'
 		}
 	};
 }

@@ -4,6 +4,8 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[cfg(debug_assertions)]
+use chrono::{DateTime, Utc};
 use url::Url;
 
 const MIN_SESSION_SECRET_LEN: usize = 32;
@@ -36,6 +38,10 @@ pub struct Config {
     /// Exists only in debug builds, so a release build cannot contain the bypass (decision 0007).
     #[cfg(debug_assertions)]
     pub dev_auth_bypass: bool,
+    /// The moment the clock starts at, for tests that must not depend on the real date. Exists
+    /// only in debug builds, as the login bypass.
+    #[cfg(debug_assertions)]
+    pub dev_now: Option<DateTime<Utc>>,
 }
 
 // Secrets stay out of debug output and logs.
@@ -107,6 +113,16 @@ impl Config {
             );
         }
 
+        let dev_now_setting = optional("DEV_NOW");
+        #[cfg(not(debug_assertions))]
+        if dev_now_setting.is_some() {
+            tracing::warn!("DEV_NOW is set but ignored: release builds use the real clock");
+        }
+        #[cfg(debug_assertions)]
+        let dev_now = dev_now_setting
+            .map(|value| parse_time("DEV_NOW", &value))
+            .transpose()?;
+
         Ok(Self {
             database_url: required("DATABASE_URL")?,
             oidc_issuer_url: parse_url("OIDC_ISSUER_URL", &required("OIDC_ISSUER_URL")?)?,
@@ -126,6 +142,8 @@ impl Config {
             )?,
             #[cfg(debug_assertions)]
             dev_auth_bypass: dev_auth_bypass_setting,
+            #[cfg(debug_assertions)]
+            dev_now,
         })
     }
 }
@@ -135,6 +153,16 @@ fn parse_url(name: &'static str, value: &str) -> Result<Url, ConfigError> {
         name,
         reason: error.to_string(),
     })
+}
+
+#[cfg(debug_assertions)]
+fn parse_time(name: &'static str, value: &str) -> Result<DateTime<Utc>, ConfigError> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|time| time.with_timezone(&Utc))
+        .map_err(|_| ConfigError::Invalid {
+            name,
+            reason: "must be a time such as 2026-10-12T10:00:00Z".to_owned(),
+        })
 }
 
 fn parse_positive(name: &'static str, value: &str) -> Result<u64, ConfigError> {
@@ -188,7 +216,33 @@ mod tests {
         assert_eq!(config.game_list_url.as_str(), "https://db.basketball.nl/");
         #[cfg(debug_assertions)]
         assert!(!config.dev_auth_bypass);
+        #[cfg(debug_assertions)]
+        assert_eq!(config.dev_now, None);
         Ok(())
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn reads_the_start_of_the_development_clock() -> Result<(), ConfigError> {
+        use chrono::TimeZone;
+
+        let config = settings(&[("DEV_NOW", Some("2026-10-12T10:00:00Z"))])?;
+        let expected = Utc.with_ymd_and_hms(2026, 10, 12, 10, 0, 0).single();
+        assert_eq!(config.dev_now, expected);
+        Ok(())
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn names_a_development_clock_that_is_not_a_time() {
+        let error = settings(&[("DEV_NOW", Some("12 October 2026"))]).err();
+        assert!(matches!(
+            error,
+            Some(ConfigError::Invalid {
+                name: "DEV_NOW",
+                ..
+            })
+        ));
     }
 
     #[test]

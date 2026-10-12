@@ -87,3 +87,11 @@ export async function readNow(): Promise<Reading> {
 export async function confirmGone(id: number): Promise<Reading> {
 	return dataOf(await api.POST('/api/readings/{id}/confirm-gone', { params: { path: { id } } }));
 }
+
+export type Schedule = components['schemas']['ScheduleView'];
+export type ScheduleGame = components['schemas']['ScheduleGame'];
+
+/** The schedule to show (story 3b), or null when there is none yet. */
+export async function loadSchedule(fetch: typeof globalThis.fetch): Promise<Schedule | null> {
+	return (await dataOf(await api.GET('/api/schedule', { fetch }))).schedule ?? null;
+}

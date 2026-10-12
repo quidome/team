@@ -15,7 +15,7 @@ use common::{Harness, INDEX_HTML, START_SCRIPT, body_text};
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn app_paths_get_index_html(pool: PgPool) {
     let harness = Harness::start(pool).await;
-    for path in ["/", "/sample", "/some/deep/link"] {
+    for path in ["/", "/choose", "/some/deep/link"] {
         let response = harness.get(path, None).await;
         assert_eq!(response.status(), StatusCode::OK, "{path}");
         assert!(

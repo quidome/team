@@ -231,6 +231,29 @@
         }
       }
     },
+    "/api/schedule": {
+      "get": {
+        "tags": [
+          "schedule"
+        ],
+        "operationId": "schedule",
+        "responses": {
+          "200": {
+            "description": "The schedule to show, or `null` when there is none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleAnswer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/selection": {
       "get": {
         "tags": [
@@ -632,6 +655,121 @@
             ],
             "format": "int64",
             "description": "The source's team number; leave it out only when the season has no games yet."
+          }
+        }
+      },
+      "ScheduleAnswer": {
+        "type": "object",
+        "properties": {
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleView",
+                "description": "`null`: no club is chosen, or a team is needed and no earlier season had one."
+              }
+            ]
+          }
+        }
+      },
+      "ScheduleGame": {
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "home",
+          "away",
+          "hall",
+          "town",
+          "reason",
+          "in_list"
+        ],
+        "properties": {
+          "away": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "Dutch local date, for example \"2026-10-31\"."
+          },
+          "hall": {
+            "type": "string"
+          },
+          "home": {
+            "type": "string",
+            "description": "Full team names, with the club name in front."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's game id."
+          },
+          "in_list": {
+            "type": "boolean",
+            "description": "False: the game is no longer in the game list."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ScheduleReasonView"
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Dutch local start time, for example \"13:00\"; `null` when it is not known yet."
+          },
+          "town": {
+            "type": "string"
+          }
+        }
+      },
+      "ScheduleReasonView": {
+        "type": "string",
+        "enum": [
+          "team",
+          "duty"
+        ]
+      },
+      "ScheduleView": {
+        "type": "object",
+        "required": [
+          "season",
+          "last_season",
+          "club",
+          "team",
+          "coming",
+          "past"
+        ],
+        "properties": {
+          "club": {
+            "$ref": "#/components/schemas/ClubView"
+          },
+          "coming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleGame"
+            },
+            "description": "Today (Dutch date) and later, in time order."
+          },
+          "last_season": {
+            "type": "boolean",
+            "description": "True: a new season started and its team is not chosen yet; these are the games of the\nteam of the newest earlier season."
+          },
+          "past": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleGame"
+            },
+            "description": "Before today, newest date first, in time order within a date."
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the games, for example \"2026-2027\"."
+          },
+          "team": {
+            "$ref": "#/components/schemas/TeamView"
           }
         }
       },

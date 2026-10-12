@@ -134,6 +134,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/schedule': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['schedule'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/selection': {
 		parameters: {
 			query?: never;
@@ -261,6 +277,45 @@ export interface components {
 			 * @description The source's team number; leave it out only when the season has no games yet.
 			 */
 			team?: number | null;
+		};
+		ScheduleAnswer: {
+			schedule?: null | components['schemas']['ScheduleView'];
+		};
+		ScheduleGame: {
+			away: string;
+			/** @description Dutch local date, for example "2026-10-31". */
+			date: string;
+			hall: string;
+			/** @description Full team names, with the club name in front. */
+			home: string;
+			/**
+			 * Format: int64
+			 * @description The source's game id.
+			 */
+			id: number;
+			/** @description False: the game is no longer in the game list. */
+			in_list: boolean;
+			reason: components['schemas']['ScheduleReasonView'];
+			/** @description Dutch local start time, for example "13:00"; `null` when it is not known yet. */
+			start_time?: string | null;
+			town: string;
+		};
+		/** @enum {string} */
+		ScheduleReasonView: 'team' | 'duty';
+		ScheduleView: {
+			club: components['schemas']['ClubView'];
+			/** @description Today (Dutch date) and later, in time order. */
+			coming: components['schemas']['ScheduleGame'][];
+			/**
+			 * @description True: a new season started and its team is not chosen yet; these are the games of the
+			 *     team of the newest earlier season.
+			 */
+			last_season: boolean;
+			/** @description Before today, newest date first, in time order within a date. */
+			past: components['schemas']['ScheduleGame'][];
+			/** @description The season of the games, for example "2026-2027". */
+			season: string;
+			team: components['schemas']['TeamView'];
 		};
 		/** @description The state of the choice. `season` is always the current season. */
 		Selection:
@@ -551,6 +606,33 @@ export interface operations {
 			};
 			/** @description No such reading */
 			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	schedule: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The schedule to show, or `null` when there is none */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['ScheduleAnswer'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
 				headers: {
 					[name: string]: unknown;
 				};

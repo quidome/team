@@ -12,12 +12,6 @@ test('without login, the start page offers to log in', async ({ page }) => {
 	expect(errors).toEqual([]);
 });
 
-test('without login, the sample page asks to log in', async ({ page }) => {
-	await page.goto('/sample');
-	await expect(page.getByText('Log in to see the sample schedule.')).toBeVisible();
-	await expect(page.getByTestId('game')).toHaveCount(0);
-});
-
 test('screenshot of the login page for the look', async ({ page }) => {
 	for (const colorScheme of ['light', 'dark'] as const) {
 		await page.emulateMedia({ colorScheme });

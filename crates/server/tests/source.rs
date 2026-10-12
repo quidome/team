@@ -8,7 +8,10 @@ use std::time::Duration;
 use chrono::NaiveDate;
 use serde_json::{Value, json};
 use team::source::{Source, SourceError};
-use team_core::{Club, ClubNumber, ScheduleReason, Season, TeamNumber, in_schedule, own_teams};
+use team_core::{
+    Club, ClubNumber, ScheduleReason, ScheduledGame, Season, StoredGame, TeamNumber, in_schedule,
+    own_teams, schedule,
+};
 use url::Url;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -148,6 +151,40 @@ async fn the_schedule_of_m16_1_has_its_games_and_the_club_home_games() {
     assert_eq!(count(Some(ScheduleReason::TeamGame)), 10);
     assert_eq!(count(Some(ScheduleReason::DutyGame)), 27);
     assert_eq!(count(None), 34);
+}
+
+#[tokio::test]
+async fn on_12_october_2026_the_schedule_of_m16_1_has_23_coming_and_14_past_games() {
+    let (_server, source) = source_with(data("games-37-2026-2027.json")).await;
+    let games = source
+        .club_games(DRAKES, season("2026-2027"))
+        .await
+        .unwrap();
+    let stored = games
+        .into_iter()
+        .map(|game| StoredGame {
+            game,
+            in_list: true,
+        })
+        .collect();
+    let today = NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();
+    let schedule = schedule(stored, DRAKES, TeamNumber(184), today);
+
+    let team_games = |games: &[ScheduledGame]| {
+        games
+            .iter()
+            .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame)
+            .count()
+    };
+    assert_eq!(schedule.coming.len(), 23);
+    assert_eq!(team_games(&schedule.coming), 5);
+    assert_eq!(schedule.past.len(), 14);
+    assert_eq!(team_games(&schedule.past), 5);
+
+    let first = &schedule.coming[0].game;
+    assert_eq!(first.date, NaiveDate::from_ymd_opt(2026, 10, 31).unwrap());
+    assert_eq!(first.start_time.unwrap().to_string(), "13:00:00");
+    assert_eq!(first.home.team_name, "Blue Drakes X12 1");
 }
 
 #[tokio::test]

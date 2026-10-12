@@ -17,6 +17,29 @@ impl Clock for SystemClock {
     }
 }
 
+/// Development only (`DEV_NOW`): starts at a set moment and then runs with the real time, so
+/// a later reading still starts later (decision 0015).
+#[cfg(debug_assertions)]
+pub struct ShiftedClock {
+    shift: chrono::TimeDelta,
+}
+
+#[cfg(debug_assertions)]
+impl ShiftedClock {
+    pub fn starting_at(start: DateTime<Utc>) -> Self {
+        Self {
+            shift: start - Utc::now(),
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+impl Clock for ShiftedClock {
+    fn now(&self) -> DateTime<Utc> {
+        Utc::now() + self.shift
+    }
+}
+
 /// Today's date in the Netherlands: the source's dates and the season follow Dutch local time.
 pub fn today_in_netherlands(clock: &dyn Clock) -> NaiveDate {
     clock.now().with_timezone(&Amsterdam).date_naive()
@@ -46,6 +69,18 @@ mod tests {
             .with_ymd_and_hms(year, month, day, hour, minute, 0)
             .single()
             .expect("valid time"))
+    }
+
+    #[test]
+    fn a_shifted_clock_starts_at_its_moment_and_runs_on() {
+        let start = at(2026, 10, 12, 10, 0).0;
+        let clock = ShiftedClock::starting_at(start);
+        let first = clock.now();
+        let second = clock.now();
+        assert!(first >= start);
+        assert!(first - start < chrono::TimeDelta::seconds(5));
+        assert!(second >= first);
+        assert_eq!(current_season(&clock).to_string(), "2026-2027");
     }
 
     #[test]

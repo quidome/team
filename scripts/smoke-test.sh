@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test of the built images (decision 0010): migrations, health, the front end, and that the
-# login bypass is off in the release build. Used by `just smoke` and by the Build job in CI.
+# login bypass and the development clock are off in the release build. Used by `just smoke` and by
+# the Build job in CI.
 #
 # Usage: scripts/smoke-test.sh RUNTIME_IMAGE MIGRATION_IMAGE
 # Needs a PostgreSQL server on localhost:5432 with role team/team (`just db-up`, or the CI service).
@@ -81,9 +82,12 @@ content_type=$(curl -s -o /dev/null -w '%{content_type}' http://localhost:3000/)
 [[ "$content_type" == text/html* ]] || fail "/ gave content type $content_type"
 echo "ok   / is the front end"
 
-start team-smoke-bypass 3001 DEV_AUTH_BYPASS=true
+start team-smoke-bypass 3001 DEV_AUTH_BYPASS=true DEV_NOW=2020-01-01T00:00:00Z
 expect_status http://localhost:3001/api/health/liveness 200
 expect_status http://localhost:3001/api/me 401
 echo "ok   the release build ignores DEV_AUTH_BYPASS"
+docker logs team-smoke-bypass 2>&1 | grep -q 'DEV_NOW is set but ignored' \
+    || fail "the release build does not say that it ignores DEV_NOW"
+echo "ok   the release build ignores DEV_NOW"
 
 echo "smoke test passed"

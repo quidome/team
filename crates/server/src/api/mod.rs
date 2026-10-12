@@ -4,6 +4,7 @@ pub mod clubs;
 pub mod health;
 pub mod me;
 pub mod readings;
+pub mod schedule;
 pub mod selection;
 
 use utoipa::OpenApi;
@@ -21,7 +22,8 @@ use utoipa::OpenApi;
         clubs::teams,
         readings::read,
         readings::latest,
-        readings::confirm_gone
+        readings::confirm_gone,
+        schedule::get
     )
 )]
 pub struct ApiDoc;

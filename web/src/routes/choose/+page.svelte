@@ -30,7 +30,7 @@
 		<ChooseTeam
 			{club}
 			clubKept={data.selection.state === 'team_needed'}
-			onSaved={() => goto(resolve('/'))}
+			onSaved={() => goto(resolve('/'), { invalidateAll: true })}
 		/>
 	</section>
 {/if}
