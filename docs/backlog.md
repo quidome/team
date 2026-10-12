@@ -2,10 +2,10 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Games from the game list](changes/2026-10-10-games-from-game-list/) – implement (epic, 5 stories; stories 1 and 2 done)
+1. [Games from the game list](changes/2026-10-10-games-from-game-list/) – implement (epic, 5 stories; stories 1, 2 and 3a done)
    - Story 1, the base: done (v0.1.0).
-   - Story 2, choose club and team: done (branch `feat/choose-club-and-team`, not merged or released yet).
-   - Story 3a, [read on demand](changes/2026-10-11-read-on-demand/): close (built and reviewed; for Close: decision 0014, a record for the parts of 0013 that readings change, `architecture.md`, `docs/product/`). Next: `/close docs/changes/2026-10-11-read-on-demand`.
+   - Story 2, choose club and team: done (on `main`, not released yet).
+   - Story 3a, read on demand: done (on `main`, not released yet).
    - Then story 3b, the schedule (`/design` from the epic).
 
 Small:

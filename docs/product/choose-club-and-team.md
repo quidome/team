@@ -21,7 +21,7 @@ number: the club is found by name, and the team is chosen from the club's own te
 - "The game list cannot be reached. Please try again." when the game list does not answer, or answers with an error. "Try again" repeats the last action. Nothing is saved.
 - "The game list has data the tool does not understand." when the game list has data in a form the tool does not know. Nothing is saved.
 - One club and one team for each season. More teams or more coordinators are not possible.
-- The game list is read each time the coordinator searches, opens the teams, or saves. While a team is still needed, each visit to the start page reads it too.
+- The game list is read each time the coordinator searches, opens the teams, or saves. While a team is still needed, each visit to the start page reads it too. Reading the games themselves is in [Read the game list](read-the-game-list.md).
 
 ## Interface
 - Screens: the start page (`/`) and the page for a change (`/choose`).
