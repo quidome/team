@@ -8,10 +8,11 @@ mod common;
 use chrono::{NaiveDate, NaiveTime, TimeDelta};
 use common::Harness;
 use common::game_list::{
-    DRAKES, M16_2, Reader, game_mut, games_with, in_m16_1_schedule, real_games, utc,
+    DRAKES, M16_1, M16_2, Reader, game_mut, games_with, in_m16_1_schedule, real_games, utc,
 };
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use team::clock::Clock;
 use wiremock::ResponseTemplate;
 
 /// A team game of M16 1 on 12 December 2026.
@@ -199,7 +200,7 @@ async fn without_a_choice_there_is_nothing_to_read(pool: PgPool) {
     assert_eq!((status, body), (400, json!({ "error": "no_choice" })));
     assert_eq!(
         reader.latest().await,
-        json!({ "latest": null, "last_good": null })
+        json!({ "latest": null, "last_good": null, "held_back": null })
     );
 }
 
@@ -476,4 +477,96 @@ async fn in_a_new_season_the_kept_club_is_read(pool: PgPool) {
         count_rows(pool, "SELECT count(*) FROM games WHERE season_year = 2026").await,
         71
     );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn saving_the_same_choice_again_still_counts_the_changes(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.answer(base());
+    reader.read_good().await;
+
+    reader.harness.clock.advance(TimeDelta::minutes(1));
+    reader.choose(M16_1).await;
+    reader.answer(changed());
+    let body = reader.read_good().await;
+    assert_eq!(body["first_reading"], false);
+    assert_eq!(body["counts"], changed_counts());
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_failed_reading_does_not_hide_the_held_back_reading(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    reader.answer(games_with(|games| games.truncate(30)));
+    let (_, held) = reader.read().await;
+    assert_eq!(held["result"], "held_back");
+
+    reader.answer_with(ResponseTemplate::new(503));
+    let (_, failed) = reader.read().await;
+    assert_eq!(failed["result"], "failed");
+    let latest = reader.latest().await;
+    assert_eq!(latest["latest"]["result"], "failed");
+    assert_eq!(latest["held_back"], held);
+
+    reader.answer(games_with(|games| games.truncate(30)));
+    let (status, body) = reader.confirm_gone(&held["id"]).await;
+    assert_eq!((status, &body["result"]), (200, &json!("good")));
+    assert_eq!(reader.latest().await["held_back"], Value::Null);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn really_gone_never_loses_more_games_than_confirmed(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let pool = reader.pool();
+    let games_before = snapshot(pool).await;
+    reader.answer(games_with(|games| games.truncate(30)));
+    let (_, held) = reader.read().await;
+
+    // The game list now gives even fewer games than the warning showed.
+    reader.answer(games_with(|games| games.truncate(10)));
+    let (status, body) = reader.confirm_gone(&held["id"]).await;
+    assert_eq!(status, 200);
+    assert_eq!(body["result"], "held_back");
+    assert_eq!(
+        body["hold"],
+        json!({ "reason": "far_fewer", "before": 71, "now": 10 })
+    );
+    assert_eq!(snapshot(pool).await, games_before);
+    assert_eq!(reader.latest().await["held_back"], body);
+
+    // The first warning is no longer the one to confirm.
+    let (status, error) = reader.confirm_gone(&held["id"]).await;
+    assert_eq!((status, error), (400, json!({ "error": "not_held_back" })));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn an_older_answer_is_not_stored_over_a_newer_one(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let pool = reader.pool();
+    let games_before = snapshot(pool).await;
+
+    // A reading that read the source later and stored its games first.
+    let later = reader.harness.clock.now() + TimeDelta::seconds(5);
+    let newer = team::readings::insert(
+        pool,
+        team_core::ClubNumber(DRAKES),
+        "2026-2027".parse().unwrap(),
+        Some(team_core::TeamNumber(M16_1)),
+        later,
+        later,
+        &team::readings::ReadingResult::Good {
+            games_read: 71,
+            first_reading: false,
+            counts: Some(team_core::Counts::default()),
+        },
+    )
+    .await
+    .unwrap();
+
+    reader.answer(changed());
+    let body = reader.read_good().await;
+    assert_eq!(body["id"], newer);
+    assert_eq!(snapshot(pool).await, games_before);
 }

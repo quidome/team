@@ -12,10 +12,11 @@ pub mod team_choice;
 pub use access::{Identity, may_access};
 pub use club::{Club, ClubNumber, search_clubs};
 pub use comparison::{
-    Change, Counts, Difference, GameChange, StoredGame, compare, count, same_number_pairs,
+    Change, Counts, Difference, GameChange, StoredGame, compare, count, no_longer_in_list,
+    same_number_pairs,
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
-pub use guard::{Guard, HoldReason, guard};
+pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
 pub use schedule::{ScheduleReason, in_schedule};
 pub use season::{Season, SeasonError};
 pub use team_choice::{

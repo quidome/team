@@ -31,6 +31,7 @@ CREATE TABLE readings (
     id             bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     club_number    bigint NOT NULL,
     season_year    integer NOT NULL,
+    team_number    bigint,                     -- the team chosen when it was read; NULL = none
     started_at     timestamptz NOT NULL,
     finished_at    timestamptz NOT NULL,
     result         text NOT NULL CHECK (result IN ('good', 'failed', 'held_back')),

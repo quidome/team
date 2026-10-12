@@ -38,17 +38,6 @@ pub async fn newest_before(
     Ok(row.map(Row::into_followed_team))
 }
 
-/// When the choice of `season` was saved, if there is one.
-pub async fn chosen_at(pool: &PgPool, season: Season) -> Result<Option<DateTime<Utc>>, StoreError> {
-    let at = sqlx::query_scalar!(
-        "SELECT chosen_at FROM followed_teams WHERE season_year = $1",
-        season.start_year(),
-    )
-    .fetch_optional(pool)
-    .await?;
-    Ok(at)
-}
-
 struct Row {
     season_year: i32,
     club_number: i64,

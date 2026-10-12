@@ -2,13 +2,11 @@
 //! result. Readings take a PostgreSQL advisory lock, so two at the same time (a tap and the
 //! nightly reading) never count a change twice or lose one (decision 0005).
 
-use std::collections::BTreeSet;
-
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use team_core::{
-    Change, ClubNumber, GameChange, Guard, Season, TeamNumber, compare, count, guard,
-    same_number_pairs,
+    Change, ClubNumber, GameChange, Guard, HoldReason, Season, TeamNumber, compare, count, guard,
+    guard_after_confirm, is_first_reading, no_longer_in_list, same_number_pairs,
 };
 
 use crate::clock::{Clock, current_season};
@@ -25,6 +23,9 @@ const READING_LOCK: i64 = 0x7465_616d_7265_6164;
 pub enum ReadingError {
     #[error("no club chosen")]
     NoChoice,
+    /// The reading to confirm is not the newest reading that did not fail, or is not held back.
+    #[error("not held back")]
+    NotHeldBack,
     #[error(transparent)]
     Store(#[from] StoreError),
     /// The source client could not be made or used; not a failure of the source itself.
@@ -38,6 +39,15 @@ impl From<sqlx::Error> for ReadingError {
     }
 }
 
+/// How the guard applies to a reading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// A reading with no or far fewer games is held back.
+    Guarded,
+    /// The coordinator confirmed that the games of this held-back reading are really gone.
+    Confirm { held_id: i64 },
+}
+
 /// The club and team a reading is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Target {
@@ -45,8 +55,6 @@ pub struct Target {
     pub club: ClubNumber,
     /// `None` while no team is chosen for the season.
     pub team: Option<TeamNumber>,
-    /// When the choice that gives this club and team was saved.
-    pub chosen_at: DateTime<Utc>,
 }
 
 /// The club and team of the current season: the choice of the current season; or, in a new season
@@ -54,39 +62,30 @@ pub struct Target {
 /// was ever chosen.
 pub async fn target(pool: &PgPool, clock: &dyn Clock) -> Result<Option<Target>, StoreError> {
     let season = current_season(clock);
-    let (choice, team) = match followed_teams::for_season(pool, season).await? {
-        Some(choice) => {
-            let team = choice.team.as_ref().map(|team| team.number);
-            (choice, team)
-        }
+    let (club, team) = match followed_teams::for_season(pool, season).await? {
+        Some(choice) => (
+            choice.club.number,
+            choice.team.as_ref().map(|team| team.number),
+        ),
         None => match followed_teams::newest_before(pool, season).await? {
-            Some(earlier) => (earlier, None),
+            Some(earlier) => (earlier.club.number, None),
             None => return Ok(None),
         },
     };
-    let Some(chosen_at) = followed_teams::chosen_at(pool, choice.season).await? else {
-        return Ok(None);
-    };
-    Ok(Some(Target {
-        season,
-        club: choice.club.number,
-        team,
-        chosen_at,
-    }))
+    Ok(Some(Target { season, club, team }))
 }
 
-/// Reads the game list of the current club and season and records the reading. With `guard_on`
-/// false, a reading with no or far fewer games is not held back ("these games are really gone").
-/// A failed or held-back reading is a recorded result, not an error.
+/// Reads the game list of the current club and season and records the reading. A failed or
+/// held-back reading is a recorded result, not an error.
 pub async fn read(
     pool: &PgPool,
     source: &Source,
     clock: &dyn Clock,
-    guard_on: bool,
+    mode: Mode,
 ) -> Result<Reading, ReadingError> {
     let started_at = clock.now();
     let target = target(pool, clock).await?.ok_or(ReadingError::NoChoice)?;
-    let Target { season, club, .. } = target;
+    let Target { season, club, team } = target;
 
     // The source is read before the lock, so a slow source never holds the lock.
     let read = match source.club_games(club, season).await {
@@ -100,7 +99,10 @@ pub async fn read(
                 _ => FailureKind::SourceUnavailable,
             };
             let result = ReadingResult::Failed(kind);
-            return record(pool, target, started_at, clock.now(), result).await;
+            let finished_at = clock.now();
+            let id = readings::insert(pool, club, season, team, started_at, finished_at, &result)
+                .await?;
+            return Ok(reading(id, target, started_at, finished_at, result));
         }
     };
 
@@ -109,39 +111,66 @@ pub async fn read(
         .execute(&mut *tx)
         .await?;
 
-    let stored = games::stored(&mut tx, club, season).await?;
-    let last_good = readings::last_good(&mut *tx, club, season).await?;
-    let games_read = u32::try_from(read.len())
-        .map_err(|_| StoreError::Invalid(format!("too many games: {}", read.len())))?;
-
-    if guard_on {
-        let before = last_good.as_ref().and_then(|reading| match reading.result {
-            ReadingResult::Good { games_read, .. } => Some(games_read),
-            _ => None,
-        });
-        if let Guard::HoldBack(reason) = guard(before, games_read) {
-            let result = ReadingResult::HeldBack(reason);
-            let finished_at = clock.now();
-            let id =
-                readings::insert(&mut *tx, club, season, started_at, finished_at, &result).await?;
-            tx.commit().await?;
-            return Ok(reading(id, target, started_at, finished_at, result));
-        }
+    // A reading that read the source later already stored newer games: storing this older
+    // answer would count the changes in between backwards, and the next reading forwards again.
+    if let Some(newer) = readings::good_started_after(&mut *tx, club, season, started_at).await? {
+        tx.commit().await?;
+        return Ok(newer);
     }
 
-    let first_reading = !readings::good_since(&mut *tx, club, season, target.chosen_at).await?;
+    let games_read = u32::try_from(read.len())
+        .map_err(|_| StoreError::Invalid(format!("too many games: {}", read.len())))?;
+    let last_good = readings::last_good(&mut *tx, club, season).await?;
+    let last_good_count = last_good.as_ref().and_then(|reading| match reading.result {
+        ReadingResult::Good { games_read, .. } => Some(games_read),
+        _ => None,
+    });
+    let verdict = match mode {
+        Mode::Guarded => guard(last_good_count, games_read),
+        Mode::Confirm { held_id } => {
+            let held = readings::newest_not_failed(&mut *tx, club, season).await?;
+            let confirmed = match held {
+                Some(Reading {
+                    id,
+                    result: ReadingResult::HeldBack(reason),
+                    ..
+                }) if id == held_id => match reason {
+                    HoldReason::Empty { .. } => 0,
+                    HoldReason::FarFewer { now, .. } => now,
+                },
+                _ => return Err(ReadingError::NotHeldBack),
+            };
+            guard_after_confirm(last_good_count, confirmed, games_read)
+        }
+    };
+    if let Guard::HoldBack(reason) = verdict {
+        let result = ReadingResult::HeldBack(reason);
+        let finished_at = clock.now();
+        let id = readings::insert(
+            &mut *tx,
+            club,
+            season,
+            team,
+            started_at,
+            finished_at,
+            &result,
+        )
+        .await?;
+        tx.commit().await?;
+        return Ok(reading(id, target, started_at, finished_at, result));
+    }
+
+    let stored = games::stored(&mut tx, club, season).await?;
+    let first_reading = is_first_reading(last_good.map(|reading| reading.team), team);
     let counts = if first_reading {
         None
     } else {
-        let changes = compare(&stored, &read, club, target.team);
+        let changes = compare(&stored, &read, club, team);
         log_same_numbers(&changes);
         Some(count(&changes))
     };
-
-    let read_ids: BTreeSet<i64> = read.iter().map(|game| game.source_id).collect();
-    let gone: Vec<i64> = stored
+    let gone: Vec<i64> = no_longer_in_list(&stored, &read)
         .iter()
-        .filter(|stored| stored.in_list && !read_ids.contains(&stored.game.source_id))
         .map(|stored| stored.game.source_id)
         .collect();
     let finished_at = clock.now();
@@ -152,27 +181,17 @@ pub async fn read(
         first_reading,
         counts,
     };
-    let id = readings::insert(&mut *tx, club, season, started_at, finished_at, &result).await?;
-    tx.commit().await?;
-    Ok(reading(id, target, started_at, finished_at, result))
-}
-
-async fn record(
-    pool: &PgPool,
-    target: Target,
-    started_at: DateTime<Utc>,
-    finished_at: DateTime<Utc>,
-    result: ReadingResult,
-) -> Result<Reading, ReadingError> {
     let id = readings::insert(
-        pool,
-        target.club,
-        target.season,
+        &mut *tx,
+        club,
+        season,
+        team,
         started_at,
         finished_at,
         &result,
     )
     .await?;
+    tx.commit().await?;
     Ok(reading(id, target, started_at, finished_at, result))
 }
 
@@ -187,6 +206,7 @@ fn reading(
         id,
         club: target.club,
         season: target.season,
+        team: target.team,
         started_at,
         finished_at,
         result,

@@ -4,7 +4,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgExecutor;
-use team_core::{ClubNumber, Counts, HoldReason, Season};
+use team_core::{ClubNumber, Counts, HoldReason, Season, TeamNumber};
 
 use crate::db::StoreError;
 
@@ -35,6 +35,8 @@ pub struct Reading {
     pub id: i64,
     pub club: ClubNumber,
     pub season: Season,
+    /// The team chosen when it was read; `None` while no team was chosen.
+    pub team: Option<TeamNumber>,
     pub started_at: DateTime<Utc>,
     pub finished_at: DateTime<Utc>,
     pub result: ReadingResult,
@@ -45,6 +47,7 @@ pub async fn insert(
     db: impl PgExecutor<'_>,
     club: ClubNumber,
     season: Season,
+    team: Option<TeamNumber>,
     started_at: DateTime<Utc>,
     finished_at: DateTime<Utc>,
     result: &ReadingResult,
@@ -52,12 +55,13 @@ pub async fn insert(
     let columns = Columns::of(result)?;
     let id = sqlx::query_scalar!(
         "INSERT INTO readings
-             (club_number, season_year, started_at, finished_at, result, error, games_read,
-              first_reading, counts, hold_reason, hold_before)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             (club_number, season_year, team_number, started_at, finished_at, result, error,
+              games_read, first_reading, counts, hold_reason, hold_before)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING id",
         club.0,
         season.start_year(),
+        team.map(|team| team.0),
         started_at,
         finished_at,
         columns.result,
@@ -81,8 +85,8 @@ pub async fn latest(
 ) -> Result<Option<Reading>, StoreError> {
     let row = sqlx::query_as!(
         Row,
-        "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,
-                first_reading, counts, hold_reason, hold_before
+        "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,
+                games_read, first_reading, counts, hold_reason, hold_before
          FROM readings WHERE club_number = $1 AND season_year = $2
          ORDER BY id DESC LIMIT 1",
         club.0,
@@ -101,8 +105,8 @@ pub async fn last_good(
 ) -> Result<Option<Reading>, StoreError> {
     let row = sqlx::query_as!(
         Row,
-        "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,
-                first_reading, counts, hold_reason, hold_before
+        "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,
+                games_read, first_reading, counts, hold_reason, hold_before
          FROM readings WHERE club_number = $1 AND season_year = $2 AND result = 'good'
          ORDER BY id DESC LIMIT 1",
         club.0,
@@ -113,33 +117,56 @@ pub async fn last_good(
     row.map(Row::into_reading).transpose()
 }
 
-/// Whether `club` and `season` have a good reading that finished at or after `at`.
-pub async fn good_since(
+/// The newest reading of `club` and `season` that did not fail. A failed reading changes nothing,
+/// so a held-back reading stays open behind it.
+pub async fn newest_not_failed(
+    db: impl PgExecutor<'_>,
+    club: ClubNumber,
+    season: Season,
+) -> Result<Option<Reading>, StoreError> {
+    let row = sqlx::query_as!(
+        Row,
+        "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,
+                games_read, first_reading, counts, hold_reason, hold_before
+         FROM readings WHERE club_number = $1 AND season_year = $2 AND result <> 'failed'
+         ORDER BY id DESC LIMIT 1",
+        club.0,
+        season.start_year(),
+    )
+    .fetch_optional(db)
+    .await?;
+    row.map(Row::into_reading).transpose()
+}
+
+/// The newest good reading of `club` and `season` that started after `at`: it read the source
+/// later, so its games are newer.
+pub async fn good_started_after(
     db: impl PgExecutor<'_>,
     club: ClubNumber,
     season: Season,
     at: DateTime<Utc>,
-) -> Result<bool, StoreError> {
-    let found = sqlx::query_scalar!(
-        r#"SELECT EXISTS (
-               SELECT 1 FROM readings
-               WHERE club_number = $1 AND season_year = $2 AND result = 'good'
-                 AND finished_at >= $3
-           ) AS "found!""#,
+) -> Result<Option<Reading>, StoreError> {
+    let row = sqlx::query_as!(
+        Row,
+        "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,
+                games_read, first_reading, counts, hold_reason, hold_before
+         FROM readings
+         WHERE club_number = $1 AND season_year = $2 AND result = 'good' AND started_at > $3
+         ORDER BY id DESC LIMIT 1",
         club.0,
         season.start_year(),
         at,
     )
-    .fetch_one(db)
+    .fetch_optional(db)
     .await?;
-    Ok(found)
+    row.map(Row::into_reading).transpose()
 }
 
 pub async fn by_id(db: impl PgExecutor<'_>, id: i64) -> Result<Option<Reading>, StoreError> {
     let row = sqlx::query_as!(
         Row,
-        "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,
-                first_reading, counts, hold_reason, hold_before
+        "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,
+                games_read, first_reading, counts, hold_reason, hold_before
          FROM readings WHERE id = $1",
         id,
     )
@@ -271,6 +298,7 @@ struct Row {
     id: i64,
     club_number: i64,
     season_year: i32,
+    team_number: Option<i64>,
     started_at: DateTime<Utc>,
     finished_at: DateTime<Utc>,
     result: String,
@@ -320,6 +348,7 @@ impl Row {
             id: self.id,
             club: ClubNumber(self.club_number),
             season: Season::from_start_year(self.season_year),
+            team: self.team_number.map(TeamNumber),
             started_at: self.started_at,
             finished_at: self.finished_at,
             result,

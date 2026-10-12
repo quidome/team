@@ -64,8 +64,6 @@ pub fn compare(
         .iter()
         .map(|stored| (stored.game.source_id, stored))
         .collect();
-    let read_ids: BTreeSet<i64> = read.iter().map(|game| game.source_id).collect();
-
     let mut changes = Vec::new();
     for after in read {
         let change = match stored_by_id.get(&after.source_id) {
@@ -90,11 +88,8 @@ pub fn compare(
             });
         }
     }
-    for stored in stored {
-        let gone = stored.in_list
-            && !read_ids.contains(&stored.game.source_id)
-            && schedule(&stored.game).is_some();
-        if gone {
+    for stored in no_longer_in_list(stored, read) {
+        if schedule(&stored.game).is_some() {
             changes.push(GameChange {
                 source_id: stored.game.source_id,
                 change: Change::Gone,
@@ -105,6 +100,17 @@ pub fn compare(
     }
     changes.sort_by_key(|change| change.source_id);
     changes
+}
+
+/// The stored games that were in the game list and are not in this reading. All of them are
+/// stored as no longer in the game list (the game list is the truth); `compare` counts only the
+/// ones in the schedule as `Gone`.
+pub fn no_longer_in_list<'a>(stored: &'a [StoredGame], read: &[Game]) -> Vec<&'a StoredGame> {
+    let read_ids: BTreeSet<i64> = read.iter().map(|game| game.source_id).collect();
+    stored
+        .iter()
+        .filter(|stored| stored.in_list && !read_ids.contains(&stored.game.source_id))
+        .collect()
 }
 
 fn differences(before: &Game, after: &Game) -> Vec<Difference> {
@@ -464,6 +470,36 @@ mod tests {
                 out_of_schedule: 1,
             }
         );
+    }
+
+    #[test]
+    fn every_missing_game_in_the_list_is_no_longer_in_the_list() {
+        let before = [
+            StoredGame {
+                game: team_game(),
+                in_list: true,
+            },
+            StoredGame {
+                game: game(2, OPPONENT, CLUB_TEAM),
+                in_list: true,
+            },
+            StoredGame {
+                game: game(3, TEAM, OPPONENT),
+                in_list: false,
+            },
+            StoredGame {
+                game: game(4, TEAM, OPPONENT),
+                in_list: true,
+            },
+        ];
+        let read = [game(4, TEAM, OPPONENT)];
+        let ids: Vec<i64> = no_longer_in_list(&before, &read)
+            .iter()
+            .map(|stored| stored.game.source_id)
+            .collect();
+        assert_eq!(ids, [1, 2]);
+        // Only the one in the schedule counts.
+        assert_eq!(kinds(&before, &read), [(1, Change::Gone)]);
     }
 
     #[test]

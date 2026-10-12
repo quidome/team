@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::app::AppState;
 use crate::error::AppError;
-use crate::reading::{self, ReadingError};
+use crate::reading::{self, Mode, ReadingError};
 use crate::readings::{self, FailureKind, Reading, ReadingResult};
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -153,12 +153,16 @@ pub struct LastGood {
 pub struct LatestReadings {
     pub latest: Option<ReadingView>,
     pub last_good: Option<LastGood>,
+    /// The held-back reading the coordinator can confirm: the newest reading that did not fail,
+    /// when it is held back. A failed reading after it does not hide it.
+    pub held_back: Option<ReadingView>,
 }
 
 impl From<ReadingError> for AppError {
     fn from(error: ReadingError) -> Self {
         match error {
             ReadingError::NoChoice => Self::BadRequest("no_choice"),
+            ReadingError::NotHeldBack => Self::BadRequest("not_held_back"),
             ReadingError::Store(error) => error.into(),
             ReadingError::Client(error) => Self::Internal(error.into()),
         }
@@ -175,7 +179,13 @@ impl From<ReadingError> for AppError {
     )
 )]
 pub async fn read(State(state): State<AppState>) -> Result<Json<ReadingView>, AppError> {
-    let reading = reading::read(&state.pool, &state.source, state.clock.as_ref(), true).await?;
+    let reading = reading::read(
+        &state.pool,
+        &state.source,
+        state.clock.as_ref(),
+        Mode::Guarded,
+    )
+    .await?;
     Ok(Json(reading.into()))
 }
 
@@ -192,6 +202,7 @@ pub async fn latest(State(state): State<AppState>) -> Result<Json<LatestReadings
         return Ok(Json(LatestReadings {
             latest: None,
             last_good: None,
+            held_back: None,
         }));
     };
     let latest = readings::latest(&state.pool, target.club, target.season).await?;
@@ -204,9 +215,13 @@ pub async fn latest(State(state): State<AppState>) -> Result<Json<LatestReadings
             }),
             _ => None,
         });
+    let held_back = readings::newest_not_failed(&state.pool, target.club, target.season)
+        .await?
+        .filter(|reading| matches!(reading.result, ReadingResult::HeldBack(_)));
     Ok(Json(LatestReadings {
         latest: latest.map(ReadingView::from),
         last_good,
+        held_back: held_back.map(ReadingView::from),
     }))
 }
 
@@ -215,8 +230,8 @@ pub async fn latest(State(state): State<AppState>) -> Result<Json<LatestReadings
     path = "/api/readings/{id}/confirm-gone",
     params(("id" = i64, Path, description = "The held-back reading")),
     responses(
-        (status = 200, description = "A new reading without the guard: the missing games count as no longer in the game list", body = ReadingView),
-        (status = 400, description = "`not_held_back`: not the newest reading of the current club and season, or not held back; `no_choice`"),
+        (status = 200, description = "A new reading: with at least as many games as the held-back reading, the missing games count as no longer in the game list; with fewer, it is held back again", body = ReadingView),
+        (status = 400, description = "`not_held_back`: not the newest reading of the current club and season that did not fail, or not held back; `no_choice`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such reading"),
     )
@@ -225,17 +240,10 @@ pub async fn confirm_gone(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Json<ReadingView>, AppError> {
-    let held = readings::by_id(&state.pool, id)
+    readings::by_id(&state.pool, id)
         .await?
         .ok_or(AppError::NotFound)?;
-    let target = reading::target(&state.pool, state.clock.as_ref())
-        .await?
-        .ok_or(AppError::BadRequest("no_choice"))?;
-    let newest = readings::latest(&state.pool, target.club, target.season).await?;
-    let is_newest = newest.is_some_and(|newest| newest.id == held.id);
-    if !is_newest || !matches!(held.result, ReadingResult::HeldBack(_)) {
-        return Err(AppError::BadRequest("not_held_back"));
-    }
-    let reading = reading::read(&state.pool, &state.source, state.clock.as_ref(), false).await?;
+    let mode = Mode::Confirm { held_id: id };
+    let reading = reading::read(&state.pool, &state.source, state.clock.as_ref(), mode).await?;
     Ok(Json(reading.into()))
 }

@@ -217,6 +217,7 @@ export interface components {
 		};
 		/** @description The newest reading and the last good reading of the current club and season. */
 		LatestReadings: {
+			held_back?: null | components['schemas']['ReadingView'];
 			last_good?: null | components['schemas']['LastGood'];
 			latest?: null | components['schemas']['ReadingView'];
 		};
@@ -525,7 +526,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description A new reading without the guard: the missing games count as no longer in the game list */
+			/** @description A new reading: with at least as many games as the held-back reading, the missing games count as no longer in the game list; with fewer, it is held back again */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -534,7 +535,7 @@ export interface operations {
 					'application/json': components['schemas']['ReadingView'];
 				};
 			};
-			/** @description `not_held_back`: not the newest reading of the current club and season, or not held back; `no_choice` */
+			/** @description `not_held_back`: not the newest reading of the current club and season that did not fail, or not held back; `no_choice` */
 			400: {
 				headers: {
 					[name: string]: unknown;

@@ -226,11 +226,12 @@ async fn readings_read_back_equal(pool: PgPool) {
         ReadingResult::Failed(FailureKind::SourceUnavailable),
         ReadingResult::Failed(FailureKind::SourceFormat),
     ];
+    let team = Some(TeamNumber(184));
     let mut ids = Vec::new();
     for (minutes, result) in (0..).zip(&results) {
         let at = now() + chrono::TimeDelta::minutes(minutes);
         ids.push(
-            readings::insert(&pool, DRAKES, this, at, at, result)
+            readings::insert(&pool, DRAKES, this, team, at, at, result)
                 .await
                 .unwrap(),
         );
@@ -238,7 +239,10 @@ async fn readings_read_back_equal(pool: PgPool) {
     for (id, result) in ids.iter().zip(&results) {
         let reading = readings::by_id(&pool, *id).await.unwrap().unwrap();
         assert_eq!(&reading.result, result);
-        assert_eq!((reading.club, reading.season), (DRAKES, this));
+        assert_eq!(
+            (reading.club, reading.season, reading.team),
+            (DRAKES, this, team)
+        );
     }
 
     let latest = readings::latest(&pool, DRAKES, this)
@@ -251,16 +255,26 @@ async fn readings_read_back_equal(pool: PgPool) {
         .unwrap()
         .unwrap();
     assert_eq!(last_good.id, ids[1]);
-    assert!(
-        readings::good_since(&pool, DRAKES, this, now() + chrono::TimeDelta::minutes(1))
-            .await
-            .unwrap()
+    // The newest that did not fail is the far-fewer hold.
+    let not_failed = readings::newest_not_failed(&pool, DRAKES, this)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(not_failed.id, ids[3]);
+    // The second good reading started 1 minute after `now`.
+    let after = |minutes| {
+        readings::good_started_after(
+            &pool,
+            DRAKES,
+            this,
+            now() + chrono::TimeDelta::minutes(minutes),
+        )
+    };
+    assert_eq!(
+        after(0).await.unwrap().map(|reading| reading.id),
+        Some(ids[1])
     );
-    assert!(
-        !readings::good_since(&pool, DRAKES, this, now() + chrono::TimeDelta::minutes(2))
-            .await
-            .unwrap()
-    );
+    assert_eq!(after(1).await.unwrap(), None);
     assert_eq!(
         readings::latest(&pool, DRAKES, season("2025-2026"))
             .await

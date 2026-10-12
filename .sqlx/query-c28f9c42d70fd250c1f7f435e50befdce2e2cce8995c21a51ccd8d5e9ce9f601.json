@@ -1,0 +1,95 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,\n                games_read, first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE club_number = $1 AND season_year = $2 AND result <> 'failed'\n         ORDER BY id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "club_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "season_year",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "result",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "error",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "games_read",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "first_reading",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "counts",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "hold_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "hold_before",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c28f9c42d70fd250c1f7f435e50befdce2e2cce8995c21a51ccd8d5e9ce9f601"
+}

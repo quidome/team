@@ -19,6 +19,8 @@
 
 	let latest = $state<Reading | null>(untrack(() => readings.latest ?? null));
 	let lastGood = $state(untrack(() => readings.last_good ?? null));
+	/** The held-back reading to confirm; a failed reading after it does not hide it. */
+	let held = $state<Reading | null>(untrack(() => readings.held_back ?? null));
 	/** The reading of the last tap on this page; the result line shows only for it. */
 	let tapped = $state<Reading | null>(null);
 	let busy = $state(false);
@@ -33,7 +35,9 @@
 			tapped = reading;
 			if (reading.result === 'good' && reading.games_read != null) {
 				lastGood = { finished_at: reading.finished_at, games_read: reading.games_read };
+				held = null;
 			}
+			if (reading.result === 'held_back') held = reading;
 		} catch (failure) {
 			error =
 				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
@@ -66,23 +70,24 @@
 		</p>
 	{/if}
 
-	{#if latest?.result === 'held_back' && latest.hold}
-		{@const held = latest}
+	{#if held?.hold}
+		{@const hold = held.hold}
+		{@const heldId = held.id}
 		<div
 			class="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-4"
 			role="alert"
 			data-testid="reading-held-back"
 		>
 			<p class="text-sm">
-				{#if latest.hold.reason === 'empty'}
+				{#if hold.reason === 'empty'}
 					The game list has no games now.
 				{:else}
-					The game list has far fewer games than before ({latest.hold.now} instead of
-					{latest.hold.before}).
+					The game list has far fewer games than before ({hold.now} instead of
+					{hold.before}).
 				{/if}
 				The games are kept.
 			</p>
-			<Button variant="outline" disabled={busy} onclick={() => run(() => confirmGone(held.id))}>
+			<Button variant="outline" disabled={busy} onclick={() => run(() => confirmGone(heldId))}>
 				These games are really gone
 			</Button>
 		</div>

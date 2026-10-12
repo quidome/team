@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,\n                first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE club_number = $1 AND season_year = $2 AND result = 'good'\n         ORDER BY id DESC LIMIT 1",
+  "query": "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,\n                games_read, first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE club_number = $1 AND season_year = $2 AND result = 'good'\n         ORDER BY id DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -20,46 +20,51 @@
       },
       {
         "ordinal": 3,
+        "name": "team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "finished_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "result",
         "type_info": "Text"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "error",
         "type_info": "Text"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "games_read",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "first_reading",
         "type_info": "Bool"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "counts",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "hold_reason",
         "type_info": "Text"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "hold_before",
         "type_info": "Int4"
       }
@@ -74,6 +79,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,
@@ -85,5 +91,5 @@
       true
     ]
   },
-  "hash": "a7f165a8321f927ca495ae55ad2152a6f2d93f05d5e7255bd70ad44923ef267e"
+  "hash": "97dfb2b2f3072e810788fa3ff779ff30e87ddff8b47e0830bfdcb6b8b6cfc17b"
 }

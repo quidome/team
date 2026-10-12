@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,\n                first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE id = $1",
+  "query": "SELECT id, club_number, season_year, team_number, started_at, finished_at, result, error,\n                games_read, first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -20,46 +20,51 @@
       },
       {
         "ordinal": 3,
+        "name": "team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
         "name": "started_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "finished_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "result",
         "type_info": "Text"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "error",
         "type_info": "Text"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "games_read",
         "type_info": "Int4"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "first_reading",
         "type_info": "Bool"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "counts",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "hold_reason",
         "type_info": "Text"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "hold_before",
         "type_info": "Int4"
       }
@@ -73,6 +78,7 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       false,
@@ -84,5 +90,5 @@
       true
     ]
   },
-  "hash": "87ce0ec3dfc2862891d1cb5f7f0ebf7b0e7e4b24b5292e8d4a8c5528b52c503b"
+  "hash": "0dd770bd8eb63eb3109710c0b33e28ea20cd4c7599a20bb3fb4cb51d98de56b2"
 }

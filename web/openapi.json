@@ -210,7 +210,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A new reading without the guard: the missing games count as no longer in the game list",
+            "description": "A new reading: with at least as many games as the held-back reading, the missing games count as no longer in the game list; with fewer, it is held back again",
             "content": {
               "application/json": {
                 "schema": {
@@ -220,7 +220,7 @@
             }
           },
           "400": {
-            "description": "`not_held_back`: not the newest reading of the current club and season, or not held back; `no_choice`"
+            "description": "`not_held_back`: not the newest reading of the current club and season that did not fail, or not held back; `no_choice`"
           },
           "401": {
             "description": "Not logged in"
@@ -486,6 +486,17 @@
         "type": "object",
         "description": "The newest reading and the last good reading of the current club and season.",
         "properties": {
+          "held_back": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReadingView",
+                "description": "The held-back reading the coordinator can confirm: the newest reading that did not fail,\nwhen it is held back. A failed reading after it does not hide it."
+              }
+            ]
+          },
           "last_good": {
             "oneOf": [
               {
