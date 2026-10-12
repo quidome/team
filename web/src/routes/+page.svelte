@@ -14,10 +14,17 @@
 	// "Game list" card again and lose its result line.
 	let schedule = $derived(data.schedule);
 	let hasReading = $derived(Boolean(data.readings?.last_good));
+	let scheduleError = $state(false);
 
+	/** After a good reading. A failure here is not a failed reading, so the card does not show it. */
 	async function refreshSchedule() {
-		schedule = await loadSchedule(fetch);
 		hasReading = true;
+		try {
+			schedule = await loadSchedule(fetch);
+			scheduleError = false;
+		} catch {
+			scheduleError = true;
+		}
 	}
 </script>
 
@@ -90,6 +97,11 @@
 		{#if schedule}
 			<section aria-labelledby="schedule-heading" class="space-y-3">
 				<h2 id="schedule-heading" class="text-lg font-semibold tracking-tight">Schedule</h2>
+				{#if scheduleError}
+					<p class="text-sm" role="alert" data-testid="schedule-error">
+						The new schedule could not be loaded. Load the page again.
+					</p>
+				{/if}
 				<Schedule {schedule} {hasReading} />
 			</section>
 		{/if}

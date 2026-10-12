@@ -86,7 +86,10 @@ start team-smoke-bypass 3001 DEV_AUTH_BYPASS=true DEV_NOW=2020-01-01T00:00:00Z
 expect_status http://localhost:3001/api/health/liveness 200
 expect_status http://localhost:3001/api/me 401
 echo "ok   the release build ignores DEV_AUTH_BYPASS"
-docker logs team-smoke-bypass 2>&1 | grep -q 'DEV_NOW is set but ignored' \
+# The log is read whole first: `grep -q` stops at the first match, which with pipefail could
+# fail the pipe while `docker logs` still writes.
+bypass_log=$(docker logs team-smoke-bypass 2>&1)
+grep -q 'DEV_NOW is set but ignored' <<<"$bypass_log" \
     || fail "the release build does not say that it ignores DEV_NOW"
 echo "ok   the release build ignores DEV_NOW"
 

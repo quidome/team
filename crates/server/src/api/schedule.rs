@@ -4,7 +4,7 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    ChoiceState, Club, ScheduleReason, ScheduledGame, Season, Team, choice_state, schedule,
+    ScheduleReason, ScheduleTarget, ScheduledGame, choice_state, schedule, schedule_target,
 };
 use utoipa::ToSchema;
 
@@ -95,30 +95,20 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ScheduleAnswer>, 
     let season = current_season(state.clock.as_ref());
     let this_season = followed_teams::for_season(&state.pool, season).await?;
     let earlier = followed_teams::newest_before(&state.pool, season).await?;
-    let shown = match choice_state(this_season, earlier) {
-        ChoiceState::Chosen { club, team, .. } => Some((season, club, team, false)),
-        ChoiceState::TeamNeeded { last, .. } => last.and_then(|last| {
-            let team = last.team?;
-            Some((last.season, last.club, team, true))
-        }),
-        ChoiceState::NotChosen => None,
-    };
-    let schedule = match shown {
-        Some((season, club, team, last_season)) => {
-            Some(view(&state, season, club, team, last_season).await?)
-        }
+    let schedule = match schedule_target(choice_state(this_season, earlier)) {
+        Some(target) => Some(view(&state, target).await?),
         None => None,
     };
     Ok(Json(ScheduleAnswer { schedule }))
 }
 
-async fn view(
-    state: &AppState,
-    season: Season,
-    club: Club,
-    team: Team,
-    last_season: bool,
-) -> Result<ScheduleView, AppError> {
+async fn view(state: &AppState, target: ScheduleTarget) -> Result<ScheduleView, AppError> {
+    let ScheduleTarget {
+        season,
+        club,
+        team,
+        last_season,
+    } = target;
     let mut db = state
         .pool
         .acquire()

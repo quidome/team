@@ -8,7 +8,14 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import type { Schedule } from '#lib/api/client.js';
-	import { filterGames, filters, formatDay, groupByDate, type Filter } from '#lib/schedule.js';
+	import {
+		filterGames,
+		filters,
+		formatDay,
+		groupByDate,
+		noGamesLine,
+		type Filter
+	} from '#lib/schedule.js';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 
 	let {
@@ -36,7 +43,7 @@
 			<section aria-labelledby="day-{group.date}">
 				<h3
 					id="day-{group.date}"
-					class="sticky top-14 z-[1] -mx-4 bg-background/95 px-4 py-2 text-sm font-semibold text-muted-foreground backdrop-blur"
+					class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[1] -mx-4 bg-background/95 px-4 py-2 text-sm font-semibold text-muted-foreground backdrop-blur"
 					data-testid="day"
 				>
 					{formatDay(group.date)}
@@ -95,9 +102,13 @@
 <div class="space-y-5">
 	{#if empty}
 		<p class="text-sm text-muted-foreground" data-testid="schedule-empty">
-			{hasReading
-				? 'The game list has no games for this season yet.'
-				: 'The game list has not been read yet.'}
+			{#if schedule.last_season}
+				The tool has no games of {schedule.season}.
+			{:else if hasReading}
+				The game list has no games for this season yet.
+			{:else}
+				The game list has not been read yet.
+			{/if}
 		</p>
 	{:else}
 		<ToggleGroup.Root
@@ -123,8 +134,10 @@
 			{/each}
 		</ToggleGroup.Root>
 
-		{#if schedule.coming.length === 0}
-			<p class="text-sm text-muted-foreground" data-testid="no-coming-games">No coming games.</p>
+		{#if coming.length === 0}
+			<p class="text-sm text-muted-foreground" data-testid="no-coming-games">
+				{noGamesLine(filter, 'coming')}
+			</p>
 		{:else}
 			{@render games(coming)}
 		{/if}
@@ -140,7 +153,11 @@
 			</Button>
 			{#if showPast}
 				<div data-testid="past-games">
-					{@render games(past)}
+					{#if past.length === 0}
+						<p class="text-sm text-muted-foreground">{noGamesLine(filter, 'past')}</p>
+					{:else}
+						{@render games(past)}
+					{/if}
 				</div>
 			{/if}
 		{/if}

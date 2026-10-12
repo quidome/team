@@ -46,6 +46,40 @@ pub enum ChoiceState {
     },
 }
 
+/// Whose schedule to show: a season, its club and team.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduleTarget {
+    pub season: Season,
+    pub club: Club,
+    pub team: Team,
+    /// True: a team is needed for the current season; this is the newest earlier choice.
+    pub last_season: bool,
+}
+
+/// The schedule to show for a state of the choice: the chosen team of the current season; while a
+/// team is needed, the team of the newest earlier choice (functional story 1: last season's games
+/// until the team is chosen again). `None` when nothing is chosen, or the newest earlier choice
+/// has no team.
+pub fn schedule_target(state: ChoiceState) -> Option<ScheduleTarget> {
+    match state {
+        ChoiceState::Chosen { season, club, team } => Some(ScheduleTarget {
+            season,
+            club,
+            team,
+            last_season: false,
+        }),
+        ChoiceState::TeamNeeded { last, .. } => last.and_then(|last| {
+            Some(ScheduleTarget {
+                season: last.season,
+                club: last.club,
+                team: last.team?,
+                last_season: true,
+            })
+        }),
+        ChoiceState::NotChosen => None,
+    }
+}
+
 /// The teams of `club` in `games` (opponents left out), each team once, sorted by name.
 pub fn own_teams(club: &Club, games: &[Game]) -> Vec<Team> {
     // For each team number, the full name of its latest game.
@@ -329,6 +363,36 @@ mod tests {
                 name: name.to_owned(),
             }),
         }
+    }
+
+    #[test]
+    fn the_schedule_is_of_the_chosen_team() {
+        let state = choice_state(Some(followed("2026-2027", Some((184, "M16 1")))), None);
+        let target = schedule_target(state).expect("a target");
+        assert_eq!(target.season, season("2026-2027"));
+        assert_eq!(target.team.number, TeamNumber(184));
+        assert!(!target.last_season);
+    }
+
+    #[test]
+    fn while_a_team_is_needed_the_schedule_is_of_last_season() {
+        let earlier = followed("2026-2027", Some((184, "M16 1")));
+        for this_season in [None, Some(followed("2027-2028", None))] {
+            let state = choice_state(this_season, Some(earlier.clone()));
+            let target = schedule_target(state).expect("a target");
+            assert_eq!(target.season, season("2026-2027"));
+            assert_eq!(target.team.number, TeamNumber(184));
+            assert!(target.last_season);
+        }
+    }
+
+    #[test]
+    fn without_a_team_in_this_or_the_last_season_there_is_no_schedule() {
+        assert_eq!(schedule_target(choice_state(None, None)), None);
+        let club_only = choice_state(Some(followed("2026-2027", None)), None);
+        assert_eq!(schedule_target(club_only), None);
+        let earlier_club_only = choice_state(None, Some(followed("2026-2027", None)));
+        assert_eq!(schedule_target(earlier_club_only), None);
     }
 
     #[test]

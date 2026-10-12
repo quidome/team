@@ -1,6 +1,6 @@
 # Technical spec: The schedule
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-12-the-schedule
 **Date**: 2026-10-12
@@ -231,3 +231,134 @@ Small choices in the build (step 5, 2026-10-12):
   newest date first. Above the open past games it also says "No coming games." (true, kept).
 
 ## Review findings
+
+### Acceptance review (2026-10-12)
+By `/review accept` (fresh agent). Input: mode `accept` and this change folder; no other
+arguments. Read: `change.md`, this file, the epic's `functional.md` (stories 1 and 3) and
+`idea.md`, `docs/vision.md`, `docs/language.md`, and the diff of commit 4497315. Not read:
+`docs/changes/done/`. Run: `cargo test -p team_core schedule` (14 passed). Looked at the browser
+test screenshot `web/test-results/look/schedule-light.png` (390 px wide, 12 October 2026, fake
+source). Router tests (`tests/schedule.rs`) and Playwright were not run (no database started).
+The **Deviations** are in the same file as the steps, so they were read before this view was
+complete; each point below was checked against the functional spec on its own.
+
+**Story 3 (See the schedule)**
+
+| Criterion or open point | Built | Sort | How checked |
+|---|---|---|---|
+| Team games home and away, home games of other club teams, no away games of other club teams | `in_schedule` + `schedule` in core | matches | read `crates/core/src/schedule.rs`; unit tests run |
+| Quick filter, three choices, one tap | `ToggleGroup`, always one choice, filters coming and past on the screen | matches; see A1 | read `Schedule.svelte`, `schedule.ts` |
+| Coming first, time order, grouped by date; past on request | Server splits on the Dutch date; "Show past games" | matches | read; screenshot |
+| Past games newest date first; a game today is coming; unknown time last within its date | as listed under Deviations | faithful adaptation | read core rule and tests |
+| Team games look clearly different | coloured edge, tinted card, badge "Team" | matches | screenshot: the team games stand out among 18 duty games |
+| Day, date, start time, home, away, hall and town | all shown; "Sat 31 Oct" heading | matches | screenshot |
+| 00:00 shows "time not known yet"; no results | `start_time: null`; the view has no result field | matches | read `api/schedule.rs` (no score in `ScheduleGame`) |
+| A game no longer in the game list crossed out, hidden after "seen" | crossed out with a badge; stays until story 4 | faithful adaptation (coordinator's answer, recorded) | read |
+| Last good reading and a failed reading on the screen | the "Game list" card above the schedule | matches | read `+page.svelte`, `ReadGameList.svelte` |
+| No games yet: says so, and when last read | "has no games for this season yet" plus "Last read" on the card; before any reading "has not been read yet" | faithful adaptation | read |
+| Phone, one hand | 320 px test, the first coming game is in the first screen at 390 × 800 | matches | screenshot (top ≈ 300 px is header and card) |
+| Only the coordinator | route on the protected `/api` router | matches | read `app.rs`, `api/mod.rs` |
+| "The first thing shown is the next games" | team header and the "Game list" card come first, then the games | neutral drift | screenshot: next games still above the fold |
+
+**Story 1 (the parts this change builds)**
+
+| Criterion | Built | Sort | How checked |
+|---|---|---|---|
+| Chooses M16 1, the tool reads the game list and shows the games | the save calls `readNow()`, then the start page loads; a failed request leaves the choice saved | matches | read `ChooseTeam.svelte` |
+| After a change, the games shown follow the new choice | `/choose` navigates with `invalidateAll`; the reading runs before it | matches | read; the preload bug fix is a faithful repair of story 2 |
+| New season: last season's games, and says a new choice is needed | choose step first, then "Last season · 2026-2027", team name, past games open | matches | read `+page.svelte`, `api/schedule.rs` match on `choice_state` |
+
+**Findings**
+
+- **A1 – concerning deviation (small, no spec change needed).** A filter with no games shows an empty area with no words. `Schedule.svelte` decides "No coming games." on the unfiltered `schedule.coming`, then renders the filtered groups; when the filter leaves nothing, nothing is shown between the filter and "Show past games" (the same for the open past games). This is a real case, not a corner: the youth teams' games stop at the end of the calendar year (functional Context), so from mid-December until the second half appears, "Games of the team" is blank — the screenshot's data already shows no M16 1 game after Sat 12 Dec. A blank list after one tap reads as "the games are lost", against "keep it correct". Say it in words (for example "No coming games of the team."), and add a test. Checked: trace of `Schedule.svelte` (`schedule.coming.length === 0` vs `coming`), and the screenshot.
+  - 2026-10-12: fixed. `Schedule.svelte` decides on the filtered lists and shows a line from `noGamesLine` in `schedule.ts` ("No coming games of the team.", "No past possible duty games.", …), for the coming and the open past games. Test: browser test "a filter that leaves no games says so" (the schedule answer without coming team games, by `page.route`).
+- **A2 – neutral drift.** The start page shows the team header and the "Game list" card above the schedule; the spec's behaviour shows "Last read" and then the games. At 390 × 800 the first coming games are still in the first screen, so the intent holds. Watch it when story 4 adds the line of unseen changes. Checked: screenshot.
+  - 2026-10-12: not fixed: the first coming games are in the first screen at 390 × 800, so the intent holds. For the design of story 4, which adds the line of unseen changes to this page.
+- **A3 – neutral drift.** In the last-season view the empty text would be "The game list has no games for this season yet." under the heading "Last season". It shows only if the earlier season has a team but no stored games (for example a choice saved in story 2, before readings were stored). Rare; the words should not say "this season" there. Checked: trace (`hasReading` is always true in that view); not run.
+  - 2026-10-12: fixed. The last-season view with no games says "The tool has no games of 2025-2026." (its own season). Test: browser test "an earlier season with no kept games says which season" (`page.route`).
+- **A4 – faithful adaptation.** The reading after a choice shows no result line; the schedule is the visible result, and story 4 says the first reading lists nothing as new. Checked: read.
+  - 2026-10-12: no change needed.
+- The deviation from the epic's API outline (no `filter` and `period` parameters) is not visible to the coordinator: faithful.
+
+**Verdict: accepted with notes.** The schedule is what story 3 meant and the choose flow now does
+what story 1's behaviour says. A1 should be fixed before release (a few lines and a test in the
+build, not a spec question); A2 and A3 are for awareness.
+
+### Build review (2026-10-12)
+By `/review build` (fresh agent). Input: mode `build` and this change folder; no other
+arguments. Read: commit 4497315 against 3728d7b, and the uncommitted changes in the work tree
+during the review (the fix of A1 and A3 in `Schedule.svelte`, `schedule.ts` and two browser
+tests), this change folder, `docs/architecture.md`, decisions 0001, 0007, 0012, 0015, `CLAUDE.md`.
+Run (on the work tree with the uncommitted fix): `cargo test -p team_core schedule` (14 passed),
+`cargo test -p team --test schedule` (9 passed), `--test source` (22 passed, 1 ignored),
+`cargo test -p team --lib` (19 passed), `cargo clippy --all-targets -D warnings` and
+`cargo clippy -p team --release -D warnings` (clean, so the `cfg(debug_assertions)` split
+compiles both ways), `just api-types-check` (no diff), `svelte-check` and `npm run lint` (clean),
+`npm run build` + Playwright (19 passed, including the two new tests). Not run: `just images` /
+`just smoke`, so the release image's handling of `DEV_NOW` was not seen.
+
+No finding blocks Close. The core rule, the route, the `DEV_NOW` split and the choose flow follow
+the project's rules; the A1/A3 fix covers both lists (coming and past) and the last-season view.
+
+- **R1 – logic in the wrong place (low).** Which schedule shows is a product rule (functional
+  story 1: in a new season, last season's games until the team is chosen again), but it is
+  decided in the handler `api/schedule.rs::get` (the `match` on `choice_state`: `TeamNeeded` with
+  an earlier team → that season with `last_season: true`, else `null`). The architecture says
+  "new rules go in `crates/core` first; `crates/server` only moves data in and out" (decision
+  0001). It is covered only by router tests, not by a core unit test. A side effect of the rule
+  as written: only the *newest* earlier choice is looked at, so if that one has a club and no team
+  (a club saved with no games yet) while an older season had a team, no schedule shows. That
+  matches the design's table, so it is not a bug, but a core function (for example
+  `team_choice::schedule_target(state) -> Option<(Season, Club, Team, bool)>`) would make it a
+  tested rule. Checked: read of `api/schedule.rs` against `architecture.md` "Patterns to follow".
+  - 2026-10-12: fixed. `team_core::schedule_target(state) -> Option<ScheduleTarget>` (in `team_choice.rs`) is the rule; the handler only loads the choice and the games. The behaviour is unchanged (only the newest earlier choice is looked at, as designed). Tests: core `the_schedule_is_of_the_chosen_team`, `while_a_team_is_needed_the_schedule_is_of_last_season`, `without_a_team_in_this_or_the_last_season_there_is_no_schedule`; the 9 router tests still pass.
+- **R2 – a failed schedule reload looks like a failed reading (low).** `ReadGameList.run` awaits
+  `onRead()` inside its `try`. When `GET /api/schedule` fails after a good reading,
+  the `catch` sets `error` and the card shows "Something went wrong. Please try again." (or the
+  API message) right under the result line of a reading that succeeded, and the old schedule
+  stays. The twin path "These games are really gone" (`confirmGone`) goes through the same `run`,
+  so it has the same effect. Catch the reload on its own (in `refreshSchedule` or around
+  `onRead`). Checked: trace of `ReadGameList.svelte` and `+page.svelte`; not run.
+  - 2026-10-12: fixed. `refreshSchedule` on the start page catches its own failure and shows "The new schedule could not be loaded. Load the page again." above the old schedule; the card shows only the reading. This covers "These games are really gone" too (same callback). Test: browser test "a schedule that cannot be loaded after a reading does not look like a failed reading".
+- **R3 – the change of team is not tested against the schedule (low, test gap).** "The
+  coordinator changes the team later" checks only the team name after the save. Nothing (browser
+  or router) checks that the schedule then follows M16 2 (its team games marked, M16 1's games
+  as duty games or gone), although the `invalidateAll` fix of step 4 exists for exactly that
+  case. One assertion on `[data-of-team="true"]` after the change would close it. Checked: read
+  of `choose.e2e.ts` and `tests/schedule.rs` (search for a second team number: none).
+  - 2026-10-12: fixed. "The coordinator changes the team later" now checks that the 5 team games are games of Blue Drakes M16 2 and none of M16 1.
+- **R4 – possible flake in the smoke test (low).** `scripts/smoke-test.sh` runs with
+  `set -o pipefail` and checks `docker logs team-smoke-bypass 2>&1 | grep -q 'DEV_NOW is set but
+  ignored'`. `grep -q` exits at the first match; if `docker logs` is still writing later lines,
+  it gets SIGPIPE, the pipeline fails and the script reports that the release build does not
+  ignore `DEV_NOW`. Capture the log first (`logs=$(docker logs … 2>&1)`) or use
+  `grep -q … <(docker logs …)`. Checked: read of the script; not run (no image build).
+  - 2026-10-12: fixed. The script reads the log into a variable first, then `grep -q` on it. `just images` and `just smoke` pass ("ok   the release build ignores DEV_NOW").
+- **R5 – sticky date headings under the header in the installed app (low, not checked on a
+  device).** The date headings stick at `top-14` (3.5 rem), but the header is `h-14` plus
+  `pt-[env(safe-area-inset-top)]`, and the app has `viewport-fit=cover` and a manifest with
+  `"display": "standalone"`. Where the top inset is not 0, a sticky heading slides partly under
+  the header. Checked: search of `sticky\|h-14` in `+layout.svelte`, `viewport` in `app.html`.
+  - 2026-10-12: fixed. The date headings stick at `calc(3.5rem + env(safe-area-inset-top))`, the height of the header with its top inset. Not checked on a device (no test can set the inset); the browser tests and screenshots are unchanged where the inset is 0.
+- **R6 – documents the change makes false (for `/close`).** Checked: `git grep -i sample` and a
+  read of `architecture.md`, `README.md`.
+  - `docs/architecture.md`: the debt line "The sample page `/sample` … is temporary"; the debt
+    line "Places are shared between seasons … Decide in story 3b" (decided, R5 of story 3a); the
+    layer table (core `schedule` now also `schedule`; server `clock.rs` `ShiftedClock`, `api/`
+    `schedule`; web `Schedule.svelte`, `schedule.ts`); `DEV_NOW` next to `DEV_AUTH_BYPASS` and in
+    the test patterns (browser tests run on 12 October 2026); saving a choice with a team now also
+    reads the game list.
+  - `docs/product/read-the-game-list.md` line 25: "The schedule itself is not shown yet; the
+    sample page shows how it will look."
+  - `docs/product/choose-club-and-team.md` line 24: saving a team now also starts a reading.
+  - `README.md` settings table: `DEV_NOW` (debug builds only) is missing next to
+    `DEV_AUTH_BYPASS`.
+  - The epic's technical.md row 3b still says stage `implement`.
+  - 2026-10-12: not fixed: for `/close` (architecture, product documents, README, the epic's row and progress).
+
+Checked and found right: `today` is the server's Dutch date, so a wrong phone clock moves
+nothing; a game today is coming; unknown times sort last within a date in both lists; the route is
+on the protected router (401 test); no new query, so `.sqlx/` is unchanged (as claimed); the
+`/choose` preload fix is the only `goto` in `web/src`, so there is no twin; the `DEV_NOW` field,
+parser and `ShiftedClock` exist only in debug builds and the release build warns; no secrets or
+tokens in the new log lines.

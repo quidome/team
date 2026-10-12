@@ -115,6 +115,38 @@ test.describe('the schedule', () => {
 		await expect(page.getByTestId('game')).toHaveCount(23);
 	});
 
+	test('a filter that leaves no games says so', async ({ page }) => {
+		// As from mid-December, when the team has no coming games until the second half appears.
+		await page.route('**/api/schedule', async (route) => {
+			const response = await route.fetch();
+			const body = await response.json();
+			body.schedule.coming = body.schedule.coming.filter(
+				(game: { reason: string }) => game.reason === 'duty'
+			);
+			await route.fulfill({ response, json: body });
+		});
+		await page.goto('/');
+		await expect(page.getByTestId('game')).toHaveCount(18);
+		await page.getByRole('radio', { name: 'Games of the team' }).click();
+		await expect(page.getByTestId('game')).toHaveCount(0);
+		await expect(page.getByTestId('no-coming-games')).toHaveText('No coming games of the team.');
+		await page.getByRole('button', { name: 'Show past games' }).click();
+		await expect(page.getByTestId('game')).toHaveCount(5);
+	});
+
+	test('a schedule that cannot be loaded after a reading does not look like a failed reading', async ({
+		page
+	}) => {
+		// Only the reload after the tap fails: the page has loaded its schedule first.
+		await expect(page.getByTestId('game')).toHaveCount(23);
+		await page.route('**/api/schedule', (route) => route.fulfill({ status: 500, json: {} }));
+		await page.getByRole('button', { name: 'Read the game list' }).click();
+		await expect(page.getByTestId('reading-result')).toHaveText('No changes');
+		await expect(page.getByTestId('schedule-error')).toBeVisible();
+		await expect(page.getByText('Something went wrong')).toHaveCount(0);
+		await expect(page.getByTestId('game')).toHaveCount(23);
+	});
+
 	test('is accessible, has no console errors and fits a small phone', async ({ page }) => {
 		const errors = watchConsole(page);
 		await page.reload();
@@ -147,6 +179,11 @@ test('the coordinator changes the team later', async ({ page }) => {
 
 	await expect(page).toHaveURL('/');
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 2');
+	// The schedule follows the new team: its games are the team games now.
+	const teamGames = page.locator('[data-testid="game"][data-of-team="true"]');
+	await expect(teamGames).toHaveCount(5);
+	await expect(teamGames.filter({ hasText: 'Blue Drakes M16 2' })).toHaveCount(5);
+	await expect(teamGames.filter({ hasText: 'Blue Drakes M16 1' })).toHaveCount(0);
 });
 
 test('a club with no games yet can be saved without a team', async ({ page }) => {

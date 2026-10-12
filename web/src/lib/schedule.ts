@@ -9,6 +9,13 @@ export const filters: { value: Filter; label: string }[] = [
 	{ value: 'duty', label: 'Possible duty games' }
 ];
 
+/** The line for a list with no games under the filter, for example "No coming games of the team." */
+export function noGamesLine(filter: Filter, period: 'coming' | 'past'): string {
+	if (filter === 'team') return `No ${period} games of the team.`;
+	if (filter === 'duty') return `No ${period} possible duty games.`;
+	return `No ${period} games.`;
+}
+
 export function filterGames(games: ScheduleGame[], filter: Filter): ScheduleGame[] {
 	if (filter === 'all') return games;
 	return games.filter((game) => game.reason === filter);
