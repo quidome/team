@@ -10,7 +10,7 @@ Show the coordinator's schedule on the start page, from the games that story 3a 
 coordinator can stop keeping the schedule in the sheet.
 
 ## Requirements summary
-Story 3b of the epic [Games from the game list](../2026-10-10-games-from-game-list/technical.md),
+Story 3b of the epic [Games from the game list](../../2026-10-10-games-from-game-list/technical.md),
 from functional story 3 ("See the schedule") and the parts of functional story 1 that the
 schedule needs. Story 4 (the list of changes) has its own design.
 

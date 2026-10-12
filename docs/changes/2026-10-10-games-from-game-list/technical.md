@@ -77,7 +77,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 | 1 | [The base](../done/2026-10-10-the-base/) | technical | Remove the old app (keep `features/`, `docs/`); Rust workspace (`core`, `server`); Nix shell with Rust, sqlx-cli, Node for the front end, PostgreSQL; `team serve` and `team migrate`; health checks; login with Pocket ID, sessions, allowed users; first migration; Svelte app with style kit (colours, fonts, light and dark) and one page after login; OpenAPI types; Dockerfile with `runtime` and `migration` targets to the existing contract; `just check` and GitHub checks; written steps for the coordinator: back up `team`, create the new database, point `DATABASE_URL` to it, delete `team` after story 1 works. Ends with a real deployment and a login on the phone. The coordinator approves the look. | – | review build | done (v0.1.0) |
 | 2 | [Choose club and team](../done/2026-10-11-choose-club-and-team/) | feature | Spec story 1: club search on the club list, team choice from own teams, change later, new season. Reader for the club list and (moved from story 3) the strict reading of a full game; `followed_teams` table, one row for each season; season rule in core. | 1 | review build + accept | done |
 | 3a | [Read on demand](../done/2026-10-11-read-on-demand/) | feature | Spec story 2 and the reading parts of stories 3 and 4: storage of places, games and readings (season as start year), comparing (all kinds, counts only), guard and "really gone", lock, transaction; read action with result line on the start page. | 2 | review build + accept | done |
-| 3b | [The schedule](../2026-10-12-the-schedule/) | feature | Spec story 3: schedule screen with filter, past games, crossed-out games, last reading, last season's games; removes the sample page. | 3a | review build + accept | implement |
+| 3b | [The schedule](../done/2026-10-12-the-schedule/) | feature | Spec story 3: schedule screen with filter, past games, crossed-out games, last reading, last season's games; removes the sample page. | 3a | review build + accept | done |
 | 4 | The list of changes | feature | Spec story 4: keep changes (all seven kinds, into/out of the schedule), one open change per game, seen one and all, summary line, filter. Sets the summary threshold. | 3 | review build + accept | open |
 | 5 | The nightly reading | feature | Spec story 5: `team read-game-list`; failures and "may be out of date"; a ready change for `gitops-lab`: CronJob template in the team chart, same image and secrets, pods with both team labels, checked with `helm lint` and `helm template`, promoted through Argo CD. | 4 | checks | open |
 
@@ -122,7 +122,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 - [x] Story 1: the base (closed 2026-10-11)
 - [x] Story 2: choose club and team (closed 2026-10-11)
 - [x] Story 3a: read on demand (2026-10-12)
-- [ ] Story 3b: the schedule
+- [x] Story 3b: the schedule (closed 2026-10-12)
 - [ ] Story 4: the list of changes
 - [ ] Story 5: the nightly reading
 - [ ] Epic review accept
@@ -147,5 +147,7 @@ The design reads these points more strictly than the spec, within its words:
 - "Far fewer games" is fixed as: no games, or fewer than half of the games of the last good reading for the same season.
 - The current season is fixed to start on 1 July (1 August until 2026-10-11).
 - A reading on demand during a running reading waits and then shows its result.
+
+- 2026-10-12, from story 3b ([The schedule](../done/2026-10-12-the-schedule/technical.md)), agreed by the coordinator: games that left the game list stay crossed out until story 4 adds "seen"; choosing a team starts the first reading; in a new season last season's schedule shows under the choose step; earlier seasons show the newest hall name; `GET /api/schedule` has no `filter` and `period` parameters (the screen filters, the server splits coming and past). For story 4: the start page shows the team header and the "Game list" card above the games; the line of changes not seen yet must not push the next games out of the first screen (accept review A2 of 3b). A3 of story 3a (a game that comes back into the schedule) is still open for story 4.
 
 ## Review findings

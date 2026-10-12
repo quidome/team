@@ -11,4 +11,4 @@ Add the date. Remove a line when it becomes a change, or mark it `(rejected: rea
 - 2026-10-11 Clean up old images in the registry: `build-…` and `sha-…` images are never removed (technical debt in docs/architecture.md).
 - 2026-10-11 Automatic dependency updates (for example Renovate, as in gitops-lab) for Cargo, npm and the GitHub actions; then the actions can be pinned to exact commits at no extra cost.
 - 2026-10-11 Read an earlier season again on request, for example to fill 2025-2026 after the start (left out of story 2, choose club and team).
-- 2026-10-12 A fake game list for the browser tests whose answer a test can change, so the held-back warning, "These games are really gone" and the failure line are tested on the screen, not only at the API (story 3a, accept review A6).
+- 2026-10-12 Test the held-back warning, "These games are really gone" and the failure line on the screen, not only at the API (story 3a, accept review A6). Since story 3b the browser tests replace API answers with `page.route`, so no changeable fake game list is needed.
