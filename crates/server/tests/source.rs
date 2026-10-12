@@ -8,7 +8,7 @@ use std::time::Duration;
 use chrono::NaiveDate;
 use serde_json::{Value, json};
 use team::source::{Source, SourceError};
-use team_core::{Club, ClubNumber, Season, own_teams};
+use team_core::{Club, ClubNumber, ScheduleReason, Season, TeamNumber, in_schedule, own_teams};
 use url::Url;
 use wiremock::matchers::{header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -131,6 +131,23 @@ async fn reads_this_season_of_blue_drakes() {
             .count(),
         2
     );
+}
+
+#[tokio::test]
+async fn the_schedule_of_m16_1_has_its_games_and_the_club_home_games() {
+    let (_server, source) = source_with(data("games-37-2026-2027.json")).await;
+    let games = source
+        .club_games(DRAKES, season("2026-2027"))
+        .await
+        .unwrap();
+    let reasons: Vec<Option<ScheduleReason>> = games
+        .iter()
+        .map(|game| in_schedule(game, DRAKES, Some(TeamNumber(184))))
+        .collect();
+    let count = |reason| reasons.iter().filter(|r| **r == reason).count();
+    assert_eq!(count(Some(ScheduleReason::TeamGame)), 10);
+    assert_eq!(count(Some(ScheduleReason::DutyGame)), 27);
+    assert_eq!(count(None), 34);
 }
 
 #[tokio::test]

@@ -24,6 +24,16 @@ pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     MIGRATOR.run(pool).await
 }
 
+/// A failure of the stored data: of the database, or of data in it that the code does not
+/// understand.
+#[derive(Debug, thiserror::Error)]
+pub enum StoreError {
+    #[error(transparent)]
+    Database(#[from] sqlx::Error),
+    #[error("stored data is not valid: {0}")]
+    Invalid(String),
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum NotReady {
     #[error("database is not reachable: {0}")]

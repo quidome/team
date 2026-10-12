@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
 
-use crate::followed_teams::StoreError;
+use crate::db::StoreError;
 use crate::source::SourceError;
 
 #[derive(Debug, thiserror::Error)]

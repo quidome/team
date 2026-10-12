@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO places (number, hall, town) VALUES ($1, $2, $3)\n             ON CONFLICT (number) DO UPDATE SET hall = EXCLUDED.hall, town = EXCLUDED.town",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8454171836ea12f1b32f50a67f1edef3de0c0613b7c7d291fde9331c06caaad9"
+}

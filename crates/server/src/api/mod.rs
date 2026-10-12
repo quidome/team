@@ -3,6 +3,7 @@
 pub mod clubs;
 pub mod health;
 pub mod me;
+pub mod readings;
 pub mod selection;
 
 use utoipa::OpenApi;
@@ -17,7 +18,10 @@ use utoipa::OpenApi;
         selection::get,
         selection::save,
         clubs::search,
-        clubs::teams
+        clubs::teams,
+        readings::read,
+        readings::latest,
+        readings::confirm_gone
     )
 )]
 pub struct ApiDoc;

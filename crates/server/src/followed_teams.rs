@@ -2,27 +2,22 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
-use team_core::{Club, ClubNumber, FollowedTeam, Season, SeasonError, Team, TeamNumber};
+use team_core::{Club, ClubNumber, FollowedTeam, Season, Team, TeamNumber};
 
-#[derive(Debug, thiserror::Error)]
-pub enum StoreError {
-    #[error(transparent)]
-    Database(#[from] sqlx::Error),
-    #[error("stored season is not valid: {0}")]
-    Season(#[from] SeasonError),
-}
+use crate::db::StoreError;
 
 /// The choice saved for `season`, if any.
 pub async fn for_season(pool: &PgPool, season: Season) -> Result<Option<FollowedTeam>, StoreError> {
     let row = sqlx::query_as!(
         Row,
-        "SELECT season, club_number, club_name, club_town, team_number, team_name
-         FROM followed_teams WHERE season = $1",
-        season.to_string(),
+        r#"SELECT season_year AS "season_year!", club_number, club_name, club_town, team_number,
+                  team_name
+           FROM followed_teams WHERE season_year = $1"#,
+        season.start_year(),
     )
     .fetch_optional(pool)
     .await?;
-    row.map(Row::into_followed_team).transpose()
+    Ok(row.map(Row::into_followed_team))
 }
 
 /// The choice of the newest season before `season`, if any. Rows of later seasons (a clock that
@@ -31,20 +26,31 @@ pub async fn newest_before(
     pool: &PgPool,
     season: Season,
 ) -> Result<Option<FollowedTeam>, StoreError> {
-    // Seasons are "YYYY-YYYY", so the text order is the time order.
     let row = sqlx::query_as!(
         Row,
-        "SELECT season, club_number, club_name, club_town, team_number, team_name
-         FROM followed_teams WHERE season < $1 ORDER BY season DESC LIMIT 1",
-        season.to_string(),
+        r#"SELECT season_year AS "season_year!", club_number, club_name, club_town, team_number,
+                  team_name
+           FROM followed_teams WHERE season_year < $1 ORDER BY season_year DESC LIMIT 1"#,
+        season.start_year(),
     )
     .fetch_optional(pool)
     .await?;
-    row.map(Row::into_followed_team).transpose()
+    Ok(row.map(Row::into_followed_team))
+}
+
+/// When the choice of `season` was saved, if there is one.
+pub async fn chosen_at(pool: &PgPool, season: Season) -> Result<Option<DateTime<Utc>>, StoreError> {
+    let at = sqlx::query_scalar!(
+        "SELECT chosen_at FROM followed_teams WHERE season_year = $1",
+        season.start_year(),
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(at)
 }
 
 struct Row {
-    season: String,
+    season_year: i32,
     club_number: i64,
     club_name: String,
     club_town: Option<String>,
@@ -53,7 +59,7 @@ struct Row {
 }
 
 impl Row {
-    fn into_followed_team(self) -> Result<FollowedTeam, StoreError> {
+    fn into_followed_team(self) -> FollowedTeam {
         let team = match (self.team_number, self.team_name) {
             (Some(number), Some(name)) => Some(Team {
                 number: TeamNumber(number),
@@ -61,20 +67,21 @@ impl Row {
             }),
             _ => None,
         };
-        Ok(FollowedTeam {
-            season: self.season.parse::<Season>()?,
+        FollowedTeam {
+            season: Season::from_start_year(self.season_year),
             club: Club {
                 number: ClubNumber(self.club_number),
                 name: self.club_name,
                 town: self.club_town,
             },
             team,
-        })
+        }
     }
 }
 
 /// Saves the choice for its season. A choice of the same season is replaced; rows of other
-/// seasons are not touched. One statement on one row, so two saves at once need no lock.
+/// seasons are not touched. One statement on one row, so two saves at once need no lock. It still
+/// writes the text season (decision 0014): the computed `season_year` follows from it.
 pub async fn save(
     pool: &PgPool,
     choice: &FollowedTeam,

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM readings\n               WHERE club_number = $1 AND season_year = $2 AND result = 'good'\n                 AND finished_at >= $3\n           ) AS \"found!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "found!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "06ef1804c22725a1e685aaf0a7a3b515a47fab7d37b7233ea12a8ca3e4bc1507"
+}

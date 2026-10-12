@@ -141,6 +141,96 @@
         }
       }
     },
+    "/api/readings": {
+      "post": {
+        "tags": [
+          "readings"
+        ],
+        "operationId": "read",
+        "responses": {
+          "200": {
+            "description": "The reading; also a failed or held-back one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`no_choice`: no club is chosen"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/readings/latest": {
+      "get": {
+        "tags": [
+          "readings"
+        ],
+        "operationId": "latest",
+        "responses": {
+          "200": {
+            "description": "The newest and the last good reading of the current club and season; `null`s with no choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestReadings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/readings/{id}/confirm-gone": {
+      "post": {
+        "tags": [
+          "readings"
+        ],
+        "operationId": "confirm_gone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The held-back reading",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A new reading without the guard: the missing games count as no longer in the game list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not_held_back`: not the newest reading of the current club and season, or not held back; `no_choice`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such reading"
+          }
+        }
+      }
+    },
     "/api/selection": {
       "get": {
         "tags": [
@@ -248,6 +338,106 @@
           }
         }
       },
+      "CountsView": {
+        "type": "object",
+        "description": "How many changes of each kind a reading found, only for games in the schedule.",
+        "required": [
+          "new",
+          "moved",
+          "start_time_known",
+          "home_and_away",
+          "team_changed",
+          "gone",
+          "came_back",
+          "into_schedule",
+          "out_of_schedule"
+        ],
+        "properties": {
+          "came_back": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "gone": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "home_and_away": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "into_schedule": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "moved": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "new": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "out_of_schedule": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "start_time_known": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "team_changed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "ErrorKind": {
+        "type": "string",
+        "enum": [
+          "source_unavailable",
+          "source_format"
+        ]
+      },
+      "HoldKind": {
+        "type": "string",
+        "enum": [
+          "empty",
+          "far_fewer"
+        ]
+      },
+      "HoldView": {
+        "type": "object",
+        "description": "Why a reading was held back: `now` games instead of `before`.",
+        "required": [
+          "reason",
+          "before",
+          "now"
+        ],
+        "properties": {
+          "before": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "now": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reason": {
+            "$ref": "#/components/schemas/HoldKind"
+          }
+        }
+      },
       "LastChoice": {
         "type": "object",
         "description": "The choice of an earlier season.",
@@ -274,6 +464,50 @@
           }
         }
       },
+      "LastGood": {
+        "type": "object",
+        "required": [
+          "finished_at",
+          "games_read"
+        ],
+        "properties": {
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "games_read": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "LatestReadings": {
+        "type": "object",
+        "description": "The newest reading and the last good reading of the current club and season.",
+        "properties": {
+          "last_good": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LastGood"
+              }
+            ]
+          },
+          "latest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReadingView"
+              }
+            ]
+          }
+        }
+      },
       "Me": {
         "type": "object",
         "required": [
@@ -286,12 +520,87 @@
           }
         }
       },
+      "ReadingView": {
+        "type": "object",
+        "description": "One reading of the game list. A failed or held-back reading is a result, not an HTTP error.",
+        "required": [
+          "id",
+          "result",
+          "finished_at",
+          "first_reading"
+        ],
+        "properties": {
+          "counts": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CountsView",
+                "description": "`null` for the first reading, and for a failed or held-back reading."
+              }
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ErrorKind"
+              }
+            ]
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "first_reading": {
+            "type": "boolean",
+            "description": "The first reading after a choice of club or team: it counts nothing."
+          },
+          "games_read": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The number of games read; `null` for a failed reading.",
+            "minimum": 0
+          },
+          "hold": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HoldView"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ResultKind"
+          }
+        }
+      },
       "Reason": {
         "type": "string",
         "description": "Why a team must be chosen.",
         "enum": [
           "no_games_yet",
           "new_season"
+        ]
+      },
+      "ResultKind": {
+        "type": "string",
+        "enum": [
+          "good",
+          "failed",
+          "held_back"
         ]
       },
       "SaveSelection": {

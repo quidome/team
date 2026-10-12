@@ -29,8 +29,13 @@ impl Season {
         Season { start_year }
     }
 
+    /// The year in which the season starts: 2026 for "2026-2027". The database stores this.
     pub fn start_year(self) -> i32 {
         self.start_year
+    }
+
+    pub fn from_start_year(start_year: i32) -> Season {
+        Season { start_year }
     }
 }
 
@@ -99,6 +104,12 @@ mod tests {
         for text in ["2026", "", "26-27", "2026-2027 ", "+026-2027", "2026–2027"] {
             assert!(text.parse::<Season>().is_err(), "{text:?} was accepted");
         }
+    }
+
+    #[test]
+    fn a_start_year_shows_as_the_two_years() {
+        assert_eq!(Season::from_start_year(2026).to_string(), "2026-2027");
+        assert_eq!(Season::from_start_year(2026).start_year(), 2026);
     }
 
     #[test]

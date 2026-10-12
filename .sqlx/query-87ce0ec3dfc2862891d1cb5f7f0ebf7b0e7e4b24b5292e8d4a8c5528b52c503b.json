@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, club_number, season_year, started_at, finished_at, result, error, games_read,\n                first_reading, counts, hold_reason, hold_before\n         FROM readings WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "club_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "season_year",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "result",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "error",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "games_read",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "first_reading",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "counts",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "hold_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "hold_before",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "87ce0ec3dfc2862891d1cb5f7f0ebf7b0e7e4b24b5292e8d4a8c5528b52c503b"
+}

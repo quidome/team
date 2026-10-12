@@ -17,7 +17,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
-use crate::api::{clubs, health, me, selection};
+use crate::api::{clubs, health, me, readings, selection};
 use crate::auth;
 use crate::auth::oidc::Oidc;
 use crate::clock::Clock;
@@ -103,6 +103,9 @@ pub fn app(state: AppState) -> Router {
         .route("/selection", get(selection::get).put(selection::save))
         .route("/clubs", get(clubs::search))
         .route("/clubs/{number}/teams", get(clubs::teams))
+        .route("/readings", post(readings::read))
+        .route("/readings/latest", get(readings::latest))
+        .route("/readings/{id}/confirm-gone", post(readings::confirm_gone))
         .fallback(|| async { StatusCode::NOT_FOUND })
         .layer(middleware::from_fn_with_state(
             state.clone(),

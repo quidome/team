@@ -3,6 +3,8 @@
 
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
+pub mod game_list;
+
 use std::sync::{Arc, Mutex};
 
 use axum::Router;
@@ -348,4 +350,38 @@ pub fn cookie_value(response: &Response<Body>, name: &str) -> Option<String> {
 pub async fn body_text(response: Response<Body>) -> String {
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     String::from_utf8_lossy(&bytes).into_owned()
+}
+
+/// Captures log output written while the guard lives. A test that reads logs needs its own test
+/// file (its own process): tracing caches per process which log lines are enabled.
+#[derive(Clone, Default)]
+pub struct LogBuffer(Arc<Mutex<Vec<u8>>>);
+
+impl LogBuffer {
+    /// Captures every log line of this thread until the guard is dropped.
+    pub fn capture() -> (Self, tracing::subscriber::DefaultGuard) {
+        let buffer = Self::default();
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish();
+        (buffer, tracing::subscriber::set_default(subscriber))
+    }
+
+    pub fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+impl std::io::Write for LogBuffer {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }

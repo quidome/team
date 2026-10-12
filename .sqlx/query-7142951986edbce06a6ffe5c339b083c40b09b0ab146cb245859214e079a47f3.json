@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE games SET in_list = false\n         WHERE club_number = $1 AND season_year = $2 AND source_id = ANY($3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7142951986edbce06a6ffe5c339b083c40b09b0ab146cb245859214e079a47f3"
+}

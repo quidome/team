@@ -1,12 +1,12 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT season, club_number, club_name, club_town, team_number, team_name\n         FROM followed_teams WHERE season = $1",
+  "query": "SELECT season_year AS \"season_year!\", club_number, club_name, club_town, team_number,\n                  team_name\n           FROM followed_teams WHERE season_year = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "season",
-        "type_info": "Text"
+        "name": "season_year!",
+        "type_info": "Int4"
       },
       {
         "ordinal": 1,
@@ -36,11 +36,11 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Int4"
       ]
     },
     "nullable": [
-      false,
+      true,
       false,
       false,
       true,
@@ -48,5 +48,5 @@
       true
     ]
   },
-  "hash": "bbcc63f419c40e62e34ca6efb6d2e73394824be656a862dd876302ee4726f417"
+  "hash": "3e290643e4fadc54c561a91032489667b319f22c2c76b39e598a88de40588372"
 }

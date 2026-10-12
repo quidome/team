@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import ChooseTeam from '#lib/components/ChooseTeam.svelte';
+	import ReadGameList from '#lib/components/ReadGameList.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import type { PageProps } from './$types';
 
@@ -53,6 +54,14 @@
 			{/if}
 			<Button href={resolve('/choose')} variant="outline" class="mt-4">Change</Button>
 		</div>
+		{#if data.readings}
+			<div class="rounded-xl border bg-card p-5 shadow-xs">
+				<h2 class="mb-3 font-medium">Game list</h2>
+				{#key data.readings}
+					<ReadGameList readings={data.readings} />
+				{/key}
+			</div>
+		{/if}
 		<div class="rounded-xl border bg-card p-5 shadow-xs">
 			<h2 class="font-medium">Your schedule comes here</h2>
 			<p class="mt-1 text-sm text-muted-foreground">

@@ -2,13 +2,21 @@
 
 pub mod access;
 pub mod club;
+pub mod comparison;
 pub mod game;
+pub mod guard;
+pub mod schedule;
 pub mod season;
 pub mod team_choice;
 
 pub use access::{Identity, may_access};
 pub use club::{Club, ClubNumber, search_clubs};
+pub use comparison::{
+    Change, Counts, Difference, GameChange, StoredGame, compare, count, same_number_pairs,
+};
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
+pub use guard::{Guard, HoldReason, guard};
+pub use schedule::{ScheduleReason, in_schedule};
 pub use season::{Season, SeasonError};
 pub use team_choice::{
     ChoiceState, FollowedTeam, Team, TeamChoiceError, TeamNeededReason, choice_state, choose_team,

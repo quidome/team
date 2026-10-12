@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT g.source_id, g.game_number, g.date, g.start_time,\n                g.home_team_number, g.home_team_name, g.home_club_number,\n                g.away_team_number, g.away_team_name, g.away_club_number,\n                g.place_number, p.hall, p.town, g.court, g.competition, g.in_list\n         FROM games g JOIN places p ON p.number = g.place_number\n         WHERE g.club_number = $1 AND g.season_year = $2\n         ORDER BY g.source_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "game_number",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 3,
+        "name": "start_time",
+        "type_info": "Time"
+      },
+      {
+        "ordinal": 4,
+        "name": "home_team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "home_team_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "home_club_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "away_team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "away_team_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "away_club_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "place_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "hall",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "town",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "court",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "competition",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "in_list",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f6729624677035bf1ac8941889969c8512196671d62ee25478563f208a2912bd"
+}

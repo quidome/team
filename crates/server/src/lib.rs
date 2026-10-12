@@ -8,6 +8,9 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod followed_teams;
+pub mod games;
+pub mod reading;
+pub mod readings;
 pub mod source;
 pub mod web;
 

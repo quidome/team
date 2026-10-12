@@ -22,14 +22,18 @@ export type ClubTeams = components['schemas']['ClubTeams'];
 /** A failed API call, with a message for the coordinator. */
 export class ApiError extends Error {}
 
-/** The message for an error answer of the API (`{ "error": "<code>" }`). */
-function messageFor(error: unknown, status: number): string {
+/** The message for an error answer of the API (`{ "error": "<code>" }`), or for the `error` of a
+ * failed reading. */
+export function messageFor(error: unknown, status: number): string {
 	const code = (error as { error?: unknown } | undefined)?.error;
 	if (code === 'source_unavailable') return 'The game list cannot be reached. Please try again.';
 	if (code === 'source_format') return 'The game list has data the tool does not understand.';
 	if (code === 'unknown_club') return 'This club is not in the game list.';
 	if (code === 'not_an_own_team') return 'This team does not play for the club.';
 	if (code === 'team_required') return 'Choose a team.';
+	if (code === 'no_choice') return 'Choose your club first.';
+	if (code === 'not_held_back')
+		return 'This reading can no longer be confirmed. Read the game list again.';
 	if (status === 404) return 'This club is not in the game list.';
 	return 'Something went wrong. Please try again.';
 }
@@ -64,4 +68,22 @@ export async function loadTeams(club: number): Promise<ClubTeams> {
 
 export async function saveSelection(club: number, team: number | null): Promise<Selection> {
 	return dataOf(await api.PUT('/api/selection', { body: { club, team } }));
+}
+
+export type Reading = components['schemas']['ReadingView'];
+export type ReadingCounts = components['schemas']['CountsView'];
+export type LatestReadings = components['schemas']['LatestReadings'];
+
+export async function loadLatestReading(fetch: typeof globalThis.fetch): Promise<LatestReadings> {
+	return dataOf(await api.GET('/api/readings/latest', { fetch }));
+}
+
+/** Reads the game list now. It waits when another reading is running. */
+export async function readNow(): Promise<Reading> {
+	return dataOf(await api.POST('/api/readings'));
+}
+
+/** "These games are really gone": reads again without holding back the held-back reading `id`. */
+export async function confirmGone(id: number): Promise<Reading> {
+	return dataOf(await api.POST('/api/readings/{id}/confirm-gone', { params: { path: { id } } }));
 }

@@ -1,6 +1,6 @@
 # Technical spec: Read the game list on demand
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-11-read-on-demand
 **Date**: 2026-10-11
@@ -258,11 +258,11 @@ route needs a session), 0012 (the choice for each season), 0013 (strict reading 
 - One reading: one request to the source (about 75–125 KB), then one short transaction. A held lock waits; the source is never read while the lock is held.
 
 ## Progress
-- [ ] Step 1: core rules
-- [ ] Step 2: storage
-- [ ] Step 3: the reading and the API
-- [ ] Step 4: front end
-- [ ] All checks pass
+- [x] Step 1: core rules (2026-10-12)
+- [x] Step 2: storage (2026-10-12)
+- [x] Step 3: the reading and the API (2026-10-12)
+- [x] Step 4: front end (2026-10-12)
+- [x] All checks pass (2026-10-12; `api-types-check` passes once the new types are committed)
 
 ## Deviations
 From the epic's technical spec (none from the functional spec):
@@ -276,5 +276,43 @@ The design reads the functional spec more strictly than written, within its word
 - An empty reading is held back only when the last good reading had games; a first empty season in summer is accepted.
 - A game that changes in more than one way counts once in the result line, by its first difference (date, start time, place, start time known, home and away, team).
 - The first reading after a choice shows "N games read" and counts nothing.
+- A "place" difference is another place number or another court; another hall or town name of the
+  same place number is not a move of the game (step 1, 2026-10-12).
+- A game that was no longer in the game list and comes back outside the schedule gives no change
+  (step 1, 2026-10-12).
+
+Small choices in the build (step 2, 2026-10-12):
+- `StoreError` moved from `followed_teams.rs` to `db.rs`, because three storage modules share it.
+  Its `Season` case went (the season text is no longer read); a new case `Invalid` is for stored
+  data the code does not understand (for example an unknown `result` text).
+- `FailureKind` is in `readings.rs` (the stored record needs it); `reading.rs` uses it from there.
+- sqlx has the `json` feature now, for the `counts` column.
+- Extra storage tests: a second write marks gone games and keeps `first_read_at`; every kind of
+  reading reads back equal, with `latest`, `last_good` and `good_since`.
+
+Small choices in the build (step 3, 2026-10-12):
+- `reading::read` gives the stored `readings::Reading` (id, times, result) instead of a separate
+  `Outcome` type: the API needs `finished_at`, and the two types would hold the same data.
+- `reading::target` finds the club, team, season and `chosen_at` of a reading; `GET
+  /api/readings/latest` and "really gone" use it too. `followed_teams::chosen_at` is new.
+- Every stored game that is in the game list but not read is marked "no longer in the game list",
+  also outside the schedule (the game list is the truth); only games in the schedule are counted.
+- Test data (coordinator, 2026-10-12): the spec's "changed copy" expected "start time known 1" from
+  the 00:00 game of 16 January 2027, but that is an away game of Blue Drakes MSE 1, outside the
+  schedule of M16 1. The test uses an M16 1 game (31 October 2026, not known → 10:00) instead; the
+  16 January game gets 10:00 too and must give no count.
+- The log capture helper (`LogBuffer`) moved from `tests/logs.rs` to `tests/common/`, without
+  colour codes; the log test of story 3a has its own file (`tests/reading_logs.rs`). Shared reading
+  test helpers are in `tests/common/game_list.rs`.
+
+Small choices in the build (step 4, 2026-10-12):
+- The result line shows only after a tap on this page; after a page load it would show an old
+  result as new. "Last read", the failure and the held-back warning come from the newest reading,
+  so they also show after a page load.
+- "Last read" shows as for example "Mon 12 October 2026 14:00" (Dutch local time).
+- The browser tests run in the project `choose` right after M16 1 is chosen: that project ends with
+  a club without a team, where the read action does not show.
+- The words of the result line and the time format are in `web/src/lib/reading.ts`; the screen part
+  is `web/src/lib/components/ReadGameList.svelte`.
 
 ## Review findings

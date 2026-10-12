@@ -86,6 +86,54 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/readings': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['read'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/readings/latest': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['latest'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/readings/{id}/confirm-gone': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['confirm_gone'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/selection': {
 		parameters: {
 			query?: never;
@@ -122,21 +170,85 @@ export interface components {
 			/** @description `null` when the source has no town for the club. */
 			town?: string | null;
 		};
+		/** @description How many changes of each kind a reading found, only for games in the schedule. */
+		CountsView: {
+			/** Format: int32 */
+			came_back: number;
+			/** Format: int32 */
+			gone: number;
+			/** Format: int32 */
+			home_and_away: number;
+			/** Format: int32 */
+			into_schedule: number;
+			/** Format: int32 */
+			moved: number;
+			/** Format: int32 */
+			new: number;
+			/** Format: int32 */
+			out_of_schedule: number;
+			/** Format: int32 */
+			start_time_known: number;
+			/** Format: int32 */
+			team_changed: number;
+		};
+		/** @enum {string} */
+		ErrorKind: 'source_unavailable' | 'source_format';
+		/** @enum {string} */
+		HoldKind: 'empty' | 'far_fewer';
+		/** @description Why a reading was held back: `now` games instead of `before`. */
+		HoldView: {
+			/** Format: int32 */
+			before: number;
+			/** Format: int32 */
+			now: number;
+			reason: components['schemas']['HoldKind'];
+		};
 		/** @description The choice of an earlier season. */
 		LastChoice: {
 			club: components['schemas']['ClubView'];
 			season: string;
 			team?: null | components['schemas']['TeamView'];
 		};
+		LastGood: {
+			/** Format: date-time */
+			finished_at: string;
+			/** Format: int32 */
+			games_read: number;
+		};
+		/** @description The newest reading and the last good reading of the current club and season. */
+		LatestReadings: {
+			last_good?: null | components['schemas']['LastGood'];
+			latest?: null | components['schemas']['ReadingView'];
+		};
 		Me: {
 			/** @description The name to show. */
 			name: string;
+		};
+		/** @description One reading of the game list. A failed or held-back reading is a result, not an HTTP error. */
+		ReadingView: {
+			counts?: null | components['schemas']['CountsView'];
+			error?: null | components['schemas']['ErrorKind'];
+			/** Format: date-time */
+			finished_at: string;
+			/** @description The first reading after a choice of club or team: it counts nothing. */
+			first_reading: boolean;
+			/**
+			 * Format: int32
+			 * @description The number of games read; `null` for a failed reading.
+			 */
+			games_read?: number | null;
+			hold?: null | components['schemas']['HoldView'];
+			/** Format: int64 */
+			id: number;
+			result: components['schemas']['ResultKind'];
 		};
 		/**
 		 * @description Why a team must be chosen.
 		 * @enum {string}
 		 */
 		Reason: 'no_games_yet' | 'new_season';
+		/** @enum {string} */
+		ResultKind: 'good' | 'failed' | 'held_back';
 		SaveSelection: {
 			/**
 			 * Format: int64
@@ -333,6 +445,111 @@ export interface operations {
 			};
 			/** @description Not logged in */
 			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	read: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The reading; also a failed or held-back one */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['ReadingView'];
+				};
+			};
+			/** @description `no_choice`: no club is chosen */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	latest: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The newest and the last good reading of the current club and season; `null`s with no choice */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['LatestReadings'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	confirm_gone: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The held-back reading */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description A new reading without the guard: the missing games count as no longer in the game list */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['ReadingView'];
+				};
+			};
+			/** @description `not_held_back`: not the newest reading of the current club and season, or not held back; `no_choice` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such reading */
+			404: {
 				headers: {
 					[name: string]: unknown;
 				};
