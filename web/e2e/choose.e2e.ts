@@ -147,6 +147,31 @@ test.describe('the schedule', () => {
 		await expect(page.getByTestId('game')).toHaveCount(23);
 	});
 
+	test('without changes not seen, the start page has no line for them', async ({ page }) => {
+		await expect(page.getByTestId('game')).toHaveCount(23);
+		await expect(page.getByTestId('unseen-changes')).toHaveCount(0);
+	});
+
+	test('the line of changes not seen opens the list, and the next games stay in view', async ({
+		page
+	}) => {
+		await page.route('**/api/schedule', async (route) => {
+			const response = await route.fetch();
+			const body = await response.json();
+			body.schedule.unseen_changes = 3;
+			await route.fulfill({ response, json: body });
+		});
+		await page.setViewportSize({ width: 390, height: 800 });
+		await page.goto('/');
+		const line = page.getByTestId('unseen-changes');
+		await expect(line).toHaveText('3 changes not seen');
+		const firstGame = await page.getByTestId('game').first().boundingBox();
+		expect(firstGame && firstGame.y + firstGame.height).toBeLessThanOrEqual(800);
+		await line.click();
+		await expect(page).toHaveURL('/changes');
+		await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
+	});
+
 	test('is accessible, has no console errors and fits a small phone', async ({ page }) => {
 		const errors = watchConsole(page);
 		await page.reload();

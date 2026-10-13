@@ -55,8 +55,8 @@ pub struct Schedule {
 
 /// Keeps the stored games that [`in_schedule`] accepts and splits them on `today` (a game today
 /// is coming). A game no longer in the game list is kept only while `open` (the games with a
-/// change not seen yet) has it: after "seen" it is hidden. Within a date, known start times come first in time order, then the games whose
-/// start time is not known, then by source id.
+/// change to show) has it: after "seen" it is hidden. Within a date, known start times come
+/// first in time order, then the games whose start time is not known, then by source id.
 pub fn schedule(
     stored: Vec<StoredGame>,
     club: ClubNumber,

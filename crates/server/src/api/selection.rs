@@ -5,7 +5,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use team_core::{
     ChoiceState, ClubNumber, FollowedTeam, Season, TeamChoiceError, TeamNeededReason, TeamNumber,
-    choice_state, choose_team, own_teams,
+    choice_state, choose_team, own_teams, same_choice,
 };
 use utoipa::ToSchema;
 
@@ -117,12 +117,8 @@ async fn save_choice(state: &AppState, choice: &FollowedTeam) -> Result<(), Stor
     let mut tx = state.pool.begin().await?;
     db::lock_readings(&mut tx).await?;
     let before = followed_teams::for_season(&mut *tx, choice.season).await?;
-    let team_number = |choice: &FollowedTeam| choice.team.as_ref().map(|team| team.number);
-    let same = before.is_some_and(|before| {
-        before.club.number == choice.club.number && team_number(&before) == team_number(choice)
-    });
     followed_teams::save(&mut *tx, choice, state.clock.now()).await?;
-    if !same {
+    if !same_choice(before.as_ref(), choice) {
         changes::remove_all(&mut tx).await?;
     }
     tx.commit().await?;

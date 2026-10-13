@@ -1,6 +1,6 @@
 //! One reading of the game list: read the source, compare with the stored games, store the
-//! result and the open changes. Readings take a PostgreSQL advisory lock, so two at the same time (a tap and the
-//! nightly reading) never count a change twice or lose one (decision 0005).
+//! result and the open changes. Readings take a PostgreSQL advisory lock, so two at the same
+//! time (a tap and the nightly reading) never count a change twice or lose one (decision 0005).
 
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -169,6 +169,7 @@ pub async fn read(
         Some(count(&changes))
     };
     // The first reading after a choice keeps no changes; without a team there is no schedule.
+    // The save of another choice already removed the open changes, under the same lock.
     let updates = match team {
         Some(team) if !first_reading => {
             update_open_changes(&open, &stored, &read, club, team, today)
@@ -181,9 +182,6 @@ pub async fn read(
         .collect();
     let finished_at = clock.now();
     games::write(&mut tx, club, season, &read, &gone, finished_at).await?;
-    if first_reading {
-        changes::remove_for(&mut tx, club, season).await?;
-    }
     changes::apply(&mut tx, club, season, &updates, finished_at).await?;
 
     let result = ReadingResult::Good {

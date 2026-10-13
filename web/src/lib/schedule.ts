@@ -16,7 +16,11 @@ export function noGamesLine(filter: Filter, period: 'coming' | 'past'): string {
 	return `No ${period} games.`;
 }
 
-export function filterGames(games: ScheduleGame[], filter: Filter): ScheduleGame[] {
+/** The games (or changes) that the filter shows, by their `reason`. */
+export function filterGames<T extends Pick<ScheduleGame, 'reason'>>(
+	games: T[],
+	filter: Filter
+): T[] {
 	if (filter === 'all') return games;
 	return games.filter((game) => game.reason === filter);
 }

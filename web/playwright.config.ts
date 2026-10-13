@@ -56,7 +56,7 @@ export default defineConfig({
 		},
 		{
 			name: 'logged-in',
-			testMatch: 'logged-in.e2e.ts',
+			testMatch: /(logged-in|changes)\.e2e\.ts/,
 			dependencies: ['choose'],
 			use: { baseURL: 'http://localhost:4100' }
 		},

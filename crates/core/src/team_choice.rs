@@ -189,6 +189,18 @@ pub fn choice_state(
     }
 }
 
+/// Whether a new choice keeps the open changes: the season already had a choice with the same
+/// club and the same team. Another club or team, or the first choice of a season, starts with no
+/// changes.
+pub fn same_choice(before: Option<&FollowedTeam>, now: &FollowedTeam) -> bool {
+    let team = |choice: &FollowedTeam| choice.team.as_ref().map(|team| team.number);
+    before.is_some_and(|before| {
+        before.season == now.season
+            && before.club.number == now.club.number
+            && team(before) == team(now)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::{NaiveDate, NaiveTime};
@@ -500,5 +512,31 @@ mod tests {
             choose_team(teams(), None),
             Err(TeamChoiceError::TeamRequired)
         );
+    }
+
+    fn choice(club_number: i64, team: Option<i64>) -> FollowedTeam {
+        FollowedTeam {
+            season: Season::of(NaiveDate::from_ymd_opt(2026, 10, 12).expect("valid date")),
+            club: club(club_number, "Club"),
+            team: team.map(|number| Team {
+                number: TeamNumber(number),
+                name: "M16 1".to_owned(),
+            }),
+        }
+    }
+
+    #[test]
+    fn the_same_club_and_team_again_is_the_same_choice() {
+        let now = choice(DRAKES, Some(184));
+        assert!(same_choice(Some(&choice(DRAKES, Some(184))), &now));
+    }
+
+    #[test]
+    fn another_team_or_club_or_a_first_choice_is_not_the_same_choice() {
+        let now = choice(DRAKES, Some(184));
+        assert!(!same_choice(Some(&choice(DRAKES, Some(1404))), &now));
+        assert!(!same_choice(Some(&choice(GIANTS, Some(184))), &now));
+        assert!(!same_choice(Some(&choice(DRAKES, None)), &now));
+        assert!(!same_choice(None, &now));
     }
 }

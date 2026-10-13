@@ -7,7 +7,7 @@ Open work, most important first. Changes link to their folder; small fixes are o
    - Story 2, choose club and team: done (on `main`, not released yet).
    - Story 3a, read on demand: done (on `main`, not released yet).
    - Story 3b, the schedule: done (on `main`, not released yet).
-   - Story 4, [the list of changes](changes/2026-10-13-the-list-of-changes/): implement (4 steps; designed 2026-10-13).
+   - Story 4, [the list of changes](changes/2026-10-13-the-list-of-changes/): close (built and reviewed 2026-10-13; `/close` next).
    - Then story 5, the nightly reading (`/design` from the epic).
 
 Small:
