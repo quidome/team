@@ -3,8 +3,6 @@
 //! change is worked out from it and the stored game (`team_core::change_between`). "Seen" deletes
 //! the row.
 
-use std::collections::BTreeSet;
-
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
@@ -50,7 +48,7 @@ pub async fn open(
     db: &mut PgConnection,
     club: ClubNumber,
     season: Season,
-) -> Result<Vec<(OpenChange, i32)>, StoreError> {
+) -> Result<Vec<(OpenChange, i64)>, StoreError> {
     let rows = sqlx::query!(
         "SELECT source_id, last_seen, version FROM changes
          WHERE club_number = $1 AND season_year = $2
@@ -74,35 +72,19 @@ pub async fn open(
         .collect()
 }
 
-/// The source ids of the games of `club` and `season` with an open change.
-pub async fn open_ids(
-    db: &mut PgConnection,
-    club: ClubNumber,
-    season: Season,
-) -> Result<BTreeSet<i64>, StoreError> {
-    let ids = sqlx::query_scalar!(
-        "SELECT source_id FROM changes WHERE club_number = $1 AND season_year = $2",
-        club.0,
-        season.start_year(),
-    )
-    .fetch_all(db)
-    .await?;
-    Ok(ids.into_iter().collect())
-}
-
 /// Marks changes as seen: deletes each one whose version is still `version`. A change that a
-/// reading updated after the screen loaded it stays. A row that a reading holds is deleted after
-/// that reading, so its new version is compared.
+/// reading updated or made again after the screen loaded it has another version and stays. The
+/// caller holds the reading lock, so a reading never runs in between.
 pub async fn mark_seen(
     db: &mut PgConnection,
     club: ClubNumber,
     season: Season,
-    seen: &[(i64, i32)],
+    seen: &[(i64, i64)],
 ) -> Result<(), StoreError> {
-    let (ids, versions): (Vec<i64>, Vec<i32>) = seen.iter().copied().unzip();
+    let (ids, versions): (Vec<i64>, Vec<i64>) = seen.iter().copied().unzip();
     sqlx::query!(
         "DELETE FROM changes c
-         USING unnest($3::bigint[], $4::integer[]) AS seen(source_id, version)
+         USING unnest($3::bigint[], $4::bigint[]) AS seen(source_id, version)
          WHERE c.club_number = $1 AND c.season_year = $2
            AND c.source_id = seen.source_id AND c.version = seen.version",
         club.0,
@@ -145,7 +127,7 @@ pub async fn apply(
             }
             ChangeUpdate::Touch { source_id } => {
                 sqlx::query!(
-                    "UPDATE changes SET version = version + 1, updated_at = $4
+                    "UPDATE changes SET version = nextval('change_versions'), updated_at = $4
                      WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
                     club.0,
                     season.start_year(),
@@ -168,22 +150,6 @@ pub async fn apply(
             }
         }
     }
-    Ok(())
-}
-
-/// Removes the open changes of `club` and `season` (a first reading after a choice).
-pub async fn remove_for(
-    db: &mut PgConnection,
-    club: ClubNumber,
-    season: Season,
-) -> Result<(), StoreError> {
-    sqlx::query!(
-        "DELETE FROM changes WHERE club_number = $1 AND season_year = $2",
-        club.0,
-        season.start_year(),
-    )
-    .execute(db)
-    .await?;
     Ok(())
 }
 

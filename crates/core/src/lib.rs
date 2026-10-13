@@ -22,5 +22,5 @@ pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedul
 pub use season::{Season, SeasonError};
 pub use team_choice::{
     ChoiceState, FollowedTeam, ScheduleTarget, Team, TeamChoiceError, TeamNeededReason,
-    choice_state, choose_team, own_teams, schedule_target,
+    choice_state, choose_team, own_teams, same_choice, schedule_target,
 };

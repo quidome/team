@@ -476,7 +476,7 @@
           },
           "version": {
             "type": "integer",
-            "format": "int32",
+            "format": "int64",
             "description": "Send it back with \"seen\": a change that a reading updated meanwhile stays."
           }
         }
@@ -997,7 +997,7 @@
           },
           "version": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           }
         }
       },

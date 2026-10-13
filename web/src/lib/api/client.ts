@@ -95,3 +95,18 @@ export type ScheduleGame = components['schemas']['ScheduleGame'];
 export async function loadSchedule(fetch: typeof globalThis.fetch): Promise<Schedule | null> {
 	return (await dataOf(await api.GET('/api/schedule', { fetch }))).schedule ?? null;
 }
+
+export type Change = components['schemas']['ChangeView'];
+export type ChangeGame = components['schemas']['ChangeGame'];
+
+/** The changes not seen yet (story 4). */
+export async function loadChanges(fetch: typeof globalThis.fetch): Promise<Change[]> {
+	return (await dataOf(await api.GET('/api/changes', { fetch }))).changes;
+}
+
+/** Marks these changes as seen; a change that a reading updated meanwhile stays. Gives the number
+ * of changes still not seen. */
+export async function markSeen(changes: Pick<Change, 'id' | 'version'>[]): Promise<number> {
+	const seen = changes.map(({ id, version }) => ({ id, version }));
+	return (await dataOf(await api.POST('/api/changes/seen', { body: { changes: seen } }))).open;
+}

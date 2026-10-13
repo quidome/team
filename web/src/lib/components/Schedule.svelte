@@ -6,16 +6,9 @@
 	import { untrack } from 'svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import FilterToggle from '#lib/components/FilterToggle.svelte';
 	import type { Schedule } from '#lib/api/client.js';
-	import {
-		filterGames,
-		filters,
-		formatDay,
-		groupByDate,
-		noGamesLine,
-		type Filter
-	} from '#lib/schedule.js';
+	import { filterGames, formatDay, groupByDate, noGamesLine, type Filter } from '#lib/schedule.js';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 
 	let {
@@ -111,28 +104,7 @@
 			{/if}
 		</p>
 	{:else}
-		<ToggleGroup.Root
-			type="single"
-			variant="outline"
-			class="grid w-full grid-cols-3"
-			aria-label="Filter games"
-			bind:value={
-				() => filter,
-				(value) => {
-					// A tap on the chosen filter keeps it; there is always one.
-					if (value) filter = value as Filter;
-				}
-			}
-		>
-			{#each filters as option (option.value)}
-				<ToggleGroup.Item
-					value={option.value}
-					class="h-auto min-h-10 px-2 py-2 text-xs leading-tight whitespace-normal data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground sm:text-sm"
-				>
-					{option.label}
-				</ToggleGroup.Item>
-			{/each}
-		</ToggleGroup.Root>
+		<FilterToggle bind:filter label="Filter games" />
 
 		{#if coming.length === 0}
 			<p class="text-sm text-muted-foreground" data-testid="no-coming-games">

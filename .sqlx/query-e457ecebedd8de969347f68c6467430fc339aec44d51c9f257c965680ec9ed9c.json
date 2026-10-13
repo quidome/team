@@ -16,7 +16,7 @@
       {
         "ordinal": 2,
         "name": "version",
-        "type_info": "Int4"
+        "type_info": "Int8"
       }
     ],
     "parameters": {

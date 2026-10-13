@@ -241,7 +241,7 @@ export interface components {
 			/** @description Now, or as last seen when the game is no longer in the schedule. */
 			reason: components['schemas']['ScheduleReasonView'];
 			/**
-			 * Format: int32
+			 * Format: int64
 			 * @description Send it back with "seen": a change that a reading updated meanwhile stays.
 			 */
 			version: number;
@@ -414,7 +414,7 @@ export interface components {
 		SeenChange: {
 			/** Format: int64 */
 			id: number;
-			/** Format: int32 */
+			/** Format: int64 */
 			version: number;
 		};
 		SeenRequest: {

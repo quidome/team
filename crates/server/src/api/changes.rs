@@ -1,13 +1,15 @@
 //! `GET /api/changes` and `POST /api/changes/seen`: the changes the coordinator has not seen yet
 //! (story 4, decision 0016).
 
+use std::collections::BTreeMap;
+
 use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use team_core::{
     Change, ChangeKind, ChoiceState, ClubNumber, Difference, Game, ListedChange, Season,
-    TeamNumber, choice_state, list_changes,
+    StoredGame, TeamNumber, choice_state, list_changes,
 };
 use utoipa::ToSchema;
 
@@ -15,7 +17,7 @@ use crate::api::schedule::ScheduleReasonView;
 use crate::app::AppState;
 use crate::changes;
 use crate::clock::{current_season, today_in_netherlands};
-use crate::db::StoreError;
+use crate::db::{self, StoreError};
 use crate::error::AppError;
 use crate::{followed_teams, games};
 
@@ -31,7 +33,7 @@ pub struct ChangeView {
     /// The source's game id.
     pub id: i64,
     /// Send it back with "seen": a change that a reading updated meanwhile stays.
-    pub version: i32,
+    pub version: i64,
     pub kind: ChangeKindView,
     /// Every difference of a `moved`, `start_time_known`, `home_and_away` or `team_changed`
     /// change; empty for the other kinds.
@@ -93,7 +95,7 @@ pub struct SeenRequest {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SeenChange {
     pub id: i64,
-    pub version: i32,
+    pub version: i64,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -115,7 +117,7 @@ impl From<&Game> for ChangeGame {
     }
 }
 
-fn view(listed: ListedChange, version: i32) -> Option<ChangeView> {
+fn view(listed: ListedChange, version: i64) -> Option<ChangeView> {
     let kind = match listed.change.kind()? {
         ChangeKind::New => ChangeKindView::New,
         ChangeKind::Moved => ChangeKindView::Moved,
@@ -163,32 +165,44 @@ async fn chosen(state: &AppState) -> Result<Option<(ClubNumber, TeamNumber, Seas
     })
 }
 
-/// The changes to show for `club`, `team` and `season`.
+/// The changes to show for `club`, `team` and `season`, with `stored` the stored games of that
+/// club and season.
 pub async fn list(
     state: &AppState,
     db: &mut PgConnection,
     club: ClubNumber,
     team: TeamNumber,
     season: Season,
+    stored: &[StoredGame],
 ) -> Result<Vec<ChangeView>, StoreError> {
     let (open, versions): (Vec<_>, Vec<_>) = changes::open(&mut *db, club, season)
         .await?
         .into_iter()
         .unzip();
-    let version_of: std::collections::BTreeMap<i64, i32> = open
+    let version_of: BTreeMap<i64, i64> = open
         .iter()
         .map(|open| open.source_id)
         .zip(versions)
         .collect();
-    let stored = games::stored(&mut *db, club, season).await?;
     let today = today_in_netherlands(state.clock.as_ref());
-    Ok(list_changes(open, &stored, club, team, today)
+    Ok(list_changes(open, stored, club, team, today)
         .into_iter()
         .filter_map(|listed| {
             let version = *version_of.get(&listed.source_id)?;
             view(listed, version)
         })
         .collect())
+}
+
+async fn list_loaded(
+    state: &AppState,
+    db: &mut PgConnection,
+    club: ClubNumber,
+    team: TeamNumber,
+    season: Season,
+) -> Result<Vec<ChangeView>, StoreError> {
+    let stored = games::stored(&mut *db, club, season).await?;
+    list(state, db, club, team, season, &stored).await
 }
 
 #[utoipa::path(
@@ -204,7 +218,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ChangesAnswer>, A
     let changes = match chosen(&state).await? {
         Some((club, team, season)) => {
             let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
-            list(&state, &mut db, club, team, season).await?
+            list_loaded(&state, &mut db, club, team, season).await?
         }
         None => Vec::new(),
     };
@@ -228,14 +242,20 @@ pub async fn seen(
     let Some((club, team, season)) = chosen(&state).await? else {
         return Ok(Json(SeenAnswer { open: 0 }));
     };
-    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
-    let seen: Vec<(i64, i32)> = body
+    // Under the reading lock: a reading never runs in between, and the two never lock the same
+    // rows in another order.
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    db::lock_readings(&mut tx).await?;
+    let seen: Vec<(i64, i64)> = body
         .changes
         .iter()
         .map(|change| (change.id, change.version))
         .collect();
-    changes::mark_seen(&mut db, club, season, &seen).await?;
-    let open = list(&state, &mut db, club, team, season).await?.len();
+    changes::mark_seen(&mut tx, club, season, &seen).await?;
+    let open = list_loaded(&state, &mut tx, club, team, season)
+        .await?
+        .len();
+    tx.commit().await.map_err(StoreError::from)?;
     let open = u32::try_from(open).map_err(|_| StoreError::Invalid(format!("{open} changes")))?;
     Ok(Json(SeenAnswer { open }))
 }

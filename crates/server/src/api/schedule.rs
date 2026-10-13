@@ -1,5 +1,7 @@
 //! `GET /api/schedule`: the coordinator's schedule from the stored games (story 3b).
 
+use std::collections::BTreeSet;
+
 use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
@@ -13,7 +15,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{api, changes, followed_teams, games};
+use crate::{api, followed_teams, games};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ScheduleAnswer {
@@ -121,15 +123,16 @@ async fn view(state: &AppState, target: ScheduleTarget) -> Result<ScheduleView, 
     let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
     let stored = games::stored(&mut db, club.number, season).await?;
     let today = today_in_netherlands(state.clock.as_ref());
-    let open = changes::open_ids(&mut db, club.number, season).await?;
-    let unseen_changes = if last_season {
-        0
+    // The games with a change to show keep their crossed-out game; last season's view shows no
+    // changes, so its gone games are hidden.
+    let changes = if last_season {
+        Vec::new()
     } else {
-        let count = api::changes::list(state, &mut db, club.number, team.number, season)
-            .await?
-            .len();
-        u32::try_from(count).map_err(|_| StoreError::Invalid(format!("{count} changes")))?
+        api::changes::list(state, &mut db, club.number, team.number, season, &stored).await?
     };
+    let open: BTreeSet<i64> = changes.iter().map(|change| change.id).collect();
+    let unseen_changes = u32::try_from(changes.len())
+        .map_err(|_| StoreError::Invalid(format!("{} changes", changes.len())))?;
     let schedule = schedule(stored, club.number, team.number, today, &open);
     Ok(ScheduleView {
         season: season.to_string(),

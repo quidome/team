@@ -1,8 +1,9 @@
 // The words for a reading of the game list (story 3a).
 import type { Reading, ReadingCounts } from '#lib/api/client.js';
 
-/** The kinds of change in the order of the result line, with their words. */
-const kinds: [keyof ReadingCounts, string][] = [
+/** The kinds of change in the order of the result line, with their words. The list of changes
+ * uses the same words. */
+export const kinds: [keyof ReadingCounts, string][] = [
 	['new', 'new'],
 	['moved', 'moved'],
 	['start_time_known', 'start time known'],

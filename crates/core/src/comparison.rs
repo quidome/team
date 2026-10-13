@@ -231,7 +231,7 @@ fn by_id(stored: &[StoredGame]) -> BTreeMap<i64, &StoredGame> {
 
 /// The stored games that were in the game list and are not in this reading. All of them are
 /// stored as no longer in the game list (the game list is the truth); `compare` counts only the
-/// ones in the schedule as `Gone`.
+/// coming ones in the schedule as `Gone`.
 pub fn no_longer_in_list<'a>(stored: &'a [StoredGame], read: &[Game]) -> Vec<&'a StoredGame> {
     let read_ids: BTreeSet<i64> = read.iter().map(|game| game.source_id).collect();
     stored
@@ -351,8 +351,8 @@ pub fn count(changes: &[GameChange]) -> Counts {
 pub struct ListedChange {
     pub source_id: i64,
     pub change: Change,
-    /// The reason the game is in the schedule now, or, when it is no longer there, was when last
-    /// seen. It decides the filter and the team look.
+    /// `TeamGame` when the team plays the game now or did when last seen; else the reason the
+    /// game is in the schedule now, or was when last seen. It decides the filter and the team look.
     pub reason: ScheduleReason,
     /// `None`: a new game.
     pub last_seen: Option<StoredGame>,
@@ -377,14 +377,23 @@ pub fn list_changes(
         .filter_map(|open| {
             let now = (*stored_by_id.get(&open.source_id)?).clone();
             let change = change_between(open.last_seen.as_ref(), &now, club, team, today)?;
-            let reason = now
-                .in_list
-                .then(|| in_schedule(&now.game, club, team))
-                .flatten()
-                .or_else(|| {
-                    let last_seen = open.last_seen.as_ref()?;
-                    in_schedule(&last_seen.game, club, team)
-                })?;
+            let last_seen_reason = open
+                .last_seen
+                .as_ref()
+                .and_then(|last_seen| in_schedule(&last_seen.game, club, team));
+            let now_reason = in_schedule(&now.game, club, team);
+            // A change to a game the team plays, or played when last seen, is a change of the
+            // team: for example its home game that another club team plays now.
+            let reason = if now_reason == Some(ScheduleReason::TeamGame)
+                || last_seen_reason == Some(ScheduleReason::TeamGame)
+            {
+                ScheduleReason::TeamGame
+            } else {
+                now.in_list
+                    .then_some(now_reason)
+                    .flatten()
+                    .or(last_seen_reason)?
+            };
             Some(ListedChange {
                 source_id: open.source_id,
                 change,
@@ -1039,5 +1048,26 @@ mod tests {
             Change::IntoSchedule(ScheduleReason::DutyGame).kind(),
             Some(ChangeKind::IntoSchedule)
         );
+    }
+
+    #[test]
+    fn a_team_game_that_another_club_team_plays_now_is_still_a_change_of_the_team() {
+        let open = vec![open_seen(game(1, TEAM, OPPONENT))];
+        let stored = [StoredGame {
+            game: game(1, CLUB_TEAM, OPPONENT),
+            in_list: true,
+        }];
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        assert_eq!(listed[0].change, changed(&[Difference::Team]));
+        assert_eq!(listed[0].reason, ScheduleReason::TeamGame);
+
+        // And the other way round: a duty game that the team plays now.
+        let open = vec![open_seen(game(2, CLUB_TEAM, OPPONENT))];
+        let stored = [StoredGame {
+            game: game(2, TEAM, OPPONENT),
+            in_list: true,
+        }];
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        assert_eq!(listed[0].reason, ScheduleReason::TeamGame);
     }
 }

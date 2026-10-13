@@ -1,6 +1,6 @@
 # Technical spec: The list of changes
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-13-the-list-of-changes
 **Date**: 2026-10-13
@@ -258,8 +258,8 @@ choice for each season), 0014 (seasons as start years; Dutch local dates and tim
 - [x] Step 1: core rules (2026-10-13)
 - [x] Step 2: storage and the reading (2026-10-13)
 - [x] Step 3: the API (2026-10-13; `api-types-check` passes once the new types are committed)
-- [ ] Step 4: the screens
-- [ ] All checks pass
+- [x] Step 4: the screens (2026-10-13)
+- [x] All checks pass (2026-10-13)
 
 ## Deviations
 From the functional spec (agreed by the coordinator, 2026-10-13):
@@ -327,4 +327,171 @@ Small choices in the build (step 3, 2026-10-13):
 - The OpenAPI operation names are `changes` and `markSeen` (the handler names `get` and `seen` would mix with other routes in the generated types, as in story 3b).
 - `GET /api/schedule` works out `unseen_changes` with the same function as `GET /api/changes`, so the number on the start page always matches the list.
 
+Small choices in the build (step 4, 2026-10-13):
+- The quick filter is now one component, `FilterToggle.svelte`, used by the schedule and the list of changes; `filterGames` works on anything with a `reason`.
+- The line "N changes not seen" is a link under the team name in the team header, in the team colour. At 390 × 800 the first coming game is still in the first screen (browser test).
+- A game no longer in the game list shows "no longer in the game list" in the gone colour, not crossed out: the list shows a change, not the game.
+- The browser tests of the page are in the new `web/e2e/changes.e2e.ts`, in the Playwright project `logged-in`; they replace the answers of `GET /api/changes` and `POST /api/changes/seen` (`page.route`). The two start-page tests are in `choose.e2e.ts`, where M16 1 is chosen.
+
 ## Review findings
+
+### Accept review (2026-10-13)
+Reviewed by `/review accept` (fresh agent). Input: mode `accept` and this change folder, nothing
+else. This folder has no `functional.md` or `idea.md`; the functional spec is story 4 (and the
+parts of stories 1–3 it touches) of
+[the epic's functional spec](../2026-10-10-games-from-game-list/functional.md), with that
+folder's `idea.md`. Also read: `change.md`, this file (Deviations read after the view below was
+formed), and the diff against `main` (committed and not). Runs: `cargo test -p team_core` (91
+passed), `cargo test -p team --test changes` (19 passed), and a probe program outside the
+repository that calls `team_core::list_changes` (A1). The browser tests were not run: port 4102
+was already in use by another process, which I left alone.
+
+**A1 – concerning deviation: a game of the team whose team is replaced loses the team look and
+leaves the "Games of the team" filter.** A home game of the team where the game list puts another
+club team in its place (for example M16 1 → M16 2; "a team of the game changed" in story 4) is in
+the schedule before and after, so it is `team_changed`. But `list_changes` takes the reason from
+the game *now* (`DutyGame`), so the change shows without the team look and the badge "Team", and
+the filter "Games of the team" (and "Mark these N as seen" under it) does not include it. This is
+exactly a change that breaks a drive the coordinator arranged, and story 4 asks that "a change to
+a game of the team is clearly visible". The other branches are right: `out_of_schedule` and `gone`
+take the reason as last seen, so they keep the team look. Checked: trace of `list_changes`
+(`crates/core/src/comparison.rs`, the `reason` is `now` first, last seen only when `now` is not in
+the schedule) and the probe: last seen home 100 (the team) – away 900, now home 101 (club team) –
+away 900 gives `change=Changed([Team]) reason=DutyGame`. Fix within the spec: the reason is
+`team` when the game was or is a game of the team. The reverse (a duty game that becomes a team
+game) already shows as `team`.
+  - 2026-10-13: fixed (with R2). `list_changes` gives the reason `team` when the team plays the game now or did when last seen. Tests: core `a_team_game_that_another_club_team_plays_now_is_still_a_change_of_the_team`, router `a_team_game_that_another_club_team_plays_now_is_a_change_of_the_team`.
+
+**A2 – neutral drift: the result line of a reading and the list can differ.** Story 2 says the
+counts "match the list of changes". The result line counts this reading (stored before → read
+now); the list shows last seen → now. A game moved and moved back before "seen" gives "1 moved" in
+the result line and nothing in the list; a game moved twice gives "1 moved" both times while the
+list has one change. Both follow from the spec's own rules ("from what the coordinator last saw to
+what is true now"), and the result line still never counts what the list would not hold for that
+reading. Checked: trace of `compare` and `update_open_changes`.
+  - 2026-10-13: no change needed: both follow the spec's rules (the result line counts one reading; the list shows last seen to now). For `docs/product/read-the-game-list.md` at `/close`.
+
+**A3 – neutral drift: a gone past game can stay crossed out with nothing to mark.** The schedule
+keeps a game no longer in the game list while it has an open change (`changes::open_ids`), but
+`GET /api/changes` and `unseen_changes` leave out changes whose game is now past on both dates. A
+gone game whose date passes before the coordinator looks stays crossed out under past games, with
+no change to mark as seen, until the next reading removes the row. Before story 5 that is the next
+tap on "read". Small, and only in past games. Checked: trace of `schedule` (`open` from
+`open_ids`) against `list_changes` and the `Remove` branch of `update_open_changes`.
+  - 2026-10-13: fixed (with R3). The schedule now keeps a gone game only while its change is in the list, so a gone game whose date passed is hidden at once. Test: router `a_gone_game_whose_date_passed_is_hidden_with_its_change`. One line in `docs/product/schedule.md` at `/close`.
+
+**A4 – faithful adaptation: the filter on the list is its own choice.** Story 3 says "the same
+filter applies to the list of changes". The list has the same three choices and the same rule (by
+`reason`), but starts at "All" each time and does not follow the filter chosen on the schedule.
+Fine for "what must I act on": the list opens complete. Checked: `web/src/routes/changes/+page.svelte`.
+  - 2026-10-13: no change needed (the filter starts at "All" on each page, as the schedule does).
+
+**Per criterion of story 4** (by reading the code and the router tests; the screen only by reading,
+the browser tests were not run):
+- Every kind (new, moved with old and new value, start time known, home and away with the old and new home team, team changed with the old teams, gone with "was …", came back): matches. `came_back` shows only the new values; that is the rule from story 3a (the coordinator saw it gone) and fits.
+- Into or out of the schedule says why, also for A3 of story 3a: matches ("now a home game of another club team", "no longer a game of the team", …).
+- Stays until seen; one or all: matches, with the version check so a change a reading touched after the page loaded stays.
+- Summary line: matches the intent (deviation agreed); new games of the team never hide in it.
+- A change to a game of the team clearly visible: matches, except A1.
+- The first reading after a choice lists nothing; a change of club or team removes the old changes (story 1): matches (router tests ran).
+- Edge cases (deleted and made again with a new number; two changes before seen; left and came back): match.
+- Only coming games (deviation): matches the coordinator's answer, also in the result line.
+
+**The deviations**, read after the above: they match what I found and none of them hides A1–A3.
+
+**Verdict: needs correction** – only A1. It is a small fix inside the spec, so the user may choose
+to send it back to `/implement` rather than `/discover review:`. A2–A4 need no change; A3 may get
+a line in `docs/product/schedule.md` at `/close`.
+
+### Build review (2026-10-13)
+Reviewed by `/review build` (fresh agent). Input: mode `build` and this change folder, no other
+text. Read: the diff against `main` (committed, and the uncommitted step 4 files), `change.md`,
+this file, `docs/architecture.md`, the valid decision records (0001, 0002, 0004, 0005, 0007,
+0010–0015), `CLAUDE.md`, `AGENTS.md`, `docs/language.md`. Runs: `cargo test --workspace` and
+`just check` in the Nix shell with the local database (exit 0: all cargo tests, svelte-check,
+lint, build, 28 browser tests, `api-types-check`, `check-sqlx`). The findings below were formed
+before reading the accept review above; R2 and R3 are the same as its A1 and A3.
+
+**R1 – bug (medium): a version number is used again, so a stale "Seen" can delete a change the
+coordinator never saw.** `Insert` always starts at `version = 1` (column default), and a `Remove`
+or a "seen" deletes the row. So the pair (id, version) is not unique over time. Trace: the page
+shows game G moved 14:30 → 16:00 with version 1; a reading moves it back (`Remove`); a later
+reading moves it to 17:30 (`Insert`, version 1 again, last seen 14:30); a tap on "Seen" or "Mark
+all as seen" on the page that is still open sends `{G, 1}` and `mark_seen` deletes the new change
+(14:30 → 17:30), which was never on the screen. The same happens with a second device after
+"seen" on the first one and a new change of that game. This breaks requirement 5 and the decision
+row "a change that a reading updated after the screen loaded is not marked as seen". With the
+nightly reading (story 5) a page left open on the phone for a day is enough. Checked: trace of
+`changes::apply` (`Insert` without a version), `migrations/0004_changes.sql` (`DEFAULT 1`) and
+`changes::mark_seen`; not run. Fix: take every version from one sequence (insert and `Touch` both
+set `nextval`), so a version is never given twice. `0004_changes` is not released yet, so it can
+still be changed in place.
+  - 2026-10-13: fixed. Every version comes from one sequence (`change_versions`, in `0004_changes`, which is not released yet, changed in place); `Insert` and `Touch` both take the next value. The version is a 64-bit number in the API. Test: router `a_change_made_again_never_gets_an_old_version`.
+
+**R2 – bug against the spec's intent (medium): a game of the team that becomes a home game of
+another club team loses the team look.** For a `Changed([Team])` where the team's home game now
+has another club team (M16 1 → M16 2), `list_changes` takes the reason from the game now
+(`DutyGame`): no team look, no "Team" badge, not under the filter "Games of the team", and not
+in "Mark these N as seen" there. Story 4: "a change to a game of the team is clearly visible";
+this is the change that breaks a drive. Checked: trace of `list_changes` and `in_schedule`
+(`crates/core/src/schedule.rs`: both sides visible, so `Changed`, reason now). Fix in the core:
+the reason is `team` when the game was a game of the team as last seen or is one now. Add a
+`list_changes` unit test and a router test.
+  - 2026-10-13: fixed; see A1.
+
+**R3 – bug (low): the schedule and the list use two different sets of open changes.**
+`api/schedule.rs` gives `team_core::schedule` every id from `changes::open_ids`, while
+`unseen_changes` and `GET /api/changes` use `list_changes`, which leaves out changes whose game is
+past on both dates. A gone game whose date passes stays crossed out in the past games with nothing
+to mark as seen, until the next reading removes the row. The same holds for last season's view
+(no reading of that season removes the rows until the choice is saved). Also, `view` now loads the
+stored games twice and the open changes twice (`open_ids`, then `changes::open` inside
+`api::changes::list`). Checked: trace. Fix: pass the ids of the listed changes to `schedule`
+(for last season: no ids, so gone games are hidden, as the deviation "hidden at once" says), load
+once, and drop `open_ids`.
+  - 2026-10-13: fixed. `schedule` gets the ids of the listed changes (none for last season's view); the view loads the stored games once and passes them to `api::changes::list`; `changes::open_ids` is removed. Test: see A3.
+
+**R4 – possible deadlock (low): "seen" and a reading lock the same rows in different orders.**
+The reading locks its open changes with `FOR UPDATE … ORDER BY source_id`; `mark_seen` deletes
+them in the order the screen sends (date order) and takes no advisory lock. A "Mark all as seen"
+at the moment of a reading can make PostgreSQL abort one of the two with a deadlock error: either
+"seen" answers 500, or the reading fails with 500 and is not recorded as a reading (decision 0015
+records only source failures). Rare with one coordinator, more likely with story 5. Checked:
+trace of the lock order; not run. Fix: `seen` takes `db::lock_readings` in a transaction (as the
+save of the choice now does), or sorts the ids and locks with `FOR UPDATE` first.
+  - 2026-10-13: fixed. `POST /api/changes/seen` runs in a transaction that takes `db::lock_readings` first, as the save of the choice does. Not run as a race (no test can time it); the lock makes the two run one after the other.
+
+**R5 – logic in the server (low).** The rule "the choice is the same: same club and same team
+number, so keep the open changes" (requirement 10) lives in `api/selection.rs::save_choice`, a
+route handler. The architecture's pattern is "new rules go in `crates/core` first; `crates/server`
+only moves data in and out" (decision 0001), and finding R1 of story 3b was the same kind. Small,
+but it is the rule the duties change will build on. Checked: reading `save_choice`. Fix: a core
+function (for example `same_choice(before, now)`) with unit tests; the handler only calls it.
+  - 2026-10-13: fixed. The rule is `team_core::same_choice(before, now)` with two unit tests; `save_choice` only calls it.
+
+**R6 – tests that cannot fail, or are missing (low).**
+- `changes::remove_for` on a first reading cannot be reached in practice: every change of club or team already calls `remove_all` under the lock, so a first reading never finds open rows, and no test has rows at that point. `the_first_reading_after_a_choice_keeps_no_changes` passes without `remove_for` (it does test the `!first_reading` guard). Either test it with rows put in by hand, or remove it and say in a comment why the save covers it. Checked: search `remove_for` (one call) and trace of `save_choice`.
+- `a_failure_while_storing_keeps_no_changes` checks that no change row is left, but not the planned "and no games changed". Checked: reading the test.
+- Step 4 planned "with the filter 'Games of the team' the button says 'Mark these N as seen' and sends only those N". The browser test uses the filter "Possible duty games" with one change ("Mark this one as seen"); the branch `Mark these ${count} as seen` of `seenAllLabel` runs in no test. Checked: search `Mark these` in `web/` (only `changes.ts`).
+- The claim "All checks pass" is true: `just check` exit 0 in this review.
+  - 2026-10-13: fixed. `changes::remove_for` is removed, with a comment in `reading.rs` that the save of another choice removes the open changes under the same lock. `a_failure_while_storing_keeps_no_changes` now also checks that the moved game kept its start time. Browser test "with the filter on the team, the button marks only the changes of the team" covers "Mark these 2 as seen".
+
+**R7 – a version goes up without a visible change (low, note).** `Touch` compares the whole
+`StoredGame`, also the hall and town names. A new hall name in the source (the place number stays)
+raises the version of every open change at that place, so a "Seen" sent from a page loaded before
+that reading leaves the change open with nothing new to see. It does what the design says ("Touch
+only when … `StoredGame` equality") and costs one more tap; mention it in decision 0016 or compare
+only what the list shows. Checked: trace of `update_open_changes` and `games::stored` (newest hall
+name from `places`).
+  - 2026-10-13: not fixed: it does what the design says and costs one more tap; for decision 0016 at `/close`.
+
+**R8 – docs and comments the diff made false or left behind.**
+- `crates/core/src/comparison.rs`, `no_longer_in_list`: "`compare` counts only the ones in the schedule as `Gone`": now only the coming ones in the schedule.
+- Two doc comments were not wrapped again and are longer than the rest (113 characters in the module doc of `crates/server/src/reading.rs`; the doc of `schedule` in `crates/core/src/schedule.rs`).
+- For `/close`: `docs/architecture.md` (core functions `change_between`, `update_open_changes`, `list_changes`, `Change::kind`; `changes.rs`; migration `0004_changes`; the reading steps; `db::lock_readings` shared with the save of the choice; the API routes; `followed_teams` now runs in the save's transaction), the module list in `CLAUDE.md` (no `changes.rs`), `docs/product/schedule.md` line 18, and decision 0016.
+- The step 4 files (`web/src/routes/changes/`, `web/src/lib/changes.ts`, `FilterToggle.svelte`, `web/e2e/changes.e2e.ts` and the other web changes) are not committed yet.
+
+  - 2026-10-13: fixed: the comments in `comparison.rs` (`no_longer_in_list`), `reading.rs` (module doc) and `schedule.rs` (`schedule`). Not fixed: the documents are for `/close`; the step 4 files are committed with the fixes.
+
+**Verdict:** fix R1 and R2 before Close (R2 is A1 of the accept review); R3 and R4 are small and
+cheap to fix in the same pass; R5–R8 are clean-up and `/close` items.

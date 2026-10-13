@@ -6,6 +6,7 @@
 	import ReadGameList from '#lib/components/ReadGameList.svelte';
 	import Schedule from '#lib/components/Schedule.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { unseenLine } from '#lib/changes.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -83,6 +84,15 @@
 					{data.selection.club.name}
 					{data.selection.team.name}
 				</h1>
+				{#if schedule && schedule.unseen_changes > 0}
+					<a
+						href={resolve('/changes')}
+						class="mt-1 inline-block text-sm font-medium text-team underline underline-offset-4"
+						data-testid="unseen-changes"
+					>
+						{unseenLine(schedule.unseen_changes)}
+					</a>
+				{/if}
 			</div>
 			<Button href={resolve('/choose')} variant="outline">Change</Button>
 		</div>

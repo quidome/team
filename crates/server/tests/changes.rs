@@ -30,7 +30,7 @@ fn at(id: i64, time: &str) -> Value {
 }
 
 /// The open changes: (source id, version, last seen).
-async fn rows(pool: &PgPool) -> Vec<(i64, i32, Option<Value>)> {
+async fn rows(pool: &PgPool) -> Vec<(i64, i64, Option<Value>)> {
     sqlx::query_as("SELECT source_id, version, last_seen FROM changes ORDER BY source_id")
         .fetch_all(pool)
         .await
@@ -146,6 +146,14 @@ async fn a_failure_while_storing_keeps_no_changes(pool: PgPool) {
     let (status, _) = reader.read().await;
     assert_eq!(status, 500);
     assert_eq!(ids(reader.pool()).await, Vec::<i64>::new());
+    let start: Option<chrono::NaiveTime> = sqlx::query_scalar(
+        "SELECT start_time FROM games WHERE source_id = $1 AND season_year = 2026",
+    )
+    .bind(TEAM_GAME)
+    .fetch_one(reader.pool())
+    .await
+    .unwrap();
+    assert_eq!(start, chrono::NaiveTime::from_hms_opt(14, 30, 0));
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
@@ -435,4 +443,66 @@ async fn the_schedule_counts_unseen_changes_and_hides_a_gone_game_after_seen(poo
             .iter()
             .all(|game| game["id"] != TEAM_GAME)
     );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_change_made_again_never_gets_an_old_version(pool: PgPool) {
+    let reader = read_once(pool).await;
+    let first = only_change(&reader, at(TEAM_GAME, "16:00")).await;
+    // Moved back: no change; moved again: a new change of the same game.
+    reader.answer(real_games());
+    reader.read_good().await;
+    let again = only_change(&reader, at(TEAM_GAME, "17:30")).await;
+    assert_ne!(again["version"], first["version"]);
+
+    // "Seen" from a page that still shows the first change does not hide the new one.
+    let body = seen(
+        &reader,
+        json!([{ "id": TEAM_GAME, "version": first["version"] }]),
+    )
+    .await;
+    assert_eq!(body, json!({ "open": 1 }));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_team_game_that_another_club_team_plays_now_is_a_change_of_the_team(pool: PgPool) {
+    let reader = read_once(pool).await;
+    let change = only_change(
+        &reader,
+        games_with(|games| {
+            let game = game_mut(games, TEAM_GAME);
+            game["thuis_ploeg_id"] = json!(M16_2);
+            game["thuis_ploeg"] = json!("Blue Drakes M16 2");
+        }),
+    )
+    .await;
+    assert_eq!(
+        (&change["kind"], &change["reason"]),
+        (&json!("team_changed"), &json!("team"))
+    );
+    assert_eq!(change["after"]["home"], "Blue Drakes M16 2");
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_gone_game_whose_date_passed_is_hidden_with_its_change(pool: PgPool) {
+    let mut reader = read_once(pool).await;
+    reader.answer(games_with(|games| {
+        games.retain(|game| game["id"] != TEAM_GAME)
+    }));
+    reader.read_good().await;
+    assert_eq!(schedule(&reader).await["unseen_changes"], 1);
+
+    // 13 December 2026: the gone game of 12 December is past, with no reading in between.
+    reader.harness.clock.set(utc(2026, 12, 13, 12, 0));
+    reader.log_in_again().await;
+    let schedule_now = schedule(&reader).await;
+    assert_eq!(schedule_now["unseen_changes"], 0);
+    assert!(
+        schedule_now["past"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|game| game["id"] != TEAM_GAME)
+    );
+    assert_eq!(changes(&reader).await, Vec::<Value>::new());
 }
