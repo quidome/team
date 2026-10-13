@@ -7,7 +7,8 @@ Open work, most important first. Changes link to their folder; small fixes are o
    - Story 2, choose club and team: done (on `main`, not released yet).
    - Story 3a, read on demand: done (on `main`, not released yet).
    - Story 3b, the schedule: done (on `main`, not released yet).
-   - Then story 4, the list of changes (`/design` from the epic).
+   - Story 4, [the list of changes](changes/2026-10-13-the-list-of-changes/): implement (4 steps; designed 2026-10-13).
+   - Then story 5, the nightly reading (`/design` from the epic).
 
 Small:
 - Delete the untested images `sha-a9b5906` and `sha-a9b5906-migration` from GHCR (needs `gh auth refresh -s read:packages,delete:packages`, or the GitHub web page). Until then, do not tag commit `a9b5906`. Decision 0010 says they were deleted; that is true only after this.
