@@ -15,6 +15,7 @@ number: the club is found by name, and the team is chosen from the club's own te
 - **New season.** A season starts on 1 July (Dutch time), as the NBB (the Dutch basketball federation) counts it, and is written as "2026-2027". In a new season the tool keeps the club and asks for the team again, because a youth team moves up an age group. It shows last season's team (for example "In 2026-2027 the team was Blue Drakes M16 1"), and below the choose step last season's schedule.
 - **No games yet.** In summer the new season can still be empty. The tool then says that the club has no games for the season yet. A club that is not kept yet can be saved without a team ("Save club"); a kept club needs nothing. The team is chosen on the start page when games appear.
 - The choice of each season is kept. A change in the same season replaces that season's choice; earlier seasons are not changed.
+- Another club or team, or the team of a new season, removes the changes not seen yet ([list of changes](list-of-changes.md)); saving the same club and team again keeps them.
 
 ## Errors and limits
 - "No club found. Try another name." when the search finds nothing.
