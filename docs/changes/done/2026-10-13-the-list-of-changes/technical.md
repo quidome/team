@@ -10,7 +10,7 @@ Keep each change to a coming game in the schedule until the coordinator has seen
 coordinator knows when a drive, a jury or a referee duty may need action.
 
 ## Requirements summary
-Story 4 of the epic [Games from the game list](../2026-10-10-games-from-game-list/technical.md),
+Story 4 of the epic [Games from the game list](../../2026-10-10-games-from-game-list/technical.md),
 from functional story 4 ("See what changed") and the part of functional story 1 about a change of
 club or team. The coordinator's view (2026-10-13): this is a list of things that may need action.
 When a game of the team changes, or a game where players may have a duty, the coordinator must
@@ -280,7 +280,7 @@ The design reads the functional spec more strictly than written, within its word
 Reviewed by `/review spec … deviations` (fresh agent). Input: mode `spec`, this change folder,
 `deviations`; no other arguments. This folder has no `functional.md`; the functional spec is
 story 4 (and story 1, 2, 3 where they touch it) of
-[the epic's functional spec](../2026-10-10-games-from-game-list/functional.md). Read: that file
+[the epic's functional spec](../../2026-10-10-games-from-game-list/functional.md). Read: that file
 with its `idea.md`, `change.md` of this folder, `docs/vision.md`, `docs/language.md`, and
 `docs/product/` (`schedule.md`, `read-the-game-list.md`, `choose-club-and-team.md`). Only the
 items under **Deviations** are judged. All checks are by reading (a trace through the spec
@@ -339,7 +339,7 @@ Small choices in the build (step 4, 2026-10-13):
 Reviewed by `/review accept` (fresh agent). Input: mode `accept` and this change folder, nothing
 else. This folder has no `functional.md` or `idea.md`; the functional spec is story 4 (and the
 parts of stories 1–3 it touches) of
-[the epic's functional spec](../2026-10-10-games-from-game-list/functional.md), with that
+[the epic's functional spec](../../2026-10-10-games-from-game-list/functional.md), with that
 folder's `idea.md`. Also read: `change.md`, this file (Deviations read after the view below was
 formed), and the diff against `main` (committed and not). Runs: `cargo test -p team_core` (91
 passed), `cargo test -p team --test changes` (19 passed), and a probe program outside the

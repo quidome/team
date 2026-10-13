@@ -1,6 +1,6 @@
 # 0012 – The choice of club and team is kept for each season
 
-**Status**: valid; partly replaced by 0015
+**Status**: valid; partly replaced by 0015 and 0016
 **Date**: 2026-10-11
 **Change**: [2026-10-11-choose-club-and-team](../changes/done/2026-10-11-choose-club-and-team/)
 
