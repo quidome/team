@@ -1,13 +1,16 @@
 //! The chosen club and team, one row for each season (table `followed_teams`).
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::PgExecutor;
 use team_core::{Club, ClubNumber, FollowedTeam, Season, Team, TeamNumber};
 
 use crate::db::StoreError;
 
 /// The choice saved for `season`, if any.
-pub async fn for_season(pool: &PgPool, season: Season) -> Result<Option<FollowedTeam>, StoreError> {
+pub async fn for_season(
+    db: impl PgExecutor<'_>,
+    season: Season,
+) -> Result<Option<FollowedTeam>, StoreError> {
     let row = sqlx::query_as!(
         Row,
         r#"SELECT season_year AS "season_year!", club_number, club_name, club_town, team_number,
@@ -15,7 +18,7 @@ pub async fn for_season(pool: &PgPool, season: Season) -> Result<Option<Followed
            FROM followed_teams WHERE season_year = $1"#,
         season.start_year(),
     )
-    .fetch_optional(pool)
+    .fetch_optional(db)
     .await?;
     Ok(row.map(Row::into_followed_team))
 }
@@ -23,7 +26,7 @@ pub async fn for_season(pool: &PgPool, season: Season) -> Result<Option<Followed
 /// The choice of the newest season before `season`, if any. Rows of later seasons (a clock that
 /// went back) are never returned, so they cannot hide the current season.
 pub async fn newest_before(
-    pool: &PgPool,
+    db: impl PgExecutor<'_>,
     season: Season,
 ) -> Result<Option<FollowedTeam>, StoreError> {
     let row = sqlx::query_as!(
@@ -33,7 +36,7 @@ pub async fn newest_before(
            FROM followed_teams WHERE season_year < $1 ORDER BY season_year DESC LIMIT 1"#,
         season.start_year(),
     )
-    .fetch_optional(pool)
+    .fetch_optional(db)
     .await?;
     Ok(row.map(Row::into_followed_team))
 }
@@ -69,10 +72,10 @@ impl Row {
 }
 
 /// Saves the choice for its season. A choice of the same season is replaced; rows of other
-/// seasons are not touched. One statement on one row, so two saves at once need no lock. It still
-/// writes the text season (decision 0014): the computed `season_year` follows from it.
+/// seasons are not touched. It still writes the text season (decision 0014): the computed
+/// `season_year` follows from it.
 pub async fn save(
-    pool: &PgPool,
+    db: impl PgExecutor<'_>,
     choice: &FollowedTeam,
     chosen_at: DateTime<Utc>,
 ) -> Result<(), StoreError> {
@@ -95,7 +98,7 @@ pub async fn save(
         choice.team.as_ref().map(|team| team.name.as_str()),
         chosen_at,
     )
-    .execute(pool)
+    .execute(db)
     .await?;
     Ok(())
 }

@@ -1,6 +1,7 @@
 //! Which games of the club's game list go in the coordinator's schedule.
 
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use chrono::NaiveDate;
 
@@ -53,16 +54,21 @@ pub struct Schedule {
 }
 
 /// Keeps the stored games that [`in_schedule`] accepts and splits them on `today` (a game today
-/// is coming). Within a date, known start times come first in time order, then the games whose
+/// is coming). A game no longer in the game list is kept only while `open` (the games with a
+/// change not seen yet) has it: after "seen" it is hidden. Within a date, known start times come first in time order, then the games whose
 /// start time is not known, then by source id.
 pub fn schedule(
     stored: Vec<StoredGame>,
     club: ClubNumber,
     team: TeamNumber,
     today: NaiveDate,
+    open: &BTreeSet<i64>,
 ) -> Schedule {
     let mut schedule = Schedule::default();
     for StoredGame { game, in_list } in stored {
+        if !in_list && !open.contains(&game.source_id) {
+            continue;
+        }
         let Some(reason) = in_schedule(&game, club, Some(team)) else {
             continue;
         };
@@ -229,7 +235,7 @@ pub(crate) mod tests {
                 in_list: true,
             },
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(1));
+        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
         assert_eq!(ids(&schedule.coming), [1, 3]);
         assert_eq!(
             schedule
@@ -245,7 +251,7 @@ pub(crate) mod tests {
     #[test]
     fn a_game_today_is_coming_and_a_game_yesterday_is_past() {
         let games = vec![stored(1, 9, Some((10, 0))), stored(2, 10, Some((10, 0)))];
-        let schedule = schedule(games, CLUB, TEAM, day(10));
+        let schedule = schedule(games, CLUB, TEAM, day(10), &BTreeSet::new());
         assert_eq!(ids(&schedule.coming), [2]);
         assert_eq!(ids(&schedule.past), [1]);
     }
@@ -260,7 +266,7 @@ pub(crate) mod tests {
             stored(6, 14, Some((10, 0))),
             stored(5, 14, Some((10, 0))),
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(1));
+        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
         assert_eq!(ids(&schedule.coming), [4, 5, 6, 3, 2, 1]);
     }
 
@@ -272,16 +278,17 @@ pub(crate) mod tests {
             stored(3, 14, Some((14, 0))),
             stored(4, 14, Some((10, 0))),
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(20));
+        let schedule = schedule(games, CLUB, TEAM, day(20), &BTreeSet::new());
         assert!(schedule.coming.is_empty());
         assert_eq!(ids(&schedule.past), [4, 3, 2, 1]);
     }
 
     #[test]
-    fn a_game_no_longer_in_the_game_list_stays_in_the_schedule() {
+    fn a_game_no_longer_in_the_game_list_stays_while_its_change_is_not_seen() {
         let mut gone = stored(1, 14, Some((10, 0)));
         gone.in_list = false;
-        let schedule = schedule(vec![gone, stored(2, 14, Some((11, 0)))], CLUB, TEAM, day(1));
+        let games = vec![gone, stored(2, 14, Some((11, 0)))];
+        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::from([1]));
         assert_eq!(
             schedule
                 .coming
@@ -290,5 +297,14 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             [(1, false), (2, true)]
         );
+    }
+
+    #[test]
+    fn a_game_no_longer_in_the_game_list_is_hidden_after_its_change_is_seen() {
+        let mut gone = stored(1, 14, Some((10, 0)));
+        gone.in_list = false;
+        let games = vec![gone, stored(2, 14, Some((11, 0)))];
+        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
+        assert_eq!(ids(&schedule.coming), [2]);
     }
 }

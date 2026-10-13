@@ -3,6 +3,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use chrono::NaiveDate;
+
 use crate::club::ClubNumber;
 use crate::game::{Game, TeamNumber};
 use crate::schedule::{ScheduleReason, in_schedule};
@@ -52,47 +54,41 @@ pub struct GameChange {
 }
 
 /// The changes of the games that are in the schedule before or after the reading, one change for
-/// each game, sorted by source id.
+/// each game, sorted by source id. Each change is [`change_between`] the stored game and the game
+/// after the reading, so the result line and the list of changes use one rule.
 pub fn compare(
     stored: &[StoredGame],
     read: &[Game],
     club: ClubNumber,
     team: Option<TeamNumber>,
+    today: NaiveDate,
 ) -> Vec<GameChange> {
-    let schedule = |game: &Game| in_schedule(game, club, team);
-    let stored_by_id: BTreeMap<i64, &StoredGame> = stored
-        .iter()
-        .map(|stored| (stored.game.source_id, stored))
-        .collect();
+    let stored_by_id = by_id(stored);
     let mut changes = Vec::new();
     for after in read {
-        let change = match stored_by_id.get(&after.source_id) {
-            None => schedule(after).map(|_| Change::New),
-            Some(stored) if !stored.in_list => schedule(after).map(|_| Change::CameBack),
-            Some(stored) => match (schedule(&stored.game), schedule(after)) {
-                (Some(_), Some(_)) => {
-                    let differences = differences(&stored.game, after);
-                    (!differences.is_empty()).then_some(Change::Changed(differences))
-                }
-                (None, Some(reason)) => Some(Change::IntoSchedule(reason)),
-                (Some(_), None) => Some(Change::OutOfSchedule),
-                (None, None) => None,
-            },
+        let before = stored_by_id.get(&after.source_id).copied();
+        let now = StoredGame {
+            game: after.clone(),
+            in_list: true,
         };
-        if let Some(change) = change {
+        if let Some(change) = change_between(before, &now, club, team, today) {
             changes.push(GameChange {
                 source_id: after.source_id,
                 change,
-                before: stored_by_id.get(&after.source_id).map(|s| s.game.clone()),
+                before: before.map(|stored| stored.game.clone()),
                 after: Some(after.clone()),
             });
         }
     }
     for stored in no_longer_in_list(stored, read) {
-        if schedule(&stored.game).is_some() {
+        let now = StoredGame {
+            game: stored.game.clone(),
+            in_list: false,
+        };
+        if let Some(change) = change_between(Some(stored), &now, club, team, today) {
             changes.push(GameChange {
                 source_id: stored.game.source_id,
-                change: Change::Gone,
+                change,
                 before: Some(stored.game.clone()),
                 after: None,
             });
@@ -100,6 +96,137 @@ pub fn compare(
     }
     changes.sort_by_key(|change| change.source_id);
     changes
+}
+
+/// The change from the game as the coordinator last saw it to the game now; `None`: nothing to
+/// show. `last_seen: None`: the game was not in the tool before. Only games of `today` or later
+/// (as last seen or now) give a change: a change to a past game needs no action.
+pub fn change_between(
+    last_seen: Option<&StoredGame>,
+    now: &StoredGame,
+    club: ClubNumber,
+    team: Option<TeamNumber>,
+    today: NaiveDate,
+) -> Option<Change> {
+    let past = |stored: &StoredGame| stored.game.date < today;
+    if past(now) && last_seen.is_none_or(past) {
+        return None;
+    }
+    let visible = |stored: &StoredGame| {
+        stored
+            .in_list
+            .then(|| in_schedule(&stored.game, club, team))
+            .flatten()
+    };
+    let Some(last_seen) = last_seen else {
+        return visible(now).map(|_| Change::New);
+    };
+    match (visible(last_seen), visible(now)) {
+        (Some(_), Some(_)) => {
+            let differences = differences(&last_seen.game, &now.game);
+            (!differences.is_empty()).then_some(Change::Changed(differences))
+        }
+        (Some(_), None) if !now.in_list => Some(Change::Gone),
+        (Some(_), None) => Some(Change::OutOfSchedule),
+        // It left the game list while in the schedule.
+        (None, Some(_))
+            if !last_seen.in_list && in_schedule(&last_seen.game, club, team).is_some() =>
+        {
+            Some(Change::CameBack)
+        }
+        // It was outside the schedule, also when it left the game list from there.
+        (None, Some(reason)) => Some(Change::IntoSchedule(reason)),
+        (None, None) => None,
+    }
+}
+
+/// A change the coordinator has not seen yet: the game as last seen (`None`: a new game).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenChange {
+    pub source_id: i64,
+    pub last_seen: Option<StoredGame>,
+}
+
+/// What a reading does with the open change of one game.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChangeUpdate {
+    /// A new open change; `last_seen` is the stored game before this reading.
+    Insert {
+        source_id: i64,
+        last_seen: Option<Box<StoredGame>>,
+    },
+    /// The game changed in this reading and still differs from last seen: `last_seen` stays,
+    /// the version goes up.
+    Touch { source_id: i64 },
+    /// Nothing to show any more: the game is as last seen again, or it is a past game.
+    Remove { source_id: i64 },
+}
+
+/// The updates of the open changes after a reading, sorted by source id. For each game of the club
+/// and season: last seen is the copy in its open change, or else the stored game before this
+/// reading; now is the game after this reading.
+pub fn update_open_changes(
+    open: &[OpenChange],
+    stored: &[StoredGame],
+    read: &[Game],
+    club: ClubNumber,
+    team: TeamNumber,
+    today: NaiveDate,
+) -> Vec<ChangeUpdate> {
+    let team = Some(team);
+    let open_by_id: BTreeMap<i64, &OpenChange> =
+        open.iter().map(|open| (open.source_id, open)).collect();
+    let stored_by_id = by_id(stored);
+    // After the reading: every stored game not read is no longer in the game list.
+    let mut after: BTreeMap<i64, StoredGame> = stored
+        .iter()
+        .map(|stored| {
+            let game = StoredGame {
+                game: stored.game.clone(),
+                in_list: false,
+            };
+            (stored.game.source_id, game)
+        })
+        .collect();
+    for game in read {
+        let now = StoredGame {
+            game: game.clone(),
+            in_list: true,
+        };
+        after.insert(game.source_id, now);
+    }
+
+    let mut updates = Vec::new();
+    for (source_id, now) in &after {
+        let source_id = *source_id;
+        let before = stored_by_id.get(&source_id).copied();
+        match open_by_id.get(&source_id) {
+            Some(open) => {
+                let change = change_between(open.last_seen.as_ref(), now, club, team, today);
+                if change.is_none() {
+                    updates.push(ChangeUpdate::Remove { source_id });
+                } else if before != Some(now) {
+                    updates.push(ChangeUpdate::Touch { source_id });
+                }
+            }
+            None => {
+                if change_between(before, now, club, team, today).is_some() {
+                    updates.push(ChangeUpdate::Insert {
+                        source_id,
+                        last_seen: before.cloned().map(Box::new),
+                    });
+                }
+            }
+        }
+    }
+    updates
+}
+
+fn by_id(stored: &[StoredGame]) -> BTreeMap<i64, &StoredGame> {
+    stored
+        .iter()
+        .map(|stored| (stored.game.source_id, stored))
+        .collect()
 }
 
 /// The stored games that were in the game list and are not in this reading. All of them are
@@ -153,35 +280,134 @@ pub struct Counts {
     pub out_of_schedule: u32,
 }
 
-/// Counts each change once. A `Changed` counts by its first difference in this order: date, start
-/// time, place ("moved"), start time known, home and away, team.
-pub fn count(changes: &[GameChange]) -> Counts {
-    let mut counts = Counts::default();
-    for change in changes {
-        let counter = match &change.change {
-            Change::New => &mut counts.new,
-            Change::Gone => &mut counts.gone,
-            Change::CameBack => &mut counts.came_back,
-            Change::IntoSchedule(_) => &mut counts.into_schedule,
-            Change::OutOfSchedule => &mut counts.out_of_schedule,
+/// The kind of a change, as the result line counts it and the list of changes names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeKind {
+    New,
+    /// Another date, start time or place.
+    Moved,
+    StartTimeKnown,
+    HomeAndAway,
+    TeamChanged,
+    Gone,
+    CameBack,
+    IntoSchedule,
+    OutOfSchedule,
+}
+
+impl Change {
+    /// A `Changed` is named by its first difference in this order: date, start time, place
+    /// ("moved"), start time known, home and away, team. `None`: a `Changed` with no difference.
+    pub fn kind(&self) -> Option<ChangeKind> {
+        Some(match self {
+            Change::New => ChangeKind::New,
+            Change::Gone => ChangeKind::Gone,
+            Change::CameBack => ChangeKind::CameBack,
+            Change::IntoSchedule(_) => ChangeKind::IntoSchedule,
+            Change::OutOfSchedule => ChangeKind::OutOfSchedule,
             Change::Changed(differences) => {
                 let has = |difference| differences.contains(&difference);
                 if has(Difference::Date) || has(Difference::StartTime) || has(Difference::Place) {
-                    &mut counts.moved
+                    ChangeKind::Moved
                 } else if has(Difference::StartTimeKnown) {
-                    &mut counts.start_time_known
+                    ChangeKind::StartTimeKnown
                 } else if has(Difference::HomeAndAway) {
-                    &mut counts.home_and_away
+                    ChangeKind::HomeAndAway
                 } else if has(Difference::Team) {
-                    &mut counts.team_changed
+                    ChangeKind::TeamChanged
                 } else {
-                    continue;
+                    return None;
                 }
             }
+        })
+    }
+}
+
+/// Counts each change once, by its [`Change::kind`].
+pub fn count(changes: &[GameChange]) -> Counts {
+    let mut counts = Counts::default();
+    for change in changes {
+        let Some(kind) = change.change.kind() else {
+            continue;
+        };
+        let counter = match kind {
+            ChangeKind::New => &mut counts.new,
+            ChangeKind::Moved => &mut counts.moved,
+            ChangeKind::StartTimeKnown => &mut counts.start_time_known,
+            ChangeKind::HomeAndAway => &mut counts.home_and_away,
+            ChangeKind::TeamChanged => &mut counts.team_changed,
+            ChangeKind::Gone => &mut counts.gone,
+            ChangeKind::CameBack => &mut counts.came_back,
+            ChangeKind::IntoSchedule => &mut counts.into_schedule,
+            ChangeKind::OutOfSchedule => &mut counts.out_of_schedule,
         };
         *counter += 1;
     }
     counts
+}
+
+/// An open change as the list of changes shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListedChange {
+    pub source_id: i64,
+    pub change: Change,
+    /// The reason the game is in the schedule now, or, when it is no longer there, was when last
+    /// seen. It decides the filter and the team look.
+    pub reason: ScheduleReason,
+    /// `None`: a new game.
+    pub last_seen: Option<StoredGame>,
+    pub now: StoredGame,
+}
+
+/// The open changes to show: each one is [`change_between`] its last-seen game and the stored
+/// game now; changes that give nothing (for example of past games) are left out. In the order of
+/// the game's date and start time (now, or as last seen for a game no longer in the game list);
+/// not known start times last within a date; then by source id.
+pub fn list_changes(
+    open: Vec<OpenChange>,
+    stored: &[StoredGame],
+    club: ClubNumber,
+    team: TeamNumber,
+    today: NaiveDate,
+) -> Vec<ListedChange> {
+    let team = Some(team);
+    let stored_by_id = by_id(stored);
+    let mut listed: Vec<ListedChange> = open
+        .into_iter()
+        .filter_map(|open| {
+            let now = (*stored_by_id.get(&open.source_id)?).clone();
+            let change = change_between(open.last_seen.as_ref(), &now, club, team, today)?;
+            let reason = now
+                .in_list
+                .then(|| in_schedule(&now.game, club, team))
+                .flatten()
+                .or_else(|| {
+                    let last_seen = open.last_seen.as_ref()?;
+                    in_schedule(&last_seen.game, club, team)
+                })?;
+            Some(ListedChange {
+                source_id: open.source_id,
+                change,
+                reason,
+                last_seen: open.last_seen,
+                now,
+            })
+        })
+        .collect();
+    let key = |listed: &ListedChange| {
+        let game = match (&listed.last_seen, listed.now.in_list) {
+            (Some(last_seen), false) => &last_seen.game,
+            _ => &listed.now.game,
+        };
+        (
+            game.date,
+            game.start_time.is_none(),
+            game.start_time,
+            listed.source_id,
+        )
+    };
+    listed.sort_by_key(key);
+    listed
 }
 
 /// Pairs (gone source id, new source id) with the same game number: a sign that the source's id
@@ -216,6 +442,9 @@ mod tests {
     use crate::game::PlaceNumber;
     use crate::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, TEAM, game};
 
+    /// The test games are on 1 November 2026.
+    const TODAY: NaiveDate = NaiveDate::from_ymd_opt(2026, 10, 13).expect("valid date");
+
     fn stored(games: &[Game]) -> Vec<StoredGame> {
         games
             .iter()
@@ -227,7 +456,7 @@ mod tests {
     }
 
     fn kinds(stored: &[StoredGame], read: &[Game]) -> Vec<(i64, Change)> {
-        compare(stored, read, CLUB, Some(TEAM))
+        compare(stored, read, CLUB, Some(TEAM), TODAY)
             .into_iter()
             .map(|change| (change.source_id, change.change))
             .collect()
@@ -302,7 +531,13 @@ mod tests {
     fn a_start_time_that_is_no_longer_known_is_a_move() {
         let mut not_known = team_game();
         not_known.start_time = None;
-        let changes = compare(&stored(&[team_game()]), &[not_known], CLUB, Some(TEAM));
+        let changes = compare(
+            &stored(&[team_game()]),
+            &[not_known],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+        );
         assert_eq!(changes[0].change, changed(&[Difference::StartTime]));
         assert_eq!(count(&changes).moved, 1);
     }
@@ -383,7 +618,7 @@ mod tests {
         let mut moved = team_game();
         moved.date = NaiveDate::from_ymd_opt(2026, 11, 8).expect("valid date");
         moved.place.number = PlaceNumber(2);
-        let changes = compare(&stored(&[team_game()]), &[moved], CLUB, Some(TEAM));
+        let changes = compare(&stored(&[team_game()]), &[moved], CLUB, Some(TEAM), TODAY);
         assert_eq!(
             changes[0].change,
             changed(&[Difference::Date, Difference::Place])
@@ -401,7 +636,13 @@ mod tests {
     fn a_change_keeps_the_stored_and_the_read_game() {
         let mut moved = team_game();
         moved.start_time = time(11);
-        let changes = compare(&stored(&[team_game()]), &[moved.clone()], CLUB, Some(TEAM));
+        let changes = compare(
+            &stored(&[team_game()]),
+            &[moved.clone()],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+        );
         assert_eq!(changes[0].before, Some(team_game()));
         assert_eq!(changes[0].after, Some(moved));
     }
@@ -457,7 +698,7 @@ mod tests {
             game(10, TEAM, OPPONENT),
         ];
         assert_eq!(
-            count(&compare(&before, &read, CLUB, Some(TEAM))),
+            count(&compare(&before, &read, CLUB, Some(TEAM), TODAY)),
             Counts {
                 new: 1,
                 moved: 1,
@@ -512,6 +753,7 @@ mod tests {
             &[renamed, other_new],
             CLUB,
             Some(TEAM),
+            TODAY,
         );
         assert_eq!(same_number_pairs(&changes), [(1, 2)]);
     }
@@ -523,7 +765,279 @@ mod tests {
             &[game(2, TEAM, OPPONENT)],
             CLUB,
             Some(TEAM),
+            TODAY,
         );
         assert_eq!(same_number_pairs(&changes), []);
+    }
+
+    fn day(day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 10, day).expect("valid date")
+    }
+
+    fn on(mut game: Game, date: NaiveDate) -> Game {
+        game.date = date;
+        game
+    }
+
+    #[test]
+    fn a_game_that_left_outside_the_schedule_and_comes_back_into_it_is_now_in_the_schedule() {
+        let gone = [StoredGame {
+            game: game(1, OPPONENT, CLUB_TEAM),
+            in_list: false,
+        }];
+        assert_eq!(
+            kinds(&gone, &[game(1, CLUB_TEAM, OPPONENT)]),
+            [(1, Change::IntoSchedule(ScheduleReason::DutyGame))]
+        );
+    }
+
+    #[test]
+    fn a_change_to_a_past_game_gives_nothing() {
+        let yesterday = on(team_game(), day(12));
+        let mut moved = yesterday.clone();
+        moved.start_time = time(11);
+        assert_eq!(kinds(&stored(&[yesterday.clone()]), &[moved]), []);
+        assert_eq!(kinds(&stored(&[yesterday]), &[]), []);
+        let changes = compare(&[], &[on(team_game(), day(12))], CLUB, Some(TEAM), TODAY);
+        assert_eq!(changes, []);
+        assert_eq!(count(&changes), Counts::default());
+    }
+
+    #[test]
+    fn a_game_moved_from_the_past_to_the_future_or_back_is_a_change() {
+        let yesterday = on(team_game(), day(12));
+        let next_week = on(team_game(), day(20));
+        let date = [(1, changed(&[Difference::Date]))];
+        assert_eq!(
+            kinds(&stored(&[yesterday.clone()]), &[next_week.clone()]),
+            date
+        );
+        assert_eq!(kinds(&stored(&[next_week]), &[yesterday]), date);
+    }
+
+    #[test]
+    fn a_change_to_a_game_of_today_is_a_change() {
+        assert_eq!(kinds(&[], &[on(team_game(), TODAY)]), [(1, Change::New)]);
+    }
+
+    fn open(source_id: i64, last_seen: Option<Game>) -> OpenChange {
+        OpenChange {
+            source_id,
+            last_seen: last_seen.map(|game| StoredGame {
+                game,
+                in_list: true,
+            }),
+        }
+    }
+
+    fn updates(open: &[OpenChange], stored: &[StoredGame], read: &[Game]) -> Vec<ChangeUpdate> {
+        update_open_changes(open, stored, read, CLUB, TEAM, TODAY)
+    }
+
+    fn at(hour: u32) -> Game {
+        let mut game = team_game();
+        game.start_time = time(hour);
+        game
+    }
+
+    #[test]
+    fn a_first_change_is_inserted_with_the_stored_game_as_last_seen() {
+        assert_eq!(
+            updates(&[], &stored(&[at(10)]), &[at(11)]),
+            [ChangeUpdate::Insert {
+                source_id: 1,
+                last_seen: Some(Box::new(StoredGame {
+                    game: at(10),
+                    in_list: true,
+                })),
+            }]
+        );
+        assert_eq!(
+            updates(&[], &[], &[at(10)]),
+            [ChangeUpdate::Insert {
+                source_id: 1,
+                last_seen: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn a_game_that_moves_twice_keeps_its_first_old_value() {
+        let open = [open(1, Some(at(10)))];
+        assert_eq!(
+            updates(&open, &stored(&[at(11)]), &[at(12)]),
+            [ChangeUpdate::Touch { source_id: 1 }]
+        );
+    }
+
+    #[test]
+    fn a_game_that_moves_back_has_no_change() {
+        let open = [open(1, Some(at(10)))];
+        assert_eq!(
+            updates(&open, &stored(&[at(11)]), &[at(10)]),
+            [ChangeUpdate::Remove { source_id: 1 }]
+        );
+    }
+
+    #[test]
+    fn a_new_game_that_is_gone_before_it_is_seen_has_no_change() {
+        let open = [open(1, None)];
+        assert_eq!(
+            updates(&open, &stored(&[at(10)]), &[]),
+            [ChangeUpdate::Remove { source_id: 1 }]
+        );
+    }
+
+    #[test]
+    fn a_game_the_reading_does_not_change_keeps_its_change_and_version() {
+        let open = [open(1, Some(at(10)))];
+        assert_eq!(updates(&open, &stored(&[at(11)]), &[at(11)]), []);
+        assert_eq!(updates(&[], &stored(&[at(11)]), &[at(11)]), []);
+    }
+
+    #[test]
+    fn a_change_whose_game_is_now_past_on_both_dates_is_removed() {
+        let open = [open(1, Some(on(team_game(), day(11))))];
+        let yesterday = on(at(11), day(12));
+        assert_eq!(
+            updates(&open, &stored(&[yesterday.clone()]), &[yesterday]),
+            [ChangeUpdate::Remove { source_id: 1 }]
+        );
+    }
+
+    #[test]
+    fn a_game_moved_from_next_week_to_yesterday_keeps_its_change() {
+        let next_week = on(team_game(), day(20));
+        let open = [open(1, Some(next_week.clone()))];
+        let yesterday = on(team_game(), day(12));
+        assert_eq!(
+            updates(&open, &stored(&[next_week.clone()]), &[yesterday.clone()]),
+            [ChangeUpdate::Touch { source_id: 1 }]
+        );
+        assert_eq!(
+            updates(&[], &stored(&[next_week]), &[yesterday]),
+            [ChangeUpdate::Insert {
+                source_id: 1,
+                last_seen: Some(Box::new(StoredGame {
+                    game: on(team_game(), day(20)),
+                    in_list: true,
+                })),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_gone_game_that_was_seen_and_comes_back_came_back() {
+        let seen_gone = StoredGame {
+            game: team_game(),
+            in_list: false,
+        };
+        assert_eq!(
+            updates(&[], &[seen_gone.clone()], &[team_game()]),
+            [ChangeUpdate::Insert {
+                source_id: 1,
+                last_seen: Some(Box::new(seen_gone.clone())),
+            }]
+        );
+        assert_eq!(
+            change_between(
+                Some(&seen_gone),
+                &StoredGame {
+                    game: team_game(),
+                    in_list: true
+                },
+                CLUB,
+                Some(TEAM),
+                TODAY
+            ),
+            Some(Change::CameBack)
+        );
+    }
+
+    fn open_seen(game: Game) -> OpenChange {
+        OpenChange {
+            source_id: game.source_id,
+            last_seen: Some(StoredGame {
+                game,
+                in_list: true,
+            }),
+        }
+    }
+
+    #[test]
+    fn the_list_has_the_reason_now_or_as_last_seen() {
+        // 1: a duty game that became an away game of another club team; 2: a team game gone.
+        let open = vec![
+            open_seen(game(1, CLUB_TEAM, OPPONENT)),
+            open_seen(game(2, TEAM, OPPONENT)),
+        ];
+        let stored = [
+            StoredGame {
+                game: game(1, OPPONENT, CLUB_TEAM),
+                in_list: true,
+            },
+            StoredGame {
+                game: game(2, TEAM, OPPONENT),
+                in_list: false,
+            },
+        ];
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        assert_eq!(
+            listed
+                .iter()
+                .map(|listed| (listed.source_id, listed.change.clone(), listed.reason))
+                .collect::<Vec<_>>(),
+            [
+                (1, Change::OutOfSchedule, ScheduleReason::DutyGame),
+                (2, Change::Gone, ScheduleReason::TeamGame)
+            ]
+        );
+    }
+
+    #[test]
+    fn the_list_leaves_out_changes_that_give_nothing_and_is_in_date_order() {
+        let mut later = at(11);
+        later.source_id = 2;
+        later.date = day(20);
+        let mut not_known = team_game();
+        not_known.source_id = 3;
+        not_known.date = day(20);
+        not_known.start_time = None;
+        let mut past = team_game();
+        past.source_id = 4;
+        past.date = day(12);
+        let open = vec![
+            open(1, None),
+            open(2, None),
+            open(3, None),
+            open(4, None),
+            // 5: as last seen again.
+            open_seen(game(5, TEAM, OPPONENT)),
+        ];
+        let stored = stored(&[team_game(), later, not_known, past, game(5, TEAM, OPPONENT)]);
+        let ids: Vec<i64> = list_changes(open, &stored, CLUB, TEAM, TODAY)
+            .iter()
+            .map(|listed| listed.source_id)
+            .collect();
+        assert_eq!(ids, [2, 3, 1]);
+    }
+
+    #[test]
+    fn a_change_is_named_by_its_first_difference() {
+        let kind = |differences: &[Difference]| changed(differences).kind();
+        assert_eq!(
+            kind(&[Difference::StartTimeKnown, Difference::Place]),
+            Some(ChangeKind::Moved)
+        );
+        assert_eq!(
+            kind(&[Difference::StartTimeKnown, Difference::Team]),
+            Some(ChangeKind::StartTimeKnown)
+        );
+        assert_eq!(kind(&[Difference::Team]), Some(ChangeKind::TeamChanged));
+        assert_eq!(kind(&[]), None);
+        assert_eq!(
+            Change::IntoSchedule(ScheduleReason::DutyGame).kind(),
+            Some(ChangeKind::IntoSchedule)
+        );
     }
 }

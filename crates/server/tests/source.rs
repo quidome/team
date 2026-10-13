@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use chrono::NaiveDate;
@@ -168,7 +169,7 @@ async fn on_12_october_2026_the_schedule_of_m16_1_has_23_coming_and_14_past_game
         })
         .collect();
     let today = NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();
-    let schedule = schedule(stored, DRAKES, TeamNumber(184), today);
+    let schedule = schedule(stored, DRAKES, TeamNumber(184), today, &BTreeSet::new());
 
     let team_games = |games: &[ScheduledGame]| {
         games

@@ -1,5 +1,5 @@
 //! One reading of the game list: read the source, compare with the stored games, store the
-//! result. Readings take a PostgreSQL advisory lock, so two at the same time (a tap and the
+//! result and the open changes. Readings take a PostgreSQL advisory lock, so two at the same time (a tap and the
 //! nightly reading) never count a change twice or lose one (decision 0005).
 
 use chrono::{DateTime, Utc};
@@ -7,17 +7,16 @@ use sqlx::PgPool;
 use team_core::{
     Change, ClubNumber, GameChange, Guard, HoldReason, Season, TeamNumber, compare, count, guard,
     guard_after_confirm, is_first_reading, no_longer_in_list, same_number_pairs,
+    update_open_changes,
 };
 
-use crate::clock::{Clock, current_season};
-use crate::db::StoreError;
+use crate::changes;
+use crate::clock::{Clock, current_season, today_in_netherlands};
+use crate::db::{self, StoreError};
 use crate::followed_teams;
 use crate::games;
 use crate::readings::{self, FailureKind, Reading, ReadingResult};
 use crate::source::{Source, SourceError};
-
-/// The key of the advisory lock that every reading takes ("team" "read" in ASCII).
-const READING_LOCK: i64 = 0x7465_616d_7265_6164;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReadingError {
@@ -107,9 +106,7 @@ pub async fn read(
     };
 
     let mut tx = pool.begin().await?;
-    sqlx::query!("SELECT pg_advisory_xact_lock($1)", READING_LOCK)
-        .execute(&mut *tx)
-        .await?;
+    db::lock_readings(&mut tx).await?;
 
     // A reading that read the source later already stored newer games: storing this older
     // answer would count the changes in between backwards, and the next reading forwards again.
@@ -161,13 +158,22 @@ pub async fn read(
     }
 
     let stored = games::stored(&mut tx, club, season).await?;
+    let open = changes::open_for_update(&mut tx, club, season).await?;
+    let today = today_in_netherlands(clock);
     let first_reading = is_first_reading(last_good.map(|reading| reading.team), team);
     let counts = if first_reading {
         None
     } else {
-        let changes = compare(&stored, &read, club, team);
+        let changes = compare(&stored, &read, club, team, today);
         log_same_numbers(&changes);
         Some(count(&changes))
+    };
+    // The first reading after a choice keeps no changes; without a team there is no schedule.
+    let updates = match team {
+        Some(team) if !first_reading => {
+            update_open_changes(&open, &stored, &read, club, team, today)
+        }
+        _ => Vec::new(),
     };
     let gone: Vec<i64> = no_longer_in_list(&stored, &read)
         .iter()
@@ -175,6 +181,10 @@ pub async fn read(
         .collect();
     let finished_at = clock.now();
     games::write(&mut tx, club, season, &read, &gone, finished_at).await?;
+    if first_reading {
+        changes::remove_for(&mut tx, club, season).await?;
+    }
+    changes::apply(&mut tx, club, season, &updates, finished_at).await?;
 
     let result = ReadingResult::Good {
         games_read,

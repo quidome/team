@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM changes c\n         USING unnest($3::bigint[], $4::integer[]) AS seen(source_id, version)\n         WHERE c.club_number = $1 AND c.season_year = $2\n           AND c.source_id = seen.source_id AND c.version = seen.version",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8Array",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d962b213205789b1f6e987c8c61dcbc336323ada0e8409a2f489b074fbf10cb5"
+}

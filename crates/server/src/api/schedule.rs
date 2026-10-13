@@ -11,8 +11,9 @@ use utoipa::ToSchema;
 use crate::api::clubs::{ClubView, TeamView};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
+use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{followed_teams, games};
+use crate::{api, changes, followed_teams, games};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ScheduleAnswer {
@@ -29,6 +30,8 @@ pub struct ScheduleView {
     pub last_season: bool,
     pub club: ClubView,
     pub team: TeamView,
+    /// The number of changes not seen yet (`GET /api/changes`); 0 for last season's schedule.
+    pub unseen_changes: u32,
     /// Today (Dutch date) and later, in time order.
     pub coming: Vec<ScheduleGame>,
     /// Before today, newest date first, in time order within a date.
@@ -49,7 +52,7 @@ pub struct ScheduleGame {
     pub hall: String,
     pub town: String,
     pub reason: ScheduleReasonView,
-    /// False: the game is no longer in the game list.
+    /// False: the game is no longer in the game list; it shows until its change is seen.
     pub in_list: bool,
 }
 
@@ -60,6 +63,15 @@ pub enum ScheduleReasonView {
     Team,
     /// A home game of another club team: a possible duty game.
     Duty,
+}
+
+impl From<ScheduleReason> for ScheduleReasonView {
+    fn from(reason: ScheduleReason) -> Self {
+        match reason {
+            ScheduleReason::TeamGame => Self::Team,
+            ScheduleReason::DutyGame => Self::Duty,
+        }
+    }
 }
 
 impl From<ScheduledGame> for ScheduleGame {
@@ -73,10 +85,7 @@ impl From<ScheduledGame> for ScheduleGame {
             away: game.away.team_name,
             hall: game.place.hall,
             town: game.place.town,
-            reason: match scheduled.reason {
-                ScheduleReason::TeamGame => ScheduleReasonView::Team,
-                ScheduleReason::DutyGame => ScheduleReasonView::Duty,
-            },
+            reason: scheduled.reason.into(),
             in_list: scheduled.in_list,
         }
     }
@@ -109,19 +118,25 @@ async fn view(state: &AppState, target: ScheduleTarget) -> Result<ScheduleView, 
         team,
         last_season,
     } = target;
-    let mut db = state
-        .pool
-        .acquire()
-        .await
-        .map_err(crate::db::StoreError::from)?;
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
     let stored = games::stored(&mut db, club.number, season).await?;
     let today = today_in_netherlands(state.clock.as_ref());
-    let schedule = schedule(stored, club.number, team.number, today);
+    let open = changes::open_ids(&mut db, club.number, season).await?;
+    let unseen_changes = if last_season {
+        0
+    } else {
+        let count = api::changes::list(state, &mut db, club.number, team.number, season)
+            .await?
+            .len();
+        u32::try_from(count).map_err(|_| StoreError::Invalid(format!("{count} changes")))?
+    };
+    let schedule = schedule(stored, club.number, team.number, today, &open);
     Ok(ScheduleView {
         season: season.to_string(),
         last_season,
         club: club.into(),
         team: team.into(),
+        unseen_changes,
         coming: schedule
             .coming
             .into_iter()
