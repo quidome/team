@@ -19,8 +19,9 @@ use wiremock::ResponseTemplate;
 const TEAM_GAME: i64 = 1073178;
 /// A team game of M16 1 on 31 October 2026 at 16:00; "not known" in the base list.
 const TIME_GAME: i64 = 1073152;
-/// A home game of Blue Drakes X12 1: a duty game.
-const DUTY_GAME: i64 = 1081900;
+/// A home game of Blue Drakes X12 1 on 31 October 2026: a coming duty game. Changes to past games
+/// are not counted, so the changed games must be coming.
+const DUTY_GAME: i64 = 1081923;
 /// An away game of Blue Drakes MSE 1 on 16 January 2027 with no known start time.
 const OTHER_TEAM_AWAY: i64 = 1078886;
 /// An away game of Blue Drakes M16 2.

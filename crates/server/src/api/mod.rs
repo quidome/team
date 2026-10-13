@@ -1,5 +1,6 @@
 //! The JSON API under `/api`, and its OpenAPI description.
 
+pub mod changes;
 pub mod clubs;
 pub mod health;
 pub mod me;
@@ -23,7 +24,9 @@ use utoipa::OpenApi;
         readings::read,
         readings::latest,
         readings::confirm_gone,
-        schedule::get
+        schedule::get,
+        changes::get,
+        changes::seen
     )
 )]
 pub struct ApiDoc;

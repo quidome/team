@@ -12,8 +12,9 @@ pub mod team_choice;
 pub use access::{Identity, may_access};
 pub use club::{Club, ClubNumber, search_clubs};
 pub use comparison::{
-    Change, Counts, Difference, GameChange, StoredGame, compare, count, no_longer_in_list,
-    same_number_pairs,
+    Change, ChangeKind, ChangeUpdate, Counts, Difference, GameChange, ListedChange, OpenChange,
+    StoredGame, change_between, compare, count, list_changes, no_longer_in_list, same_number_pairs,
+    update_open_changes,
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};

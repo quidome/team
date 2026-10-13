@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id, last_seen, version FROM changes\n         WHERE club_number = $1 AND season_year = $2\n         ORDER BY source_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_seen",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 2,
+        "name": "version",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "e457ecebedd8de969347f68c6467430fc339aec44d51c9f257c965680ec9ed9c"
+}

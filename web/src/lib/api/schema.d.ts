@@ -4,6 +4,38 @@
  */
 
 export interface paths {
+	'/api/changes': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['changes'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/changes/seen': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['markSeen'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/clubs': {
 		parameters: {
 			query?: never;
@@ -170,6 +202,54 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
 	schemas: {
+		ChangeGame: {
+			away: string;
+			/** @description Dutch local date, for example "2026-10-31". */
+			date: string;
+			hall: string;
+			home: string;
+			/** @description Dutch local start time, for example "13:00"; `null` when it is not known. */
+			start_time?: string | null;
+			town: string;
+		};
+		/** @enum {string} */
+		ChangeKindView:
+			| 'new'
+			| 'moved'
+			| 'start_time_known'
+			| 'home_and_away'
+			| 'team_changed'
+			| 'gone'
+			| 'came_back'
+			| 'into_schedule'
+			| 'out_of_schedule';
+		/** @description A change from the game as the coordinator last saw it to the game now. */
+		ChangeView: {
+			after?: null | components['schemas']['ChangeGame'];
+			before?: null | components['schemas']['ChangeGame'];
+			/**
+			 * @description Every difference of a `moved`, `start_time_known`, `home_and_away` or `team_changed`
+			 *     change; empty for the other kinds.
+			 */
+			differences: components['schemas']['DifferenceView'][];
+			/**
+			 * Format: int64
+			 * @description The source's game id.
+			 */
+			id: number;
+			kind: components['schemas']['ChangeKindView'];
+			/** @description Now, or as last seen when the game is no longer in the schedule. */
+			reason: components['schemas']['ScheduleReasonView'];
+			/**
+			 * Format: int32
+			 * @description Send it back with "seen": a change that a reading updated meanwhile stays.
+			 */
+			version: number;
+		};
+		ChangesAnswer: {
+			/** @description Empty unless a team is chosen for the current season. In the order of the games. */
+			changes: components['schemas']['ChangeView'][];
+		};
 		ClubTeams: {
 			/** @description The current season, for example "2026-2027". */
 			season: string;
@@ -207,6 +287,8 @@ export interface components {
 			/** Format: int32 */
 			team_changed: number;
 		};
+		/** @enum {string} */
+		DifferenceView: 'date' | 'start_time' | 'start_time_known' | 'place' | 'home_and_away' | 'team';
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
 		/** @enum {string} */
@@ -293,7 +375,7 @@ export interface components {
 			 * @description The source's game id.
 			 */
 			id: number;
-			/** @description False: the game is no longer in the game list. */
+			/** @description False: the game is no longer in the game list; it shows until its change is seen. */
 			in_list: boolean;
 			reason: components['schemas']['ScheduleReasonView'];
 			/** @description Dutch local start time, for example "13:00"; `null` when it is not known yet. */
@@ -316,6 +398,27 @@ export interface components {
 			/** @description The season of the games, for example "2026-2027". */
 			season: string;
 			team: components['schemas']['TeamView'];
+			/**
+			 * Format: int32
+			 * @description The number of changes not seen yet (`GET /api/changes`); 0 for last season's schedule.
+			 */
+			unseen_changes: number;
+		};
+		SeenAnswer: {
+			/**
+			 * Format: int32
+			 * @description The number of changes not seen yet after this.
+			 */
+			open: number;
+		};
+		SeenChange: {
+			/** Format: int64 */
+			id: number;
+			/** Format: int32 */
+			version: number;
+		};
+		SeenRequest: {
+			changes: components['schemas']['SeenChange'][];
 		};
 		/** @description The state of the choice. `season` is always the current season. */
 		Selection:
@@ -357,6 +460,64 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+	changes: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The changes not seen yet */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['ChangesAnswer'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	markSeen: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['SeenRequest'];
+			};
+		};
+		responses: {
+			/** @description Marked; a change with another version stays */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['SeenAnswer'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	search: {
 		parameters: {
 			query?: {

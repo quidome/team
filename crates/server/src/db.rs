@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use sqlx::PgPool;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgConnection, PgPool};
 
 /// The SQL files in `migrations/`, compiled into the binary.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
@@ -22,6 +22,18 @@ pub fn lazy_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
 /// Applies the migrations that are not applied yet, under sqlx's lock.
 pub async fn migrate(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     MIGRATOR.run(pool).await
+}
+
+/// The key of the advisory lock that every reading and every save of the choice takes ("team"
+/// "read" in ASCII), so they run one after the other (decision 0005).
+const READING_LOCK: i64 = 0x7465_616d_7265_6164;
+
+/// Takes the reading lock until the end of the transaction.
+pub async fn lock_readings(tx: &mut PgConnection) -> Result<(), StoreError> {
+    sqlx::query!("SELECT pg_advisory_xact_lock($1)", READING_LOCK)
+        .execute(tx)
+        .await?;
+    Ok(())
 }
 
 /// A failure of the stored data: of the database, or of data in it that the code does not

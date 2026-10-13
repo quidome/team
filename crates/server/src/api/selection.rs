@@ -12,8 +12,9 @@ use utoipa::ToSchema;
 use crate::api::clubs::{ClubView, TeamView, find_club};
 use crate::app::AppState;
 use crate::clock::current_season;
+use crate::db::{self, StoreError};
 use crate::error::AppError;
-use crate::followed_teams;
+use crate::{changes, followed_teams};
 
 /// Why a team must be chosen.
 #[derive(Debug, Serialize, ToSchema)]
@@ -105,8 +106,27 @@ pub async fn save(
             }
         })?;
     let choice = FollowedTeam { season, club, team };
-    followed_teams::save(&state.pool, &choice, state.clock.now()).await?;
+    save_choice(&state, &choice).await?;
     Ok(Json(selection(&state, season).await?))
+}
+
+/// Saves the choice and, when the club or team is another one (or it is the first choice of this
+/// season), removes the open changes of the old choice. Under the reading lock, so a reading that
+/// is still running cannot write changes of the old choice after the removal.
+async fn save_choice(state: &AppState, choice: &FollowedTeam) -> Result<(), StoreError> {
+    let mut tx = state.pool.begin().await?;
+    db::lock_readings(&mut tx).await?;
+    let before = followed_teams::for_season(&mut *tx, choice.season).await?;
+    let team_number = |choice: &FollowedTeam| choice.team.as_ref().map(|team| team.number);
+    let same = before.is_some_and(|before| {
+        before.club.number == choice.club.number && team_number(&before) == team_number(choice)
+    });
+    followed_teams::save(&mut *tx, choice, state.clock.now()).await?;
+    if !same {
+        changes::remove_all(&mut tx).await?;
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 async fn selection(state: &AppState, season: Season) -> Result<Selection, AppError> {

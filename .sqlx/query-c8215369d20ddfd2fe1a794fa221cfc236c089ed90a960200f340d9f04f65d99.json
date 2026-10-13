@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE changes SET version = version + 1, updated_at = $4\n                     WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c8215369d20ddfd2fe1a794fa221cfc236c089ed90a960200f340d9f04f65d99"
+}

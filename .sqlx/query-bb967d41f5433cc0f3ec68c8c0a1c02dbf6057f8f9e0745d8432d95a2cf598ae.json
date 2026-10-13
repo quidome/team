@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO changes (club_number, season_year, source_id, last_seen, updated_at)\n                     VALUES ($1, $2, $3, $4, $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb967d41f5433cc0f3ec68c8c0a1c02dbf6057f8f9e0745d8432d95a2cf598ae"
+}
