@@ -79,7 +79,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 | 3a | [Read on demand](../done/2026-10-11-read-on-demand/) | feature | Spec story 2 and the reading parts of stories 3 and 4: storage of places, games and readings (season as start year), comparing (all kinds, counts only), guard and "really gone", lock, transaction; read action with result line on the start page. | 2 | review build + accept | done |
 | 3b | [The schedule](../done/2026-10-12-the-schedule/) | feature | Spec story 3: schedule screen with filter, past games, crossed-out games, last reading, last season's games; removes the sample page. | 3a | review build + accept | done |
 | 4 | [The list of changes](../done/2026-10-13-the-list-of-changes/) | feature | Spec story 4: keep changes (all seven kinds, into/out of the schedule), one open change per game, seen one and all, summary line, filter. Sets the summary threshold. | 3 | review build + accept | done |
-| 5 | The nightly reading | feature | Spec story 5: `team read-game-list`; failures and "may be out of date"; a ready change for `gitops-lab`: CronJob template in the team chart, same image and secrets, pods with both team labels, checked with `helm lint` and `helm template`, promoted through Argo CD. | 4 | checks | open |
+| 5 | [The nightly reading](../2026-10-14-the-nightly-reading/) | feature | Spec story 5: a timer in the app reads at 03:00 Dutch time (replaces the CronJob of decision 0005, see Deviations); failures and "may be out of date" after 3 nights with no good reading. | 4 | review build | implement |
 
 ## Decisions
 | Decision | Reason | Decision record? |
@@ -115,7 +115,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 ## Compatibility and performance
 - The old app and its data are not migrated. The coordinator does not use it.
-- The cluster contract stays the same until story 5 adds a CronJob.
+- The cluster contract stays the same (story 5 uses a timer in the app, not a CronJob).
 - Load is tiny: one user, a few hundred games per season, one reading a night plus taps. The source is read politely.
 
 ## Progress
@@ -129,6 +129,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
+- 2026-10-14, from the design of story 5 ([The nightly reading](../2026-10-14-the-nightly-reading/technical.md)), agreed by the coordinator: the nightly reading is a timer in the app, not a Kubernetes CronJob (the app runs as one pod; the reading lock makes two readings safe; readings are stored with their result). No `team read-game-list` command and no change in `gitops-lab`; the cluster contract stays the same. Decision 0017 replaces 0005 at Close. The story 5 tests change to match; its closure is `review build` instead of `checks`.
 - 2026-10-11, from the design of story 3a ([Read on demand](../done/2026-10-11-read-on-demand/technical.md)), agreed by the coordinator: story 3 is split into 3a (read on demand) and 3b (the schedule); a season is stored as its start year (`season_year`, decision 0014); dates and start times are stored as Dutch local `date` and `time`, not `timestamptz`; the source's `id` is the game key and `nr` is stored too; "really gone" reads the source again with the guard off.
 - 2026-10-12, from the build and accept reviews of story 3a: "really gone" reads again in its own mode and accepts no fewer games than the warning showed; "first reading" comes from the team stored with each reading, not from `chosen_at` (decision 0015, which partly replaces 0012 and 0013). For later stories: story 4 decides whether a game that left the list outside the schedule and comes back into it is "came back" or "now in the schedule" (A3); story 3b decides whether choosing a team starts the first reading, what shows before the team is chosen in a new season (A4), and whether earlier seasons may show a place's newest hall name (R5).
 - 2026-10-11: the season starts on 1 July, not 1 August. The coordinator: the NBB counts the season from 1 July to 30 June. Fixed in the code of story 2 as a small fix.
