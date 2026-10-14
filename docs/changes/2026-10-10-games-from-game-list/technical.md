@@ -125,7 +125,7 @@ Each story gets its own change folder (stage `design`) and its own `/design`.
 - [x] Story 3b: the schedule (closed 2026-10-12)
 - [x] Story 4: the list of changes (closed 2026-10-13)
 - [x] Story 5: the nightly reading (closed 2026-10-14)
-- [ ] Epic review accept
+- [x] Epic review accept (2026-10-14, accepted with notes; A1 a deviation, A2 to the backlog)
 
 ## Deviations
 - 2026-10-11: images are published as decision 0010 says (it replaces 0008 and 0009).
@@ -154,3 +154,62 @@ The design reads these points more strictly than the spec, within its words:
 ## Review findings
 - 2026-10-14, from story 5 ([The nightly reading](../done/2026-10-14-the-nightly-reading/technical.md)): a reading that ends in an error and stores nothing was tried again every 5 minutes (R1) and a timer that stops was not logged (R2); both fixed. Decision 0017 replaces 0005.
 - 2026-10-13, from story 4 ([The list of changes](../done/2026-10-13-the-list-of-changes/technical.md)), agreed by the coordinator: only changes to games of today or later are kept and counted (also in the result line); one route `POST /api/changes/seen` for one or all changes, and `GET /api/changes` without a `filter` parameter; the `changes` table keeps the game as last seen and a version, not the kind, old and new values and a seen time (decision 0016). A3 of story 3a is decided: a game that left the list outside the schedule and comes back into it is "now in the schedule".
+
+### Epic review accept (2026-10-14)
+Fresh agent, `/review accept` with only the mode and this change folder as input. Read: `functional.md`,
+`idea.md`, `change.md`, the objective of this file, `docs/language.md`, `docs/product/`, the code in
+`crates/core`, `crates/server/src/{reading,nightly}.rs` and the front end (`web/src`). Ran: `cargo test
+--workspace` (all pass); the debug server with `DEV_AUTH_BYPASS`, `DEV_NOW` (2026-10-14, then 2027-07-02)
+and `GAME_LIST_URL` pointing at a local copy of the real test data (71 games), on a scratch database that
+was dropped afterwards; edited copies of the game list for each kind of change, an empty list, a broken
+list, "really gone" and the return of the games; phone-size screenshots (Playwright, iPhone 13) of `/` and
+`/changes`. Deviations read after the view below was formed.
+
+**Verdict: accepted with notes.** Every acceptance criterion of stories 1–5 is met in the running
+program or by a test that I read; the differences are the agreed ones plus two small ones (A1, A2), for
+`/discover` or the backlog, not blocking Close.
+
+- **A1 – The result line does not always match the list of changes (neutral drift).** Story 2 says the
+  counts "match the list of changes". The result line counts what this reading changed against the stored
+  games; the list shows what changed since the coordinator last looked. Checked by a run: a game moved,
+  not seen, then moved back gave "2 moved, 1 came back" while the list held one of those moves; "these
+  games are really gone" on an empty list said "32 no longer in the game list" while the list showed 22
+  (10 were new games never seen, which drop out without a trace). `docs/product/read-the-game-list.md`
+  states that the two can differ, but no entry under **Deviations** records this against the criterion.
+  In daily use (nightly reading, weekly look) a tap mostly says "No changes" while the list holds the
+  night's changes, which reads well. Record it as a deviation at Close, or let Discover reword the criterion.
+  - 2026-10-14: not changed in the code (coordinator). The result line counts what one reading found, the list shows what changed since the coordinator last looked (story 4, decision 0016). Recorded as a deviation at the close of the epic; the criterion in `functional.md` is changed to say this.
+- **A2 – A game the coordinator never saw can show as "came back" (neutral drift, rare).** Spec story 4:
+  a game that leaves and returns "shows as a game that came back". Checked by a run: 6 new possible duty
+  games, 2 new team games and one "now a home game of another club team", all not seen, then gone
+  (confirmed), then back, all show as "came back" (screenshot of `/changes`). The coordinator never saw
+  them, so "new" (and the "6 new games" summary line, which no longer forms) or "now in the schedule"
+  would be truer. Cause by trace: `update_open_changes` removes an open change whose last seen is "none"
+  when the game goes, and on return `change_between` compares with the stored gone game, not with "not
+  seen". Needs a federation that drops a game and restores the same id before the coordinator looks.
+  Suggest one backlog line.
+  - 2026-10-14: not fixed now (coordinator); a line in `docs/backlog.md` (small fix in the core comparison).
+- **A3 – Faithful adaptations (agreed, recorded under Deviations):** only changes to games of today or
+  later are kept and counted; the start page shows the team header and the "Game list" card above the
+  games (spec: "the first thing shown is the next games"; checked on a phone screenshot: the first games
+  start at about three quarters of the first screen); the summary line "N new games" is only for 5 or more new
+  possible duty games, team games always one by one; choosing a team starts the first reading; the
+  nightly reading is a timer at 03:00 in the app (decision 0017); "Last read" shows the full date and time
+  instead of "today 03:00". Each keeps the intent.
+  - 2026-10-14: no change; agreed earlier.
+- **A4 – Checked and matching the intent (by run unless noted):** "drakes" finds "Blue Drakes, Woerden";
+  no match gives an empty result; own teams M16 1, M16 2, M18 1, MSE 1, X12 1, X14 1; first reading says
+  "71 games read" and records nothing; schedule has team games and home games of other club teams, no away
+  games of other club teams (an away game of X12 1 on 25 Oct was left out); every kind of change appears
+  with old and new values and the reason ("now a home game of another club team" for a swapped away game
+  of another club team); a move to a past game is not counted; "time not known yet" for 00:00; seen hides
+  a gone game; a game moved back to its last seen state drops off the list; empty list held back with
+  "These games are really gone", a later broken list ("source_format") does not hide the warning and the
+  games stay; on 2 July 2027 the club is kept, the team is asked again with last season's games shown, and
+  there are no changes. The nightly rules (no choice, new season without team, tap after 03:00, failed
+  night not retried, 3 nights "may be out of date") by reading `crates/server/tests/nightly.rs` and the
+  browser test, not run on a clock.
+  - 2026-10-14: no change.
+- **A5 – Not checked:** login against the real Pocket ID and the deployed cluster (story 1 ended with a
+  real deployment, not repeated here); the live source (`cargo test -- --ignored` not run).
+  - 2026-10-14: no change. The login on the cluster was checked by hand at the end of story 1; the live source is checked by hand with `cargo test -p team --test source -- --ignored`.
