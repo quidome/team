@@ -12,7 +12,7 @@ show the schedule and story 4 can keep the changes, from the same stored games a
 comparison.
 
 ## Requirements summary
-Story 3a of the epic [Games from the game list](../../2026-10-10-games-from-game-list/technical.md),
+Story 3a of the epic [Games from the game list](../2026-10-10-games-from-game-list/technical.md),
 from functional story 2 ("Read the game list when the coordinator asks") and the parts of
 functional stories 3 and 4 that reading needs. Story 3b (the schedule screen) has its own design.
 

@@ -8,7 +8,7 @@ created: 2026-10-11
 
 # Choose club and team
 
-Story 2 of the epic [Games from the game list](../../2026-10-10-games-from-game-list/). The
+Story 2 of the epic [Games from the game list](../2026-10-10-games-from-game-list/). The
 coordinator finds the club by name in the source's club list and chooses the team from the club's
 own teams, changes it later, and chooses again at a new season. The choice is kept for each
 season, so earlier seasons stay.

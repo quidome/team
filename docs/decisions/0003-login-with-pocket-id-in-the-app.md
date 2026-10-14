@@ -2,7 +2,7 @@
 
 **Status**: replaced by 0007
 **Date**: 2026-10-10
-**Change**: [2026-10-10-games-from-game-list](../changes/2026-10-10-games-from-game-list/)
+**Change**: [2026-10-10-games-from-game-list](../changes/done/2026-10-10-games-from-game-list/)
 
 ## Context
 Only the coordinator may see and change data. The coordinator wants login on the API itself,

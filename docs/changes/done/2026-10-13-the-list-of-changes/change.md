@@ -8,7 +8,7 @@ created: 2026-10-13
 
 # The list of changes
 
-Story 4 of the epic [Games from the game list](../../2026-10-10-games-from-game-list/). The tool
+Story 4 of the epic [Games from the game list](../2026-10-10-games-from-game-list/). The tool
 keeps each change to a coming game in the schedule until the coordinator marks it as seen, so
 the coordinator knows when a drive or a duty may need action. The start page shows how many
 changes are not seen yet; a page lists them with old and new values, the quick filter, and

@@ -10,7 +10,7 @@ Read the game list every night without the coordinator, with the same code as a 
 on the start page when the games may be out of date.
 
 ## Requirements summary
-Story 5 of the epic [Games from the game list](../../2026-10-10-games-from-game-list/technical.md),
+Story 5 of the epic [Games from the game list](../2026-10-10-games-from-game-list/technical.md),
 from functional story 5 ("Nightly reading"):
 
 1. The tool reads the game list once a night, without the coordinator. Run moment: 03:00 Dutch time (coordinator, 2026-10-14).

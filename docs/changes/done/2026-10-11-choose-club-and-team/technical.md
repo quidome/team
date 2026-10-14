@@ -9,7 +9,7 @@
 Let the coordinator choose the club (by name, from the source's club list) and the team (from the
 club's own teams in the source's game list), change it later and choose again at a new season,
 and keep the choice for each season, so that stories 3–5 of the epic
-[Games from the game list](../../2026-10-10-games-from-game-list/technical.md) read the right games.
+[Games from the game list](../2026-10-10-games-from-game-list/technical.md) read the right games.
 
 ## Requirements summary
 From story 1 of the epic's `functional.md` (approved after two spec reviews):

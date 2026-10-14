@@ -8,7 +8,7 @@ created: 2026-10-14
 
 # The nightly reading
 
-Story 5 of the epic [Games from the game list](../../2026-10-10-games-from-game-list/). The tool
+Story 5 of the epic [Games from the game list](../2026-10-10-games-from-game-list/). The tool
 reads the game list by itself every night at 03:00, so the schedule is up to date without the
 coordinator thinking of it. When no good reading happened for 3 nights, the start page says that
 the games may be out of date, and since when.

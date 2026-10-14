@@ -31,11 +31,12 @@ It is not:
 - The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
 - The coordinator uses a Google Sheet as a workaround.
 - The base of the new product runs on the cluster (v0.1.0, October 2026): login through Pocket ID, a start page, and a sample schedule with example games.
-- Choosing the club and team is built and reviewed (story 2 of games from the game list), not yet released: the club by name from the source's club list, the team from the club's own teams, again at each new season; the choice of each season is kept.
-- Reading the game list on demand is built and reviewed (story 3a), not yet released: one tap reads the club's games, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms.
-- The schedule is built and reviewed (story 3b), not yet released: the start page shows the team's games and the club's home games (possible duty games) from the game list, with a quick filter and past games on request; choosing the team reads the game list at once; in a new season last season's schedule shows until the team is chosen. The sheet is still in use.
-- The list of changes is built and reviewed (story 4), not yet released: each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
-- The nightly reading is built and reviewed (story 5), not yet released: the tool reads the game list by itself every night at 03:00 and says on the start page when the games may be out of date. All stories of games from the game list are built; the review of the whole result comes next.
+- Games from the game list is built and reviewed (October 2026), not yet released:
+  - the coordinator chooses the club by name and the team from the club's own teams, again at each new season; the choice of each season is kept;
+  - the tool reads the club's games on a tap and by itself every night at 03:00, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms; after 3 nights without a good reading the start page says the games may be out of date;
+  - the start page shows the team's games and the club's home games (possible duty games), with a quick filter and past games on request; in a new season last season's schedule shows until the team is chosen;
+  - each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
+- The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
 ## North star
@@ -82,7 +83,7 @@ These stay ideas until real use shows the need.
 ## Open questions
 The first design answered the questions about logging in, the backend language, data storage
 and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from the spec of
-`docs/changes/2026-10-10-games-from-game-list/`:
+`docs/changes/done/2026-10-10-games-from-game-list/`:
 - The word list calls the game list "the federation's list", but the source appears to be a private site built on the federation's data. Must the meaning change?
 - Is a word needed for the home games of other club teams, where players can get jury and referee duties (the spec says "possible duty games" in plain words)?
 
@@ -97,3 +98,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-12 | Where we are: the schedule is built (story 3b); the list of changes comes next |
 | 2026-10-13 | Where we are: the list of changes is built (story 4); the nightly reading comes next |
 | 2026-10-14 | Where we are: the nightly reading is built (story 5); the review of the whole of games from the game list comes next |
+| 2026-10-14 | Where we are: games from the game list is built and reviewed (all 5 stories); a release comes next |

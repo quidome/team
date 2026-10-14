@@ -66,7 +66,7 @@ games (story 3).
 
 #### Acceptance criteria
 - [ ] One action reads the game list of the chosen club for the current season.
-- [ ] After the reading, the tool shows a short result, for example: "3 new, 1 moved, 1 no longer in the game list." The counts are for the games in the schedule (story 3), so they match the list of changes (story 4).
+- [ ] After the reading, the tool shows a short result, for example: "3 new, 1 moved, 1 no longer in the game list." The counts are for the games in the schedule (story 3). They count what this reading found; the list of changes (story 4) shows what changed since the coordinator last looked, so the two can differ (changed 2026-10-14, epic review accept A1).
 - [ ] A reading with no changes in the game list adds or changes nothing, and says "no changes".
 - [ ] A reading never makes the same change appear twice, also when the nightly reading (story 5) runs at the same time.
 - [ ] The tool never changes the data of a game by itself or by hand. The game list is the truth. When the game list is wrong, the coordinator asks the club or the federation to fix it. (Confirmed by the coordinator on 2026-10-10. If real use shows that the coordinator needs own corrections, that becomes a new idea.)

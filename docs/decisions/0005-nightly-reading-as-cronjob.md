@@ -2,7 +2,7 @@
 
 **Status**: replaced by 0017
 **Date**: 2026-10-10
-**Change**: [2026-10-10-games-from-game-list](../changes/2026-10-10-games-from-game-list/)
+**Change**: [2026-10-10-games-from-game-list](../changes/done/2026-10-10-games-from-game-list/)
 
 ## Context
 The tool reads the game list once a night without the coordinator, and also when the

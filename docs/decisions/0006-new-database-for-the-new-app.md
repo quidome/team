@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-10
-**Change**: [2026-10-10-games-from-game-list](../changes/2026-10-10-games-from-game-list/)
+**Change**: [2026-10-10-games-from-game-list](../changes/done/2026-10-10-games-from-game-list/)
 
 ## Context
 The PostgreSQL server `team-postgresql` holds the database `team` of the old app. The

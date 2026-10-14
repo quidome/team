@@ -8,7 +8,7 @@ created: 2026-10-12
 
 # The schedule
 
-Story 3b of the epic [Games from the game list](../../2026-10-10-games-from-game-list/). The start
+Story 3b of the epic [Games from the game list](../2026-10-10-games-from-game-list/). The start
 page shows the coordinator's schedule from the stored games: all games of the team and the home
 games of other club teams, with a quick filter, past games on request, and games that left the
 game list crossed out. Choosing a team reads the game list at once; in a new season, last
