@@ -31,7 +31,7 @@ It is not:
 - The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
 - The coordinator uses a Google Sheet as a workaround.
 - The base of the new product runs on the cluster (v0.1.0, October 2026): login through Pocket ID, a start page, and a sample schedule with example games.
-- Games from the game list is built and reviewed (October 2026), not yet released:
+- Games from the game list runs on the cluster (v0.2.0, released 14 October 2026):
   - the coordinator chooses the club by name and the team from the club's own teams, again at each new season; the choice of each season is kept;
   - the tool reads the club's games on a tap and by itself every night at 03:00, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms; after 3 nights without a good reading the start page says the games may be out of date;
   - the start page shows the team's games and the club's home games (possible duty games), with a quick filter and past games on request; in a new season last season's schedule shows until the team is chosen;
@@ -99,3 +99,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-13 | Where we are: the list of changes is built (story 4); the nightly reading comes next |
 | 2026-10-14 | Where we are: the nightly reading is built (story 5); the review of the whole of games from the game list comes next |
 | 2026-10-14 | Where we are: games from the game list is built and reviewed (all 5 stories); a release comes next |
+| 2026-10-14 | Where we are: games from the game list is released (v0.2.0) and runs on the cluster |
