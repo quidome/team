@@ -729,6 +729,14 @@
                 "$ref": "#/components/schemas/ReadingView"
               }
             ]
+          },
+          "out_of_date_since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The time of the last good reading, when 3 nightly run moments passed without a good\nreading: the games may be out of date since then. `null` without a chosen team."
           }
         }
       },

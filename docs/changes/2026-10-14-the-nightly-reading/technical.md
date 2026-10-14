@@ -1,6 +1,6 @@
 # Technical spec: The nightly reading
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-14-the-nightly-reading
 **Date**: 2026-10-14
@@ -154,11 +154,12 @@ and times), 0015 (readings are recorded results).
 - During a rollout at 03:00 both pods can read once. Accepted (see step 2).
 
 ## Progress
-- [ ] Step 1: core rules and the Dutch local time
-- [ ] Step 2: one check of the timer
-- [ ] Step 3: the timer in the server (and the check by hand)
-- [ ] Step 4: "may be out of date" on the start page
-- [ ] All checks pass
+- [x] Step 1: core rules and the Dutch local time
+- [x] Step 2: one check of the timer
+- [x] Step 3: the timer in the server (and the check by hand)
+  - 2026-10-14, check by hand (a scratch database, the fake source of the browser tests, `DEV_NOW`): with the clock at Monday 12 October 12:00 Dutch time and an empty database, no nightly reading at start; M16 1 chosen and read. A new start at Tuesday 13 October 03:00:30 Dutch time logged at once `"nightly reading", result good, games_read 71`, and stored reading 2. Ctrl-C stopped the server in 8 ms ("stopping", "stopped").
+- [x] Step 4: "may be out of date" on the start page
+- [x] All checks pass (`just check`, 2026-10-14; 30 browser tests)
 - [ ] Review build
 
 ## Deviations
@@ -172,5 +173,8 @@ the app instead of `team read-game-list` and a CronJob in `gitops-lab`; the epic
 "no selection → nothing and exit 0" and "the CronJob passes `helm lint`/`helm template`" become
 "no choice → `tick` reads nothing" and the check by hand of step 3; closure `review build`
 instead of `checks`.
+
+Implement:
+- 2026-10-14, step 4: the browser test is in `web/e2e/choose.e2e.ts` (Playwright project `choose`), not in the project `logged-in`. The card shows only with a team chosen, and only `choose.e2e.ts` has M16 1 chosen; `logged-in` runs after it with a team still needed.
 
 ## Review findings

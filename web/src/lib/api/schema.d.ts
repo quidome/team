@@ -318,6 +318,12 @@ export interface components {
 			held_back?: null | components['schemas']['ReadingView'];
 			last_good?: null | components['schemas']['LastGood'];
 			latest?: null | components['schemas']['ReadingView'];
+			/**
+			 * Format: date-time
+			 * @description The time of the last good reading, when 3 nightly run moments passed without a good
+			 *     reading: the games may be out of date since then. `null` without a chosen team.
+			 */
+			out_of_date_since?: string | null;
 		};
 		Me: {
 			/** @description The name to show. */

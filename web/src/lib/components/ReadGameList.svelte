@@ -1,6 +1,7 @@
 <!--
 	Reads the game list on demand (story 3a): the read action, the result line, the time of the last
-	good reading, a failure, and a held-back reading with "These games are really gone".
+	good reading, a failure, and a held-back reading with "These games are really gone". After 3
+	nights without a good reading it says that the games may be out of date (story 5).
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
@@ -28,6 +29,8 @@
 	let lastGood = $state(untrack(() => readings.last_good ?? null));
 	/** The held-back reading to confirm; a failed reading after it does not hide it. */
 	let held = $state<Reading | null>(untrack(() => readings.held_back ?? null));
+	/** The time of the last good reading, when the nightly readings failed for 3 nights. */
+	let outOfDateSince = $state(untrack(() => readings.out_of_date_since ?? null));
 	/** The reading of the last tap on this page; the result line shows only for it. */
 	let tapped = $state<Reading | null>(null);
 	let busy = $state(false);
@@ -43,6 +46,7 @@
 			if (reading.result === 'good' && reading.games_read != null) {
 				lastGood = { finished_at: reading.finished_at, games_read: reading.games_read };
 				held = null;
+				outOfDateSince = null;
 				await onRead?.();
 			}
 			if (reading.result === 'held_back') held = reading;
@@ -56,6 +60,16 @@
 </script>
 
 <div class="space-y-3">
+	{#if outOfDateSince}
+		<p
+			class="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
+			role="alert"
+			data-testid="out-of-date"
+		>
+			The games may be out of date since {dutchTime(outOfDateSince)}.
+		</p>
+	{/if}
+
 	<Button onclick={() => run(readNow)} disabled={busy}>
 		{busy ? 'Reading…' : 'Read the game list'}
 	</Button>

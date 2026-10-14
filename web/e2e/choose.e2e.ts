@@ -68,6 +68,28 @@ test('reading the game list again has no changes, and the schedule stays', async
 	expect(errors).toEqual([]);
 });
 
+test('after 3 nights without a good reading the card says the games may be out of date', async ({
+	page
+}) => {
+	// The fake source never fails, so the answer of the latest readings is replaced (story 5).
+	const errors = watchConsole(page);
+	await page.route('**/api/readings/latest', async (route) => {
+		const latest = await (await route.fetch()).json();
+		await route.fulfill({ json: { ...latest, out_of_date_since: '2026-10-09T01:00:05Z' } });
+	});
+	await page.goto('/');
+	const warning = page.getByTestId('out-of-date');
+	await expect(warning).toHaveText('The games may be out of date since Fri 9 October 2026 03:00.');
+	await expect(warning).toHaveAttribute('role', 'alert');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	await page.getByRole('button', { name: 'Read the game list' }).click();
+	await expect(page.getByTestId('reading-result')).toHaveText('No changes');
+	await expect(warning).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
 // The server's clock is 12 October 2026 (DEV_NOW): the schedule of M16 1 has 23 coming games
 // (5 of the team) and 14 past games.
 test.describe('the schedule', () => {

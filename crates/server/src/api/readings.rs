@@ -5,10 +5,11 @@ use axum::Json;
 use axum::extract::{Path, State};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use team_core::{Counts, HoldReason};
+use team_core::{Counts, HoldReason, out_of_date};
 use utoipa::ToSchema;
 
 use crate::app::AppState;
+use crate::clock::in_netherlands;
 use crate::error::AppError;
 use crate::reading::{self, Mode, ReadingError};
 use crate::readings::{self, FailureKind, Reading, ReadingResult};
@@ -156,6 +157,10 @@ pub struct LatestReadings {
     /// The held-back reading the coordinator can confirm: the newest reading that did not fail,
     /// when it is held back. A failed reading after it does not hide it.
     pub held_back: Option<ReadingView>,
+    /// The time of the last good reading, when 3 nightly run moments passed without a good
+    /// reading: the games may be out of date since then. `null` without a chosen team.
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub out_of_date_since: Option<DateTime<Utc>>,
 }
 
 impl From<ReadingError> for AppError {
@@ -203,18 +208,26 @@ pub async fn latest(State(state): State<AppState>) -> Result<Json<LatestReadings
             latest: None,
             last_good: None,
             held_back: None,
+            out_of_date_since: None,
         }));
     };
     let latest = readings::latest(&state.pool, target.club, target.season).await?;
-    let last_good = readings::last_good(&state.pool, target.club, target.season)
-        .await?
-        .and_then(|reading| match reading.result {
-            ReadingResult::Good { games_read, .. } => Some(LastGood {
-                finished_at: reading.finished_at,
-                games_read,
-            }),
-            _ => None,
-        });
+    let last_good = readings::last_good(&state.pool, target.club, target.season).await?;
+    // Without a team there is no nightly reading, so nothing to be late.
+    let now = in_netherlands(state.clock.now());
+    let out_of_date_since = last_good
+        .as_ref()
+        .filter(|reading| {
+            target.team.is_some() && out_of_date(now, in_netherlands(reading.started_at))
+        })
+        .map(|reading| reading.finished_at);
+    let last_good = last_good.and_then(|reading| match reading.result {
+        ReadingResult::Good { games_read, .. } => Some(LastGood {
+            finished_at: reading.finished_at,
+            games_read,
+        }),
+        _ => None,
+    });
     let held_back = readings::newest_not_failed(&state.pool, target.club, target.season)
         .await?
         .filter(|reading| matches!(reading.result, ReadingResult::HeldBack(_)));
@@ -222,6 +235,7 @@ pub async fn latest(State(state): State<AppState>) -> Result<Json<LatestReadings
         latest: latest.map(ReadingView::from),
         last_good,
         held_back: held_back.map(ReadingView::from),
+        out_of_date_since,
     }))
 }
 

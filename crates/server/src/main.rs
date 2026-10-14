@@ -1,4 +1,5 @@
-//! The `team` binary: `serve` runs the web server, `migrate` applies database migrations.
+//! The `team` binary: `serve` runs the web server and the nightly reading, `migrate` applies
+//! database migrations.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -15,7 +16,7 @@ use team::clock::{Clock, SystemClock};
 use team::config::Config;
 use team::source::Source;
 use team::web::Web;
-use team::{AppState, api, app, db};
+use team::{AppState, api, app, db, nightly};
 
 #[derive(Parser)]
 #[command(name = "team", about = "Team coordinator tool")]
@@ -84,24 +85,30 @@ async fn serve() -> anyhow::Result<()> {
     };
     #[cfg(not(debug_assertions))]
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let source = Arc::new(source);
     let state = AppState {
         pool: pool.clone(),
         config: Arc::new(config),
         oidc: Arc::new(oidc),
-        clock,
+        clock: clock.clone(),
         web: Arc::new(Web::load(&config_web_dir)),
-        source: Arc::new(source),
+        source: source.clone(),
     };
 
     let listener = TcpListener::bind(address)
         .await
         .with_context(|| format!("listening on {address}"))?;
     tracing::info!(%address, "serving");
-    axum::serve(listener, app(state))
+    let nightly = tokio::spawn(nightly::run(pool.clone(), source, clock));
+    let served = axum::serve(listener, app(state))
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .context("serving")?;
+        .context("serving");
 
+    // Stopped before the pool closes, which would wait for a reading that holds a connection; a
+    // reading stopped halfway rolls back.
+    nightly.abort();
+    served?;
     pool.close().await;
     tracing::info!("stopped");
     Ok(())

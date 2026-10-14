@@ -162,6 +162,23 @@ pub async fn good_started_after(
     row.map(Row::into_reading).transpose()
 }
 
+/// The latest start of a reading of `club` and `season`, of any result. The latest start, not the
+/// newest row: a reading that started earlier can be stored later.
+pub async fn newest_start(
+    db: impl PgExecutor<'_>,
+    club: ClubNumber,
+    season: Season,
+) -> Result<Option<DateTime<Utc>>, StoreError> {
+    let start = sqlx::query_scalar!(
+        "SELECT max(started_at) FROM readings WHERE club_number = $1 AND season_year = $2",
+        club.0,
+        season.start_year(),
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(start)
+}
+
 pub async fn by_id(db: impl PgExecutor<'_>, id: i64) -> Result<Option<Reading>, StoreError> {
     let row = sqlx::query_as!(
         Row,

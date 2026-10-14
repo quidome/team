@@ -10,6 +10,7 @@ pub mod db;
 pub mod error;
 pub mod followed_teams;
 pub mod games;
+pub mod nightly;
 pub mod reading;
 pub mod readings;
 pub mod source;

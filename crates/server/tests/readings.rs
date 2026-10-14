@@ -201,8 +201,40 @@ async fn without_a_choice_there_is_nothing_to_read(pool: PgPool) {
     assert_eq!((status, body), (400, json!({ "error": "no_choice" })));
     assert_eq!(
         reader.latest().await,
-        json!({ "latest": null, "last_good": null, "held_back": null })
+        json!({ "latest": null, "last_good": null, "held_back": null, "out_of_date_since": null })
     );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn after_three_nights_without_a_good_reading_the_games_may_be_out_of_date(pool: PgPool) {
+    // A good reading on Monday 12 October 2026 at 14:00 Dutch time.
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    reader.answer_with(ResponseTemplate::new(503));
+
+    // The nights of Tuesday, Wednesday and Thursday fail.
+    for day in [13, 14, 15] {
+        reader.harness.clock.set(utc(2026, 10, day, 1, 1));
+        reader.log_in_again().await;
+        let (_, body) = reader.read().await;
+        assert_eq!(body["result"], "failed");
+        if day == 14 {
+            // Wednesday morning: the third-last run moment is Monday 03:00, before the good
+            // reading.
+            reader.harness.clock.set(utc(2026, 10, 14, 8, 0));
+            assert_eq!(reader.latest().await["out_of_date_since"], Value::Null);
+        }
+    }
+
+    reader.harness.clock.set(utc(2026, 10, 15, 1, 2));
+    assert_eq!(
+        reader.latest().await["out_of_date_since"],
+        "2026-10-12T12:00:00Z"
+    );
+
+    reader.answer(real_games());
+    reader.read_good().await;
+    assert_eq!(reader.latest().await["out_of_date_since"], Value::Null);
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]

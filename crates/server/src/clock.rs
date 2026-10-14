@@ -1,6 +1,6 @@
 //! The current time, behind a trait so tests can set it.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use chrono_tz::Europe::Amsterdam;
 use team_core::Season;
 
@@ -43,6 +43,11 @@ impl Clock for ShiftedClock {
 /// Today's date in the Netherlands: the source's dates and the season follow Dutch local time.
 pub fn today_in_netherlands(clock: &dyn Clock) -> NaiveDate {
     clock.now().with_timezone(&Amsterdam).date_naive()
+}
+
+/// A moment as Dutch local time, for the rules of the nightly reading.
+pub fn in_netherlands(at: DateTime<Utc>) -> NaiveDateTime {
+    at.with_timezone(&Amsterdam).naive_local()
 }
 
 /// The current season, from today's Dutch date.
@@ -94,6 +99,18 @@ mod tests {
             current_season(&at(2027, 6, 30, 22, 0)).to_string(),
             "2027-2028"
         );
+    }
+
+    #[test]
+    fn the_nights_the_clock_changes_in_dutch_time() {
+        let local = |at: At| in_netherlands(at.0).format("%Y-%m-%d %H:%M").to_string();
+        // Summer time ends at 01:00 UTC on 25 October 2026: 02:00–03:00 happens twice.
+        assert_eq!(local(at(2026, 10, 25, 0, 30)), "2026-10-25 02:30");
+        assert_eq!(local(at(2026, 10, 25, 1, 0)), "2026-10-25 02:00");
+        assert_eq!(local(at(2026, 10, 25, 2, 0)), "2026-10-25 03:00");
+        // Summer time starts at 01:00 UTC on 28 March 2027: 02:00–03:00 is skipped.
+        assert_eq!(local(at(2027, 3, 28, 0, 59)), "2027-03-28 01:59");
+        assert_eq!(local(at(2027, 3, 28, 1, 0)), "2027-03-28 03:00");
     }
 
     #[test]

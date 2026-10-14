@@ -5,6 +5,7 @@ pub mod club;
 pub mod comparison;
 pub mod game;
 pub mod guard;
+pub mod nightly;
 pub mod schedule;
 pub mod season;
 pub mod team_choice;
@@ -18,6 +19,7 @@ pub use comparison::{
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
+pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
 pub use season::{Season, SeasonError};
 pub use team_choice::{
