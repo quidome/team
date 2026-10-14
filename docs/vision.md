@@ -60,7 +60,7 @@ These stay ideas until real use shows the need.
 
 ## User journeys
 1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because our players do jury duty at those games when we play at home. When a game moves, the tool shows the change.
-2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not.
+2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows.
 3. **Set the duties of a game.** The coordinator sets how many duties a game needs. An away game needs drivers. A home game means jury or referee places at other club games.
 4. **The message for the next game.** Around training, the coordinator copies one message for the team about the next game: time, place, and who drives or does jury duty.
 5. **The message for the referee committee.** Before the weekend, the coordinator copies a message with each game, its start time, and which player (first and last name) does which duty.
@@ -68,7 +68,7 @@ These stay ideas until real use shows the need.
 
 ## Priorities
 1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
-2. **Attendance at training** – done every week, and the most direct reason to leave the sheet.
+2. **Attendance at training, then at games** – done every week, and the most direct reason to leave the sheet. For the coach it shows the effort each player gives to the team.
 3. **Duties and the message for the next game** – the weekly message is the second thing done every week.
 4. **The message for the referee committee** – built on the same duties.
 5. **The overview for the parents, with duty totals** – makes the fairness visible.
@@ -100,3 +100,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-14 | Where we are: the nightly reading is built (story 5); the review of the whole of games from the game list comes next |
 | 2026-10-14 | Where we are: games from the game list is built and reviewed (all 5 stories); a release comes next |
 | 2026-10-14 | Where we are: games from the game list is released (v0.2.0) and runs on the cluster |
+| 2026-10-14 | Attendance: the reason for each absence matters (it shows how invested a player is); attendance at games follows attendance at training; words player, attendance and reason |
