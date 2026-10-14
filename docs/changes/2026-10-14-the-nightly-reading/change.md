@@ -1,7 +1,7 @@
 ---
 title: The nightly reading
 type: feature
-stage: implement
+stage: close
 closure: review build   # a background task in the server: the loop and its stop at shutdown are checked only by hand
 created: 2026-10-14
 ---
@@ -18,3 +18,4 @@ the games may be out of date, and since when.
 |------|-------|------|
 | 2026-10-14 | design | created from story 5 of the epic; coordinator's answers: a timer in the app instead of a Kubernetes CronJob (replaces decision 0005), run at 03:00 Dutch time, "may be out of date" after 3 nights with no good reading, no retry in the same night, closure review build |
 | 2026-10-14 | implement | technical spec approved: 4 steps, closure review build |
+| 2026-10-14 | close | all 4 steps done; build review: R1 (an error that stores nothing was tried again every 5 minutes) and R2 (a timer that stops is not logged) fixed; R3, R4 no change; R5 the documents for `/close` |

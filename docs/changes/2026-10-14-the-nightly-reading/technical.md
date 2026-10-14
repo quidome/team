@@ -1,6 +1,6 @@
 # Technical spec: The nightly reading
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-14-the-nightly-reading
 **Date**: 2026-10-14
@@ -160,7 +160,7 @@ and times), 0015 (readings are recorded results).
   - 2026-10-14, check by hand (a scratch database, the fake source of the browser tests, `DEV_NOW`): with the clock at Monday 12 October 12:00 Dutch time and an empty database, no nightly reading at start; M16 1 chosen and read. A new start at Tuesday 13 October 03:00:30 Dutch time logged at once `"nightly reading", result good, games_read 71`, and stored reading 2. Ctrl-C stopped the server in 8 ms ("stopping", "stopped").
 - [x] Step 4: "may be out of date" on the start page
 - [x] All checks pass (`just check`, 2026-10-14; 30 browser tests)
-- [ ] Review build
+- [x] Review build (2026-10-14; R1 and R2 fixed, `just check` passes again)
 
 ## Deviations
 None from `functional.md`. The design reads the spec more strictly within its words:
@@ -178,3 +178,71 @@ Implement:
 - 2026-10-14, step 4: the browser test is in `web/e2e/choose.e2e.ts` (Playwright project `choose`), not in the project `logged-in`. The card shows only with a team chosen, and only `choose.e2e.ts` has M16 1 chosen; `logged-in` runs after it with a team still needed.
 
 ## Review findings
+
+Build review, 2026-10-14 (fresh agent; input: `build docs/changes/2026-10-14-the-nightly-reading`).
+Diff `main..feat/nightly-reading` (commit 915a08d, working tree clean), read against
+`docs/architecture.md`, decisions 0001–0016 and `CLAUDE.md`. Run: `cargo test -p team_core nightly`
+(9 passed), `cargo test -p team --test nightly` (7 passed), `--test readings` (19 passed),
+`cargo test -p team --lib clock` (passed), `cargo clippy --workspace --all-targets -D warnings`
+(clean), `just e2e` (30 passed). Not run: the whole `just check`, the check by hand of step 3.
+
+Summary: the build follows the design and the project's rules (rules in the core, no time zone in
+the core, checked query with `.sqlx/` committed, generated API types, no new route, no secrets in
+the logs, abort before `pool.close()`). One finding to fix or decide (R1); the rest are notes.
+
+- **R1 – medium: a reading that ends in an error is tried again every 5 minutes, unseen.** A
+  failure of the source is stored as a failed reading, so `nightly_due` is false until the next
+  night. But `reading::read` can also end in `Err` without storing a row: any `StoreError`
+  (database unreachable, the write of games, changes or the reading fails; the existing test
+  `a_failure_while_storing_changes_nothing` shows such a failure stores nothing). Then
+  `readings::newest_start` is unchanged, the next `tick` 5 minutes later finds the reading due
+  again, reads the source again and logs another error – until the next good or failed row. A
+  failure that keeps coming back (a write that the data of the game list breaks) means one request
+  to the federation's game list every 5 minutes, all day, every day. This goes against
+  requirement 6 ("not tried again the same night") and the claim under Compatibility "one request
+  to the game list a night", and the coordinator sees nothing of it: no "The last reading failed"
+  line (requirement 3), only the out-of-date warning after 3 nights. Checked by a trace
+  (`nightly::run` → `tick` → `newest_start` → `nightly_due`; `reading::read` returns `Err` before
+  `readings::insert` on every `?` inside the transaction); not reproduced by a run. Either keep
+  the last run moment tried in `run` (memory is enough: one pod) and skip until the next one, or
+  decide that retrying after an internal error is wanted, bound it, and write that down as a
+  deviation. Sibling checked: `ReadingError::Client` comes only from building the HTTP client
+  (`Source::with_timeout`), not from a read, so it cannot loop (search `SourceError::Client` in
+  `crates/server/src/source/mod.rs`).
+  - 2026-10-14: fixed. `nightly::tick` takes a `Tried` (the run moment this timer already tried, in memory) and tries each run moment once, also when the reading ends in an error that stores nothing; `run` keeps one `Tried`. New test `a_reading_that_ends_in_an_error_is_not_tried_again_the_same_night` (a trigger makes the store fail: no second request at 03:06, a good reading the next night). After a pod restart the moment is tried once more (accepted: one pod, rare).
+- **R2 – low: a panic in the timer ends it silently.** `main.rs` keeps the `JoinHandle` only to
+  abort it; if `nightly::run` ever panics, the task ends, the server goes on serving and no
+  nightly reading happens again until the pod restarts (only the out-of-date warning after 3 nights
+  shows it). No panic source found in `tick` or `team_core::nightly` (search `unwrap|expect|panic|\[`
+  in both: only the `const` 03:00, which is checked at compile time). A note, not a fix: a
+  `catch_unwind` around each `tick`, or an error log when the handle ends early, would make it
+  visible.
+  - 2026-10-14: fixed. `nightly::spawn` starts `run` and a second task that waits for it; any end that is not the abort at shutdown logs the error "the nightly reading stopped; it starts again with the server". `main.rs` keeps only the abort handle. Not tested automatically (no panic can be made in `run`).
+- **R3 – note: the timer can read in the window between saving a choice and the front end's
+  first reading.** Architecture line 36: after a save with a team the front end starts
+  `POST /api/readings`. With a new club (no reading of the club this season), `nightly_due` is true
+  at any hour, so a timer check in that window does the first reading and the tap gets "No
+  changes". Harmless under the lock and `is_first_reading` (traced, not run); the design already
+  names this for the browser tests. It holds in production too, which the Compatibility section
+  does not say.
+  - 2026-10-14: not changed. Harmless in production too (the lock and the first-reading rule); the choose flow shows no result line for that reading.
+- **R4 – claims under Progress.** "All checks pass … 30 browser tests": the parts re-run above
+  pass, 30 browser tests. The check by hand of step 3 was not repeated. No test that cannot fail
+  was found: `a_pod_that_was_down_at_three_reads_when_it_checks` would pass with an always-due
+  rule, but `a_tap_after_three…` and the second `tick` in
+  `the_nightly_reading_records_changes_as_a_tap_does` would not; the browser test fails if the
+  good tap does not clear the warning (the component keeps its first props, so the replaced
+  answer after `onRead` cannot bring it back). Not covered by a test: the `target.team.is_some()`
+  filter in `api/readings.rs::latest` (a good reading of the current season with no team chosen);
+  seems unreachable today, since the read button needs a team.
+  - 2026-10-14: not changed. The `team.is_some()` filter on the warning is not reachable today; no test.
+- **R5 – documents the diff made false, for Close.** Planned already: decision 0005 (still
+  "valid", says CronJob; 0017 at Close) and the debt line in `docs/architecture.md` (line 110).
+  Not named in the spec: `docs/product/read-the-game-list.md` line 27 and
+  `docs/product/list-of-changes.md` line 26 ("a nightly reading comes later");
+  `docs/architecture.md` line 15 (core modules, no `nightly`), line 16 (server modules, no
+  `nightly.rs`; `main.rs` `serve` now also runs the timer), and the reading section (line 38 on)
+  says nothing of the timer or `newest_start`; `CLAUDE.md` architecture list (no `nightly.rs`).
+  Search: `grep -n -i "nightly\|cronjob\|read-game-list"` in `docs/`, `README.md`, `CLAUDE.md`.
+  `README.md` cluster contract stays true (`team serve`, no CronJob named).
+  - 2026-10-14: for `/close`, together with decision 0017.

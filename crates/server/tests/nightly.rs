@@ -8,7 +8,7 @@ mod common;
 use common::game_list::{Reader, game_mut, games_with, utc};
 use common::{Harness, ORIGIN};
 use serde_json::json;
-use team::nightly;
+use team::nightly::{self, Tried};
 use team::readings::{Reading, ReadingResult};
 use team::source::Source;
 use url::Url;
@@ -17,16 +17,22 @@ use wiremock::{MockServer, ResponseTemplate};
 /// A team game of M16 1 on 12 December 2026.
 const TEAM_GAME: i64 = 1073178;
 
-/// One check of the timer against the harness's fake game list and clock.
+/// One check of a new timer against the harness's fake game list and clock.
 async fn tick(harness: &Harness) -> Option<Reading> {
+    tick_with(harness, &mut Tried::default()).await.unwrap()
+}
+
+/// One check of the timer that already tried `tried`.
+async fn tick_with(
+    harness: &Harness,
+    tried: &mut Tried,
+) -> Result<Option<Reading>, team::reading::ReadingError> {
     let source = Source::new(
         Url::parse(&harness.source.uri()).unwrap(),
         &Url::parse(ORIGIN).unwrap(),
     )
     .unwrap();
-    nightly::tick(&harness.pool, &source, harness.clock.as_ref())
-        .await
-        .unwrap()
+    nightly::tick(&harness.pool, &source, harness.clock.as_ref(), tried).await
 }
 
 async fn requests(source: &MockServer) -> usize {
@@ -147,4 +153,44 @@ async fn an_empty_game_list_at_night_is_held_back_for_the_coordinator(pool: sqlx
     let latest = reader.latest().await;
     assert_eq!(latest["held_back"]["id"], reading.id);
     assert_eq!(latest["held_back"]["hold"]["reason"], "empty");
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_reading_that_ends_in_an_error_is_not_tried_again_the_same_night(pool: sqlx::PgPool) {
+    let reader = read_on_monday(pool).await;
+    // Storing a good reading fails, so the reading ends in an error and stores nothing.
+    sqlx::raw_sql(
+        "CREATE FUNCTION fail_good_reading() RETURNS trigger LANGUAGE plpgsql AS
+             $$ BEGIN RAISE EXCEPTION 'test failure'; END $$;
+         CREATE TRIGGER fail_good_reading BEFORE INSERT ON readings FOR EACH ROW
+             WHEN (NEW.result = 'good') EXECUTE FUNCTION fail_good_reading();",
+    )
+    .execute(reader.pool())
+    .await
+    .unwrap();
+    let mut tried = Tried::default();
+
+    reader.harness.clock.set(utc(2026, 10, 13, 1, 1));
+    assert!(tick_with(&reader.harness, &mut tried).await.is_err());
+
+    let before = requests(&reader.harness.source).await;
+    reader.harness.clock.set(utc(2026, 10, 13, 1, 6));
+    assert!(
+        tick_with(&reader.harness, &mut tried)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(requests(&reader.harness.source).await, before);
+
+    sqlx::raw_sql("DROP TRIGGER fail_good_reading ON readings")
+        .execute(reader.pool())
+        .await
+        .unwrap();
+    reader.harness.clock.set(utc(2026, 10, 14, 1, 1));
+    let reading = tick_with(&reader.harness, &mut tried)
+        .await
+        .unwrap()
+        .expect("the next night");
+    assert!(is_good(&reading), "{reading:?}");
 }

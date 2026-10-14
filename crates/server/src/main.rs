@@ -99,7 +99,7 @@ async fn serve() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("listening on {address}"))?;
     tracing::info!(%address, "serving");
-    let nightly = tokio::spawn(nightly::run(pool.clone(), source, clock));
+    let nightly = nightly::spawn(pool.clone(), source, clock);
     let served = axum::serve(listener, app(state))
         .with_graceful_shutdown(shutdown_signal())
         .await
