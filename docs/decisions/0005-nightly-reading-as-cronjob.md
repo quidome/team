@@ -1,6 +1,6 @@
 # 0005 – Nightly reading as a Kubernetes CronJob
 
-**Status**: valid
+**Status**: replaced by 0017
 **Date**: 2026-10-10
 **Change**: [2026-10-10-games-from-game-list](../changes/2026-10-10-games-from-game-list/)
 

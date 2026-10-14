@@ -23,7 +23,7 @@ each change until the coordinator has seen it.
 ## Errors and limits
 - No changes: "No changes not seen." With a filter: "No changes of the team not seen." or "No changes of possible duty games not seen."
 - A change whose game has passed (the old and the new date before today) drops off the list without a tap.
-- The changes come from readings of the game list ([Read the game list](read-the-game-list.md)); a nightly reading comes later.
+- The changes come from readings of the game list ([Read the game list](read-the-game-list.md)): each tap and the nightly reading.
 - No history of seen changes. Duties and messages to players come later.
 
 ## Interface

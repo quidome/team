@@ -34,7 +34,8 @@ It is not:
 - Choosing the club and team is built and reviewed (story 2 of games from the game list), not yet released: the club by name from the source's club list, the team from the club's own teams, again at each new season; the choice of each season is kept.
 - Reading the game list on demand is built and reviewed (story 3a), not yet released: one tap reads the club's games, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms.
 - The schedule is built and reviewed (story 3b), not yet released: the start page shows the team's games and the club's home games (possible duty games) from the game list, with a quick filter and past games on request; choosing the team reads the game list at once; in a new season last season's schedule shows until the team is chosen. The sheet is still in use.
-- The list of changes is built and reviewed (story 4), not yet released: each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time. The nightly reading (story 5) comes next.
+- The list of changes is built and reviewed (story 4), not yet released: each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
+- The nightly reading is built and reviewed (story 5), not yet released: the tool reads the game list by itself every night at 03:00 and says on the start page when the games may be out of date. All stories of games from the game list are built; the review of the whole result comes next.
 - The product is successful when the coordinator stops using the sheet.
 
 ## North star
@@ -95,3 +96,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-12 | Where we are: reading the game list on demand is built (story 3a); the schedule screen comes next |
 | 2026-10-12 | Where we are: the schedule is built (story 3b); the list of changes comes next |
 | 2026-10-13 | Where we are: the list of changes is built (story 4); the nightly reading comes next |
+| 2026-10-14 | Where we are: the nightly reading is built (story 5); the review of the whole of games from the game list comes next |
