@@ -33,31 +33,42 @@ valid or not valid.
 ## User stories
 
 ### Story 1: Keep the players
-**As a** coordinator, **I want to** keep the list of players of the team, **so that** I can mark
-their attendance without typing names each time.
+**As a** coordinator, **I want to** keep the players and when each one is in the team, **so
+that** I can mark their attendance without typing names, and the totals are fair to players who
+join or leave during the season.
+
+A player is the person: a name, with no dates. What has a start and an end is the player's role
+in the team of a season: "plays games" or "only trains" (coordinator, 2026-10-15). Both roles come
+to training.
 
 #### Acceptance criteria
-- [ ] The coordinator can add a player with a first name (required), a last name (optional), "plays games" or "only trains", and "in the team since" (a date; the tool proposes the first training date of the current season, or today when there is none).
-- [ ] The coordinator can change the first name, the last name, "plays games" or "only trains", and "in the team since" of a player.
-- [ ] The coordinator can mark a player as "left the team" with a date (the tool proposes today), and undo it. A player who left does not show at trainings after that date, and keeps the attendance of earlier trainings. Absences at trainings after that date are kept, but do not count; they count again when the date is moved back.
-- [ ] A player shows at a training, and counts for it, only when the date of the training is on or after "in the team since" and not after the date the player left. So a player who joined in November has no missed trainings in September and October.
+- [ ] The coordinator can add a player with a first name (required) and a last name (optional), and change both later. A player has no dates.
+- [ ] The coordinator can give a player a role in the current season: "plays games" or "only trains", from a date (the tool proposes the first training date of the season, or today when the season's trainings have started).
+- [ ] The coordinator can end a player's role with a date (the tool proposes today), and undo the end. A role ends at the latest at the end of its season (30 June).
+- [ ] A player who leaves and comes back in the same season gets a new role from the date of return; the time between does not count.
+- [ ] A player shows at a training, and counts for it, only when the date of the training is inside one of the player's roles. So a player who joined in November has no missed trainings in September and October.
+- [ ] Absences outside a player's roles (for example after the role end was moved earlier) are kept, but do not count; they count again when the dates are changed back.
+- [ ] A new season starts with no players in a role. The players page shows the players of last season with "Add to this season" for each, and "Add all": each gets the same role as at the end of last season, from the first training date of the new season (or today).
 - [ ] Players are shown by name only: first name and last name. Two players with the same first name are told apart by the last name.
-- [ ] The list of players shows the current players first (sorted by first name), then "Left the team" with the players who left.
-- [ ] Players do not depend on the season or on the chosen team: in a new season the same players are kept.
+- [ ] The players page shows, for the chosen season, the players with a role now (sorted by first name, with "Plays games" or "Only trains"), then "Left the team" with the players whose role in the season ended.
+
+A change of role within a season (from "only trains" to "plays games") is the end of one role and
+the start of the other on the same day. The stored data must allow it; a screen for it comes later.
 
 #### Behaviour
 At the start of the season the coordinator opens "Players", taps "Add player" and types the 14
-players once. Each player has a switch "Plays games" / "Only trains" and the date "in the team
-since" (proposed: the first training date of the season). For a player who joined later, the
-coordinator sets the date the player joined. When a player leaves, the coordinator opens the
-player and taps "Left the team" (with the date).
+players once, each with "Plays games" or "Only trains". For a player who joined later, the
+coordinator sets the date the role started. When a player leaves, the coordinator opens the player
+and taps "Left the team" (with the date). Next season, the coordinator taps "Add all" (or adds
+players one by one) and ends the roles of those who did not come back.
 
 #### Errors and edge cases
 - No first name: the player cannot be saved; the tool says "A first name is needed."
-- "In the team since" is changed to a later date while the player has absences before it: the absences are kept, but do not count; they count again when the date is moved back.
+- A role end before its start: not saved ("The end must be after the start.").
+- Two roles of one player that overlap in time: not saved ("This player already has a role on that date.").
 - Two players with the same first and last name: allowed (the coordinator knows who is who), but the tool warns "There is already a player with this name."
-- A player with no absences can be deleted at any time ("Delete player", after a confirmation), for example a player added by mistake. "There" is not stored for each player, so nothing is lost. A player with absences can only be marked as left.
-- A player is added (or "in the team since" is moved earlier) while trainings on or after that date are already entered: "there" is the default, so the player now counts as there at those trainings. On save the tool says "This player now counts as there at N earlier trainings." and lists them, so the coordinator can mark absences.
+- A player with no absences can be deleted at any time ("Delete player", after a confirmation), for example a player added by mistake. "There" is not stored for each player, so nothing is lost. A player with absences can only end the role.
+- A role starts (or its start is moved earlier) while trainings on or after that date are already entered: "there" is the default, so the player now counts as there at those trainings. On save the tool says "This player now counts as there at N earlier trainings." and lists them, so the coordinator can mark absences.
 
 ### Story 2: Training days and trainings
 **As a** coordinator, **I want** the tool to know when the team trains, **so that** today's
@@ -105,7 +116,7 @@ I can keep attendance in the hall with one hand.
 - [ ] Each tap is saved at once; there is no save button. The training shows "N absent" or "All there".
 - [ ] When a tap cannot be saved (no network, server error), the row shows the old state again and the tool says "Not saved. Try again." It never shows a mark as saved when it was not.
 - [ ] A training in the past can be opened from the page "Attendance" and marked or corrected in the same way, also weeks later.
-- [ ] Which players show follows story 1: from "in the team since" up to the date the player left.
+- [ ] Which players show follows story 1: the players with a role on the training's date.
 - [ ] The rows are large enough to tap with a thumb on a phone (390 pixels wide), and the page has no sideways scroll.
 
 #### Behaviour
@@ -148,8 +159,8 @@ and why they were not, **so that** I understand the effort each player gives to 
 #### Acceptance criteria
 - [ ] The page "Attendance" shows, for the current season, one row for each player who could be at one or more trainings of the season: the name, "there" (count), "absent, valid" (count), "absent, not valid" (count), and "of N trainings".
 - [ ] Only trainings up to and including today count. A training in the future with an absence noted in advance does not count yet.
-- [ ] For each player, only the trainings (opened or added) at which the player could be count: from "in the team since" up to the date the player left (story 1). A player who joined later has no missed trainings before that date.
-- [ ] Players who left the team show in a separate group "Left the team", with the totals of their trainings.
+- [ ] For each player, only the trainings (opened or added) at which the player had a role count (story 1). A player who joined later has no missed trainings before that date.
+- [ ] Players whose role in the season ended show in a separate group "Left the team", with the totals of their trainings.
 - [ ] The page also lists the training days and trainings of the season (story 2), newest first; a tap opens the training (story 3).
 - [ ] The season runs from 1 July to 30 June (Dutch time), the same as for the games. An earlier season can be chosen on the same page.
 - [ ] With no trainings in the season yet: "No trainings yet this season."
@@ -169,7 +180,7 @@ Screens (phone first, also usable on a computer):
 - **Start page** (`/`): below the team header, a compact card "Training · Tue 20 Oct · 19:45" with "Not opened yet", "All there", "N absent" or "Cancelled". A tap opens the training (and so makes it exist, story 2). It shows only between the first and the last training date, and takes one line so the next games stay high on the first screen.
 - **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Cancel training" or "Undo cancel", and "Delete training" for an extra training only.
 - **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date). A tap on a player shows the trainings that player missed.
-- **Players**: the list of players, "Add player", and for each player: first name, last name, "Plays games" / "Only trains", "in the team since", "Left the team" (with a date), and "Delete player" when the player has no absences.
+- **Players**: the list of players, "Add player", the players of last season with "Add to this season" and "Add all" (in a new season), and for each player: first name, last name, the roles of the season ("Plays games" or "Only trains", from and until), "Left the team" (with a date), and "Delete player" when the player has no absences.
 - **Training days and reasons** (settings): the training days of the week with start and end time, the first and the last training date of the season, and the list of reasons with valid / not valid, "Add reason", rename, hide.
 - Navigation: the start page links to "Attendance"; "Attendance" links to "Players" and the settings.
 
@@ -294,3 +305,13 @@ Decided with the coordinator; the stories above are changed to match.
 - **S9:** fixed. The list shows the whole season: "Coming" up to the last training date above "Past", so absences and cancels can be noted weeks ahead.
 - **S10:** fixed. A change of training days applies from the day it is made; earlier dates keep the days set then. No new word: "training day" in the settings is a day of the week, in the list a date; the spec says which.
 - **S11:** not in this spec; a line in `docs/ideas.md` (a longer login, so a training does not start with logging in).
+
+
+## Change after approval (2026-10-15, during /design)
+Decided with the coordinator, without a third spec review: a player is the person and has no
+dates; a **role** ("plays games" or "only trains") in the team of a season has a start and an end.
+A player can leave and come back (a new role). A role ends at the latest at the end of its season;
+a new season starts with no players in a role, and "Add to this season" / "Add all" brings last
+season's players back. A change of role within a season must be possible in the stored data; its
+screen comes later. Story 1 and the parts of stories 3 and 5 and the Interface that named "in the
+team since" are changed. The answers to S2, S7 and S8 still hold, now for roles.
