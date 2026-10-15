@@ -8,7 +8,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | coordinator | The one person who uses the tool and changes its data. Runs one team. | Not "admin", not "user" when the coordinator is meant. |
 | team | The youth team the coordinator runs. | Say "other club team" for the club's other teams. |
 | club | The sports club the team belongs to. | |
-| player | A member of the team. Has a first and a last name. Plays games, or only trains. | Not "member", not "child" in the product. |
+| player | A member of the team. Has a first name, and usually a last name. Plays games, or only trains. | Not "member", not "child" in the product. |
 | game | One match on the schedule, with a date, start time, place, home team and away team. | Not "match", not "fixture". |
 | home game / away game | A game of the team in the club's own hall / at another club. | |
 | game list | The federation's list of all games of the club, read by the tool. | Not "feed" in user-facing text. |

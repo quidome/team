@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – discover (next: `/discover docs/changes/2026-10-14-attendance-at-training`)
+1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – design (next: `/design docs/changes/2026-10-14-attendance-at-training`)
 
 Small:
 - A new game that the coordinator has not seen, confirmed as gone and then back in the game list, shows as "came back" instead of "new", so it is not in the summary line of new games (epic review accept A2; `update_open_changes` and `change_between` in `crates/core/src/comparison.rs`).

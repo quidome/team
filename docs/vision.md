@@ -101,3 +101,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-14 | Where we are: games from the game list is built and reviewed (all 5 stories); a release comes next |
 | 2026-10-14 | Where we are: games from the game list is released (v0.2.0) and runs on the cluster |
 | 2026-10-14 | Attendance: the reason for each absence matters (it shows how invested a player is); attendance at games follows attendance at training; words player, attendance and reason |
+| 2026-10-15 | Word player: a first name, and usually a last name (the last name is optional) |
