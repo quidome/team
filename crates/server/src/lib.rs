@@ -11,9 +11,12 @@ pub mod error;
 pub mod followed_teams;
 pub mod games;
 pub mod nightly;
+pub mod players;
 pub mod reading;
 pub mod readings;
+pub mod reasons;
 pub mod source;
+pub mod training_settings;
 pub mod web;
 
 pub use app::{AppState, app};

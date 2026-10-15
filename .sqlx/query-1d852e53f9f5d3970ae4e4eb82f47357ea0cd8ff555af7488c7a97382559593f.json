@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE reasons SET name = $2, valid = $3, hidden = $4 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1d852e53f9f5d3970ae4e4eb82f47357ea0cd8ff555af7488c7a97382559593f"
+}

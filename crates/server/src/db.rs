@@ -46,6 +46,18 @@ pub enum StoreError {
     Invalid(String),
 }
 
+impl StoreError {
+    /// A write that a unique index refused, for example a reason name that is taken.
+    pub fn is_unique_violation(&self) -> bool {
+        match self {
+            Self::Database(error) => error
+                .as_database_error()
+                .is_some_and(|error| error.is_unique_violation()),
+            Self::Invalid(_) => false,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum NotReady {
     #[error("database is not reachable: {0}")]

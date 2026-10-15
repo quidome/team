@@ -4,9 +4,12 @@ pub mod changes;
 pub mod clubs;
 pub mod health;
 pub mod me;
+pub mod players;
 pub mod readings;
+pub mod reasons;
 pub mod schedule;
 pub mod selection;
+pub mod training_settings;
 
 use utoipa::OpenApi;
 
@@ -26,7 +29,20 @@ use utoipa::OpenApi;
         readings::confirm_gone,
         schedule::get,
         changes::get,
-        changes::seen
+        changes::seen,
+        players::list,
+        players::add,
+        players::rename,
+        players::delete,
+        players::add_role,
+        players::change_role,
+        players::carry,
+        reasons::list,
+        reasons::add,
+        reasons::change,
+        training_settings::get,
+        training_settings::proposal,
+        training_settings::save
     )
 )]
 pub struct ApiDoc;

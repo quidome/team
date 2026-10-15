@@ -3,6 +3,7 @@
 
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
+pub mod api;
 pub mod game_list;
 
 use std::sync::{Arc, Mutex};

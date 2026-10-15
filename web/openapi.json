@@ -197,6 +197,288 @@
         }
       }
     },
+    "/api/players": {
+      "get": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "players",
+        "responses": {
+          "200": {
+            "description": "The players for the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayersView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "addPlayer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlayer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new player",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlayer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`first_name_required`, `outside_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/players/carry": {
+      "post": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "carryPlayers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CarryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The players; the listed players of last season have the same role in this season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayersView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/players/{id}": {
+      "put": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "renamePlayer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The player",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedPlayer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`first_name_required`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "deletePlayer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with its roles"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          }
+        }
+      }
+    },
+    "/api/players/{id}/roles": {
+      "post": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "addRole",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The player",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`until_before_from`, `outside_season`, `roles_overlap`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          }
+        }
+      }
+    },
+    "/api/players/{id}/roles/{role}": {
+      "put": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "changeRole",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "role",
+            "in": "path",
+            "description": "The role",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The player",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`until_before_from`, `outside_season`, `roles_overlap`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player or role"
+          }
+        }
+      }
+    },
     "/api/readings": {
       "post": {
         "tags": [
@@ -287,6 +569,123 @@
         }
       }
     },
+    "/api/reasons": {
+      "get": {
+        "tags": [
+          "reasons"
+        ],
+        "operationId": "reasons",
+        "responses": {
+          "200": {
+            "description": "All reasons in their order, also the hidden ones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenceReason"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "reasons"
+        ],
+        "operationId": "addReason",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewReason"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "All reasons; the new one last",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenceReason"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`reason_name_required`, `reason_name_taken`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/reasons/{id}": {
+      "put": {
+        "tags": [
+          "reasons"
+        ],
+        "operationId": "changeReason",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The reason",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "All reasons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AbsenceReason"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`reason_name_required`, `reason_name_taken`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such reason"
+          }
+        }
+      }
+    },
     "/api/schedule": {
       "get": {
         "tags": [
@@ -369,10 +768,146 @@
           }
         }
       }
+    },
+    "/api/training-settings": {
+      "get": {
+        "tags": [
+          "training_settings"
+        ],
+        "operationId": "trainingSettings",
+        "responses": {
+          "200": {
+            "description": "The training settings of the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "training_settings"
+        ],
+        "operationId": "saveTrainingSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The saved settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`end_before_start`, `last_before_first`, `no_training_days`, `duplicate_weekday`, `outside_season`, `invalid_weekday`, `invalid_time`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/training-settings/proposal": {
+      "get": {
+        "tags": [
+          "training_settings"
+        ],
+        "operationId": "trainingDatesProposal",
+        "parameters": [
+          {
+            "name": "weekdays",
+            "in": "query",
+            "description": "The chosen days of the week, for example \"2\" or \"2,4\".",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The first chosen day in September and the last in May",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`no_training_days`, `invalid_weekday`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AbsenceReason": {
+        "type": "object",
+        "description": "A reason for an absence. (The schema name `Reason` is taken by the choice of club and team.)",
+        "required": [
+          "id",
+          "name",
+          "valid",
+          "hidden"
+        ],
+        "properties": {
+          "hidden": {
+            "type": "boolean",
+            "description": "Not offered for new absences; still shown on old ones."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CarryRequest": {
+        "type": "object",
+        "required": [
+          "players"
+        ],
+        "properties": {
+          "players": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Players of last season to bring into this season (\"Add all\" sends all of them)."
+          }
+        }
+      },
       "ChangeGame": {
         "type": "object",
         "required": [
@@ -752,6 +1287,192 @@
           }
         }
       },
+      "NameChange": {
+        "type": "object",
+        "required": [
+          "first_name"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NewPlayer": {
+        "type": "object",
+        "required": [
+          "first_name"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NewRole",
+                "description": "The first role, if any."
+              }
+            ]
+          }
+        }
+      },
+      "NewReason": {
+        "type": "object",
+        "required": [
+          "name",
+          "valid"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NewRole": {
+        "type": "object",
+        "required": [
+          "role",
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          }
+        }
+      },
+      "PlayerView": {
+        "type": "object",
+        "required": [
+          "id",
+          "first_name",
+          "roles"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RoleKind",
+                "description": "Today's role (or the coming one); in \"left\", the last role of the season; in \"last_season\", the last role of\nlast season; `null` in \"others\"."
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleView"
+            },
+            "description": "The roles of the season shown (last season's for \"last_season\")."
+          }
+        }
+      },
+      "PlayersView": {
+        "type": "object",
+        "description": "The players for the current season.",
+        "required": [
+          "season",
+          "today",
+          "proposed_from",
+          "players",
+          "left",
+          "last_season",
+          "others"
+        ],
+        "properties": {
+          "last_season": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerView"
+            },
+            "description": "Players who were in the team until the end of last season and have no role in this season:\n\"Add all\" brings them back."
+          },
+          "left": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerView"
+            },
+            "description": "Players whose roles in the season all ended before today."
+          },
+          "others": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerView"
+            },
+            "description": "Players with no role in this season who are not in `last_season`."
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerView"
+            },
+            "description": "Players with a role today or later in the season, sorted by first name."
+          },
+          "proposed_from": {
+            "type": "string",
+            "description": "The proposed start of a new role: the first training date of the season, or today when\ntrainings have started or nothing is set."
+          },
+          "season": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string",
+            "description": "Today's Dutch date: the proposed end for \"Left the team\"."
+          }
+        }
+      },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "first",
+          "last"
+        ],
+        "properties": {
+          "first": {
+            "type": "string"
+          },
+          "last": {
+            "type": "string"
+          }
+        }
+      },
       "ReadingView": {
         "type": "object",
         "description": "One reading of the game list. A failed or held-back reading is a result, not an HTTP error.",
@@ -827,6 +1548,25 @@
           "new_season"
         ]
       },
+      "ReasonChange": {
+        "type": "object",
+        "required": [
+          "name",
+          "valid",
+          "hidden"
+        ],
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
       "ResultKind": {
         "type": "string",
         "enum": [
@@ -834,6 +1574,66 @@
           "failed",
           "held_back"
         ]
+      },
+      "RoleChange": {
+        "type": "object",
+        "required": [
+          "role",
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "`null` while the role continues; \"Left the team\" sets it, \"Undo\" clears it."
+          }
+        }
+      },
+      "RoleKind": {
+        "type": "string",
+        "enum": [
+          "plays_games",
+          "only_trains"
+        ]
+      },
+      "RoleView": {
+        "type": "object",
+        "description": "A role of a player in the team of a season.",
+        "required": [
+          "id",
+          "role",
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "The first day, for example \"2026-09-01\"."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last day; `null` while the role continues."
+          }
+        }
       },
       "SaveSelection": {
         "type": "object",
@@ -853,6 +1653,22 @@
             ],
             "format": "int64",
             "description": "The source's team number; leave it out only when the season has no games yet."
+          }
+        }
+      },
+      "SavedPlayer": {
+        "type": "object",
+        "description": "A saved player, with the warning that another player has the same name.",
+        "required": [
+          "player",
+          "same_name"
+        ],
+        "properties": {
+          "player": {
+            "$ref": "#/components/schemas/PlayerView"
+          },
+          "same_name": {
+            "type": "boolean"
           }
         }
       },
@@ -1109,6 +1925,30 @@
         ],
         "description": "The state of the choice. `season` is always the current season."
       },
+      "SettingsChange": {
+        "type": "object",
+        "required": [
+          "first",
+          "last",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainingDayView"
+            }
+          },
+          "first": {
+            "type": "string",
+            "format": "date"
+          },
+          "last": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "TeamView": {
         "type": "object",
         "required": [
@@ -1124,6 +1964,65 @@
             "type": "integer",
             "format": "int64",
             "description": "The source's team number."
+          }
+        }
+      },
+      "TrainingDayView": {
+        "type": "object",
+        "description": "A day of the week the team trains, with its times.",
+        "required": [
+          "weekday",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "description": "For example \"19:45\"."
+          },
+          "weekday": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 (Monday) to 7 (Sunday)."
+          }
+        }
+      },
+      "TrainingSettings": {
+        "type": "object",
+        "required": [
+          "season",
+          "saved",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainingDayView"
+            },
+            "description": "The training days that apply today (before the first training date: the first ones)."
+          },
+          "first": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "saved": {
+            "type": "boolean",
+            "description": "`false` while nothing is saved for the season; then the dates are `null` and `days` is\nempty."
+          },
+          "season": {
+            "type": "string"
           }
         }
       }

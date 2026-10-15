@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, player_id, season_year, role, from_date, until_date FROM player_roles\n         WHERE player_id = $1 ORDER BY from_date, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "player_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "season_year",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "role",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "from_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 5,
+        "name": "until_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "41170173048fc1c8243f0c75ac7489020631f09c591413e4767e1a2292f09817"
+}
