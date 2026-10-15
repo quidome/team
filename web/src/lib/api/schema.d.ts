@@ -118,6 +118,86 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/players': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['players'];
+		put?: never;
+		post: operations['addPlayer'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/players/carry': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['carryPlayers'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/players/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['renamePlayer'];
+		post?: never;
+		delete: operations['deletePlayer'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/players/{id}/roles': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['addRole'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/players/{id}/roles/{role}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['changeRole'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/readings': {
 		parameters: {
 			query?: never;
@@ -166,6 +246,38 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/reasons': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['reasons'];
+		put?: never;
+		post: operations['addReason'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/reasons/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['changeReason'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/schedule': {
 		parameters: {
 			query?: never;
@@ -198,10 +310,55 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/training-settings': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['trainingSettings'];
+		put: operations['saveTrainingSettings'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/training-settings/proposal': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['trainingDatesProposal'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 }
 export type webhooks = Record<string, never>;
 export interface components {
 	schemas: {
+		/** @description A reason for an absence. (The schema name `Reason` is taken by the choice of club and team.) */
+		AbsenceReason: {
+			/** @description Not offered for new absences; still shown on old ones. */
+			hidden: boolean;
+			/** Format: int64 */
+			id: number;
+			name: string;
+			valid: boolean;
+		};
+		CarryRequest: {
+			/** @description Players of last season to bring into this season ("Add all" sends all of them). */
+			players: number[];
+		};
 		ChangeGame: {
 			away: string;
 			/** @description Dutch local date, for example "2026-10-31". */
@@ -329,6 +486,59 @@ export interface components {
 			/** @description The name to show. */
 			name: string;
 		};
+		NameChange: {
+			first_name: string;
+			last_name?: string | null;
+		};
+		NewPlayer: {
+			first_name: string;
+			last_name?: string | null;
+			role?: null | components['schemas']['NewRole'];
+		};
+		NewReason: {
+			name: string;
+			valid: boolean;
+		};
+		NewRole: {
+			/** Format: date */
+			from: string;
+			role: components['schemas']['RoleKind'];
+		};
+		PlayerView: {
+			first_name: string;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			role?: null | components['schemas']['RoleKind'];
+			/** @description The roles of the season shown (last season's for "last_season"). */
+			roles: components['schemas']['RoleView'][];
+		};
+		/** @description The players for the current season. */
+		PlayersView: {
+			/**
+			 * @description Players who were in the team until the end of last season and have no role in this season:
+			 *     "Add all" brings them back.
+			 */
+			last_season: components['schemas']['PlayerView'][];
+			/** @description Players whose roles in the season all ended before today. */
+			left: components['schemas']['PlayerView'][];
+			/** @description Players with no role in this season who are not in `last_season`. */
+			others: components['schemas']['PlayerView'][];
+			/** @description Players with a role today or later in the season, sorted by first name. */
+			players: components['schemas']['PlayerView'][];
+			/**
+			 * @description The proposed start of a new role: the first training date of the season, or today when
+			 *     trainings have started or nothing is set.
+			 */
+			proposed_from: string;
+			season: string;
+			/** @description Today's Dutch date: the proposed end for "Left the team". */
+			today: string;
+		};
+		Proposal: {
+			first: string;
+			last: string;
+		};
 		/** @description One reading of the game list. A failed or held-back reading is a result, not an HTTP error. */
 		ReadingView: {
 			counts?: null | components['schemas']['CountsView'];
@@ -352,8 +562,35 @@ export interface components {
 		 * @enum {string}
 		 */
 		Reason: 'no_games_yet' | 'new_season';
+		ReasonChange: {
+			hidden: boolean;
+			name: string;
+			valid: boolean;
+		};
 		/** @enum {string} */
 		ResultKind: 'good' | 'failed' | 'held_back';
+		RoleChange: {
+			/** Format: date */
+			from: string;
+			role: components['schemas']['RoleKind'];
+			/**
+			 * Format: date
+			 * @description `null` while the role continues; "Left the team" sets it, "Undo" clears it.
+			 */
+			until?: string | null;
+		};
+		/** @enum {string} */
+		RoleKind: 'plays_games' | 'only_trains';
+		/** @description A role of a player in the team of a season. */
+		RoleView: {
+			/** @description The first day, for example "2026-09-01". */
+			from: string;
+			/** Format: int64 */
+			id: number;
+			role: components['schemas']['RoleKind'];
+			/** @description The last day; `null` while the role continues. */
+			until?: string | null;
+		};
 		SaveSelection: {
 			/**
 			 * Format: int64
@@ -365,6 +602,11 @@ export interface components {
 			 * @description The source's team number; leave it out only when the season has no games yet.
 			 */
 			team?: number | null;
+		};
+		/** @description A saved player, with the warning that another player has the same name. */
+		SavedPlayer: {
+			player: components['schemas']['PlayerView'];
+			same_name: boolean;
 		};
 		ScheduleAnswer: {
 			schedule?: null | components['schemas']['ScheduleView'];
@@ -448,6 +690,13 @@ export interface components {
 					state: 'chosen';
 					team: components['schemas']['TeamView'];
 			  };
+		SettingsChange: {
+			days: components['schemas']['TrainingDayView'][];
+			/** Format: date */
+			first: string;
+			/** Format: date */
+			last: string;
+		};
 		TeamView: {
 			/** @description The short name, for example "M16 1". */
 			name: string;
@@ -456,6 +705,29 @@ export interface components {
 			 * @description The source's team number.
 			 */
 			number: number;
+		};
+		/** @description A day of the week the team trains, with its times. */
+		TrainingDayView: {
+			end: string;
+			/** @description For example "19:45". */
+			start: string;
+			/**
+			 * Format: int32
+			 * @description 1 (Monday) to 7 (Sunday).
+			 */
+			weekday: number;
+		};
+		TrainingSettings: {
+			/** @description The training days that apply today (before the first training date: the first ones). */
+			days: components['schemas']['TrainingDayView'][];
+			first?: string | null;
+			last?: string | null;
+			/**
+			 * @description `false` while nothing is saved for the season; then the dates are `null` and `days` is
+			 *     empty.
+			 */
+			saved: boolean;
+			season: string;
 		};
 	};
 	responses: never;
@@ -675,6 +947,283 @@ export interface operations {
 			};
 		};
 	};
+	players: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The players for the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PlayersView'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	addPlayer: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['NewPlayer'];
+			};
+		};
+		responses: {
+			/** @description The new player */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['SavedPlayer'];
+				};
+			};
+			/** @description `first_name_required`, `outside_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	carryPlayers: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['CarryRequest'];
+			};
+		};
+		responses: {
+			/** @description The players; the listed players of last season have the same role in this season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PlayersView'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	renamePlayer: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['NameChange'];
+			};
+		};
+		responses: {
+			/** @description The player */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['SavedPlayer'];
+				};
+			};
+			/** @description `first_name_required` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	deletePlayer: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Deleted, with its roles */
+			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	addRole: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['RoleChange'];
+			};
+		};
+		responses: {
+			/** @description The player */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PlayerView'];
+				};
+			};
+			/** @description `until_before_from`, `outside_season`, `roles_overlap` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	changeRole: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+				/** @description The role */
+				role: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['RoleChange'];
+			};
+		};
+		responses: {
+			/** @description The player */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PlayerView'];
+				};
+			};
+			/** @description `until_before_from`, `outside_season`, `roles_overlap` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player or role */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	read: {
 		parameters: {
 			query?: never;
@@ -780,6 +1329,119 @@ export interface operations {
 			};
 		};
 	};
+	reasons: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description All reasons in their order, also the hidden ones */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AbsenceReason'][];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	addReason: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['NewReason'];
+			};
+		};
+		responses: {
+			/** @description All reasons; the new one last */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AbsenceReason'][];
+				};
+			};
+			/** @description `reason_name_required`, `reason_name_taken` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	changeReason: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The reason */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ReasonChange'];
+			};
+		};
+		responses: {
+			/** @description All reasons */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AbsenceReason'][];
+				};
+			};
+			/** @description `reason_name_required`, `reason_name_taken` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such reason */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	schedule: {
 		parameters: {
 			query?: never;
@@ -872,6 +1534,108 @@ export interface operations {
 			};
 			/** @description The game list cannot be reached or is not understood; nothing is saved */
 			502: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	trainingSettings: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training settings of the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingSettings'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	saveTrainingSettings: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['SettingsChange'];
+			};
+		};
+		responses: {
+			/** @description The saved settings */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingSettings'];
+				};
+			};
+			/** @description `end_before_start`, `last_before_first`, `no_training_days`, `duplicate_weekday`, `outside_season`, `invalid_weekday`, `invalid_time` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	trainingDatesProposal: {
+		parameters: {
+			query: {
+				/** @description The chosen days of the week, for example "2" or "2,4". */
+				weekdays: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The first chosen day in September and the last in May */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Proposal'];
+				};
+			};
+			/** @description `no_training_days`, `invalid_weekday` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
 				headers: {
 					[name: string]: unknown;
 				};

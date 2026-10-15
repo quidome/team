@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO training_seasons (season_year, first_date, last_date) VALUES ($1, $2, $3)\n         ON CONFLICT (season_year) DO UPDATE SET\n             first_date = EXCLUDED.first_date, last_date = EXCLUDED.last_date",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "81d9df17fe2bfc0ceace7d3984a42814da49c46950274d3d3a94f4345d0368d4"
+}

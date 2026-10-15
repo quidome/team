@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE player_roles SET season_year = $3, role = $4, from_date = $5, until_date = $6\n         WHERE id = $2 AND player_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int4",
+        "Text",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "310f462af211a06bc8b31269d05d9bac864d52bfdbdb199c459247541d21fb4c"
+}

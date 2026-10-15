@@ -8,7 +8,7 @@ use axum::extract::{Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum_extra::extract::CookieJar;
 use sqlx::PgPool;
 use tower::ServiceExt;
@@ -17,7 +17,9 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
-use crate::api::{changes, clubs, health, me, readings, schedule, selection};
+use crate::api::{
+    changes, clubs, health, me, players, readings, reasons, schedule, selection, training_settings,
+};
 use crate::auth;
 use crate::auth::oidc::Oidc;
 use crate::clock::Clock;
@@ -109,6 +111,24 @@ pub fn app(state: AppState) -> Router {
         .route("/schedule", get(schedule::get))
         .route("/changes", get(changes::get))
         .route("/changes/seen", post(changes::seen))
+        .route("/players", get(players::list).post(players::add))
+        .route(
+            "/players/{id}",
+            put(players::rename).delete(players::delete),
+        )
+        .route("/players/carry", post(players::carry))
+        .route("/players/{id}/roles", post(players::add_role))
+        .route("/players/{id}/roles/{role}", put(players::change_role))
+        .route("/reasons", get(reasons::list).post(reasons::add))
+        .route("/reasons/{id}", put(reasons::change))
+        .route(
+            "/training-settings",
+            get(training_settings::get).put(training_settings::save),
+        )
+        .route(
+            "/training-settings/proposal",
+            get(training_settings::proposal),
+        )
         .fallback(|| async { StatusCode::NOT_FOUND })
         .layer(middleware::from_fn_with_state(
             state.clone(),

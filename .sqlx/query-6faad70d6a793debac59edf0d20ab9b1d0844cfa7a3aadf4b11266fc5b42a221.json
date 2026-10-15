@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM players\n               WHERE lower(first_name) = lower($1)\n                 AND lower(coalesce(last_name, '')) = lower(coalesce($2, ''))\n                 AND id IS DISTINCT FROM $3\n           ) AS \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6faad70d6a793debac59edf0d20ab9b1d0844cfa7a3aadf4b11266fc5b42a221"
+}

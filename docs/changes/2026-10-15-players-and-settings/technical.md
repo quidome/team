@@ -1,6 +1,6 @@
 # Technical spec: Players and settings
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
 **Date**: 2026-10-15
@@ -167,12 +167,12 @@ Decisions that apply: 0001, 0002, 0004, 0007, 0014; the epic's architecture (pla
 - Load: about 15 players and a few roles each season.
 
 ## Progress
-- [ ] Step 1: core rules
-- [ ] Step 2: migration and storage
-- [ ] Step 3: API
-- [ ] Step 4: screens
-- [ ] Step 5: "Add all"
-- [ ] All checks pass
+- [x] Step 1: core rules
+- [x] Step 2: migration and storage
+- [x] Step 3: API
+- [x] Step 4: screens
+- [x] Step 5: "Add all"
+- [x] All checks pass (`just check`, 2026-10-15; 36 browser tests)
 - [ ] Review build
 
 ## Deviations
@@ -181,5 +181,25 @@ None from `functional.md` (as changed on 2026-10-15). The design reads the spec 
 - Settings only for the current season.
 - Without saved settings the proposed start of a role is today.
 - A player with no role in this or the previous season is listed under "Other players" (folded), where it can get a role or be deleted.
+
+Implement:
+- 2026-10-15, step 1: `check_role` takes no `role` argument (the kind of role is not part of any check); `training::set_on` (the set that applies on a date) is public, because story B needs it for the start page card.
+- 2026-10-15, step 2: the reason name also has `CHECK (btrim(name) <> '')` in the table; `StoreError::is_unique_violation` (in `db.rs`) tells the API that a reason name is taken. The storage of reasons uses its own type `StoredReason` (the core has only the name rule).
+- 2026-10-15, step 3:
+  - The first save of a season's settings applies from the first training date, also when it is made during the season (`settings_change` gets `first_save`). Found by a test: the coordinator sets up the tool in October and enters the trainings since September; with "valid from today" the stored set would start on the day of the save.
+  - Two extra error codes for input the screen should never send: `invalid_weekday` (not 1–7) and `invalid_time` (not "HH:MM").
+  - `GET /api/players` already fills `last_season` (the grouping is one rule); the route "Add all" stays in step 5.
+  - Test helper `tests/common/api.rs` (`Coordinator`: a logged-in harness that sends JSON).
+- 2026-10-15, step 4:
+  - `GET /api/players` also gives `today` and `proposed_from` (the proposed start of a role), so the screens use the server's clock, not the phone's; the browser tests run with the server's clock at 12 October 2026.
+  - Until step 5, last season's players are listed under "Other players".
+  - Before the first save of the settings, a change of the chosen days proposes the dates again (unless the coordinator typed dates).
+  - The proposal route marks `weekdays` as a query parameter in the OpenAPI description (`#[into_params(parameter_in = Query)]`).
+  - A hidden reason has a dashed border, not a lower opacity (the accessibility test failed on contrast); date and time fields can shrink, and the two training dates stand below each other on a phone (no sideways scroll at 320 pixels).
+- 2026-10-15, step 5:
+  - `roles_to_carry(roles, season)` gives the players and their kinds of role; the start date is the same as `proposed_from` (the first training date, or today when later, or today without settings), worked out in the API, not in the core.
+  - "Players of last season" lists only the players who stayed until the end of last season (the ones "Add all" brings back); a player who left early last season is under "Other players", where "Add to the team" works. Otherwise "Add to this season" would do nothing for such a player.
+  - A player whose role starts later in the season (for example after "Add all" in August, from 1 September) is listed with the current players, not under "Left the team".
+  - A browser test with replaced answers checks the part "Players of last season" and the request of "Add all" (the browser server's clock has no last season).
 
 ## Review findings

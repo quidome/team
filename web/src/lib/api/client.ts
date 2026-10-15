@@ -34,6 +34,21 @@ export function messageFor(error: unknown, status: number): string {
 	if (code === 'no_choice') return 'Choose your club first.';
 	if (code === 'not_held_back')
 		return 'This reading can no longer be confirmed. Read the game list again.';
+	const players: Record<string, string> = {
+		first_name_required: 'A first name is needed.',
+		until_before_from: 'The end must be after the start.',
+		outside_season: 'This date is outside the season.',
+		roles_overlap: 'This player already has a role on that date.',
+		end_before_start: 'The end time must be after the start time.',
+		last_before_first: 'The last training date must be after the first.',
+		no_training_days: 'Choose at least one training day.',
+		duplicate_weekday: 'This day is already a training day.',
+		invalid_weekday: 'Choose a day of the week.',
+		invalid_time: 'Enter a time such as 19:45.',
+		reason_name_required: 'A name is needed.',
+		reason_name_taken: 'There is already a reason with this name.'
+	};
+	if (typeof code === 'string' && code in players) return players[code];
 	if (status === 404) return 'This club is not in the game list.';
 	return 'Something went wrong. Please try again.';
 }
@@ -109,4 +124,114 @@ export async function loadChanges(fetch: typeof globalThis.fetch): Promise<Chang
 export async function markSeen(changes: Pick<Change, 'id' | 'version'>[]): Promise<number> {
 	const seen = changes.map(({ id, version }) => ({ id, version }));
 	return (await dataOf(await api.POST('/api/changes/seen', { body: { changes: seen } }))).open;
+}
+
+export type Players = components['schemas']['PlayersView'];
+export type Player = components['schemas']['PlayerView'];
+export type RoleKind = components['schemas']['RoleKind'];
+export type SavedPlayer = components['schemas']['SavedPlayer'];
+
+/** The players for the current season (attendance at training, story A). */
+export async function loadPlayers(fetch: typeof globalThis.fetch): Promise<Players> {
+	return dataOf(await api.GET('/api/players', { fetch }));
+}
+
+export async function addPlayer(
+	first_name: string,
+	last_name: string | null,
+	role: { role: RoleKind; from: string } | null
+): Promise<SavedPlayer> {
+	return dataOf(await api.POST('/api/players', { body: { first_name, last_name, role } }));
+}
+
+export async function renamePlayer(
+	id: number,
+	first_name: string,
+	last_name: string | null
+): Promise<SavedPlayer> {
+	return dataOf(
+		await api.PUT('/api/players/{id}', {
+			params: { path: { id } },
+			body: { first_name, last_name }
+		})
+	);
+}
+
+export async function deletePlayer(id: number): Promise<void> {
+	const result = await api.DELETE('/api/players/{id}', { params: { path: { id } } });
+	if (!result.response.ok) throw new ApiError(messageFor(result.error, result.response.status));
+}
+
+export async function addRole(
+	id: number,
+	role: { role: RoleKind; from: string; until: string | null }
+): Promise<Player> {
+	return dataOf(
+		await api.POST('/api/players/{id}/roles', { params: { path: { id } }, body: role })
+	);
+}
+
+export async function changeRole(
+	id: number,
+	roleId: number,
+	role: { role: RoleKind; from: string; until: string | null }
+): Promise<Player> {
+	return dataOf(
+		await api.PUT('/api/players/{id}/roles/{role}', {
+			params: { path: { id, role: roleId } },
+			body: role
+		})
+	);
+}
+
+/** Brings these players of last season into this season, with the same role ("Add all"). */
+export async function carryPlayers(players: number[]): Promise<Players> {
+	return dataOf(await api.POST('/api/players/carry', { body: { players } }));
+}
+
+export type AbsenceReason = components['schemas']['AbsenceReason'];
+
+export async function loadReasons(fetch: typeof globalThis.fetch): Promise<AbsenceReason[]> {
+	return dataOf(await api.GET('/api/reasons', { fetch }));
+}
+
+export async function addReason(name: string, valid: boolean): Promise<AbsenceReason[]> {
+	return dataOf(await api.POST('/api/reasons', { body: { name, valid } }));
+}
+
+export async function changeReason(
+	reason: Pick<AbsenceReason, 'id' | 'name' | 'valid' | 'hidden'>
+): Promise<AbsenceReason[]> {
+	const { id, name, valid, hidden } = reason;
+	return dataOf(
+		await api.PUT('/api/reasons/{id}', { params: { path: { id } }, body: { name, valid, hidden } })
+	);
+}
+
+export type TrainingSettings = components['schemas']['TrainingSettings'];
+export type TrainingDay = components['schemas']['TrainingDayView'];
+
+export async function loadTrainingSettings(
+	fetch: typeof globalThis.fetch
+): Promise<TrainingSettings> {
+	return dataOf(await api.GET('/api/training-settings', { fetch }));
+}
+
+/** The proposed first and last training date for these days of the week (1 = Monday). */
+export async function proposeTrainingDates(
+	weekdays: number[]
+): Promise<{ first: string; last: string }> {
+	return dataOf(
+		await api.GET('/api/training-settings/proposal', {
+			params: { query: { weekdays: weekdays.join(',') } }
+		})
+	);
+}
+
+export async function saveTrainingSettings(
+	first: string,
+	last: string,
+	days: TrainingDay[]
+): Promise<TrainingSettings> {
+	return dataOf(await api.PUT('/api/training-settings', { body: { first, last, days } }));
 }

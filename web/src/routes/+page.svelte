@@ -33,6 +33,14 @@
 	<title>Team</title>
 </svelte:head>
 
+{#snippet links()}
+	<nav aria-label="Team" class="text-sm" data-testid="team-links">
+		<a href={resolve('/players')} class="font-medium underline underline-offset-4">Players</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
+		<a href={resolve('/settings')} class="font-medium underline underline-offset-4">Settings</a>
+	</nav>
+{/snippet}
+
 {#if data.selection?.state === 'not_chosen'}
 	<section class="space-y-5">
 		<div>
@@ -41,6 +49,7 @@
 				The tool reads your team's games from the game list.
 			</p>
 		</div>
+		{@render links()}
 		<ChooseTeam onSaved={invalidateAll} />
 	</section>
 {:else if data.selection?.state === 'team_needed'}
@@ -59,6 +68,7 @@
 				</p>
 			{/if}
 		</div>
+		{@render links()}
 		<ChooseTeam club={data.selection.club} clubKept onSaved={invalidateAll} />
 		{#if schedule?.last_season}
 			<section aria-labelledby="last-season-heading" class="space-y-3 pt-4">
@@ -93,6 +103,7 @@
 						{unseenLine(schedule.unseen_changes)}
 					</a>
 				{/if}
+				<div class="mt-1">{@render links()}</div>
 			</div>
 			<Button href={resolve('/choose')} variant="outline">Change</Button>
 		</div>
