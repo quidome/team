@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Enter the pinned Nix dev shell first: `nix develop path:.` (Rust, sqlx-cli, Node for the front end, PostgreSQL client, just).
+The pinned Nix dev shell (Rust, sqlx-cli, Node for the front end, PostgreSQL client, just) is already loaded: run the tools directly. Never use `nix develop` or `nix build` with `path:.` (see AGENTS.md, "Dev environment").
 
 - Local database: `just db-up` / `just db-down` (PostgreSQL from `compose.yaml`); `just migrate` creates the database in `DATABASE_URL` and applies migrations
 - Run the server: `just serve` (settings from `.env`, see `.env.example`)

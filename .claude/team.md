@@ -23,4 +23,4 @@ structure: Rust workspace, crates/core without I/O, crates/server for I/O and co
   Svelte front end (docs/decisions/0001, 0002).
 deployment: gitops-lab/applications/productivity/team (Argo CD, Helmfile, Vault). Never apply by hand.
 check: just check (in the Nix shell; database tests need `just db-up` and DATABASE_URL)
-dev-shell: nix develop path:.
+dev-shell: already loaded (`nix develop` from the project directory); never `nix develop path:.`
