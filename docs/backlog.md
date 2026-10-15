@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories)
-   - Story A, players and settings: next (`/design` from the epic).
+   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): implement (`/implement docs/changes/2026-10-15-players-and-settings`).
    - Then story B, trainings and attendance, and story C, the overview.
 
 Small:
