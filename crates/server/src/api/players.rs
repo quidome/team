@@ -13,6 +13,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
+use super::team::{self, TeamPageView};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
@@ -148,11 +149,11 @@ impl From<PlayerError> for AppError {
     }
 }
 
-fn day(date: NaiveDate) -> String {
+pub(crate) fn day(date: NaiveDate) -> String {
     date.format("%Y-%m-%d").to_string()
 }
 
-fn role_view(role: &PlayerRole) -> RoleView {
+pub(crate) fn role_view(role: &PlayerRole) -> RoleView {
     RoleView {
         id: role.id.0,
         role: role.role.into(),
@@ -249,7 +250,7 @@ fn group(
 }
 
 /// The proposed start of a new role in `season` (see `proposed_start`).
-async fn proposed_from(
+pub(crate) async fn proposed_from(
     state: &AppState,
     season: Season,
     today: NaiveDate,
@@ -382,7 +383,7 @@ pub async fn delete(
     params(("id" = i64, Path, description = "The player")),
     request_body = RoleChange,
     responses(
-        (status = 200, description = "The player", body = PlayerView),
+        (status = 200, description = "The team", body = TeamPageView),
         (status = 400, description = "`until_before_from`, `outside_season`, `roles_overlap`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player"),
@@ -392,9 +393,9 @@ pub async fn add_role(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(body): Json<RoleChange>,
-) -> Result<Json<PlayerView>, AppError> {
+) -> Result<Json<TeamPageView>, AppError> {
     save_role(&state, PlayerId(id), None, body).await?;
-    Ok(Json(one(&state, PlayerId(id)).await?))
+    Ok(Json(team::load(&state).await?))
 }
 
 #[utoipa::path(
@@ -480,14 +481,14 @@ async fn save_role(
     operation_id = "carryPlayers",
     request_body = CarryRequest,
     responses(
-        (status = 200, description = "The players; the listed players of last season have the same role in this season", body = PlayersView),
+        (status = 200, description = "The team; the listed players of last season have the same role in this season", body = TeamPageView),
         (status = 401, description = "Not logged in"),
     )
 )]
 pub async fn carry(
     State(state): State<AppState>,
     Json(body): Json<CarryRequest>,
-) -> Result<Json<PlayersView>, AppError> {
+) -> Result<Json<TeamPageView>, AppError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
     let from = proposed_from(&state, season, today).await?;
@@ -510,5 +511,5 @@ pub async fn carry(
         }
     }
     tx.commit().await.map_err(StoreError::from)?;
-    Ok(Json(load(&state).await?))
+    Ok(Json(team::load(&state).await?))
 }

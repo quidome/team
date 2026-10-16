@@ -35,6 +35,8 @@
 
 {#snippet links()}
 	<nav aria-label="Team" class="text-sm" data-testid="team-links">
+		<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/players')} class="font-medium underline underline-offset-4">Players</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/settings')} class="font-medium underline underline-offset-4">Settings</a>

@@ -192,7 +192,7 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 - [x] First form: steps 1–5, fixes 1–5, build review twice, accept review (2026-10-15/16; replaced by this design)
 - [x] Step 1: weekly trainings, end to end (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 39 browser tests)
 - [x] Step 2: core rules for players (2026-10-16; `just check` passes, 39 browser tests)
-- [ ] Step 3: the team page
+- [x] Step 3: the team page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [ ] Step 4: the players page and the player page
 - [ ] Review build
 - [ ] Review accept
@@ -220,6 +220,14 @@ Implement:
   - Until step 4, `GET /api/players` keeps its first-form groups, built from `team`: "others" are the candidates that are not in last season's team, so a hidden player without a role is no longer listed there (nothing can hide a player on the screens yet).
   - Removed first-form tests: the core test of `proposed_start` with two inputs (replaced by the test with three) and the two tests of `roles_to_carry` (moved to `team(…).last_season`, same cases).
   - Added beyond the step's list: the server tests `add_all_leaves_out_a_hidden_player` and `a_player_is_not_hidden_until_it_is_set`, and the case of 12 Oct moved from step 1. The hidden tests fail without the rule.
+- 2026-10-16, step 3:
+  - Schema names: the team page is `TeamPageView` (the club API already has `TeamView`, a game list team); the bodies are `ChangeRole` and `LeaveTeam`; the operation of "Change role" is `changeRoleFrom` (`changeRole` is "Correct", `PUT /api/players/{id}/roles/{role}`, until step 4).
+  - The handlers are in `api/team.rs`; `POST /api/players/{id}/roles` and `POST /api/players/carry` stay in `api/players.rs` and answer `TeamPageView`. The first-form pages `/players` and `/players/[id]` ignore these answers and load again, so they keep working until step 4.
+  - The test of a refused "Change role" (`roles_overlap`) writes the later role from Sun 15 Nov through storage, past the checks: the new role lies inside the old one and stored roles never overlap, so the screens cannot make this case. It shows that nothing is stored when the check refuses.
+  - The lock test: the other connection ends the role on Thu 15 Oct and holds the lock; "Change role" on Sun 1 Nov waits, then answers `not_in_team`. Without the lock the test fails.
+  - Moved from `tests/players.rs` to `tests/team.rs`, on `GET /api/team`: the "Add all" test (with the hidden player of step 2 in it), the two R1 tests, and "last season's players join during the season". The test helper `Coordinator::add_player` replaces the local `add`.
+  - The team page has no "Add to this season" for one player of last season (the first form had it): "Add player" offers last season's team first. "Players of last season" shows each player's role.
+  - The browser tests of the team page are in `web/e2e/players.e2e.ts` (one database, in order); the test adds a Tuesday weekly training again, because the settings test deletes its own.
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed
