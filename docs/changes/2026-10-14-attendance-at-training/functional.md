@@ -275,7 +275,7 @@ The coordinator types in the players once (no import from the sheet).
 
 ## Open questions
 - Settled 2026-10-15 (Vision, with the coordinator): **player** now "has a first name, and usually a last name" (`docs/language.md`); 3 players in the coordinator's sheet have no last name.
-- For `/vision` (2026-10-16, during /design of story A): the coordinator's model: the **club** has the players, a **team** exists for one season and is the team chosen from the game list for that season, and a player is in the team through a role. So **team** ("the youth team the coordinator runs") and **player** ("a person the coordinator keeps") need sharper meanings.
+- Settled 2026-10-16 (Vision, with the coordinator): **team** is the youth team of one season, the team chosen from the game list for that season; the **club** has the players and the teams; a **player** is a person of the club; the **coordinator** runs one team in each season (`docs/language.md`).
 - Settled 2026-10-16 (Vision, with the coordinator): **player** is a person the coordinator keeps, in the team through a **role**; new words **role**, **hidden**, **weekly training** and **training day**; **training** exists, and counts, only when opened or added (`docs/language.md`).
 
 ## Spec review
