@@ -602,3 +602,32 @@ async fn roles_are_saved_only_in_the_current_season(pool: PgPool) {
     assert_eq!(list["last_season"][0]["roles"][0]["from"], "2025-09-02");
     assert!(list["others"].as_array().unwrap().is_empty());
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn add_all_leaves_out_a_hidden_player(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    coordinator.harness.clock.set(utc(2026, 3, 1, 12, 0));
+    coordinator.log_in_again().await;
+    let avery = add(&coordinator, "Avery", "plays_games", "2025-09-02").await;
+    let blake = add(&coordinator, "Blake", "only_trains", "2025-09-02").await;
+    // Blake left the club.
+    assert!(
+        players::set_hidden(&pool, PlayerId(blake), true)
+            .await
+            .unwrap()
+    );
+
+    coordinator.harness.clock.set(utc(2026, 8, 15, 12, 0));
+    coordinator.log_in_again().await;
+    let list = coordinator.ok("GET", "/api/players", None).await;
+    assert_eq!(names(&list["last_season"]), ["Avery"]);
+    let list = coordinator
+        .ok(
+            "POST",
+            "/api/players/carry",
+            Some(json!({ "players": [avery, blake] })),
+        )
+        .await;
+    assert_eq!(names(&list["players"]), ["Avery"]);
+    assert!(list["others"].as_array().unwrap().is_empty());
+}

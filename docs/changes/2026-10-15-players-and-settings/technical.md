@@ -191,7 +191,7 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 ## Progress
 - [x] First form: steps 1–5, fixes 1–5, build review twice, accept review (2026-10-15/16; replaced by this design)
 - [x] Step 1: weekly trainings, end to end (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 39 browser tests)
-- [ ] Step 2: core rules for players
+- [x] Step 2: core rules for players (2026-10-16; `just check` passes, 39 browser tests)
 - [ ] Step 3: the team page
 - [ ] Step 4: the players page and the player page
 - [ ] Review build
@@ -214,6 +214,12 @@ Implement:
   - Removed first-form tests: `tests/settings.rs` (9 tests of the training-day sets and their API; replaced by `tests/weekly_trainings.rs`, 7 tests), the 2 set tests in `tests/players_storage.rs` (replaced by one test of a weekly training), the core tests of the sets, `proposed_dates` and `settings_change` (replaced by 7 tests of weekly trainings), and the browser test of the training days (replaced by the test of weekly trainings).
   - Dates on the settings page use the tool's format (`formatDay`, as on the schedule: "Tue 1 Sept").
   - The browser test of weekly trainings expects the one console message of the refused second Thursday (a 400 answer).
+- 2026-10-16, step 2:
+  - The struct of the team page is `TeamPage`, not `Team`: the core already has `team_choice::Team` (the game list team).
+  - Storage writes `hidden` with its own function `players::set_hidden`; step 4 uses it for `PUT /api/players/{id}`.
+  - Until step 4, `GET /api/players` keeps its first-form groups, built from `team`: "others" are the candidates that are not in last season's team, so a hidden player without a role is no longer listed there (nothing can hide a player on the screens yet).
+  - Removed first-form tests: the core test of `proposed_start` with two inputs (replaced by the test with three) and the two tests of `roles_to_carry` (moved to `team(…).last_season`, same cases).
+  - Added beyond the step's list: the server tests `add_all_leaves_out_a_hidden_player` and `a_player_is_not_hidden_until_it_is_set`, and the case of 12 Oct moved from step 1. The hidden tests fail without the rule.
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

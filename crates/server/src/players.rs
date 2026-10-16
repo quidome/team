@@ -10,7 +10,7 @@ use crate::db::StoreError;
 /// All players, sorted by first name, then last name.
 pub async fn all(db: impl PgExecutor<'_>) -> Result<Vec<Player>, StoreError> {
     let rows = sqlx::query!(
-        "SELECT id, first_name, last_name FROM players
+        "SELECT id, first_name, last_name, hidden FROM players
          ORDER BY lower(first_name), lower(coalesce(last_name, '')), id"
     )
     .fetch_all(db)
@@ -21,13 +21,14 @@ pub async fn all(db: impl PgExecutor<'_>) -> Result<Vec<Player>, StoreError> {
             id: PlayerId(row.id),
             first_name: row.first_name,
             last_name: row.last_name,
+            hidden: row.hidden,
         })
         .collect())
 }
 
 pub async fn by_id(db: impl PgExecutor<'_>, id: PlayerId) -> Result<Option<Player>, StoreError> {
     let row = sqlx::query!(
-        "SELECT id, first_name, last_name FROM players WHERE id = $1",
+        "SELECT id, first_name, last_name, hidden FROM players WHERE id = $1",
         id.0
     )
     .fetch_optional(db)
@@ -36,6 +37,7 @@ pub async fn by_id(db: impl PgExecutor<'_>, id: PlayerId) -> Result<Option<Playe
         id: PlayerId(row.id),
         first_name: row.first_name,
         last_name: row.last_name,
+        hidden: row.hidden,
     }))
 }
 
@@ -94,6 +96,18 @@ pub async fn update_name(
     )
     .execute(db)
     .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Sets whether the player is hidden; `false` when there is no such player.
+pub async fn set_hidden(
+    db: impl PgExecutor<'_>,
+    id: PlayerId,
+    hidden: bool,
+) -> Result<bool, StoreError> {
+    let result = sqlx::query!("UPDATE players SET hidden = $2 WHERE id = $1", id.0, hidden)
+        .execute(db)
+        .await?;
     Ok(result.rows_affected() == 1)
 }
 

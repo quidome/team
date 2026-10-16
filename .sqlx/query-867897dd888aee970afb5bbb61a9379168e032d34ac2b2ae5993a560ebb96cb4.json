@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, first_name, last_name FROM players\n         ORDER BY lower(first_name), lower(coalesce(last_name, '')), id",
+  "query": "SELECT id, first_name, last_name, hidden FROM players\n         ORDER BY lower(first_name), lower(coalesce(last_name, '')), id",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "last_name",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "hidden",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -25,8 +30,9 @@
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "4c2461477cd41dbc2990123f3f8c1c4485d354fb6b4bc4169a2d9ace86063545"
+  "hash": "867897dd888aee970afb5bbb61a9379168e032d34ac2b2ae5993a560ebb96cb4"
 }

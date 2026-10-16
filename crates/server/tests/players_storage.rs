@@ -183,3 +183,18 @@ async fn a_weekly_training_is_read_back_changed_and_deleted(pool: PgPool) {
             .is_empty()
     );
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_player_is_not_hidden_until_it_is_set(pool: PgPool) {
+    let now = Utc.with_ymd_and_hms(2026, 10, 12, 12, 0, 0).unwrap();
+    let id = players::insert(&pool, "Avery", None, now).await.unwrap();
+    assert!(!players::by_id(&pool, id).await.unwrap().unwrap().hidden);
+    assert!(players::set_hidden(&pool, id, true).await.unwrap());
+    assert!(players::by_id(&pool, id).await.unwrap().unwrap().hidden);
+    assert!(players::all(&pool).await.unwrap()[0].hidden);
+    assert!(
+        !players::set_hidden(&pool, team_core::PlayerId(id.0 + 1), true)
+            .await
+            .unwrap()
+    );
+}
