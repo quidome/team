@@ -5,10 +5,10 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 
 | Term | Meaning | Use / do not use |
 |------|---------|------------------|
-| coordinator | The one person who uses the tool and changes its data. Runs one team. | Not "admin", not "user" when the coordinator is meant. |
-| team | The youth team the coordinator runs. | Say "other club team" for the club's other teams. |
-| club | The sports club the team belongs to. | |
-| player | A person the coordinator keeps in the tool. Has a first name, and usually a last name. Is in the team through a role, or is not in the team now. | Not "member", not "child" in the product. |
+| coordinator | The one person who uses the tool and changes its data. Runs one team in each season. | Not "admin", not "user" when the coordinator is meant. |
+| team | The youth team the coordinator runs in one season: the team chosen from the game list for that season. Each season has its own team, often with the same players. | Say "other club team" for the club's other teams. |
+| club | The sports club the team belongs to. It has the players and the teams of each season. | |
+| player | A person of the club that the coordinator keeps in the tool. Has a first name, and usually a last name. Is in the team of a season through a role, or is not in the team. | Not "member", not "child" in the product. |
 | role | What a player is in the team of a season: plays games, or only trains. Has a start date, and an end date when the player leaves or changes role. A player's roles, one after the other, are the player's history. | "Plays games" / "Only trains". Not "position", not "membership". |
 | hidden | A player or a reason that the tool no longer offers as a choice. Its history and totals stay. | Not "deleted", not "archived". |
 | game | One match on the schedule, with a date, start time, place, home team and away team. | Not "match", not "fixture". |
