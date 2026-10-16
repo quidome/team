@@ -115,11 +115,13 @@ pub fn app(state: AppState) -> Router {
         .route("/players", get(players::list).post(players::add))
         .route(
             "/players/{id}",
-            put(players::rename).delete(players::delete),
+            get(players::get)
+                .put(players::change)
+                .delete(players::delete),
         )
         .route("/players/carry", post(players::carry))
         .route("/players/{id}/roles", post(players::add_role))
-        .route("/players/{id}/roles/{role}", put(players::change_role))
+        .route("/players/{id}/roles/{role}", put(players::correct_role))
         .route("/players/{id}/role-change", post(team::role_change))
         .route("/players/{id}/team-leave", post(team::team_leave))
         .route("/team", get(team::get))

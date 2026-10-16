@@ -20,15 +20,10 @@ test('add a player with a first name only', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add player' }).click();
 	const form = page.getByTestId('add-player');
 	await form.getByLabel('First name').fill('Quinn');
-	await form.getByLabel('Only trains').check();
-	await expect(form.getByLabel('In the team from')).toHaveValue('2026-10-12');
-	// Only dates of the current season.
-	await expect(form.getByLabel('In the team from')).toHaveAttribute('min', '2026-07-01');
-	await expect(form.getByLabel('In the team from')).toHaveAttribute('max', '2027-06-30');
 	await form.getByRole('button', { name: 'Save' }).click();
 	const player = page.getByTestId('player').filter({ hasText: 'Quinn' });
 	await expect(player).toBeVisible();
-	await expect(player).toContainText('Only trains');
+	await expect(player).toContainText('Not in the team');
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 	expect(errors).toEqual([]);
@@ -43,47 +38,18 @@ test('the same name again shows a warning', async ({ page }) => {
 	await expect(page.getByTestId('same-name')).toHaveText(
 		'There is already a player with this name.'
 	);
-});
-
-test('a player leaves the team, and it is undone', async ({ page }) => {
-	const errors = watchConsole(page);
-	await page.goto('/players');
-	await page.getByTestId('player').filter({ hasText: 'Quinn' }).first().click();
-	await expect(page.getByTestId('player-name')).toHaveText('Quinn');
-	await page.getByRole('button', { name: 'Left the team' }).click();
-	// Proposed: today; a role that ends today still counts today, so end it on its first day.
-	await page.getByLabel('Last day in the team').fill('2026-10-12');
-	await page.getByRole('button', { name: 'Left the team' }).click();
-	await expect(page.getByTestId('roles')).toContainText('until Mon 12 Oct');
-	await page.getByRole('button', { name: 'Undo "Left the team"' }).click();
-	await expect(page.getByRole('button', { name: 'Left the team' })).toBeVisible();
-	await expect(page.getByTestId('roles')).not.toContainText('until');
-	await expectAccessible(page);
-	await expectNoHorizontalScroll(page, 320);
-	expect(errors).toEqual([]);
-});
-
-test('"Left the team" proposes the start of a role that starts later', async ({ page }) => {
-	await page.goto('/players');
-	await page.getByRole('button', { name: 'Add player' }).click();
-	const form = page.getByTestId('add-player');
-	await form.getByLabel('First name').fill('Robin');
-	await form.getByLabel('In the team from').fill('2026-11-02');
-	await form.getByRole('button', { name: 'Save' }).click();
-	await page.getByTestId('player').filter({ hasText: 'Robin' }).click();
-	await page.getByRole('button', { name: 'Left the team' }).click();
-	await expect(page.getByLabel('Last day in the team')).toHaveValue('2026-11-02');
+	await expect(page.getByTestId('player')).toHaveCount(2);
 });
 
 test('a player that no longer exists gives a general message', async ({ page }) => {
 	await page.goto('/players');
-	await page.getByTestId('player').filter({ hasText: 'Robin' }).click();
+	await page.getByTestId('player').first().click();
 	await page.route('**/api/players/*', (route) =>
 		route.request().method() === 'PUT'
 			? route.fulfill({ status: 404, json: { error: 'not_found' } })
 			: route.fallback()
 	);
-	await page.getByRole('button', { name: 'Save name' }).click();
+	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByRole('alert')).toHaveText('This no longer exists. Load the page again.');
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
@@ -155,68 +121,6 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	expect(errors).toEqual([
 		'Failed to load resource: the server responded with a status of 400 (Bad Request)'
 	]);
-});
-
-test('players of last season come back with "Add all"', async ({ page }) => {
-	// The server's clock has no last season, so the answer is replaced (story A, step 5); the API
-	// tests cover the real carry.
-	const errors = watchConsole(page);
-	const lastSeason = [
-		{ id: 9001, first_name: 'Rowan', last_name: null, role: 'plays_games', roles: [] },
-		{ id: 9002, first_name: 'Sasha', last_name: 'Bos', role: 'only_trains', roles: [] }
-	];
-	const sent: unknown[] = [];
-	await page.route('**/api/players/carry', async (route) => {
-		sent.push(route.request().postDataJSON());
-		await route.fulfill({ json: {} });
-	});
-	await page.route('**/api/players', async (route) => {
-		if (route.request().method() !== 'GET') return route.fallback();
-		const response = await route.fetch();
-		const body = await response.json();
-		// After "Add all", last season's players are gone from the list.
-		await route.fulfill({ json: { ...body, last_season: sent.length ? [] : lastSeason } });
-	});
-	await page.goto('/players');
-	const part = page.getByTestId('last-season');
-	await expect(part.getByText('Rowan')).toBeVisible();
-	await expect(part.getByText('Sasha Bos')).toBeVisible();
-	await expect(part.getByRole('button', { name: 'Add Rowan to this season' })).toBeVisible();
-	await expectAccessible(page);
-	await expectNoHorizontalScroll(page, 320);
-	await part.getByRole('button', { name: 'Add all' }).click();
-	await expect(part).toHaveCount(0);
-	expect(sent).toEqual([{ players: [9001, 9002] }]);
-	expect(errors).toEqual([]);
-	// A load of the list can still be under way when the test ends; its handler must not fail then.
-	await page.unrouteAll({ behavior: 'ignoreErrors' });
-});
-
-test('a player of last season has no roles of this season yet', async ({ page }) => {
-	// The server's clock has no last season, so the answer is replaced.
-	const rowan = {
-		id: 9001,
-		first_name: 'Rowan',
-		last_name: null,
-		role: 'only_trains',
-		roles: [{ id: 9101, role: 'only_trains', from: '2025-09-02', until: null }]
-	};
-	await page.route('**/api/players', async (route) => {
-		if (route.request().method() !== 'GET') return route.fallback();
-		const response = await route.fetch();
-		// A proposed start that is not today, as in summer before the first training date.
-		await route.fulfill({
-			json: { ...(await response.json()), last_season: [rowan], proposed_from: '2026-11-03' }
-		});
-	});
-	await page.goto('/players/9001');
-	await expect(page.getByTestId('player-name')).toHaveText('Rowan');
-	await expect(page.getByText('Not in the team this season.')).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Left the team' })).toHaveCount(0);
-	await page.getByRole('button', { name: 'Add to the team' }).click();
-	await expect(page.getByLabel('Only trains')).toBeChecked();
-	await expect(page.getByLabel('In the team from')).toHaveValue('2026-11-03');
-	await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('the team page: add a player, change the role, remove from and add to the team', async ({
@@ -344,4 +248,67 @@ test('the team page brings last season\'s players back with "Add all"', async ({
 	expect(sent).toEqual([{ players: [9001, 9002] }]);
 	expect(errors).toEqual([]);
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('a hidden player is listed only with "Show hidden players"', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/players');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await page.getByTestId('add-player').getByLabel('First name').fill('Uma');
+	await page.getByTestId('add-player').getByRole('button', { name: 'Save' }).click();
+	await page.getByTestId('player').filter({ hasText: 'Uma' }).click();
+	await expect(page.getByTestId('player-name')).toHaveText('Uma');
+	await expect(page.getByText('Never in the team.')).toBeVisible();
+	await page.getByLabel('Hidden').check();
+	await page.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByLabel('Hidden')).toBeChecked();
+
+	await page.goto('/players');
+	const uma = page.getByTestId('player').filter({ hasText: 'Uma' });
+	await expect(page.getByTestId('player').first()).toBeVisible();
+	await expect(uma).toHaveCount(0);
+	await page.getByLabel('Show hidden players').check();
+	await expect(uma).toContainText('hidden');
+
+	// Delete, after a confirmation.
+	await uma.click();
+	page.once('dialog', (dialog) => void dialog.accept());
+	await page.getByRole('button', { name: 'Delete player' }).click();
+	await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
+	await page.getByLabel('Show hidden players').check();
+	await expect(page.getByTestId('player').first()).toBeVisible();
+	await expect(uma).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
+test('"Correct" in the history changes the start of a role', async ({ page }) => {
+	// Sky has the roles of the team page test: Only trains from Tue 1 Sep until Sun 11 Oct, then
+	// Plays games.
+	const errors = watchConsole(page);
+	await page.goto('/players');
+	await page.getByTestId('player').filter({ hasText: 'Sky' }).first().click();
+	const roles = page.getByTestId('history-role');
+	await expect(roles).toHaveText([
+		/Plays games · from Mon 12 Oct\s*Correct/,
+		/Only trains · Tue 1 Sept – Sun 11 Oct\s*Correct/
+	]);
+	await roles.nth(1).getByRole('button', { name: 'Correct' }).click();
+	const form = page.getByTestId('correct-form');
+	await expect(form.getByLabel('From')).toHaveValue('2026-09-01');
+	await expect(form.getByLabel('From')).toHaveAttribute('min', '2026-07-01');
+	await expect(form.getByLabel(/^Until/)).toHaveValue('2026-10-11');
+	await form.getByLabel('From').fill('2026-09-08');
+	await form.getByRole('button', { name: 'Save' }).click();
+	await expect(roles.nth(1)).toContainText('Only trains · Tue 8 Sept – Sun 11 Oct');
+
+	// An overlap is refused.
+	await roles.nth(1).getByRole('button', { name: 'Correct' }).click();
+	await form.getByLabel(/^Until/).fill('2026-10-20');
+	await form.getByRole('button', { name: 'Save' }).click();
+	await expect(form.getByRole('alert')).toHaveText('This player already has a role on that date.');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 400 (Bad Request)'
+	]);
 });

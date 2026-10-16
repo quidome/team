@@ -8,8 +8,8 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::PgExecutor;
 use team_core::{
-    Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season,
-    check_change, check_role, clean_name, first_training_date, place, proposed_start, team,
+    PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
+    first_training_date, proposed_start, role_on, team,
 };
 use utoipa::ToSchema;
 
@@ -56,40 +56,54 @@ pub struct RoleView {
     pub until: Option<String>,
 }
 
+/// A player in the list of all players.
 #[derive(Debug, Serialize, ToSchema)]
-pub struct PlayerView {
+pub struct PlayerListItem {
     pub id: i64,
     pub first_name: String,
     pub last_name: Option<String>,
-    /// Today's role (or the coming one); in "left", the last role of the season; in "last_season", the last role of
-    /// last season; `null` in "others".
-    pub role: Option<RoleKind>,
-    /// The roles of the season shown (last season's for "last_season").
-    pub roles: Vec<RoleView>,
+    pub hidden: bool,
+    /// The role today; `null` when the player is not in the team today.
+    pub role_today: Option<RoleKind>,
 }
 
-/// The players for the current season.
+/// All players of the club, sorted by first name.
 #[derive(Debug, Serialize, ToSchema)]
-pub struct PlayersView {
+pub struct PlayersList {
     pub season: String,
-    /// The first day of the season, for example "2026-07-01": the earliest date of a role.
+    pub players: Vec<PlayerListItem>,
+}
+
+/// A role in a player's history.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct HistoryRole {
+    pub id: i64,
+    /// The season of the role, for example "2026-2027".
+    pub season: String,
+    pub role: RoleKind,
+    /// The first day, for example "2026-09-01".
+    pub from: String,
+    /// The last day; `null` while the role continues.
+    pub until: Option<String>,
+    /// Only a role of the current season can be corrected.
+    pub correctable: bool,
+}
+
+/// One player with the history of all seasons.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PlayerDetail {
+    pub id: i64,
+    pub first_name: String,
+    pub last_name: Option<String>,
+    pub hidden: bool,
+    /// The current season, for example "2026-2027".
+    pub season: String,
+    /// The first day of the current season: the earliest date of a corrected role.
     pub season_first_day: String,
-    /// The last day of the season, for example "2027-06-30": the latest date of a role.
+    /// The last day of the current season: the latest date of a corrected role.
     pub season_last_day: String,
-    /// Today's Dutch date: the proposed end for "Left the team".
-    pub today: String,
-    /// The proposed start of a new role: the first training date of the season, or today when
-    /// trainings have started or nothing is set.
-    pub proposed_from: String,
-    /// Players with a role today or later in the season, sorted by first name.
-    pub players: Vec<PlayerView>,
-    /// Players whose roles in the season all ended before today.
-    pub left: Vec<PlayerView>,
-    /// Players who were in the team until the end of last season and have no role in this season:
-    /// "Add all" brings them back.
-    pub last_season: Vec<PlayerView>,
-    /// Players with no role in this season who are not in `last_season`.
-    pub others: Vec<PlayerView>,
+    /// All roles of all seasons, newest first.
+    pub history: Vec<HistoryRole>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -108,9 +122,11 @@ pub struct NewPlayer {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct NameChange {
+pub struct PlayerChange {
     pub first_name: String,
     pub last_name: Option<String>,
+    /// A hidden player is not offered in "Add player" of the team page and not in "Add all".
+    pub hidden: bool,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -118,7 +134,7 @@ pub struct RoleChange {
     pub role: RoleKind,
     #[schema(value_type = String, format = Date)]
     pub from: NaiveDate,
-    /// `null` while the role continues; "Left the team" sets it, "Undo" clears it.
+    /// `null` while the role continues.
     #[schema(value_type = Option<String>, format = Date)]
     pub until: Option<NaiveDate>,
 }
@@ -132,7 +148,7 @@ pub struct CarryRequest {
 /// A saved player, with the warning that another player has the same name.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SavedPlayer {
-    pub player: PlayerView,
+    pub player: PlayerDetail,
     pub same_name: bool,
 }
 
@@ -162,26 +178,6 @@ pub(crate) fn role_view(role: &PlayerRole) -> RoleView {
     }
 }
 
-fn player_view(player: Player, placement: &Placement) -> PlayerView {
-    PlayerView {
-        id: player.id.0,
-        first_name: player.first_name,
-        last_name: player.last_name,
-        role: placement.role.map(RoleKind::from),
-        roles: placement.roles.iter().map(|role| role_view(role)).collect(),
-    }
-}
-
-fn member_view(member: &Member) -> PlayerView {
-    PlayerView {
-        id: member.player.id.0,
-        first_name: member.player.first_name.clone(),
-        last_name: member.player.last_name.clone(),
-        role: Some(member.role.into()),
-        roles: member.roles.iter().map(|role| role_view(role)).collect(),
-    }
-}
-
 /// The roles of `player` in the current season and the season before.
 async fn roles_around(
     db: impl PgExecutor<'_>,
@@ -195,60 +191,6 @@ async fn roles_around(
         .collect())
 }
 
-/// The view of one player in the current season, as the players page shows it.
-async fn one(state: &AppState, id: PlayerId) -> Result<PlayerView, AppError> {
-    let player = players::by_id(&state.pool, id)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    let season = current_season(state.clock.as_ref());
-    let today = today_in_netherlands(state.clock.as_ref());
-    let roles = roles_around(&state.pool, id, season).await?;
-    Ok(player_view(player, &place(&roles, id, season, today)))
-}
-
-/// Groups the players for `season` on `today`.
-fn group(
-    season: Season,
-    today: NaiveDate,
-    proposed_from: NaiveDate,
-    all: Vec<Player>,
-    roles: &[PlayerRole],
-) -> PlayersView {
-    let mut view = PlayersView {
-        season: season.to_string(),
-        season_first_day: day(season.first_day()),
-        season_last_day: day(season.last_day()),
-        today: day(today),
-        proposed_from: day(proposed_from),
-        players: Vec::new(),
-        left: Vec::new(),
-        last_season: Vec::new(),
-        others: Vec::new(),
-    };
-    let team = team(&all, roles, season, today);
-    view.players = team.members.iter().map(member_view).collect();
-    view.left = team.left.iter().map(member_view).collect();
-    view.last_season = team.last_season.iter().map(member_view).collect();
-    view.others = team
-        .candidates
-        .iter()
-        .filter(|player| {
-            !team
-                .last_season
-                .iter()
-                .any(|member| member.player.id == player.id)
-        })
-        .map(|player| PlayerView {
-            id: player.id.0,
-            first_name: player.first_name.clone(),
-            last_name: player.last_name.clone(),
-            role: None,
-            roles: Vec::new(),
-        })
-        .collect();
-    view
-}
-
 /// The proposed start of a new role in `season` (see `proposed_start`).
 pub(crate) async fn proposed_from(
     state: &AppState,
@@ -260,13 +202,34 @@ pub(crate) async fn proposed_from(
     Ok(proposed_start(first_training_date(&weekly), false, today))
 }
 
-pub async fn load(state: &AppState) -> Result<PlayersView, StoreError> {
+/// The detail of one player, with the history of all seasons.
+async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError> {
+    let player = players::by_id(&state.pool, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
     let season = current_season(state.clock.as_ref());
-    let today = today_in_netherlands(state.clock.as_ref());
-    let all = players::all(&state.pool).await?;
-    let roles = players::roles_in(&state.pool, &[season, season.previous()]).await?;
-    let proposed_from = proposed_from(state, season, today).await?;
-    Ok(group(season, today, proposed_from, all, &roles))
+    let mut roles = players::roles_of(&state.pool, id).await?;
+    roles.reverse();
+    Ok(PlayerDetail {
+        id: player.id.0,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        hidden: player.hidden,
+        season: season.to_string(),
+        season_first_day: day(season.first_day()),
+        season_last_day: day(season.last_day()),
+        history: roles
+            .iter()
+            .map(|role| HistoryRole {
+                id: role.id.0,
+                season: role.season.to_string(),
+                role: role.role.into(),
+                from: day(role.from),
+                until: role.until.map(day),
+                correctable: role.season == season,
+            })
+            .collect(),
+    })
 }
 
 #[utoipa::path(
@@ -274,12 +237,46 @@ pub async fn load(state: &AppState) -> Result<PlayersView, StoreError> {
     path = "/api/players",
     operation_id = "players",
     responses(
-        (status = 200, description = "The players for the current season", body = PlayersView),
+        (status = 200, description = "All players, hidden ones too, sorted by first name", body = PlayersList),
         (status = 401, description = "Not logged in"),
     )
 )]
-pub async fn list(State(state): State<AppState>) -> Result<Json<PlayersView>, AppError> {
-    Ok(Json(load(&state).await?))
+pub async fn list(State(state): State<AppState>) -> Result<Json<PlayersList>, AppError> {
+    let season = current_season(state.clock.as_ref());
+    let today = today_in_netherlands(state.clock.as_ref());
+    let all = players::all(&state.pool).await?;
+    let roles = players::roles_in(&state.pool, &[season]).await?;
+    Ok(Json(PlayersList {
+        season: season.to_string(),
+        players: all
+            .into_iter()
+            .map(|player| PlayerListItem {
+                role_today: role_on(&roles, player.id, today).map(|role| role.role.into()),
+                id: player.id.0,
+                first_name: player.first_name,
+                last_name: player.last_name,
+                hidden: player.hidden,
+            })
+            .collect(),
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/players/{id}",
+    operation_id = "player",
+    params(("id" = i64, Path, description = "The player")),
+    responses(
+        (status = 200, description = "The player with its history", body = PlayerDetail),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such player"),
+    )
+)]
+pub async fn get(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<PlayerDetail>, AppError> {
+    Ok(Json(detail(&state, PlayerId(id)).await?))
 }
 
 #[utoipa::path(
@@ -318,7 +315,7 @@ pub async fn add(
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = id.0, "player added");
     Ok(Json(SavedPlayer {
-        player: one(&state, id).await?,
+        player: detail(&state, id).await?,
         same_name,
     }))
 }
@@ -326,9 +323,9 @@ pub async fn add(
 #[utoipa::path(
     put,
     path = "/api/players/{id}",
-    operation_id = "renamePlayer",
+    operation_id = "changePlayer",
     params(("id" = i64, Path, description = "The player")),
-    request_body = NameChange,
+    request_body = PlayerChange,
     responses(
         (status = 200, description = "The player", body = SavedPlayer),
         (status = 400, description = "`first_name_required`"),
@@ -336,20 +333,25 @@ pub async fn add(
         (status = 404, description = "No such player"),
     )
 )]
-pub async fn rename(
+pub async fn change(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Json(body): Json<NameChange>,
+    Json(body): Json<PlayerChange>,
 ) -> Result<Json<SavedPlayer>, AppError> {
     let id = PlayerId(id);
     let (first_name, last_name) = clean_name(&body.first_name, body.last_name.as_deref())?;
-    if !players::update_name(&state.pool, id, &first_name, last_name.as_deref()).await? {
+    // The name and "Hidden" together, or neither.
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    if !players::update_name(&mut *tx, id, &first_name, last_name.as_deref()).await? {
         return Err(AppError::NotFound);
     }
+    players::set_hidden(&mut *tx, id, body.hidden).await?;
     let same_name =
-        players::same_name_exists(&state.pool, &first_name, last_name.as_deref(), Some(id)).await?;
+        players::same_name_exists(&mut *tx, &first_name, last_name.as_deref(), Some(id)).await?;
+    tx.commit().await.map_err(StoreError::from)?;
+    tracing::info!(player = id.0, "player changed");
     Ok(Json(SavedPlayer {
-        player: one(&state, id).await?,
+        player: detail(&state, id).await?,
         same_name,
     }))
 }
@@ -401,26 +403,26 @@ pub async fn add_role(
 #[utoipa::path(
     put,
     path = "/api/players/{id}/roles/{role}",
-    operation_id = "changeRole",
+    operation_id = "correctRole",
     params(
         ("id" = i64, Path, description = "The player"),
         ("role" = i64, Path, description = "The role"),
     ),
     request_body = RoleChange,
     responses(
-        (status = 200, description = "The player", body = PlayerView),
-        (status = 400, description = "`until_before_from`, `outside_season`, `roles_overlap`"),
+        (status = 200, description = "The player with its history", body = PlayerDetail),
+        (status = 400, description = "`until_before_from`, `outside_season` (also for a role of another season), `roles_overlap`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player or role"),
     )
 )]
-pub async fn change_role(
+pub async fn correct_role(
     State(state): State<AppState>,
     Path((id, role)): Path<(i64, i64)>,
     Json(body): Json<RoleChange>,
-) -> Result<Json<PlayerView>, AppError> {
+) -> Result<Json<PlayerDetail>, AppError> {
     save_role(&state, PlayerId(id), Some(RoleId(role)), body).await?;
-    Ok(Json(one(&state, PlayerId(id)).await?))
+    Ok(Json(detail(&state, PlayerId(id)).await?))
 }
 
 /// Adds a role (`role` is `None`) or changes one, under the player's lock, so two saves at the same

@@ -131,14 +131,26 @@ export async function markSeen(changes: Pick<Change, 'id' | 'version'>[]): Promi
 	return (await dataOf(await api.POST('/api/changes/seen', { body: { changes: seen } }))).open;
 }
 
-export type Players = components['schemas']['PlayersView'];
-export type Player = components['schemas']['PlayerView'];
+export type Players = components['schemas']['PlayersList'];
+export type PlayerListItem = components['schemas']['PlayerListItem'];
+export type PlayerDetail = components['schemas']['PlayerDetail'];
+export type HistoryRole = components['schemas']['HistoryRole'];
 export type RoleKind = components['schemas']['RoleKind'];
 export type SavedPlayer = components['schemas']['SavedPlayer'];
 
-/** The players for the current season (attendance at training, story A). */
+/** All players of the club (attendance at training, story A). */
 export async function loadPlayers(fetch: typeof globalThis.fetch): Promise<Players> {
 	return dataOf(await api.GET('/api/players', { fetch }));
+}
+
+/** One player with its history, or null when it does not exist. */
+export async function loadPlayer(
+	fetch: typeof globalThis.fetch,
+	id: number
+): Promise<PlayerDetail | null> {
+	const result = await api.GET('/api/players/{id}', { fetch, params: { path: { id } } });
+	if (result.response.status === 404) return null;
+	return dataOf(result);
 }
 
 export async function addPlayer(
@@ -149,15 +161,17 @@ export async function addPlayer(
 	return dataOf(await api.POST('/api/players', { body: { first_name, last_name, role } }));
 }
 
-export async function renamePlayer(
+/** Saves the name and "Hidden". */
+export async function changePlayer(
 	id: number,
 	first_name: string,
-	last_name: string | null
+	last_name: string | null,
+	hidden: boolean
 ): Promise<SavedPlayer> {
 	return dataOf(
 		await api.PUT('/api/players/{id}', {
 			params: { path: { id } },
-			body: { first_name, last_name }
+			body: { first_name, last_name, hidden }
 		})
 	);
 }
@@ -177,11 +191,12 @@ export async function addRole(
 	);
 }
 
-export async function changeRole(
+/** "Correct" in the history: a role of the current season. */
+export async function correctRole(
 	id: number,
 	roleId: number,
 	role: { role: RoleKind; from: string; until: string | null }
-): Promise<Player> {
+): Promise<PlayerDetail> {
 	return dataOf(
 		await api.PUT('/api/players/{id}/roles/{role}', {
 			params: { path: { id, role: roleId } },
@@ -205,7 +220,7 @@ export async function loadTeam(fetch: typeof globalThis.fetch): Promise<TeamPage
 }
 
 /** "Change role": the role on `from` ends the day before, the new role starts on `from`. */
-export async function changeRoleFrom(id: number, role: RoleKind, from: string): Promise<TeamPage> {
+export async function changeRole(id: number, role: RoleKind, from: string): Promise<TeamPage> {
 	return dataOf(
 		await api.POST('/api/players/{id}/role-change', {
 			params: { path: { id } },

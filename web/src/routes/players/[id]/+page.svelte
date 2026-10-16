@@ -1,16 +1,17 @@
 <!--
-	One player (attendance at training, story A): the name, the roles of the season, "Left the team"
-	and "Undo", "Back in the team", and "Delete player".
+	One player (attendance at training, story A): the name and "Hidden", the history of all seasons
+	with "Correct" for a role of the current season, and "Delete player".
 -->
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		ApiError,
-		addRole,
-		changeRole,
+		changePlayer,
+		correctRole,
 		deletePlayer,
-		renamePlayer,
+		type HistoryRole,
+		type PlayerDetail,
 		type RoleKind
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -21,77 +22,78 @@
 
 	let { data }: PageProps = $props();
 
+	// Replaced by the answer of each save.
+	let player = $state<PlayerDetail | null>(untrack(() => data.player));
 	let firstName = $state(untrack(() => data.player?.first_name ?? ''));
 	let lastName = $state(untrack(() => data.player?.last_name ?? ''));
-	let leaving = $state(false);
+	let hidden = $state(untrack(() => data.player?.hidden ?? false));
+
+	/** The role in the "Correct" form. */
+	let correcting = $state<number | null>(null);
+	let role = $state<RoleKind>('plays_games');
+	let from = $state('');
 	let until = $state('');
-	let returning = $state(false);
-	let returnRole = $state<RoleKind>('plays_games');
-	let returnFrom = $state('');
+
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let warning = $state<string | null>(null);
 
-	/** The newest role of the season: the one that "Left the team" or "Undo" changes. */
-	const newest = $derived(data.player?.roles.at(-1) ?? null);
+	function message(failure: unknown): string {
+		return failure instanceof ApiError
+			? failure.message
+			: 'Something went wrong. Please try again.';
+	}
 
-	async function run(action: () => Promise<unknown>) {
+	async function save(event: SubmitEvent) {
+		event.preventDefault();
+		if (!player) return;
 		busy = true;
 		error = null;
+		warning = null;
 		try {
-			await action();
-			await invalidateAll();
+			const saved = await changePlayer(
+				player.id,
+				firstName,
+				lastName.trim() ? lastName : null,
+				hidden
+			);
+			player = saved.player;
+			if (saved.same_name) warning = 'There is already a player with this name.';
 		} catch (failure) {
-			error =
-				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
+			error = message(failure);
 		} finally {
 			busy = false;
 		}
 	}
 
-	function saveName(event: SubmitEvent) {
-		event.preventDefault();
-		const player = data.player;
-		if (!player) return;
-		warning = null;
-		return run(async () => {
-			const saved = await renamePlayer(player.id, firstName, lastName.trim() ? lastName : null);
-			if (saved.same_name) warning = 'There is already a player with this name.';
-		});
+	function startCorrecting(entry: HistoryRole) {
+		correcting = entry.id;
+		role = entry.role;
+		from = entry.from;
+		until = entry.until ?? '';
+		error = null;
 	}
 
-	function leave(event: SubmitEvent) {
+	async function correct(event: SubmitEvent) {
 		event.preventDefault();
-		const player = data.player;
-		const role = newest;
-		if (!player || !role) return;
-		return run(async () => {
-			await changeRole(player.id, role.id, { role: role.role, from: role.from, until });
-			leaving = false;
-		});
-	}
-
-	function undoLeave() {
-		const player = data.player;
-		const role = newest;
-		if (!player || !role) return;
-		return run(() =>
-			changeRole(player.id, role.id, { role: role.role, from: role.from, until: null })
-		);
-	}
-
-	function comeBack(event: SubmitEvent) {
-		event.preventDefault();
-		const player = data.player;
-		if (!player) return;
-		return run(async () => {
-			await addRole(player.id, { role: returnRole, from: returnFrom, until: null });
-			returning = false;
-		});
+		if (!player || correcting === null) return;
+		busy = true;
+		error = null;
+		try {
+			player = await correctRole(player.id, correcting, {
+				role,
+				from,
+				until: until || null
+			});
+			correcting = null;
+		} catch (failure) {
+			error = message(failure);
+		} finally {
+			busy = false;
+		}
 	}
 
 	async function remove() {
-		const player = data.player;
 		if (!player) return;
 		if (!confirm(`Delete ${fullName(player)}? This cannot be undone.`)) return;
 		busy = true;
@@ -100,26 +102,15 @@
 			await deletePlayer(player.id);
 			await goto(resolve('/players'), { invalidateAll: true });
 		} catch (failure) {
-			error =
-				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
+			error = message(failure);
 			busy = false;
 		}
 	}
 
-	/** The proposed last day: today, or the start of the role when that is later. */
-	function startLeaving() {
-		const today = data.players?.today ?? '';
-		const from = newest?.from ?? '';
-		until = from > today ? from : today;
-		leaving = true;
-	}
-
-	/** "Add to the team" proposes the start of a new role; "Back in the team" proposes today. */
-	function startReturning() {
-		returnFrom =
-			(data.player?.roles.length ? data.players?.today : data.players?.proposed_from) ?? '';
-		returnRole = newest?.role ?? data.player?.role ?? 'plays_games';
-		returning = true;
+	function dates(entry: HistoryRole): string {
+		return entry.until
+			? `${formatDay(entry.from)} – ${formatDay(entry.until)}`
+			: `from ${formatDay(entry.from)}`;
 	}
 
 	const field =
@@ -127,38 +118,38 @@
 </script>
 
 <svelte:head>
-	<title>{data.player ? fullName(data.player) : 'Player'} · Team</title>
+	<title>{player ? fullName(player) : 'Player'} · Team</title>
 </svelte:head>
 
-{#if !data.players}
+{#if !data.loggedIn}
 	<section class="py-16 text-center">
 		<p class="text-muted-foreground">Log in to see the players.</p>
 		<Button href="/auth/login" class="mt-4" data-sveltekit-reload>Log in</Button>
 	</section>
-{:else if !data.player}
+{:else if !player}
 	<section class="space-y-4 py-8">
 		<p class="text-muted-foreground">This player does not exist.</p>
 		<Button href={resolve('/players')} variant="outline">Players</Button>
 	</section>
 {:else}
-	{@const player = data.player}
+	{@const shown = player}
 	<section class="space-y-6">
 		<div class="flex items-center justify-between gap-3">
 			<h1 class="min-w-0 truncate text-2xl font-semibold tracking-tight" data-testid="player-name">
-				{fullName(player)}
+				{fullName(shown)}
 			</h1>
 			<Button href={resolve('/players')} variant="ghost">Back</Button>
 		</div>
 
-		{#if error}
+		{#if error && correcting === null}
 			<p class="text-sm" role="alert">{error}</p>
 		{/if}
 		{#if warning}
 			<p class="text-sm" role="status" data-testid="same-name">{warning}</p>
 		{/if}
 
-		<form class="space-y-4 rounded-xl border bg-card p-4 shadow-xs" onsubmit={saveName}>
-			<h2 class="font-medium">Name</h2>
+		<form class="space-y-4 rounded-xl border bg-card p-4 shadow-xs" onsubmit={save}>
+			<h2 class="font-medium">Player</h2>
 			<label class="block space-y-1">
 				<span class="text-sm">First name</span>
 				<input class={field} bind:value={firstName} autocomplete="off" required />
@@ -167,94 +158,90 @@
 				<span class="text-sm">Last name (optional)</span>
 				<input class={field} bind:value={lastName} autocomplete="off" />
 			</label>
-			<Button type="submit" variant="outline" disabled={busy}>Save name</Button>
+			<label class="flex min-h-11 items-center gap-3 text-sm">
+				<input type="checkbox" role="switch" bind:checked={hidden} class="size-5" />
+				<span>
+					Hidden
+					<span class="block text-muted-foreground">
+						Not offered in "Add player" and "Add all". The history stays.
+					</span>
+				</span>
+			</label>
+			<Button type="submit" variant="outline" disabled={busy}>Save</Button>
 		</form>
 
-		<section class="space-y-3 rounded-xl border bg-card p-4 shadow-xs" aria-labelledby="roles">
-			<h2 id="roles" class="font-medium">In the team · {data.players.season}</h2>
-			{#if player.roles.length === 0}
-				<p class="text-sm text-muted-foreground">Not in the team this season.</p>
+		<section class="space-y-3 rounded-xl border bg-card p-4 shadow-xs" aria-labelledby="history">
+			<h2 id="history" class="font-medium">History</h2>
+			{#if shown.history.length === 0}
+				<p class="text-sm text-muted-foreground">Never in the team.</p>
 			{:else}
-				<ul class="space-y-1" data-testid="roles">
-					{#each player.roles as role (role.id)}
-						<li class="text-sm tabular-nums">
-							<span class="font-medium">{roleLabels[role.role]}</span>
-							· from {formatDay(role.from)}{role.until ? ` until ${formatDay(role.until)}` : ''}
+				<ul class="space-y-3" data-testid="history">
+					{#each shown.history as entry (entry.id)}
+						<li class="space-y-2" data-testid="history-role">
+							<div class="flex min-h-11 items-center justify-between gap-3">
+								<p class="text-sm tabular-nums">
+									<span class="font-medium">{roleLabels[entry.role]}</span>
+									· {dates(entry)}
+									{#if entry.season !== shown.season}
+										<span class="text-muted-foreground">· {entry.season}</span>
+									{/if}
+								</p>
+								{#if entry.correctable && correcting !== entry.id}
+									<Button variant="outline" size="sm" onclick={() => startCorrecting(entry)}>
+										Correct
+									</Button>
+								{/if}
+							</div>
+							{#if correcting === entry.id}
+								<form class="space-y-3" onsubmit={correct} data-testid="correct-form">
+									<fieldset class="space-y-2">
+										<legend class="text-sm">Role</legend>
+										<div class="flex gap-2">
+											{#each Object.entries(roleLabels) as [value, label] (value)}
+												<label
+													class="flex min-h-11 flex-1 items-center gap-2 rounded-md border px-3 has-checked:border-primary has-checked:bg-primary/10"
+												>
+													<input type="radio" name="correct-role" {value} bind:group={role} />
+													<span class="text-sm">{label}</span>
+												</label>
+											{/each}
+										</div>
+									</fieldset>
+									<label class="block space-y-1">
+										<span class="text-sm">From</span>
+										<input
+											class={field}
+											type="date"
+											bind:value={from}
+											min={shown.season_first_day}
+											max={shown.season_last_day}
+											required
+										/>
+									</label>
+									<label class="block space-y-1">
+										<span class="text-sm">Until (empty while the role continues)</span>
+										<input
+											class={field}
+											type="date"
+											bind:value={until}
+											min={shown.season_first_day}
+											max={shown.season_last_day}
+										/>
+									</label>
+									{#if error}
+										<p class="text-sm" role="alert">{error}</p>
+									{/if}
+									<div class="flex gap-2">
+										<Button type="submit" disabled={busy}>Save</Button>
+										<Button type="button" variant="ghost" onclick={() => (correcting = null)}>
+											Cancel
+										</Button>
+									</div>
+								</form>
+							{/if}
 						</li>
 					{/each}
 				</ul>
-			{/if}
-
-			{#if newest && !newest.until}
-				{#if leaving}
-					<form class="space-y-3" onsubmit={leave}>
-						<label class="block space-y-1">
-							<span class="text-sm">Last day in the team</span>
-							<input
-								class={field}
-								type="date"
-								bind:value={until}
-								min={newest.from}
-								max={data.players.season_last_day}
-								required
-							/>
-						</label>
-						<div class="flex gap-2">
-							<Button type="submit" disabled={busy}>Left the team</Button>
-							<Button type="button" variant="ghost" onclick={() => (leaving = false)}>Cancel</Button
-							>
-						</div>
-					</form>
-				{:else}
-					<Button variant="outline" onclick={startLeaving}>Left the team</Button>
-				{/if}
-			{:else}
-				<div class="flex flex-wrap gap-2">
-					{#if newest?.until}
-						<Button variant="outline" disabled={busy} onclick={undoLeave}
-							>Undo "Left the team"</Button
-						>
-					{/if}
-					{#if !returning}
-						<Button variant="outline" onclick={startReturning}>
-							{player.roles.length === 0 ? 'Add to the team' : 'Back in the team'}
-						</Button>
-					{/if}
-				</div>
-				{#if returning}
-					<form class="space-y-3" onsubmit={comeBack}>
-						<fieldset class="space-y-2">
-							<legend class="text-sm">Role</legend>
-							<div class="flex gap-2">
-								{#each Object.entries(roleLabels) as [value, label] (value)}
-									<label
-										class="flex min-h-11 flex-1 items-center gap-2 rounded-md border px-3 has-checked:border-primary has-checked:bg-primary/10"
-									>
-										<input type="radio" name="return-role" {value} bind:group={returnRole} />
-										<span class="text-sm">{label}</span>
-									</label>
-								{/each}
-							</div>
-						</fieldset>
-						<label class="block space-y-1">
-							<span class="text-sm">In the team from</span>
-							<input
-								class={field}
-								type="date"
-								bind:value={returnFrom}
-								min={data.players.season_first_day}
-								max={data.players.season_last_day}
-								required
-							/>
-						</label>
-						<div class="flex gap-2">
-							<Button type="submit" disabled={busy}>Save</Button>
-							<Button type="button" variant="ghost" onclick={() => (returning = false)}>
-								Cancel
-							</Button>
-						</div>
-					</form>
-				{/if}
 			{/if}
 		</section>
 
