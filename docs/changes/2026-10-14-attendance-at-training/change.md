@@ -1,7 +1,7 @@
 ---
 title: Attendance at training
 type: feature
-stage: design
+stage: implement
 closure: review accept   # epic: each story has its own closure; a fresh agent checks the whole result after story C
 created: 2026-10-14
 ---
@@ -25,3 +25,4 @@ the team. This is the first change with players in the tool.
 | 2026-10-16 | discover | fourth spec review (S17–S22): coordinator split story 1 into the pages "Players" (all players, "Hidden", the history with "Correct") and "Team" ("Add player", "Change role" and "Remove from the team" with a date); "Change" on a training; trainings of an earlier season stay open; words player, role, hidden and weekly training for /vision; fifth spec review pending |
 | 2026-10-16 | discover | fifth spec review: all stories serve (notes S23–S26, fixed; coordinator: the proposed start is the first training date until a training of the season is opened); waiting for approval, then /vision for the words player, role, hidden, weekly training and training day |
 | 2026-10-16 | design | functional spec approved again (coordinator); before design: /vision for the words player, role, hidden, weekly training and training day; then the epic's technical spec and story A are designed again |
+| 2026-10-16 | implement | technical spec designed again and approved: weekly trainings replace the season's training days, pages Players and Team, one training per date with "Change" and delete by hand; story A rewrites its migration 0005; story A to /design again |
