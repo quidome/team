@@ -1,6 +1,6 @@
 # Functional spec: Attendance at training
 
-**Status**: approved (changed after the accept review of story A, approved again 2026-10-16 after the fifth spec review)
+**Status**: approved (changed after the second accept and build review of story A, approved again 2026-10-16 after the sixth spec review)
 **Change**: docs/changes/2026-10-14-attendance-at-training
 **Date**: 2026-10-15, changed 2026-10-16
 
@@ -26,7 +26,8 @@ This change brings the players into the tool for the first time. It must be fast
 sheet: in the hall, on a phone, with one hand (core value 1 of the vision: "attendance at
 training takes seconds, on a phone, with one hand").
 
-Words (`docs/language.md`): a **player** is a member of the team who plays games or only trains;
+Words (`docs/language.md`): a **player** is a person of the club, in the team of a season through a
+**role** (plays games or only trains);
 **attendance** is whether a player was at a training, and if not, the **reason**; a reason is
 valid or not valid.
 
@@ -47,18 +48,20 @@ ever entered, and **Team**, the team of the current season.
 Players:
 - [ ] The page "Players" lists all players, sorted by first name, each with "Plays games" or "Only trains" when the player is in the team today, else "Not in the team". "Add player" adds a player with a first name (required) and a last name (optional).
 - [ ] A tap on a player opens the player: the name (change and save), the switch "Hidden", the history, and "Delete player".
-- [ ] A hidden player is not listed on "Players" (unless the switch "Show hidden players" is on) and is not offered when a player is added to the team. Hiding changes nothing else: the history, the team and the totals stay. For example a player who left the club.
-- [ ] The history lists the player's roles, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct". A role of the current season has "Correct": the kind, the start date and the end date (empty while the role continues), filled in with the stored values. A correction applies to the whole role, with the same checks as a new role. For example a player added from the proposed date who joined on 3 November, or added as "Plays games" by mistake. Roles of an earlier season are shown but cannot be corrected.
+- [ ] "Hidden" only keeps lists short; it is not a status of the player (coordinator, 2026-10-16). A hidden player is left out of three lists: the list on "Players" (unless the switch "Show hidden players" is on), the choices of "Add player" on the team page, and "Players of last season" (so "Add all" does not add it). Nothing else changes: the history, the team and the totals stay, and a hidden player under "Left the team" still has "Add to the team" on its own row. For example a player who left the club.
+- [ ] The history lists the player's roles, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct". A role of the current season has "Correct": the kind, the start date and the end date (empty while the role continues), filled in with the stored values. A correction applies to the whole role, with the same checks as a new role. For example a player added from today who joined on 1 September, or added as "Plays games" by mistake. Roles of an earlier season are shown but cannot be corrected.
 
 Team:
 - [ ] The page "Team" has a heading with the name of the team chosen from the game list for the season and the season, for example "U14-1 · 2026-2027"; before the team is chosen, "Team not chosen yet" with a link to choose it. Players can be added to the team before the team is chosen (coordinator, 2026-10-16, during /design of story A).
 - [ ] The page "Team" shows, for the current season, the players in the team today or later in the season (sorted by first name, with "Plays games" or "Only trains"), then "Left the team" with the players who had a role earlier in the season and have none today or later in the season. A player after "Change role" stays in the team.
-- [ ] "Add player" on the team page adds a player to the team: a player from the list (not hidden, not in the team; last season's team first), or a new player (first name and last name), with a role and the date from which the player is in the team. The tool proposes the first training date of the season until the coordinator has opened a training of the season, and today after that; with no weekly training yet, today (coordinator, 2026-10-16). So when the coordinator sets up in October and then enters the trainings since 1 September, all players are proposed from 1 September.
+- [ ] "Add player" on the team page adds a player to the team: a player from the list (not hidden, not in the team; last season's team first), or a new player (a first name, and a last name if wanted), with a role and the date from which the player is in the team ("In the team from"). For "Add player" and "Add all", "In the team from" is filled with 1 September of the season, with a button "Today" next to the date field; any other date is typed or picked (coordinator, 2026-10-16, after the sixth spec review). So the first setup in October, with the trainings since 1 September, needs no typed date, and a newcomer in January takes one tap on "Today". "Add to the team" and "Change role" are filled with today.
+- [ ] A player in the team whose last day in the team is today (a role that ends today, with no role after it) shows "Last day today" in the row, so a removal from tomorrow is visible at once. Not on the last day of the season (30 June), when every role ends.
 - [ ] A tap on a player of the team gives "Change role" and "Remove from the team".
-- [ ] "Change role" (new role and a date, proposed today) ends the current role on the day before that date and starts the new role on it. So the history keeps both, for example "Only trains" until 31 October and "Plays games" from 1 November.
-- [ ] "Remove from the team" (a date, proposed today, or the start of the role when that is later) ends the role on that date. A mistake is undone in the history ("Correct", end date empty).
-- [ ] A player under "Left the team" can be added again ("Add to the team", with a role and a date, proposed the day after the end, or today when later): a new role from the date of return; the time between does not count.
-- [ ] A role ends at the latest at the end of its season (30 June). A new season starts with no players in the team. The team page shows the players of last season's team with "Add all": each gets the same role as at the end of last season, from the proposed date (as for "Add player"). Hidden players are not added.
+- [ ] "Change role" (the new role and "From", the first day of the new role, proposed today) acts on the role on that date: that role ends on the day before, and the new role starts on the date and keeps the planned end of the old role. So the history keeps both, for example "Only trains · Tue 1 Sep – Sat 31 Oct" and "Plays games · from Sun 1 Nov". A planned later role stays as it is.
+- [ ] "Remove from the team" asks "Not in the team from" (the first day without the team), filled with today, with a button "Tomorrow" next to the date field, always (for a player whose last day is today). From that date the player has no roles in the season (coordinator, 2026-10-16): the role on the day before ends on that day, and every role that starts on the date or later is removed, also a planned "Change role". For example on Thu 15 Oct "Not in the team from" today: "Only trains · Tue 1 Sep – Wed 14 Oct", and the player is under "Left the team" at once with "Left · last day Wed 14 Oct". A player whose roles of the season all start on the date or later has no role in the season after it: not under "Left the team", and back in the choices of "Add player". So "Add all" in August, followed by "Remove from the team" from today for a player who did not come back, leaves nothing of that player in the season. When the removal also removes a role that starts after the date (for example a planned "Change role"), the tool first asks for a confirmation that names it: "This also removes "Plays games · from Sun 1 Nov"." A removal that only ends the current role is saved at once.
+- [ ] After "Remove from the team", the player's row shows "Undo" until the coordinator leaves the team page. "Undo" puts back the player's roles exactly as they were before the removal. After that, "Correct" (end date empty) restores the role that was ended, and "Add to the team" a role that was removed; the history shows only the roles that are still there.
+- [ ] A player under "Left the team" can be added again ("Add to the team", with a role and "In the team from", proposed today): a new role from the date of return; the time between does not count.
+- [ ] A role ends at the latest at the end of its season (30 June). A new season starts with no players in the team. While no player of last season's team has a role in the season, the team page shows "Players of last season" (last season's team, not hidden) with "Add all". "Add all" asks "In the team from" (1 September of the season, with "Today", as for "Add player"); each player gets the same role as at the end of last season, from that date. A newcomer added first does not make the group go; a player of last season's team with a role in the season does. Players of last season are still first in the choices of "Add player".
 
 Everywhere:
 - [ ] A player shows at a training, and counts for it, only when the date of the training is inside one of the player's roles. So a player who joined in November has no missed trainings in September and October.
@@ -70,14 +73,21 @@ At the start of the season the coordinator opens "Team", taps "Add player" and t
 players once, each with "Plays games" or "Only trains". For a player who joined later, the
 coordinator sets the date the role started. When a player moves from "only trains" to "plays
 games", the coordinator taps the player, "Change role", and the date. When a player leaves, the
-coordinator taps the player, "Remove from the team", and the date. Next season, the coordinator
-taps "Add all" (or adds players one by one) and removes those who did not come back. A player who
-left the club is set to "Hidden" on the page "Players".
+coordinator taps the player, "Remove from the team", and the first day without the team (today,
+or "Tomorrow" when the player still trains today). Next season, the coordinator taps "Add all" (or
+adds players one by one) and removes those who did not come back ("Not in the team from" today:
+nothing of them stays in the season). A removal by mistake is undone with "Undo". A player who
+left the club is set to "Hidden" on the page "Players", so the lists stay short.
 
 #### Errors and edge cases
 - No first name: the player cannot be saved; the tool says "A first name is needed."
 - The end of a role before its start: not saved ("The end must be after the start.").
 - "Change role" on a date that is not after the start of the current role: not saved ("The change must be after the start of the role. To change the role from its start, use "Correct" in the history.").
+- "Change role" on a date before a role that starts later (for example a role typed from Mon 2 Nov): not saved ("This player's role starts on Mon 2 Nov. To change it, use "Correct" in the history.").
+- "Change role" or "Remove from the team" on a date on which the player has no role, and none later in the season: not saved ("This player is not in the team on that date.").
+- "Change role" to the role the player already has on that date: not saved ("The player already has this role.").
+- "Undo" after another screen changed the player's roles: not saved ("This player was changed in the meantime. Use "Correct" in the history.").
+- A role removed by "Remove from the team" had absences (story B): they are kept and do not count, as for any date outside a role; "Undo" or a new role on those dates makes them count again.
 - Two roles of one player that overlap in time: not saved ("This player already has a role on that date.").
 - Two players with the same first and last name: allowed (the coordinator knows who is who), but the tool warns "There is already a player with this name."
 - A player with no absences can be deleted at any time ("Delete player", after a confirmation), for example a player added by mistake. "There" is not stored for each player, so nothing is lost. A player with absences can only be removed from the team or hidden.
@@ -100,7 +110,6 @@ and times, and a later change of the weekly training does not touch it.
 - [ ] The coordinator can change everything of a weekly training ("Change": the day, the times and the window), and delete it. A mistake is corrected by a change, for the whole window. A real change of schedule is the end of one weekly training (its window ends) and a new one (for example Thursday from Thu 7 Jan).
 - [ ] A change or delete of a weekly training never changes or deletes an opened training: only the training days that are not opened follow it.
 - [ ] The settings page lists the weekly trainings of the season, sorted by the start of the window, for example "Tuesday 19:45–21:00 · Tue 1 Sep – Tue 25 May".
-- [ ] The first training date of the season is the first training day of all its weekly trainings (story 1 uses it for the proposed start of a role).
 - [ ] The start page shows a card "Training" for the next training: today's training until midnight (so attendance can still be entered at home after the training), else the next training day or training. A cancelled training shows on the card too, as "Training · Tue 20 Oct · Cancelled". For example "Training · Tue 20 Oct · 19:45".
 - [ ] With no coming training day or training in the season, the start page shows no training card. The coordinator can still open trainings from the page "Attendance".
 - [ ] The coordinator can open the next training at any time, also days before it, to note an absence in advance.
@@ -217,7 +226,7 @@ Screens (phone first, also usable on a computer):
 - **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Change" (date and times), "Cancel training" or "Undo cancel", and "Delete training".
 - **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date). A tap on a player shows the trainings that player missed.
 - **Players**: all players, sorted by first name, with the role today or "Not in the team", "Add player" and the switch "Show hidden players". A tap opens the player: first name, last name, "Hidden", the history (the roles, newest first, "Correct" for a role of the current season), and "Delete player" when the player has no absences.
-- **Team** (current season): the heading with the team's name and the season, or "Team not chosen yet"; the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); in a new season the players of last season's team with "Add all". A tap on a player gives "Change role" and "Remove from the team" (each with a date), or "Add to the team" under "Left the team".
+- **Team** (current season): the heading with the team's name and the season, or "Team not chosen yet"; the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); while no player of last season's team has a role in the season, those players with "Add all" (with "In the team from"). A tap on a player gives "Change role" ("From") and "Remove from the team" ("Not in the team from", with "Tomorrow"), or "Add to the team" under "Left the team"; after a removal, "Undo" on the row. "In the team from" of "Add player" and "Add all" is filled with 1 September, with "Today"; the other dates with today, and "Not in the team from" with "Tomorrow" next to it.
 - **Weekly trainings and reasons** (settings): the weekly trainings of the season (day, start and end time, window), "Add weekly training", "Change" and "Delete" for each, and the list of reasons with valid / not valid, "Add reason", rename, hide.
 - Navigation: the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings.
 
@@ -252,8 +261,10 @@ The coordinator types in the players once (no import from the sheet).
 - **[Steve]** (2026-10-16) A change of a weekly training can make a date that was a training day stop being one, also for trainings that were already opened or cancelled. The result for the user must be the one in story 2 (they stay), never a training that disappears or loses its attendance.
 - **[Steve]** (2026-10-16) Story A of the epic already stores the training days in another form (sets of days, valid from a date, and a first and last date of the season). It is not merged or released, so its stored form can still change without loss.
 - **[Bruce]** (2026-10-16) The training days are worked out from the weekly trainings each time, not stored. Two weekly trainings on the same day must never overlap, also when two screens save at the same time; opening a training day twice, or from two screens, must still make one training.
+- **[Bruce]** (2026-10-16, second accept review) "Remove from the team" ends one role and can remove others in one save, and "Undo" puts several roles back: each is saved whole or not at all, under the same rule as "Change role". "Undo" must notice a change from another screen and never overwrite it.
+- **[Steve]** (2026-10-16, second accept review) With today as the proposal everywhere, the "first training date" is no longer used by story 1; story B no longer completes that rule ("until a training of the season is opened"). The epic's technical spec must drop it at design.
 - **[Bruce]** (2026-10-16) "Change role" changes two roles at once (the end of one, the start of the next): both or neither are saved. "Change role", "Remove from the team" and "Correct" on two screens: the last save wins, and the check for overlap must use the stored roles.
-- **[Steve]** (2026-10-16) `docs/language.md` says a player is "a member of the team"; with the page "Players" a player can also be outside the team. The word is for `/vision`.
+- **[Steve]** (2026-10-16) `docs/language.md` said a player is "a member of the team"; with the page "Players" a player can also be outside the team. Settled by `/vision` on 2026-10-16 (Open questions).
 - **[Steve]** Training days, "today" and the season must use Dutch local time, the same rules as the games, also on the nights the clock changes.
 - **[Bruce]** "Saved at once" on a phone in a sports hall: the network can be slow or gone. A tap that was not saved must never look saved, and a late answer of an earlier tap must not overwrite a newer tap.
 - **[Bruce]** The same training open on two screens: the last tap wins; a screen that is shown again must show the stored marks.
@@ -417,6 +428,37 @@ Notes:
 - **S25 – story 1, "Add all" and hidden players.** "Hidden" is for "a player who left the club", and a hidden player "is not offered when a player is added to the team". "Add all" in a new season adds "the players of last season's team"; it does not say that it skips hidden players. A player hidden in June comes back in July unless the coordinator sees and removes them. Suggest: the list under "Add all" and the button leave out hidden players (or show them apart). Also not said: whether a player who is hidden while still in a role shows at the trainings (as read: yes, "hiding changes nothing else"); that is consistent, but then hiding is not a way to take a player out of the team. (Trace: story 1 criteria "Hidden", "Add all", behaviour last sentence.)
 - **S26 – text that disagrees with the rest.** (a) Story 5 says the page lists the training days "newest first"; story 2 and the Interface say "Coming" (nearest first) above "Past" (newest first). (b) Story 2 criterion 3 gives "Thursday from 5 Jan"; Tue 5 Jan 2027 is a Tuesday (checked with `date`), so the window of that example starts on a day that is not its day of the week. (c) The example training screen shows only "[ Cancel training ]"; the Interface puts "Change", "Cancel training" or "Undo cancel", and "Delete training" at the bottom. None changes what the user gets, but Design reads the text literally. (Trace: story 5 criterion 5, story 2 criteria 3 and "Attendance", Interface "Training" and the example.)
 
+### Sixth review (2026-10-16)
+A sixth fresh agent (`/review spec`) read the spec as changed after the second accept and build
+review of story A ("Remove from the team" with "Not in the team from", "Undo", every proposed
+date today, "Change role" rules, "Players of last season", "Hidden", "Last day today"), with its
+uncommitted diff against the approved version. Read: this spec, `idea.md`, `change.md`,
+`docs/vision.md`, `docs/language.md`, `docs/ideas.md`, `docs/product/choose-club-and-team.md`.
+Not read: any `technical.md`. Each note is checked by a trace through these documents; the
+weekdays of the example dates were checked with `date` (Thu 15 Oct, Wed 14 Oct, Sat 31 Oct, Sun 1
+Nov, Mon 2 Nov 2026: all right); leftover text was found with `grep -n -i "first training
+date\|proposed\|member of the team\|last day\|what was there"`. The arguments held only the mode
+and the change folder. Stories 2 to 5 changed only by the removal of the "first training date";
+they are checked for effects of the changes.
+
+| Story | What the user is doing here | Verdict | Note |
+|---|---|---|---|
+| 1 Keep the players and the team | Setting up the team once (in October for a season that started on 1 September, or with "Add all" in a new season), then recording a player who leaves, from today or from tomorrow, and undoing a removal tapped by mistake. | serves – note | "Not in the team from" with "Tomorrow" and "Undo" serve the hall well: a removal shows at once, a player who never started leaves nothing behind, and a mistake is one tap. The cost moved to the setup. See S27, S28, S29, S30. |
+| 2 Weekly trainings and trainings | Setting up the weekly training, entering the past, fixing mistakes. | serves | Only the "first training date" went; nothing else in story 2 used it (grep above: the remaining hit, "Tue 1 Sep (the first training date in the example)" in story 3, is an example, not a rule). |
+| 3 Mark attendance at a training | In the hall, two taps per absent player. | serves | No change. A removal from today takes the player off today's training; "Tomorrow" is there for a player who trained today. |
+| 4 Reasons | One tap for a reason with a weight. | serves | No change. |
+| 5 Season totals | As coach, seeing who comes and who misses. | serves | "Left the team" now follows a removal at once, and a player whose roles were all removed is in no group and no total, which is what the coach expects. Kept absences outside a role do not count (story 1 edge case). |
+
+No story conflicts with the vision. Core value 1 ("keep it correct") and Steve's warning ("every
+mistake must be correctable in the app") are served by "Undo"; S29 is about what is left after it.
+
+Notes:
+- **S27 – story 1, the first setup now takes 14 typed dates, and a missed one is silent.** The Context names the first use: in October the coordinator enters all trainings since 1 September. With every start proposed as today, the coordinator types 1 September for each of the 14 players (the criterion says so on purpose). The cost is one sitting; the risk is the one player where today is kept by mistake. The order in the behaviour (players first, then the past) then gives no sign: the warning "now counts as there at N earlier trainings" fires only when trainings were entered first, and "No player has a role on this date." only when no player has one. The September trainings just show 13 names, and that player's totals start in October. Suggest one of: the date field keeps the date typed last while the coordinator adds players in one visit (14 adds, one typed date); or the team page says so for a player whose role starts after trainings of the season that exist. Either keeps "today" for the mid-season joiner, which the coordinator chose. (Trace: Context; story 1 criterion "Add player" on the team page; edge cases "No player has a role on this date" (story 2) and "A role starts … while trainings … are already entered"; behaviour "At the start of the season".)
+- **S28 – story 1, "Players of last season" goes after the first added player, and "Add all" may have no date.** (a) The group shows only while no player has a role in the season. A new season often starts with a newcomer (the age group moves up). A coordinator who adds that newcomer first loses "Add all" and adds the 13 others one by one, each with a date. Suggest: the group shows while players of last season's team (not hidden) have no role in the season, and "Add all" adds those; or the behaviour says "Add all" first. (b) The criterion says "Add all" gives each player a role "from today", but the list of proposed dates names "Add all" as "proposed as today", which means a date field. If "Add all" has no date, a coordinator who taps it on 15 September, after two trainings, must "Correct" 13 roles. Say which; a date field ("In the team from", proposed today) is the same as for every other start. (Trace: story 1 criteria "Add player" (the list of proposed dates) and "A role ends at the latest …"; Interface "Team"; `docs/product/choose-club-and-team.md` "a youth team moves up an age group".)
+- **S29 – story 1, after "Undo" is gone, the history does not show "what was there".** The criterion says that after leaving the page, "Correct" and "Add to the team" restore the roles "with the history showing what was there". But roles that start on the date or later are removed, and there is no stored "removed" state (change section, "Undo (A7)"). So a planned "Change role", or the whole role a player got from "Add all", is gone from the history; only the ended role shows its new end. The coordinator must remember the removed role to restore it. The weight is low ("Undo" covers the moment of the mistake, and a removal is a deliberate step), but the sentence promises more than the tool keeps, and on a phone a tap on another page ends "Undo" too. Suggest the sentence says what is left: "the history shows the role that ended; roles that were removed are gone." (Trace: story 1 criteria "Remove from the team" and "After 'Remove from the team'"; change section "Undo (A7)".)
+- **S30 – story 1, "Last day today" on 30 June.** Every role ends at the latest at the end of its season, so on 30 June every player in the team has a role that ends today with no role after it, and every row says "Last day today". Harmless for one day, but it reads as if the whole team was removed. Suggest: "Last day today" only for a role that ends before the end of the season. (Trace: story 1 criteria "Last day today" and "A role ends at the latest at the end of its season (30 June)".)
+- **S31 – text that disagrees with the rest.** (a) The Context (paragraph "Words") still says a **player** is "a member of the team who plays games or only trains"; `docs/language.md` now says a person of the club, in the team through a role. Steve's warning "`docs/language.md` says a player is 'a member of the team'" is no longer true (settled in Open questions). (b) "Add player" on the team page makes a new player with "first name and last name"; the page "Players" and the word list make the last name optional. (c) "with a button 'Tomorrow' for a player whose last day is today" reads as if the button shows only for some players; the Interface and the behaviour read as if it always shows, for the coordinator to use when the player still trains today. Say which. (Trace: Context; story 1 criteria "Add player" (both pages) and "Remove from the team"; Interface "Team"; behaviour; warnings.)
+
 ## Answers to the spec review (2026-10-15)
 Decided with the coordinator; the stories above are changed to match.
 - **S1:** fixed. (The rule is widened by S7: a player with no absences can be deleted.)
@@ -503,3 +545,46 @@ page "Team" shows the name of the team chosen from the game list for the season,
 chosen yet" with a link to choose it; players can be added before the team is chosen. The model
 behind it: the club has the players; a team exists for one season and is the team chosen from the
 game list. The words go to `/vision` (Open questions).
+
+## Change after the second accept and build review of story A (2026-10-16)
+The accept review (A6–A10) and the build review (R13, R17) of story A, second form, found rules
+missing at the edges of a role. Decided with the coordinator (`/discover review:`):
+- **Removing from the team (A6, A7, R13).** "Remove from the team" means: from a date, the player
+  has no roles in the season. The field is the first day without the team ("Not in the team
+  from", proposed today, with "Tomorrow"), as "Change role" and "In the team from" also name the
+  first day of what is new. The role on the day before ends then; roles from the date on are
+  removed. A player who was in the team for part of the season is under "Left the team" at once;
+  a player who never started (for example after "Add all" in August) has nothing left in the
+  season. Before, the field was the last day (so a removal from today showed nothing until
+  tomorrow), a later planned role stayed, and a role that had not started could not be removed.
+- **Undo (A7).** Every mistake must be correctable: after "Remove from the team", "Undo" on the
+  row until the coordinator leaves the page; later by hand with "Correct" and "Add to the team".
+  No "Delete" for a role in the history, and no stored "removed" state.
+- **Proposed dates.** "In the team from" of "Add player" and "Add all" is 1 September of the
+  season, with "Today" (after the sixth spec review, S27); "Add to the team" and "Change role"
+  propose today. This replaces the answer to S23 (the first training date until a training is
+  opened). "Change role" on a role that starts later says to use "Correct" (A8).
+- **"Change role" to the same role (R17)** is refused.
+- **"Players of last season" (A10)** shows only while no player of last season's team has a role
+  in the season, and "Add all" asks "In the team from" (S28).
+- **A removal that also removes a later role** asks for a confirmation that names it (S29).
+- **Hidden (A9).** "Hidden" only keeps lists short: the list on "Players", the choices of "Add
+  player" and "Players of last season". A hidden player under "Left the team" keeps "Add to the
+  team" on its own row; before, the spec said a hidden player "is not offered when a player is
+  added to the team".
+- A player whose last day in the team is today shows "Last day today" in the row, not on 30 June
+  (S30).
+
+## Answers to the sixth spec review (2026-10-16)
+Decided with the coordinator; the stories above are changed to match.
+- **S27:** fixed. "In the team from" of "Add player" and "Add all" is filled with 1 September of
+  the season, with a button "Today" and the date field for any other date. "Add to the team" and
+  "Change role" stay on today.
+- **S28:** fixed. "Players of last season" stays while no player of last season's team has a role
+  in the season (a newcomer does not count); "Add all" asks "In the team from".
+- **S29:** fixed. A removal that also removes a later role first asks for a confirmation that names
+  that role; the criterion no longer says the history shows what was there.
+- **S30:** fixed. No "Last day today" on the last day of the season.
+- **S31:** fixed. The Context uses the word list's meaning of player; Steve's warning is marked
+  settled; the last name is optional in "Add player" on the team page; "Tomorrow" is always next
+  to the date field of "Remove from the team".
