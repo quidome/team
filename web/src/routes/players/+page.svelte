@@ -146,7 +146,14 @@
 				</fieldset>
 				<label class="block space-y-1">
 					<span class="text-sm">In the team from</span>
-					<input class={field} type="date" bind:value={from} required />
+					<input
+						class={field}
+						type="date"
+						bind:value={from}
+						min={data.players?.season_first_day}
+						max={data.players?.season_last_day}
+						required
+					/>
 				</label>
 				{#if error}
 					<p class="text-sm" role="alert">{error}</p>

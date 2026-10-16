@@ -7,8 +7,8 @@ use axum::http::StatusCode;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
-    Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_role, clean_name,
-    role_on, roles_to_carry,
+    Group, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_role,
+    clean_name, place, proposed_start, roles_to_carry,
 };
 use utoipa::ToSchema;
 
@@ -70,6 +70,10 @@ pub struct PlayerView {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PlayersView {
     pub season: String,
+    /// The first day of the season, for example "2026-07-01": the earliest date of a role.
+    pub season_first_day: String,
+    /// The last day of the season, for example "2027-06-30": the latest date of a role.
+    pub season_last_day: String,
     /// Today's Dutch date: the proposed end for "Left the team".
     pub today: String,
     /// The proposed start of a new role: the first training date of the season, or today when
@@ -154,44 +158,52 @@ fn role_view(role: &PlayerRole) -> RoleView {
     }
 }
 
-fn player_view(player: Player, role: Option<Role>, roles: &[&PlayerRole]) -> PlayerView {
+fn player_view(player: Player, placement: &Placement) -> PlayerView {
     PlayerView {
         id: player.id.0,
         first_name: player.first_name,
         last_name: player.last_name,
-        role: role.map(RoleKind::from),
-        roles: roles.iter().map(|role| role_view(role)).collect(),
+        role: placement.role.map(RoleKind::from),
+        roles: placement.roles.iter().map(|role| role_view(role)).collect(),
     }
 }
 
-/// The view of one player in the current season.
+/// The roles of `player` in the current season and the season before.
+async fn roles_around(
+    state: &AppState,
+    player: PlayerId,
+    season: Season,
+) -> Result<Vec<PlayerRole>, StoreError> {
+    Ok(players::roles_of(&state.pool, player)
+        .await?
+        .into_iter()
+        .filter(|role| role.season == season || role.season == season.previous())
+        .collect())
+}
+
+/// The view of one player in the current season, as the players page shows it.
 async fn one(state: &AppState, id: PlayerId) -> Result<PlayerView, AppError> {
     let player = players::by_id(&state.pool, id)
         .await?
         .ok_or(AppError::NotFound)?;
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let roles = players::roles_of(&state.pool, id).await?;
-    let in_season: Vec<&PlayerRole> = roles.iter().filter(|role| role.season == season).collect();
-    let role = role_on(&roles, id, today).map(|role| role.role);
-    Ok(player_view(player, role, &in_season))
+    let roles = roles_around(state, id, season).await?;
+    Ok(player_view(player, &place(&roles, id, season, today)))
 }
 
 /// Groups the players for `season` on `today`.
-pub fn group(
+fn group(
     season: Season,
     today: NaiveDate,
     proposed_from: NaiveDate,
     all: Vec<Player>,
     roles: &[PlayerRole],
 ) -> PlayersView {
-    let previous = Season::from_start_year(season.start_year() - 1);
-    let to_carry: Vec<PlayerId> = roles_to_carry(roles, season)
-        .into_iter()
-        .map(|(player, _)| player)
-        .collect();
     let mut view = PlayersView {
         season: season.to_string(),
+        season_first_day: day(season.first_day()),
+        season_last_day: day(season.last_day()),
         today: day(today),
         proposed_from: day(proposed_from),
         players: Vec::new(),
@@ -200,38 +212,19 @@ pub fn group(
         others: Vec::new(),
     };
     for player in all {
-        let of_season = |wanted: Season| -> Vec<&PlayerRole> {
-            roles
-                .iter()
-                .filter(|role| role.player == player.id && role.season == wanted)
-                .collect()
+        let placement = place(roles, player.id, season, today);
+        let list = match placement.group {
+            Group::Team => &mut view.players,
+            Group::Left => &mut view.left,
+            Group::LastSeason => &mut view.last_season,
+            Group::Other => &mut view.others,
         };
-        let this = of_season(season);
-        let last = of_season(previous);
-        // A role today, or one that starts later in the season (for example from the first
-        // training date, after "Add all" in summer).
-        let current = role_on(roles, player.id, today)
-            .filter(|role| role.season == season)
-            .or_else(|| this.iter().copied().find(|role| role.from > today));
-        if let Some(role) = current {
-            let role = role.role;
-            view.players.push(player_view(player, Some(role), &this));
-        } else if let Some(newest) = this.last() {
-            let role = newest.role;
-            view.left.push(player_view(player, Some(role), &this));
-        } else if let Some(newest) = last.last().filter(|_| to_carry.contains(&player.id)) {
-            let role = newest.role;
-            view.last_season
-                .push(player_view(player, Some(role), &last));
-        } else {
-            view.others.push(player_view(player, None, &[]));
-        }
+        list.push(player_view(player, &placement));
     }
     view
 }
 
-/// The proposed start of a new role: the first training date of the season, or today when
-/// trainings have started or nothing is set.
+/// The proposed start of a new role in `season` (see `proposed_start`).
 async fn proposed_from(
     state: &AppState,
     season: Season,
@@ -241,15 +234,14 @@ async fn proposed_from(
     let first = training_settings::for_season(&mut db, season)
         .await?
         .map(|stored| stored.first);
-    Ok(first.map_or(today, |first| first.max(today)))
+    Ok(proposed_start(first, today))
 }
 
 pub async fn load(state: &AppState) -> Result<PlayersView, StoreError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let previous = Season::from_start_year(season.start_year() - 1);
     let all = players::all(&state.pool).await?;
-    let roles = players::roles_in(&state.pool, &[season, previous]).await?;
+    let roles = players::roles_in(&state.pool, &[season, season.previous()]).await?;
     let proposed_from = proposed_from(state, season, today).await?;
     Ok(group(season, today, proposed_from, all, &roles))
 }
@@ -274,7 +266,7 @@ pub async fn list(State(state): State<AppState>) -> Result<Json<PlayersView>, Ap
     request_body = NewPlayer,
     responses(
         (status = 200, description = "The new player", body = SavedPlayer),
-        (status = 400, description = "`first_name_required`, `outside_season`"),
+        (status = 400, description = "`first_name_required`, `outside_season` (the role does not start in the current season)"),
         (status = 401, description = "Not logged in"),
     )
 )]
@@ -283,8 +275,9 @@ pub async fn add(
     Json(body): Json<NewPlayer>,
 ) -> Result<Json<SavedPlayer>, AppError> {
     let (first_name, last_name) = clean_name(&body.first_name, body.last_name.as_deref())?;
+    let season = current_season(state.clock.as_ref());
     if let Some(role) = &body.role {
-        check_role(Season::of(role.from), role.from, None, &[])?;
+        check_role(season, role.from, None, &[])?;
     }
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     let id = players::insert(
@@ -295,15 +288,7 @@ pub async fn add(
     )
     .await?;
     if let Some(role) = &body.role {
-        players::insert_role(
-            &mut *tx,
-            id,
-            Season::of(role.from),
-            role.role.into(),
-            role.from,
-            None,
-        )
-        .await?;
+        players::insert_role(&mut *tx, id, season, role.role.into(), role.from, None).await?;
     }
     let same_name =
         players::same_name_exists(&mut *tx, &first_name, last_name.as_deref(), Some(id)).await?;
@@ -416,21 +401,28 @@ pub async fn change_role(
 }
 
 /// Adds a role (`role` is `None`) or changes one, under the player's lock, so two saves at the same
-/// time cannot make an overlap.
+/// time cannot make an overlap. Only roles of the current season are saved; a changed role must be
+/// of the current season too.
 async fn save_role(
     state: &AppState,
     player: PlayerId,
     role: Option<RoleId>,
     body: RoleChange,
 ) -> Result<(), AppError> {
-    let season = Season::of(body.from);
+    let season = current_season(state.clock.as_ref());
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     if !players::lock(&mut tx, player).await? {
         return Err(AppError::NotFound);
     }
     let roles = players::roles_of(&mut *tx, player).await?;
-    if role.is_some_and(|id| !roles.iter().any(|stored| stored.id == id)) {
-        return Err(AppError::NotFound);
+    if let Some(id) = role {
+        let stored = roles
+            .iter()
+            .find(|stored| stored.id == id)
+            .ok_or(AppError::NotFound)?;
+        if stored.season != season {
+            return Err(PlayerError::OutsideSeason.into());
+        }
     }
     let others: Vec<PlayerRole> = roles
         .into_iter()
@@ -483,7 +475,6 @@ pub async fn carry(
 ) -> Result<Json<PlayersView>, AppError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let previous = Season::from_start_year(season.start_year() - 1);
     let from = proposed_from(&state, season, today).await?;
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     for id in body.players.iter().copied().map(PlayerId) {
@@ -495,7 +486,7 @@ pub async fn carry(
         let roles: Vec<PlayerRole> = players::roles_of(&mut *tx, id)
             .await?
             .into_iter()
-            .filter(|role| role.season == season || role.season == previous)
+            .filter(|role| role.season == season || role.season == season.previous())
             .collect();
         if let Some((_, role)) = roles_to_carry(&roles, season).first() {
             players::insert_role(&mut *tx, id, season, *role, from, None).await?;

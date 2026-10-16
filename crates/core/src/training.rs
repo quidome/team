@@ -92,7 +92,7 @@ pub fn training_dates(season: &TrainingSeason) -> Vec<(NaiveDate, TrainingDay)> 
 
 /// Checks a save of the settings of `season` and gives the set to store: valid from `today`, or
 /// from `first` when today is before it, or for the first save of the season (`first_save`): there
-/// is no past to keep then. A stored set with the same `valid_from` is replaced by it.
+/// is no past to keep then. The stored sets valid from the same date or later are replaced by it.
 pub fn settings_change(
     season: Season,
     first: NaiveDate,

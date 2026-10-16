@@ -193,6 +193,7 @@ pub async fn save(
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    training_settings::lock(&mut tx).await?;
     let first_save = training_settings::for_season(&mut tx, season)
         .await?
         .is_none_or(|stored| stored.sets.is_empty());

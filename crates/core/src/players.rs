@@ -60,12 +60,24 @@ pub fn clean_name(
     Ok((first.to_owned(), last.map(str::to_owned)))
 }
 
+impl PlayerRole {
+    /// The last day of the role: `until`, or the last day of its season while it continues. A role
+    /// never runs into the next season.
+    pub fn last_day(&self) -> NaiveDate {
+        self.until.unwrap_or_else(|| self.season.last_day())
+    }
+
+    fn covers(&self, date: NaiveDate) -> bool {
+        self.from <= date && date <= self.last_day()
+    }
+}
+
 /// The role of `player` on `date`, if any. Roles of one player never overlap, so there is at most
 /// one.
 pub fn role_on(roles: &[PlayerRole], player: PlayerId, date: NaiveDate) -> Option<&PlayerRole> {
     roles
         .iter()
-        .find(|role| role.player == player && covers(role.from, role.until, date))
+        .find(|role| role.player == player && role.covers(date))
 }
 
 /// Checks a role of `season` from `from` until `until` against `others`, the player's other roles
@@ -82,52 +94,122 @@ pub fn check_role(
     if Season::of(from) != season || until.is_some_and(|until| Season::of(until) != season) {
         return Err(PlayerError::OutsideSeason);
     }
-    let overlaps = |other: &PlayerRole| {
-        other.until.is_none_or(|other_until| from <= other_until)
-            && until.is_none_or(|until| other.from <= until)
-    };
-    if others.iter().any(overlaps) {
+    let last_day = until.unwrap_or_else(|| season.last_day());
+    if others
+        .iter()
+        .any(|other| other.from <= last_day && from <= other.last_day())
+    {
         return Err(PlayerError::RolesOverlap);
     }
     Ok(())
 }
 
+/// The proposed start of a new role: the first training date of the season, or today when
+/// trainings have started, or today when the season has no training settings.
+pub fn proposed_start(first_training: Option<NaiveDate>, today: NaiveDate) -> NaiveDate {
+    first_training.map_or(today, |first| first.max(today))
+}
+
+/// Where the players page lists a player in a season.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Group {
+    /// A role today, or one that starts later in the season (for example from the first training
+    /// date, after "Add all" in summer).
+    Team,
+    /// Roles earlier in the season, none today or later.
+    Left,
+    /// No role in the season, and in the team until the end of last season: "Add all" brings it
+    /// back.
+    LastSeason,
+    /// None of the above.
+    Other,
+}
+
+/// A player's place on the players page: the group, the role shown with the name, and the roles
+/// listed (of the season, or of last season for `LastSeason`), in order of start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Placement<'a> {
+    pub group: Group,
+    pub role: Option<Role>,
+    pub roles: Vec<&'a PlayerRole>,
+}
+
+/// Places `player` for `season` on `today`. `roles` holds at least the player's roles of `season`
+/// and of the season before; roles of other players are ignored.
+pub fn place(
+    roles: &[PlayerRole],
+    player: PlayerId,
+    season: Season,
+    today: NaiveDate,
+) -> Placement<'_> {
+    let this = roles_in(roles, player, season);
+    let current = this
+        .iter()
+        .find(|role| role.covers(today))
+        .or_else(|| this.iter().find(|role| role.from > today))
+        .map(|role| role.role);
+    if let Some(role) = current {
+        return Placement {
+            group: Group::Team,
+            role: Some(role),
+            roles: this,
+        };
+    }
+    if let Some(newest) = this.last() {
+        return Placement {
+            group: Group::Left,
+            role: Some(newest.role),
+            roles: this,
+        };
+    }
+    if let Some(role) = stayed_until_end(roles, player, season.previous()) {
+        return Placement {
+            group: Group::LastSeason,
+            role: Some(role),
+            roles: roles_in(roles, player, season.previous()),
+        };
+    }
+    Placement {
+        group: Group::Other,
+        role: None,
+        roles: Vec::new(),
+    }
+}
+
 /// "Add all": the players to bring into `season`, each with the kind of role it had at the end of
-/// the previous season. A player counts when its newest role of the previous season did not end
-/// before 30 June, and it has no role in `season` yet. `roles` holds the roles of both seasons.
+/// the previous season. A player counts when its newest role of the previous season lasted until
+/// the season's last day, and it has no role in `season` yet. `roles` holds the roles of both
+/// seasons.
 pub fn roles_to_carry(roles: &[PlayerRole], season: Season) -> Vec<(PlayerId, Role)> {
-    let previous = Season::from_start_year(season.start_year() - 1);
-    let season_end = NaiveDate::from_ymd_opt(season.start_year(), 6, 30);
-    let mut carried: Vec<(PlayerId, Role)> = Vec::new();
     let mut players: Vec<PlayerId> = roles.iter().map(|role| role.player).collect();
     players.sort();
     players.dedup();
-    for player in players {
-        let of = |wanted: Season| {
-            roles
-                .iter()
-                .filter(move |role| role.player == player && role.season == wanted)
-        };
-        if of(season).next().is_some() {
-            continue;
-        }
-        let Some(newest) = of(previous).max_by_key(|role| role.from) else {
-            continue;
-        };
-        let stayed = match (newest.until, season_end) {
-            (None, _) => true,
-            (Some(until), Some(end)) => until >= end,
-            (Some(_), None) => false,
-        };
-        if stayed {
-            carried.push((player, newest.role));
-        }
-    }
-    carried
+    players
+        .into_iter()
+        .filter(|player| roles_in(roles, *player, season).is_empty())
+        .filter_map(|player| {
+            stayed_until_end(roles, player, season.previous()).map(|role| (player, role))
+        })
+        .collect()
 }
 
-fn covers(from: NaiveDate, until: Option<NaiveDate>, date: NaiveDate) -> bool {
-    from <= date && until.is_none_or(|until| date <= until)
+/// The roles of `player` in `season`, in order of start.
+fn roles_in(roles: &[PlayerRole], player: PlayerId, season: Season) -> Vec<&PlayerRole> {
+    let mut found: Vec<&PlayerRole> = roles
+        .iter()
+        .filter(|role| role.player == player && role.season == season)
+        .collect();
+    found.sort_by_key(|role| role.from);
+    found
+}
+
+/// The kind of the player's newest role in `season`, when that role lasted until the season's
+/// last day.
+fn stayed_until_end(roles: &[PlayerRole], player: PlayerId, season: Season) -> Option<Role> {
+    roles_in(roles, player, season)
+        .last()
+        .filter(|newest| newest.last_day() >= season.last_day())
+        .map(|newest| newest.role)
 }
 
 #[cfg(test)]
@@ -207,6 +289,123 @@ mod tests {
         assert_eq!(
             role_on(&roles, AVERY, date(2027, 1, 10)).map(|role| role.id),
             Some(RoleId(2))
+        );
+    }
+
+    fn last_season_role(from: NaiveDate, until: Option<NaiveDate>) -> PlayerRole {
+        PlayerRole {
+            id: RoleId(50),
+            season: Season::from_start_year(2025),
+            ..role(50, from, until)
+        }
+    }
+
+    #[test]
+    fn an_open_role_ends_on_the_last_day_of_its_season() {
+        let roles = [last_season_role(date(2025, 9, 2), None)];
+        assert!(role_on(&roles, AVERY, date(2026, 6, 30)).is_some());
+        assert!(role_on(&roles, AVERY, date(2026, 7, 1)).is_none());
+        assert!(role_on(&roles, AVERY, date(2026, 10, 12)).is_none());
+        assert_eq!(roles[0].last_day(), date(2026, 6, 30));
+    }
+
+    #[test]
+    fn an_open_role_of_last_season_does_not_overlap_a_role_in_this_season() {
+        let last = [last_season_role(date(2025, 9, 2), None)];
+        assert_eq!(
+            check_role(season(), date(2026, 10, 12), None, &last),
+            Ok(())
+        );
+        assert_eq!(check_role(season(), date(2026, 7, 1), None, &last), Ok(()));
+        // "Left the team" on the new role: the other roles are only last season's.
+        assert_eq!(
+            check_role(season(), date(2026, 10, 12), Some(date(2026, 11, 1)), &last),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn the_proposed_start_is_the_first_training_date_or_today() {
+        let first = Some(date(2026, 9, 1));
+        assert_eq!(proposed_start(first, date(2026, 8, 15)), date(2026, 9, 1));
+        assert_eq!(
+            proposed_start(first, date(2026, 10, 12)),
+            date(2026, 10, 12)
+        );
+        assert_eq!(proposed_start(None, date(2026, 8, 15)), date(2026, 8, 15));
+    }
+
+    #[test]
+    fn a_player_with_a_role_today_or_later_in_the_season_is_in_the_team() {
+        // After "Add all" on 15 August, from the first training date.
+        let roles = [
+            last_season_role(date(2025, 9, 2), None),
+            PlayerRole {
+                role: Role::OnlyTrains,
+                ..role(2, date(2026, 9, 1), None)
+            },
+        ];
+        for today in [
+            date(2026, 8, 15),
+            date(2026, 9, 1),
+            date(2026, 9, 2),
+            date(2027, 6, 30),
+        ] {
+            let placement = place(&roles, AVERY, season(), today);
+            assert_eq!(placement.group, Group::Team, "on {today}");
+            assert_eq!(placement.role, Some(Role::OnlyTrains));
+            assert_eq!(placement.roles, [&roles[1]]);
+        }
+    }
+
+    #[test]
+    fn a_player_added_to_this_season_is_in_the_team_and_not_left() {
+        let roles = [
+            last_season_role(date(2025, 9, 2), None),
+            role(2, date(2026, 10, 12), None),
+        ];
+        let placement = place(&roles, AVERY, season(), date(2026, 10, 12));
+        assert_eq!(placement.group, Group::Team);
+        assert_eq!(placement.roles, [&roles[1]]);
+    }
+
+    #[test]
+    fn a_player_whose_roles_ended_is_left_with_the_newest_role() {
+        let roles = [
+            PlayerRole {
+                role: Role::OnlyTrains,
+                ..role(1, date(2026, 9, 1), Some(date(2026, 9, 30)))
+            },
+            role(2, date(2026, 10, 1), Some(date(2026, 10, 15))),
+        ];
+        let placement = place(&roles, AVERY, season(), date(2026, 10, 20));
+        assert_eq!(placement.group, Group::Left);
+        assert_eq!(placement.role, Some(Role::PlaysGames));
+        assert_eq!(placement.roles.len(), 2);
+    }
+
+    #[test]
+    fn a_player_who_stayed_last_season_waits_under_last_season() {
+        let roles = [PlayerRole {
+            role: Role::OnlyTrains,
+            ..last_season_role(date(2025, 9, 2), None)
+        }];
+        let placement = place(&roles, AVERY, season(), date(2026, 8, 15));
+        assert_eq!(placement.group, Group::LastSeason);
+        assert_eq!(placement.role, Some(Role::OnlyTrains));
+        assert_eq!(placement.roles, [&roles[0]]);
+    }
+
+    #[test]
+    fn a_player_who_left_early_last_season_or_has_no_role_is_other() {
+        let roles = [last_season_role(date(2025, 9, 2), Some(date(2026, 3, 10)))];
+        let placement = place(&roles, AVERY, season(), date(2026, 8, 15));
+        assert_eq!(placement.group, Group::Other);
+        assert_eq!(placement.role, None);
+        assert!(placement.roles.is_empty());
+        assert_eq!(
+            place(&[], AVERY, season(), date(2026, 8, 15)).group,
+            Group::Other
         );
     }
 

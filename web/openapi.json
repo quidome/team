@@ -246,7 +246,7 @@
             }
           },
           "400": {
-            "description": "`first_name_required`, `outside_season`"
+            "description": "`first_name_required`, `outside_season` (the role does not start in the current season)"
           },
           "401": {
             "description": "Not logged in"
@@ -1409,6 +1409,8 @@
         "description": "The players for the current season.",
         "required": [
           "season",
+          "season_first_day",
+          "season_last_day",
           "today",
           "proposed_from",
           "players",
@@ -1451,6 +1453,14 @@
           },
           "season": {
             "type": "string"
+          },
+          "season_first_day": {
+            "type": "string",
+            "description": "The first day of the season, for example \"2026-07-01\": the earliest date of a role."
+          },
+          "season_last_day": {
+            "type": "string",
+            "description": "The last day of the season, for example \"2027-06-30\": the latest date of a role."
           },
           "today": {
             "type": "string",

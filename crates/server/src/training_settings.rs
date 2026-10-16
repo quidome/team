@@ -52,8 +52,22 @@ pub async fn for_season(
     }))
 }
 
-/// Saves the first and the last training date of `season`, and `set`: a stored set with the same
-/// `valid_from` is replaced. Run it in a transaction.
+/// The key of the advisory lock that every save of the training settings takes ("team" "trng" in
+/// ASCII), so two saves at the same time run one after the other.
+const SETTINGS_LOCK: i64 = 0x7465_616d_7472_6e67;
+
+/// Takes the lock of the training settings until the end of the transaction. Take it before
+/// reading what is stored.
+pub async fn lock(tx: &mut PgConnection) -> Result<(), StoreError> {
+    sqlx::query!("SELECT pg_advisory_xact_lock($1)", SETTINGS_LOCK)
+        .execute(tx)
+        .await?;
+    Ok(())
+}
+
+/// Saves the first and the last training date of `season`, and `set`. The stored sets valid from
+/// the same date or later are removed: the newest save applies from its `valid_from` on. Run it in
+/// a transaction, after `lock`.
 pub async fn save(
     tx: &mut PgConnection,
     season: Season,
@@ -72,7 +86,7 @@ pub async fn save(
     .execute(&mut *tx)
     .await?;
     sqlx::query!(
-        "DELETE FROM training_days WHERE season_year = $1 AND valid_from = $2",
+        "DELETE FROM training_days WHERE season_year = $1 AND valid_from >= $2",
         season.start_year(),
         set.valid_from,
     )

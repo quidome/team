@@ -37,6 +37,24 @@ impl Season {
     pub fn from_start_year(start_year: i32) -> Season {
         Season { start_year }
     }
+
+    pub fn previous(self) -> Season {
+        Season {
+            start_year: self.start_year - 1,
+        }
+    }
+
+    /// The first day of the season: 1 July. `NaiveDate::MIN` only for a year outside chrono's
+    /// range.
+    pub fn first_day(self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(self.start_year, FIRST_MONTH, 1).unwrap_or(NaiveDate::MIN)
+    }
+
+    /// The last day of the season: 30 June of the next year. `NaiveDate::MAX` only for a year
+    /// outside chrono's range.
+    pub fn last_day(self) -> NaiveDate {
+        NaiveDate::from_ymd_opt(self.start_year + 1, FIRST_MONTH - 1, 30).unwrap_or(NaiveDate::MAX)
+    }
 }
 
 impl fmt::Display for Season {
@@ -110,6 +128,14 @@ mod tests {
     fn a_start_year_shows_as_the_two_years() {
         assert_eq!(Season::from_start_year(2026).to_string(), "2026-2027");
         assert_eq!(Season::from_start_year(2026).start_year(), 2026);
+    }
+
+    #[test]
+    fn a_season_ends_on_the_last_day_of_june() {
+        let season = Season::from_start_year(2026);
+        assert_eq!(season.first_day(), date(2026, 7, 1));
+        assert_eq!(season.last_day(), date(2027, 6, 30));
+        assert_eq!(season.previous().to_string(), "2025-2026");
     }
 
     #[test]

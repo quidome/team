@@ -173,7 +173,12 @@ Decisions that apply: 0001, 0002, 0004, 0007, 0014; the epic's architecture (pla
 - [x] Step 4: screens
 - [x] Step 5: "Add all"
 - [x] All checks pass (`just check`, 2026-10-15; 36 browser tests)
-- [ ] Review build
+- [x] Review build (2026-10-15): not ready, findings R1–R9 below
+- [x] Fix 1: R1, R2, R4 – an open role ends on the last day of its season; the grouping of the players page and the proposed start of a role in the core
+- [x] Fix 2: R3 and R9 (two saves at once) – a settings save removes the stored sets from its valid-from date on, under a lock
+- [x] Fix 3: R5 – the test of two role saves at once always catches a missing lock
+- [x] Fix 4: R6, R7, R8, R9 (the other two points) – roles only in the current season, the detail page, the 404 sentence, the proposed end, the settings page after the first save
+- [ ] Review build again
 
 ## Deviations
 None from `functional.md` (as changed on 2026-10-15). The design reads the spec more strictly within its words:
@@ -201,5 +206,126 @@ Implement:
   - "Players of last season" lists only the players who stayed until the end of last season (the ones "Add all" brings back); a player who left early last season is under "Other players", where "Add to the team" works. Otherwise "Add to this season" would do nothing for such a player.
   - A player whose role starts later in the season (for example after "Add all" in August, from 1 September) is listed with the current players, not under "Left the team".
   - A browser test with replaced answers checks the part "Players of last season" and the request of "Add all" (the browser server's clock has no last season).
+- 2026-10-16, fix 1: the browser test of "Add all" failed 2 of 6 runs ("Response has been disposed": a load of the list was still under way when the test ended). It now removes its replaced answers at the end (`page.unrouteAll({ behavior: 'ignoreErrors' })`); 6 runs passed. `Season::previous` replaces the three copies of "the season before".
+- 2026-10-16, fix 2: the lock of the settings is an advisory lock, not `SELECT … FOR UPDATE` on `training_seasons`: before the first save there is no row to lock.
+- 2026-10-16, fix 4: a role of another season cannot be changed (not only not added), so "Undo" on a role of last season gives `outside_season`. `Season::first_day` is new. The new sentence for a 404 is "This no longer exists. Load the page again." (not in the spec's list of sentences).
 
 ## Review findings
+Build review, 2026-10-15, by a fresh agent (`/review build`). The arguments held only the mode
+and the change folder. Read: the diff `main...feat/players-and-settings` (one commit, 905a767;
+nothing uncommitted), this folder, the epic's `functional.md` and `technical.md`,
+`docs/architecture.md`, decisions 0001, 0004, 0007, 0011, `CLAUDE.md`, `docs/language.md`.
+Ran: `cargo test -p team_core`, the four new server test files, `cargo clippy --all-targets -D
+warnings`, `cargo fmt --check` (all pass). Probes ran as extra tests in a copy of the tree in the
+scratchpad (`git archive HEAD`), against the local PostgreSQL; nothing in the repository was
+changed. The browser tests and `just check` as a whole were not run.
+
+**R1 – an open role of last season never ends (bug, high). Run.** `until = NULL` means "until the
+end of its season" in `roles_to_carry` (it counts as "stayed until 30 June"), but `covers` /
+`role_on` and the overlap test in `check_role` treat it as open for ever, and `save_role` checks
+against `roles_of` (all seasons). Every player who stayed until the end of last season has such a
+role. Reproduced (Avery and Blake with a role from 2 Sep 2025, no end; clock 12 Oct 2026):
+- after "Add to this season" for Avery, `GET /api/players` lists Avery under **"Left the team"**: `role_on` finds the 2025 role first, the season filter drops it, and the new role (from today) is not "later in the season";
+- "Left the team" on Avery's new role: `400 roles_overlap`;
+- "Add to the team" (`POST /roles`) for Blake from 12 Oct 2026: `400 roles_overlap`;
+- "Add all" in summer (clock 15 Aug 2026, first training 1 Sep): the players are listed with the team until 1 Sep; on 2 Sep the carried player is under "Left the team".
+- 2026-10-16: fixed. `PlayerRole::last_day` (its end, or 30 June of its season while it continues; `Season::last_day`) is the one meaning of an open role in `role_on`, the overlap of `check_role` and "Add all". Core tests with an open role of 2025-2026 against dates and roles in 2026-2027; API tests `after_add_all_in_summer_the_players_stay_in_the_team_and_can_leave` (clock 2 Sep and 2 Oct) and `last_seasons_players_join_during_the_season`. Both API tests fail with the old meaning.
+
+So "Add all" and every role change in the second season of use do not work, and story B
+(who shows at a training, `role_on`) would put last season's players at this season's trainings
+with last season's role. The tests did not see it: the core tests of `role_on` use one season, and
+the API test of "Add all" stops before the first training date (the "role starts later" branch
+hides it). Fix in the core: one meaning for an open role, its end is `until` or the season's last
+day (30 June), in `covers`, `role_on` and the overlap of `check_role`; a core test with an open role
+of 2025-2026 against a date and a role in 2026-2027; an API test of "Left the team" after "Add
+all", with the clock after the first training date.
+
+**R2 – `one()` gives a role from another season (bug, low; same root as R1). Run.** The answer
+of `POST /api/players` with a role from 2025-09-01 (clock 12 Oct 2026) has `"role": "plays_games"`
+and `"roles": []`; `one()` uses `role_on` without the season filter that `group` has. The answer
+of a role that starts later (clock 15 Aug, from 1 Sep) has `"role": null`, while the list shows
+"only_trains". The two views of one player follow two rules; the screens use only the list now.
+Fix with R1, and give `one()` the same rule as `group` (better: one core function, see R4).
+- 2026-10-16: fixed. `one()` and the list both use the core function `place`; the API test checks that the answer of a new role equals the player's row in the list.
+
+**R3 – a change of training days before the season leaves an older set in force (bug, medium).
+Run.** `training_settings::save` replaces only a set with the same `valid_from`. Before the first
+training date `valid_from` is `first`, so a set can lie in the future. Probe, clock 15 Aug 2026:
+save Tuesdays with first 8 Sep, then Thursdays 19:00–20:30 with first 1 Sep. Stored sets:
+`[(1 Sep, Thu), (8 Sep, Tue)]`; `training_dates` gives Thu 3 Sep, then Tue 8, 15, 22 Sep …; the
+settings page shows Thursday until 7 Sep and **Tuesday 19:45 from 8 Sep** (`GET` on 10 Sep), though
+the last save said Thursday. The same happens in the season when `first` is moved later than
+today. The spec says a change applies from the day it is made; a later save must win from its
+`valid_from` on. Fix: a save removes the sets with `valid_from` on or after the new one (rule in
+`settings_change` or the store, with a test of the case above).
+- 2026-10-16: fixed. `training_settings::save` removes the stored sets valid from the new set's date or later, so the newest save applies from its valid-from date on. Storage test `a_save_removes_the_sets_from_its_date_on`; API test `before_the_season_the_last_save_wins` (the probe above: one set from 1 Sep, Thursday on 10 Sep). Both fail with the old query.
+
+**R4 – product rules in the server (decision 0001, "New rules go in `crates/core` first").
+Trace.** `api/players.rs` holds the grouping of the players page (`group`: with the team, "Left
+the team", last season, others; a role that starts later counts as current) and the proposed start
+of a role (`proposed_from`: first training date, or today when later, or today without settings),
+which the technical spec put in the core (`roles_to_carry(…, start)`). The deviation of step 5
+names the move but not why. Both are product rules that story B and C need again (who is in the
+team on a date; the proposed start), and `group` is tested only through the API. R1 and R2 show
+the cost: two rules for "the role now" in one file. Suggest: a core function for the grouping and
+one for the proposed start, with unit tests; the server only loads and maps.
+- 2026-10-16: fixed. Core `players::place` (the group, the role shown, the roles listed; `Group` is with the team, left, last season or other) and `players::proposed_start`, with unit tests; `api/players.rs` only loads and maps.
+
+**R5 – the concurrency test catches a missing lock only sometimes (test, medium). Run.** With the
+`players::lock` call in `save_role` removed (in the scratch copy), `two_role_saves_at_the_same_time_never_overlap`
+failed 1 of 9 runs. `tokio::join!` on one task interleaves the two requests only by chance. The
+claim "two role saves … one stored, the other `roles_overlap`" is true for the code, but the test
+does not guard it. Suggest: hold the first request after its read (for example a second connection
+that takes the row lock first and lets go after the second request has started), or run the
+saves many times in a loop.
+- 2026-10-16: fixed. `two_role_saves_at_the_same_time_never_overlap` now holds the player's lock on a second connection and writes an overlapping role there; the save through the API must wait (still pending after 300 ms), and after the commit it answers `400 roles_overlap`, with one role stored. Without `players::lock` in `save_role` it failed 10 of 10 runs; with it, it passed 10 of 10.
+
+**R6 – roles can be saved in any season, though the spec and screens speak only of the current
+one (gap, medium). Run.** `POST /api/players` with a role from 2025-09-01 (clock 12 Oct 2026) and
+from 2027-09-01: both `200`. The first player lands under "Players of last season" with an open
+role, the second under "Other players" with a role that no screen shows (the detail page lists
+only the current season's roles). The date fields have no `min`/`max`, so a wrong year on the phone
+gives this without a sign. `outside_season` ("This date is outside the season.") can never come
+from `add`, and from the role routes only when `until` is in another season than `from`. Suggest:
+the role routes check `Season::of(from) == current season` (the spec: "a role in the current
+season"), and the date fields get the season's bounds.
+- 2026-10-16: fixed (the coordinator chose: current season only). `POST /api/players` and the role routes check against the current season, so a start date in another season gives `400 outside_season`; a role of another season cannot be changed either. `PlayersView` gives `season_first_day` and `season_last_day`; the date fields of a role use them as `min` and `max`. API test `roles_are_saved_only_in_the_current_season`; the browser test of "Add player" checks the limits.
+
+**R7 – the player detail page shows last season's roles under this season's heading (bug, low).
+Trace.** `players/[id]/+page.ts` takes the player from `last_season` too, where `roles` are last
+season's. The page then shows them under "In the team · 2026-2027" and offers "Left the team" on a
+role of 2025-2026; a save with today as end gives `outside_season`. The rows of "Players of last
+season" are not links, so the page is reached only by URL or a stale link. Suggest: on the detail
+page, take `roles` only for the current season (or show "Last season" apart).
+- 2026-10-16: fixed. The detail page gives a player of last season no roles, so it shows "Not in the team this season." and "Add to the team", with last season's kind of role proposed. Browser test `a player of last season has no roles of this season yet` (replaced answer).
+
+**R8 – a 404 on a player, role or reason shows "This club is not in the game list." (bug, low).
+Trace.** `messageFor` maps every 404 without a known code to that sentence (`client.ts`). A player
+deleted in another tab, then renamed, or a role id that no longer exists, shows it. Suggest: the
+club message only for the club route, or a code (`not_found`) checked before it with a general
+sentence.
+- 2026-10-16: fixed. `loadTeams` (the club route) gives "This club is not in the game list." for its 404; every other 404 gives "This no longer exists. Load the page again." Browser test `a player that no longer exists gives a general message` (replaced answer). This test needs a player from the test before it, so it was not run alone against the old screens.
+
+**R9 – smaller points (low). Trace.**
+- "Left the team" proposes today also for a role that starts later (after "Add all" in summer): the save gives `until_before_from`. Propose `max(today, from)`.
+- `/settings`: after the first save `data.settings.saved` stays `false` until the page is loaded again, so a change of days then proposes the dates again over the saved ones (when they came from the proposal).
+- Two first saves of the settings at the same time can both delete and insert the same set; the second fails on the primary key with `500 internal`. One coordinator, so unlikely; `SELECT … FOR UPDATE` on `training_seasons` or an advisory lock would close it.
+- 2026-10-16, third point (two first saves at once): fixed. A settings save takes its own advisory lock (`training_settings::lock`, key "team" "trng") before it reads what is stored. API test `a_save_waits_for_another_save`: with the lock held on another connection the save waits; it answers 200 after the release. It fails without the lock.
+- 2026-10-16, first point: fixed. "Left the team" proposes today, or the role's start when that is later; the date field has the role's start as `min`. Browser test `"Left the team" proposes the start of a role that starts later`.
+- 2026-10-16, second point: fixed. After a save the settings page treats the dates as saved, so a change of days no longer asks for a proposal. The browser test of the settings adds a day after the save and checks that no proposal is asked and the last date stays.
+
+**Checked and found right.** Every new route is on the protected router and tested for 401 and
+403 (run). Logs carry ids only; `AppError::Internal` logs `StoreError` by `Display`, which has no
+row data; the log test sees "player added" (so it is live) and no name (run). No `unwrap`/`expect`
+outside tests (clippy, run). The migration only adds tables (decision 0004). The `CHECK
+(btrim(...) <> '')` cannot refuse a name the core let through (Rust `trim` removes at least what
+`btrim` removes). Whether `.sqlx/` matches the queries was not checked (`just check-sqlx` not
+run; the builds used the live database).
+
+**Docs made false.** None by this diff. At Close: `docs/architecture.md` (core and server modules,
+migration `0005`, the routes, the new pages), the `CLAUDE.md` module list and the rule "logs never
+contain player names", and decision 0019, as the specs plan.
+
+**Verdict:** not ready to close. R1 and R3 are bugs against the spec's intent that the tests do not
+see; R1 breaks "Add all" and every role change from the second season on, and is the base story B
+builds on. R4 and R5 belong with the fix of R1.

@@ -164,3 +164,63 @@ async fn settings_errors_have_their_codes(pool: PgPool) {
         assert_eq!((status, answer), (400, json!({ "error": code })));
     }
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn before_the_season_the_last_save_wins(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool).await;
+    coordinator.harness.clock.set(utc(2026, 8, 15, 12, 0));
+    coordinator.log_in_again().await;
+    coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-08", "last": "2027-05-25", "days": [tuesday()] })),
+        )
+        .await;
+    // The second save moves the first training date earlier.
+    let thursday = json!({ "weekday": 4, "start": "19:00", "end": "20:30" });
+    coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-01", "last": "2027-05-27", "days": [thursday] })),
+        )
+        .await;
+
+    let mut db = coordinator.harness.pool.acquire().await.unwrap();
+    let stored = training_settings::for_season(&mut db, Season::from_start_year(2026))
+        .await
+        .unwrap()
+        .unwrap();
+    let valid_from: Vec<String> = stored
+        .sets
+        .iter()
+        .map(|set| set.valid_from.to_string())
+        .collect();
+    assert_eq!(valid_from, ["2026-09-01"]);
+
+    coordinator.harness.clock.set(utc(2026, 9, 10, 12, 0));
+    coordinator.log_in_again().await;
+    let settings = coordinator.ok("GET", "/api/training-settings", None).await;
+    assert_eq!(settings["days"], json!([thursday]));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_save_waits_for_another_save(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    // Another save holds the lock.
+    let mut other = pool.begin().await.unwrap();
+    training_settings::lock(&mut other).await.unwrap();
+
+    let save = coordinator.send(
+        "PUT",
+        "/api/training-settings",
+        Some(json!({ "first": "2026-09-01", "last": "2027-05-25", "days": [tuesday()] })),
+    );
+    tokio::pin!(save);
+    let waited = tokio::time::timeout(std::time::Duration::from_millis(300), &mut save).await;
+    assert!(waited.is_err(), "the save did not wait for the lock");
+    other.commit().await.unwrap();
+    let (status, _) = save.await;
+    assert_eq!(status, 200);
+}
