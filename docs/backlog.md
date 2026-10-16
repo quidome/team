@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; designed again 2026-10-16 for weekly trainings and the pages Players and Team)
-   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): design again (`/design docs/changes/2026-10-15-players-and-settings`); built and reviewed in the first form on branch `feat/players-and-settings`.
+   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): implement, designed again 2026-10-16 (`/implement docs/changes/2026-10-15-players-and-settings`, step 1); first `/vision` for the meanings of team and player.
    - Then story B, trainings and attendance (with "Change" of a training and the proposal of last season's weekly trainings), and story C, the overview.
 
 Small:

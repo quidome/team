@@ -51,6 +51,7 @@ Players:
 - [ ] The history lists the player's roles, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct". A role of the current season has "Correct": the kind, the start date and the end date (empty while the role continues), filled in with the stored values. A correction applies to the whole role, with the same checks as a new role. For example a player added from the proposed date who joined on 3 November, or added as "Plays games" by mistake. Roles of an earlier season are shown but cannot be corrected.
 
 Team:
+- [ ] The page "Team" has a heading with the name of the team chosen from the game list for the season and the season, for example "U14-1 · 2026-2027"; before the team is chosen, "Team not chosen yet" with a link to choose it. Players can be added to the team before the team is chosen (coordinator, 2026-10-16, during /design of story A).
 - [ ] The page "Team" shows, for the current season, the players in the team today or later in the season (sorted by first name, with "Plays games" or "Only trains"), then "Left the team" with the players who had a role earlier in the season and have none today or later in the season. A player after "Change role" stays in the team.
 - [ ] "Add player" on the team page adds a player to the team: a player from the list (not hidden, not in the team; last season's team first), or a new player (first name and last name), with a role and the date from which the player is in the team. The tool proposes the first training date of the season until the coordinator has opened a training of the season, and today after that; with no weekly training yet, today (coordinator, 2026-10-16). So when the coordinator sets up in October and then enters the trainings since 1 September, all players are proposed from 1 September.
 - [ ] A tap on a player of the team gives "Change role" and "Remove from the team".
@@ -216,7 +217,7 @@ Screens (phone first, also usable on a computer):
 - **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Change" (date and times), "Cancel training" or "Undo cancel", and "Delete training".
 - **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date). A tap on a player shows the trainings that player missed.
 - **Players**: all players, sorted by first name, with the role today or "Not in the team", "Add player" and the switch "Show hidden players". A tap opens the player: first name, last name, "Hidden", the history (the roles, newest first, "Correct" for a role of the current season), and "Delete player" when the player has no absences.
-- **Team** (current season): the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); in a new season the players of last season's team with "Add all". A tap on a player gives "Change role" and "Remove from the team" (each with a date), or "Add to the team" under "Left the team".
+- **Team** (current season): the heading with the team's name and the season, or "Team not chosen yet"; the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); in a new season the players of last season's team with "Add all". A tap on a player gives "Change role" and "Remove from the team" (each with a date), or "Add to the team" under "Left the team".
 - **Weekly trainings and reasons** (settings): the weekly trainings of the season (day, start and end time, window), "Add weekly training", "Change" and "Delete" for each, and the list of reasons with valid / not valid, "Add reason", rename, hide.
 - Navigation: the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings.
 
@@ -274,6 +275,7 @@ The coordinator types in the players once (no import from the sheet).
 
 ## Open questions
 - Settled 2026-10-15 (Vision, with the coordinator): **player** now "has a first name, and usually a last name" (`docs/language.md`); 3 players in the coordinator's sheet have no last name.
+- For `/vision` (2026-10-16, during /design of story A): the coordinator's model: the **club** has the players, a **team** exists for one season and is the team chosen from the game list for that season, and a player is in the team through a role. So **team** ("the youth team the coordinator runs") and **player** ("a person the coordinator keeps") need sharper meanings.
 - Settled 2026-10-16 (Vision, with the coordinator): **player** is a person the coordinator keeps, in the team through a **role**; new words **role**, **hidden**, **weekly training** and **training day**; **training** exists, and counts, only when opened or added (`docs/language.md`).
 
 ## Spec review
@@ -494,3 +496,10 @@ Decided with the coordinator; the stories above are changed to match.
 - **S24:** fixed. "Left the team" (story 1 and 5) is a player with a role earlier in the season and none today or later.
 - **S25:** fixed. "Add all" leaves out hidden players.
 - **S26:** fixed. Story 5 lists "Coming" above "Past"; the example is "Thursday from Thu 7 Jan"; the example training screen shows "Change", "Cancel training" and "Delete training".
+
+## Change after approval (2026-10-16, during /design of story A)
+Decided with the coordinator, without a new spec review (two small additions on one page): the
+page "Team" shows the name of the team chosen from the game list for the season, or "Team not
+chosen yet" with a link to choose it; players can be added before the team is chosen. The model
+behind it: the club has the players; a team exists for one season and is the team chosen from the
+game list. The words go to `/vision` (Open questions).
