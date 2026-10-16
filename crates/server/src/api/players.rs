@@ -8,9 +8,8 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::PgExecutor;
 use team_core::{
-    Group, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season,
-    check_change, check_role, clean_name, first_training_date, place, proposed_start,
-    roles_to_carry,
+    Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season,
+    check_change, check_role, clean_name, first_training_date, place, proposed_start, team,
 };
 use utoipa::ToSchema;
 
@@ -143,6 +142,8 @@ impl From<PlayerError> for AppError {
             PlayerError::UntilBeforeFrom => "until_before_from",
             PlayerError::OutsideSeason => "outside_season",
             PlayerError::RolesOverlap => "roles_overlap",
+            PlayerError::ChangeBeforeRoleStart => "change_before_role_start",
+            PlayerError::NotInTeam => "not_in_team",
         })
     }
 }
@@ -167,6 +168,16 @@ fn player_view(player: Player, placement: &Placement) -> PlayerView {
         last_name: player.last_name,
         role: placement.role.map(RoleKind::from),
         roles: placement.roles.iter().map(|role| role_view(role)).collect(),
+    }
+}
+
+fn member_view(member: &Member) -> PlayerView {
+    PlayerView {
+        id: member.player.id.0,
+        first_name: member.player.first_name.clone(),
+        last_name: member.player.last_name.clone(),
+        role: Some(member.role.into()),
+        roles: member.roles.iter().map(|role| role_view(role)).collect(),
     }
 }
 
@@ -213,16 +224,27 @@ fn group(
         last_season: Vec::new(),
         others: Vec::new(),
     };
-    for player in all {
-        let placement = place(roles, player.id, season, today);
-        let list = match placement.group {
-            Group::Team => &mut view.players,
-            Group::Left => &mut view.left,
-            Group::LastSeason => &mut view.last_season,
-            Group::Other => &mut view.others,
-        };
-        list.push(player_view(player, &placement));
-    }
+    let team = team(&all, roles, season, today);
+    view.players = team.members.iter().map(member_view).collect();
+    view.left = team.left.iter().map(member_view).collect();
+    view.last_season = team.last_season.iter().map(member_view).collect();
+    view.others = team
+        .candidates
+        .iter()
+        .filter(|player| {
+            !team
+                .last_season
+                .iter()
+                .any(|member| member.player.id == player.id)
+        })
+        .map(|player| PlayerView {
+            id: player.id.0,
+            first_name: player.first_name.clone(),
+            last_name: player.last_name.clone(),
+            role: None,
+            roles: Vec::new(),
+        })
+        .collect();
     view
 }
 
@@ -233,7 +255,8 @@ async fn proposed_from(
     today: NaiveDate,
 ) -> Result<NaiveDate, StoreError> {
     let weekly = weekly_trainings::for_season(&state.pool, season).await?;
-    Ok(proposed_start(first_training_date(&weekly), today))
+    // Trainings come with story B; until then no training of the season is opened.
+    Ok(proposed_start(first_training_date(&weekly), false, today))
 }
 
 pub async fn load(state: &AppState) -> Result<PlayersView, StoreError> {
@@ -475,10 +498,14 @@ pub async fn carry(
         if !players::lock(&mut tx, id).await? {
             continue;
         }
+        let Some(player) = players::by_id(&mut *tx, id).await? else {
+            continue;
+        };
         let roles = roles_around(&mut *tx, id, season).await?;
-        if let Some((_, role)) = roles_to_carry(&roles, season).first() {
+        let page = team(std::slice::from_ref(&player), &roles, season, today);
+        if let Some(member) = page.last_season.first() {
             check_role(season, from, None, &roles)?;
-            players::insert_role(&mut *tx, id, season, *role, from, None).await?;
+            players::insert_role(&mut *tx, id, season, member.role, from, None).await?;
             tracing::info!(player = id.0, "player carried into the season");
         }
     }
