@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgExecutor;
 use team_core::{
     Group, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season,
-    check_change, check_role, clean_name, place, proposed_start, roles_to_carry,
+    check_change, check_role, clean_name, first_training_date, place, proposed_start,
+    roles_to_carry,
 };
 use utoipa::ToSchema;
 
@@ -17,7 +18,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{players, training_settings};
+use crate::{players, weekly_trainings};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -231,11 +232,8 @@ async fn proposed_from(
     season: Season,
     today: NaiveDate,
 ) -> Result<NaiveDate, StoreError> {
-    let mut db = state.pool.acquire().await?;
-    let first = training_settings::for_season(&mut db, season)
-        .await?
-        .map(|stored| stored.first);
-    Ok(proposed_start(first, today))
+    let weekly = weekly_trainings::for_season(&state.pool, season).await?;
+    Ok(proposed_start(first_training_date(&weekly), today))
 }
 
 pub async fn load(state: &AppState) -> Result<PlayersView, StoreError> {

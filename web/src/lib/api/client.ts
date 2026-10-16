@@ -1,6 +1,7 @@
 // Typed client for the Rust API. Types come from `openapi.json` (`just api-types`).
 import createClient from 'openapi-fetch';
 import type { components, paths } from './schema.js';
+import { weekdays } from '#lib/players.js';
 
 export const api = createClient<paths>({ baseUrl: '', credentials: 'same-origin' });
 
@@ -41,8 +42,7 @@ export function messageFor(error: unknown, status: number): string {
 		roles_overlap: 'This player already has a role on that date.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
-		no_training_days: 'Choose at least one training day.',
-		duplicate_weekday: 'This day is already a training day.',
+		weekly_trainings_overlap: 'There is already a weekly training on that day in these dates.',
 		invalid_weekday: 'Choose a day of the week.',
 		invalid_time: 'Enter a time such as 19:45.',
 		reason_name_required: 'A name is needed.',
@@ -210,30 +210,51 @@ export async function changeReason(
 	);
 }
 
-export type TrainingSettings = components['schemas']['TrainingSettings'];
-export type TrainingDay = components['schemas']['TrainingDayView'];
+export type WeeklyTrainings = components['schemas']['WeeklyTrainings'];
+export type WeeklyTraining = components['schemas']['WeeklyTrainingView'];
+export type WeeklyTrainingInput = components['schemas']['WeeklyTrainingInput'];
 
-export async function loadTrainingSettings(
+/** The weekly trainings of the current season (attendance at training, story A). */
+export async function loadWeeklyTrainings(
 	fetch: typeof globalThis.fetch
-): Promise<TrainingSettings> {
-	return dataOf(await api.GET('/api/training-settings', { fetch }));
+): Promise<WeeklyTrainings> {
+	return dataOf(await api.GET('/api/weekly-trainings', { fetch }));
 }
 
-/** The proposed first and last training date for these days of the week (1 = Monday). */
-export async function proposeTrainingDates(
-	weekdays: number[]
-): Promise<{ first: string; last: string }> {
+/** The proposed window of a weekly training on this day of the week (1 = Monday). */
+export async function proposeWindow(weekday: number): Promise<{ from: string; until: string }> {
 	return dataOf(
-		await api.GET('/api/training-settings/proposal', {
-			params: { query: { weekdays: weekdays.join(',') } }
-		})
+		await api.GET('/api/weekly-trainings/proposal', { params: { query: { weekday } } })
 	);
 }
 
-export async function saveTrainingSettings(
-	first: string,
-	last: string,
-	days: TrainingDay[]
-): Promise<TrainingSettings> {
-	return dataOf(await api.PUT('/api/training-settings', { body: { first, last, days } }));
+/** The answer of a save, with the day of the week in the sentence of an overlap. */
+function weeklyDataOf(
+	result: { data?: WeeklyTrainings; error?: unknown; response: Response },
+	weekday: number
+): WeeklyTrainings {
+	const code = (result.error as { error?: unknown } | undefined)?.error;
+	if (code === 'weekly_trainings_overlap') {
+		const day = weekdays.find((candidate) => candidate.value === weekday)?.label ?? 'that day';
+		throw new ApiError(`There is already a weekly training on ${day} in these dates.`);
+	}
+	return dataOf(result);
+}
+
+export async function addWeeklyTraining(input: WeeklyTrainingInput): Promise<WeeklyTrainings> {
+	return weeklyDataOf(await api.POST('/api/weekly-trainings', { body: input }), input.weekday);
+}
+
+export async function changeWeeklyTraining(
+	id: number,
+	input: WeeklyTrainingInput
+): Promise<WeeklyTrainings> {
+	return weeklyDataOf(
+		await api.PUT('/api/weekly-trainings/{id}', { params: { path: { id } }, body: input }),
+		input.weekday
+	);
+}
+
+export async function deleteWeeklyTraining(id: number): Promise<WeeklyTrainings> {
+	return dataOf(await api.DELETE('/api/weekly-trainings/{id}', { params: { path: { id } } }));
 }

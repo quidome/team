@@ -18,7 +18,7 @@ use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 use crate::api::{
-    changes, clubs, health, me, players, readings, reasons, schedule, selection, training_settings,
+    changes, clubs, health, me, players, readings, reasons, schedule, selection, weekly_trainings,
 };
 use crate::auth;
 use crate::auth::oidc::Oidc;
@@ -122,12 +122,16 @@ pub fn app(state: AppState) -> Router {
         .route("/reasons", get(reasons::list).post(reasons::add))
         .route("/reasons/{id}", put(reasons::change))
         .route(
-            "/training-settings",
-            get(training_settings::get).put(training_settings::save),
+            "/weekly-trainings",
+            get(weekly_trainings::list).post(weekly_trainings::add),
         )
         .route(
-            "/training-settings/proposal",
-            get(training_settings::proposal),
+            "/weekly-trainings/proposal",
+            get(weekly_trainings::proposal),
+        )
+        .route(
+            "/weekly-trainings/{id}",
+            put(weekly_trainings::change).delete(weekly_trainings::delete),
         )
         .fallback(|| async { StatusCode::NOT_FOUND })
         .layer(middleware::from_fn_with_state(

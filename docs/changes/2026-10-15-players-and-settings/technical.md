@@ -1,6 +1,6 @@
 # Technical spec: Players and settings
 
-**Status**: approved (designed again 2026-10-16; the first form, built and reviewed on 2026-10-15 and 2026-10-16, is replaced)
+**Status**: in progress (designed again 2026-10-16; the first form, built and reviewed on 2026-10-15 and 2026-10-16, is replaced)
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
 **Date**: 2026-10-15, designed again 2026-10-16
@@ -190,7 +190,7 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 
 ## Progress
 - [x] First form: steps 1–5, fixes 1–5, build review twice, accept review (2026-10-15/16; replaced by this design)
-- [ ] Step 1: weekly trainings, end to end
+- [x] Step 1: weekly trainings, end to end (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 39 browser tests)
 - [ ] Step 2: core rules for players
 - [ ] Step 3: the team page
 - [ ] Step 4: the players page and the player page
@@ -206,6 +206,14 @@ The design reads the spec more strictly within its words:
 - A window without its day of the week in it is allowed; it suggests no training days.
 - "Change role" and "Remove from the team" act on the role that covers the given date; the new role keeps the planned end of the old role.
 - "Add player" from the list offers players in "Players of last season" and "Other players" (not hidden); a player under "Left the team" is added again with "Add to the team".
+
+Implement:
+- 2026-10-16, step 1:
+  - `just db-down` keeps the database volume, so it resets nothing; the local database was made again with `sqlx database drop --force`, `sqlx database create` and `sqlx migrate run` (it held no data; `--force` ended the editor's idle connection).
+  - The step 1 test "the proposed start is Tue 1 Sep on 12 Oct with a Tuesday weekly training" contradicts the step itself (the rule with "a training is opened" comes in step 2; until then the proposal is the later of the first training date and today). Step 1 tests on 15 Aug instead (1 Sep with a Tuesday weekly training, today without); the case on 12 Oct moves to step 2.
+  - Removed first-form tests: `tests/settings.rs` (9 tests of the training-day sets and their API; replaced by `tests/weekly_trainings.rs`, 7 tests), the 2 set tests in `tests/players_storage.rs` (replaced by one test of a weekly training), the core tests of the sets, `proposed_dates` and `settings_change` (replaced by 7 tests of weekly trainings), and the browser test of the training days (replaced by the test of weekly trainings).
+  - Dates on the settings page use the tool's format (`formatDay`, as on the schedule: "Tue 1 Sept").
+  - The browser test of weekly trainings expects the one console message of the refused second Thursday (a 400 answer).
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

@@ -9,7 +9,7 @@ pub mod readings;
 pub mod reasons;
 pub mod schedule;
 pub mod selection;
-pub mod training_settings;
+pub mod weekly_trainings;
 
 use utoipa::OpenApi;
 
@@ -40,9 +40,11 @@ use utoipa::OpenApi;
         reasons::list,
         reasons::add,
         reasons::change,
-        training_settings::get,
-        training_settings::proposal,
-        training_settings::save
+        weekly_trainings::list,
+        weekly_trainings::proposal,
+        weekly_trainings::add,
+        weekly_trainings::change,
+        weekly_trainings::delete
     )
 )]
 pub struct ApiDoc;

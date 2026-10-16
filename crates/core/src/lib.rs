@@ -35,6 +35,6 @@ pub use team_choice::{
     choice_state, choose_team, own_teams, same_choice, schedule_target,
 };
 pub use training::{
-    TrainingDay, TrainingDaySet, TrainingError, TrainingSeason, proposed_dates, replaced_from,
-    set_on, settings_change, shown_set, training_dates,
+    TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, first_training_date,
+    proposed_window, training_days,
 };

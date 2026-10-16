@@ -1,11 +1,12 @@
-//! Storage of players, roles, reasons and training settings (attendance at training, story A).
+//! Storage of players, roles, reasons and weekly trainings (attendance at training, story A).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chrono::{NaiveDate, NaiveTime, TimeZone, Utc, Weekday};
 use sqlx::PgPool;
-use team::{players, reasons, training_settings};
-use team_core::{Role, Season, TrainingDay, TrainingDaySet};
+use team::weekly_trainings::{self, WeeklyTrainingData};
+use team::{players, reasons};
+use team_core::{Role, Season, WeeklyTrainingId};
 
 fn date(year: i32, month: u32, day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(year, month, day).unwrap()
@@ -19,26 +20,14 @@ fn season() -> Season {
     Season::from_start_year(2026)
 }
 
-fn set(valid_from: NaiveDate, weekday: Weekday) -> TrainingDaySet {
-    TrainingDaySet {
-        valid_from,
-        days: vec![TrainingDay {
-            weekday,
-            start: time(19, 45),
-            end: time(21, 0),
-        }],
+fn tuesday(from: NaiveDate, until: NaiveDate) -> WeeklyTrainingData {
+    WeeklyTrainingData {
+        weekday: Weekday::Tue,
+        start: time(19, 45),
+        end: time(21, 0),
+        from,
+        until,
     }
-}
-
-/// `training_settings::save`, replacing the stored sets from `set`'s date on.
-async fn store(
-    tx: &mut sqlx::PgConnection,
-    season: Season,
-    first: NaiveDate,
-    last: NaiveDate,
-    set: &TrainingDaySet,
-) -> Result<(), team::db::StoreError> {
-    training_settings::save(tx, season, first, last, set, set.valid_from).await
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
@@ -135,89 +124,62 @@ async fn deleting_a_player_deletes_its_roles(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_second_set_is_kept_next_to_the_first_and_the_same_date_replaces(pool: PgPool) {
-    let first = date(2026, 9, 1);
-    let last = date(2027, 5, 25);
-    let mut tx = pool.begin().await.unwrap();
-    store(&mut tx, season(), first, last, &set(first, Weekday::Tue))
-        .await
-        .unwrap();
-    store(
-        &mut tx,
+async fn a_weekly_training_is_read_back_changed_and_deleted(pool: PgPool) {
+    let id = weekly_trainings::insert(
+        &pool,
         season(),
-        first,
-        last,
-        &set(date(2027, 1, 5), Weekday::Wed),
+        tuesday(date(2026, 9, 1), date(2027, 5, 25)),
     )
     .await
     .unwrap();
-    // A second change on the same day replaces the set of that day.
-    store(
-        &mut tx,
-        season(),
-        first,
-        last,
-        &set(date(2027, 1, 5), Weekday::Thu),
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-
-    let mut db = pool.acquire().await.unwrap();
-    let stored = training_settings::for_season(&mut db, season())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(stored.first, first);
-    assert_eq!(stored.last, last);
-    assert_eq!(
-        stored.sets,
-        vec![
-            set(first, Weekday::Tue),
-            set(date(2027, 1, 5), Weekday::Thu)
-        ]
-    );
+    let stored = weekly_trainings::for_season(&pool, season()).await.unwrap();
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].id, id);
+    assert_eq!(stored[0].weekday, Weekday::Tue);
+    assert_eq!(stored[0].start, time(19, 45));
+    assert_eq!(stored[0].from, date(2026, 9, 1));
+    assert_eq!(stored[0].until, date(2027, 5, 25));
     assert!(
-        training_settings::for_season(&mut db, Season::from_start_year(2025))
+        weekly_trainings::for_season(&pool, Season::from_start_year(2025))
             .await
             .unwrap()
-            .is_none()
+            .is_empty()
     );
-}
 
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_save_removes_the_sets_from_its_date_on(pool: PgPool) {
-    let first = date(2026, 9, 1);
-    let last = date(2027, 5, 25);
-    let mut tx = pool.begin().await.unwrap();
-    for set in [
-        set(first, Weekday::Mon),
-        set(date(2026, 9, 8), Weekday::Tue),
-        set(date(2026, 10, 6), Weekday::Wed),
-    ] {
-        store(&mut tx, season(), first, last, &set).await.unwrap();
-    }
-    store(
-        &mut tx,
-        season(),
-        first,
-        last,
-        &set(date(2026, 9, 8), Weekday::Thu),
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
+    let thursday = WeeklyTrainingData {
+        weekday: Weekday::Thu,
+        ..tuesday(date(2026, 9, 3), date(2027, 5, 27))
+    };
+    assert!(
+        weekly_trainings::update(&pool, season(), id, thursday)
+            .await
+            .unwrap()
+    );
+    let stored = weekly_trainings::for_season(&pool, season()).await.unwrap();
+    assert_eq!(stored[0].weekday, Weekday::Thu);
+    // Not a weekly training of that season, or none at all.
+    let last_season = Season::from_start_year(2025);
+    assert!(
+        !weekly_trainings::update(&pool, last_season, id, thursday)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !weekly_trainings::update(&pool, season(), WeeklyTrainingId(id.0 + 1), thursday)
+            .await
+            .unwrap()
+    );
 
-    let mut db = pool.acquire().await.unwrap();
-    let stored = training_settings::for_season(&mut db, season())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        stored.sets,
-        vec![
-            set(first, Weekday::Mon),
-            set(date(2026, 9, 8), Weekday::Thu)
-        ]
+    assert!(
+        !weekly_trainings::delete(&pool, last_season, id)
+            .await
+            .unwrap()
+    );
+    assert!(weekly_trainings::delete(&pool, season(), id).await.unwrap());
+    assert!(
+        weekly_trainings::for_season(&pool, season())
+            .await
+            .unwrap()
+            .is_empty()
     );
 }

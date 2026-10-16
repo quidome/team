@@ -310,15 +310,31 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/api/training-settings': {
+	'/api/weekly-trainings': {
 		parameters: {
 			query?: never;
 			header?: never;
 			path?: never;
 			cookie?: never;
 		};
-		get: operations['trainingSettings'];
-		put: operations['saveTrainingSettings'];
+		get: operations['weeklyTrainings'];
+		put?: never;
+		post: operations['addWeeklyTraining'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/weekly-trainings/proposal': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['weeklyTrainingProposal'];
+		put?: never;
 		post?: never;
 		delete?: never;
 		options?: never;
@@ -326,17 +342,17 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/api/training-settings/proposal': {
+	'/api/weekly-trainings/{id}': {
 		parameters: {
 			query?: never;
 			header?: never;
 			path?: never;
 			cookie?: never;
 		};
-		get: operations['trainingDatesProposal'];
-		put?: never;
+		get?: never;
+		put: operations['changeWeeklyTraining'];
 		post?: never;
-		delete?: never;
+		delete: operations['deleteWeeklyTraining'];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -539,10 +555,6 @@ export interface components {
 			/** @description Today's Dutch date: the proposed end for "Left the team". */
 			today: string;
 		};
-		Proposal: {
-			first: string;
-			last: string;
-		};
 		/** @description One reading of the game list. A failed or held-back reading is a result, not an HTTP error. */
 		ReadingView: {
 			counts?: null | components['schemas']['CountsView'];
@@ -694,13 +706,6 @@ export interface components {
 					state: 'chosen';
 					team: components['schemas']['TeamView'];
 			  };
-		SettingsChange: {
-			days: components['schemas']['TrainingDayView'][];
-			/** Format: date */
-			first: string;
-			/** Format: date */
-			last: string;
-		};
 		TeamView: {
 			/** @description The short name, for example "M16 1". */
 			name: string;
@@ -710,28 +715,51 @@ export interface components {
 			 */
 			number: number;
 		};
-		/** @description A day of the week the team trains, with its times. */
-		TrainingDayView: {
+		/** @description A new or changed weekly training. */
+		WeeklyTrainingInput: {
 			end: string;
+			/** Format: date */
+			from: string;
 			/** @description For example "19:45". */
 			start: string;
+			/** Format: date */
+			until: string;
 			/**
 			 * Format: int32
 			 * @description 1 (Monday) to 7 (Sunday).
 			 */
 			weekday: number;
 		};
-		TrainingSettings: {
-			/** @description The training days that apply today (before the first training date: the first ones). */
-			days: components['schemas']['TrainingDayView'][];
-			first?: string | null;
-			last?: string | null;
+		/** @description A weekly training: a day of the week with its times, in a window. */
+		WeeklyTrainingView: {
+			end: string;
+			/** @description The first day of the window, for example "2026-09-01". */
+			from: string;
+			/** Format: int64 */
+			id: number;
+			/** @description For example "19:45". */
+			start: string;
+			/** @description The last day of the window. */
+			until: string;
 			/**
-			 * @description `false` while nothing is saved for the season; then the dates are `null` and `days` is
-			 *     empty.
+			 * Format: int32
+			 * @description 1 (Monday) to 7 (Sunday).
 			 */
-			saved: boolean;
+			weekday: number;
+		};
+		/** @description The weekly trainings of the current season, sorted by the start of the window. */
+		WeeklyTrainings: {
 			season: string;
+			/** @description The first day of the season, for example "2026-07-01": the earliest date of a window. */
+			season_first_day: string;
+			/** @description The last day of the season, for example "2027-06-30": the latest date of a window. */
+			season_last_day: string;
+			weekly_trainings: components['schemas']['WeeklyTrainingView'][];
+		};
+		/** @description The proposed window of a weekly training. */
+		WindowProposal: {
+			from: string;
+			until: string;
 		};
 	};
 	responses: never;
@@ -1545,7 +1573,7 @@ export interface operations {
 			};
 		};
 	};
-	trainingSettings: {
+	weeklyTrainings: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1554,13 +1582,13 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The training settings of the current season */
+			/** @description The weekly trainings of the current season */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['TrainingSettings'];
+					'application/json': components['schemas']['WeeklyTrainings'];
 				};
 			};
 			/** @description Not logged in */
@@ -1572,7 +1600,7 @@ export interface operations {
 			};
 		};
 	};
-	saveTrainingSettings: {
+	addWeeklyTraining: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1581,20 +1609,20 @@ export interface operations {
 		};
 		requestBody: {
 			content: {
-				'application/json': components['schemas']['SettingsChange'];
+				'application/json': components['schemas']['WeeklyTrainingInput'];
 			};
 		};
 		responses: {
-			/** @description The saved settings */
+			/** @description The weekly trainings of the current season */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['TrainingSettings'];
+					'application/json': components['schemas']['WeeklyTrainings'];
 				};
 			};
-			/** @description `end_before_start`, `last_before_first`, `no_training_days`, `duplicate_weekday`, `outside_season`, `invalid_weekday`, `invalid_time` */
+			/** @description `end_before_start`, `last_before_first`, `outside_season`, `weekly_trainings_overlap`, `invalid_weekday`, `invalid_time` */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -1610,11 +1638,11 @@ export interface operations {
 			};
 		};
 	};
-	trainingDatesProposal: {
+	weeklyTrainingProposal: {
 		parameters: {
 			query: {
-				/** @description The chosen days of the week, for example "2" or "2,4". */
-				weekdays: string;
+				/** @description The day of the week, 1 (Monday) to 7 (Sunday). */
+				weekday: number;
 			};
 			header?: never;
 			path?: never;
@@ -1622,16 +1650,16 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The first chosen day in September and the last in May */
+			/** @description That day on or after 1 September until that day on or before 31 May */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['Proposal'];
+					'application/json': components['schemas']['WindowProposal'];
 				};
 			};
-			/** @description `no_training_days`, `invalid_weekday` */
+			/** @description `invalid_weekday` */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -1640,6 +1668,91 @@ export interface operations {
 			};
 			/** @description Not logged in */
 			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	changeWeeklyTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The weekly training */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['WeeklyTrainingInput'];
+			};
+		};
+		responses: {
+			/** @description The weekly trainings of the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['WeeklyTrainings'];
+				};
+			};
+			/** @description `end_before_start`, `last_before_first`, `outside_season`, `weekly_trainings_overlap`, `invalid_weekday`, `invalid_time` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such weekly training in the current season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	deleteWeeklyTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The weekly training */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The weekly trainings of the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['WeeklyTrainings'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such weekly training in the current season */
+			404: {
 				headers: {
 					[name: string]: unknown;
 				};

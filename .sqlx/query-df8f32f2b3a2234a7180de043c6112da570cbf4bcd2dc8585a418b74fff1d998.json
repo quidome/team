@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE weekly_trainings SET weekday = $3, start_time = $4, end_time = $5, from_date = $6,\n                                     until_date = $7\n         WHERE id = $1 AND season_year = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int2",
+        "Time",
+        "Time",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "df8f32f2b3a2234a7180de043c6112da570cbf4bcd2dc8585a418b74fff1d998"
+}

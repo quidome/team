@@ -16,7 +16,7 @@ pub mod reading;
 pub mod readings;
 pub mod reasons;
 pub mod source;
-pub mod training_settings;
 pub mod web;
+pub mod weekly_trainings;
 
 pub use app::{AppState, app};

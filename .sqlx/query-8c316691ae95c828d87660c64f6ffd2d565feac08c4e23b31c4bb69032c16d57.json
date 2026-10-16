@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM weekly_trainings WHERE id = $1 AND season_year = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c316691ae95c828d87660c64f6ffd2d565feac08c4e23b31c4bb69032c16d57"
+}
