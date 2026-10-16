@@ -106,14 +106,17 @@
 		}
 	}
 
+	/** The proposed last day: today, or the start of the role when that is later. */
 	function startLeaving() {
-		until = data.players?.today ?? '';
+		const today = data.players?.today ?? '';
+		const from = newest?.from ?? '';
+		until = from > today ? from : today;
 		leaving = true;
 	}
 
 	function startReturning() {
 		returnFrom = data.players?.today ?? '';
-		returnRole = newest?.role ?? 'plays_games';
+		returnRole = newest?.role ?? data.player?.role ?? 'plays_games';
 		returning = true;
 	}
 
@@ -185,7 +188,14 @@
 					<form class="space-y-3" onsubmit={leave}>
 						<label class="block space-y-1">
 							<span class="text-sm">Last day in the team</span>
-							<input class={field} type="date" bind:value={until} required />
+							<input
+								class={field}
+								type="date"
+								bind:value={until}
+								min={newest.from}
+								max={data.players.season_last_day}
+								required
+							/>
 						</label>
 						<div class="flex gap-2">
 							<Button type="submit" disabled={busy}>Left the team</Button>
@@ -226,7 +236,14 @@
 						</fieldset>
 						<label class="block space-y-1">
 							<span class="text-sm">In the team from</span>
-							<input class={field} type="date" bind:value={returnFrom} required />
+							<input
+								class={field}
+								type="date"
+								bind:value={returnFrom}
+								min={data.players.season_first_day}
+								max={data.players.season_last_day}
+								required
+							/>
 						</label>
 						<div class="flex gap-2">
 							<Button type="submit" disabled={busy}>Save</Button>

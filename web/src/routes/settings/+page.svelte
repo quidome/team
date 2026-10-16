@@ -74,6 +74,8 @@
 			days = structuredClone(saved.days);
 			first = saved.first ?? first;
 			last = saved.last ?? last;
+			// Saved dates are not a proposal: a later change of days keeps them.
+			proposed = false;
 			daysSaved = true;
 		} catch (failure) {
 			daysError = message(failure);

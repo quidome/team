@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "DELETE FROM training_days WHERE season_year = $1 AND valid_from = $2",
+  "query": "DELETE FROM training_days WHERE season_year = $1 AND valid_from >= $2",
   "describe": {
     "columns": [],
     "parameters": {
@@ -11,5 +11,5 @@
     },
     "nullable": []
   },
-  "hash": "bed24c69c32cc43b03357528903f35feabfe12a28cd651db46562a3157c85f87"
+  "hash": "2056583950027fb00aa2c731371671dff0b32c2b342196ae9e2434612a4748c4"
 }

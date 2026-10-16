@@ -173,3 +173,42 @@ async fn a_second_set_is_kept_next_to_the_first_and_the_same_date_replaces(pool:
             .is_none()
     );
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_save_removes_the_sets_from_its_date_on(pool: PgPool) {
+    let first = date(2026, 9, 1);
+    let last = date(2027, 5, 25);
+    let mut tx = pool.begin().await.unwrap();
+    for set in [
+        set(first, Weekday::Mon),
+        set(date(2026, 9, 8), Weekday::Tue),
+        set(date(2026, 10, 6), Weekday::Wed),
+    ] {
+        training_settings::save(&mut tx, season(), first, last, &set)
+            .await
+            .unwrap();
+    }
+    training_settings::save(
+        &mut tx,
+        season(),
+        first,
+        last,
+        &set(date(2026, 9, 8), Weekday::Thu),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let mut db = pool.acquire().await.unwrap();
+    let stored = training_settings::for_season(&mut db, season())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        stored.sets,
+        vec![
+            set(first, Weekday::Mon),
+            set(date(2026, 9, 8), Weekday::Thu)
+        ]
+    );
+}

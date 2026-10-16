@@ -49,7 +49,7 @@ export function messageFor(error: unknown, status: number): string {
 		reason_name_taken: 'There is already a reason with this name.'
 	};
 	if (typeof code === 'string' && code in players) return players[code];
-	if (status === 404) return 'This club is not in the game list.';
+	if (status === 404) return 'This no longer exists. Load the page again.';
 	return 'Something went wrong. Please try again.';
 }
 
@@ -78,7 +78,9 @@ export async function searchClubs(search: string): Promise<ClubView[]> {
 }
 
 export async function loadTeams(club: number): Promise<ClubTeams> {
-	return dataOf(await api.GET('/api/clubs/{number}/teams', { params: { path: { number: club } } }));
+	const result = await api.GET('/api/clubs/{number}/teams', { params: { path: { number: club } } });
+	if (result.response.status === 404) throw new ApiError('This club is not in the game list.');
+	return dataOf(result);
 }
 
 export async function saveSelection(club: number, team: number | null): Promise<Selection> {

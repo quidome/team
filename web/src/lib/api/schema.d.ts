@@ -532,6 +532,10 @@ export interface components {
 			 */
 			proposed_from: string;
 			season: string;
+			/** @description The first day of the season, for example "2026-07-01": the earliest date of a role. */
+			season_first_day: string;
+			/** @description The last day of the season, for example "2027-06-30": the latest date of a role. */
+			season_last_day: string;
 			/** @description Today's Dutch date: the proposed end for "Left the team". */
 			today: string;
 		};
@@ -996,7 +1000,7 @@ export interface operations {
 					'application/json': components['schemas']['SavedPlayer'];
 				};
 			};
-			/** @description `first_name_required`, `outside_season` */
+			/** @description `first_name_required`, `outside_season` (the role does not start in the current season) */
 			400: {
 				headers: {
 					[name: string]: unknown;
