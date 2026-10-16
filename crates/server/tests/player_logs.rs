@@ -33,10 +33,19 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
             Some(json!({ "first_name": "Zephyrina", "last_name": "Quistorpe" })),
         )
         .await;
+    coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/role-change"),
+            Some(json!({ "role": "only_trains", "from": "2026-11-01" })),
+        )
+        .await;
     coordinator.ok("GET", "/api/players", None).await;
+    coordinator.ok("GET", "/api/team", None).await;
 
     let text = log.text();
     assert!(text.contains("player added"), "{text}");
+    assert!(text.contains("role changed"), "{text}");
     for name in ["Zephyrin", "Quistorp"] {
         assert!(!text.contains(name), "a name in the log: {text}");
     }

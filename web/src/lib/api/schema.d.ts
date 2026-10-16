@@ -166,6 +166,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/players/{id}/role-change': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['changeRoleFrom'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/players/{id}/roles': {
 		parameters: {
 			query?: never;
@@ -192,6 +208,22 @@ export interface paths {
 		get?: never;
 		put: operations['changeRole'];
 		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/players/{id}/team-leave': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['leaveTeam'];
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -310,6 +342,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/team': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['team'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/weekly-trainings': {
 		parameters: {
 			query?: never;
@@ -396,6 +444,14 @@ export interface components {
 			| 'came_back'
 			| 'into_schedule'
 			| 'out_of_schedule';
+		ChangeRole: {
+			/**
+			 * Format: date
+			 * @description The first day of the new role; the current role ends on the day before.
+			 */
+			from: string;
+			role: components['schemas']['RoleKind'];
+		};
 		/** @description A change from the game as the coordinator last saw it to the game now. */
 		ChangeView: {
 			after?: null | components['schemas']['ChangeGame'];
@@ -498,9 +554,30 @@ export interface components {
 			 */
 			out_of_date_since?: string | null;
 		};
+		LeaveTeam: {
+			/**
+			 * Format: date
+			 * @description The last day in the team.
+			 */
+			until: string;
+		};
 		Me: {
 			/** @description The name to show. */
 			name: string;
+		};
+		/** @description A player in a group of the team page, with a role. */
+		MemberView: {
+			first_name: string;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			/**
+			 * @description Today's role (or the coming one); in "left", the last role of the season; in
+			 *     "last_season", the last role of last season.
+			 */
+			role: components['schemas']['RoleKind'];
+			/** @description The roles of the season shown (last season's for "last_season"). */
+			roles: components['schemas']['RoleView'][];
 		};
 		NameChange: {
 			first_name: string;
@@ -519,6 +596,13 @@ export interface components {
 			/** Format: date */
 			from: string;
 			role: components['schemas']['RoleKind'];
+		};
+		/** @description A player that "Add player" offers. */
+		PlayerSummary: {
+			first_name: string;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
 		};
 		PlayerView: {
 			first_name: string;
@@ -706,6 +790,40 @@ export interface components {
 					state: 'chosen';
 					team: components['schemas']['TeamView'];
 			  };
+		/** @description The team of the current season. */
+		TeamPageView: {
+			/**
+			 * @description The players "Add player" offers: not hidden and not in the team this season; last season's
+			 *     team first.
+			 */
+			candidates: components['schemas']['PlayerSummary'][];
+			/**
+			 * @description Players who were in the team until the end of last season, have no role in this season and
+			 *     are not hidden: "Add all" brings them back.
+			 */
+			last_season: components['schemas']['MemberView'][];
+			/** @description Players with a role earlier in the season and none today or later. */
+			left: components['schemas']['MemberView'][];
+			/** @description Players with a role today or later in the season, sorted by first name. */
+			members: components['schemas']['MemberView'][];
+			/**
+			 * @description The proposed start of a new role: the first training date of the season, or today when
+			 *     trainings have started or there is no weekly training.
+			 */
+			proposed_from: string;
+			season: string;
+			/** @description The first day of the season, for example "2026-07-01": the earliest date of a role. */
+			season_first_day: string;
+			/** @description The last day of the season, for example "2027-06-30": the latest date of a role. */
+			season_last_day: string;
+			/**
+			 * @description The name of the team chosen from the game list for the season, for example "U14-1";
+			 *     `null` while no team is chosen.
+			 */
+			team_name?: string | null;
+			/** @description Today's Dutch date: the proposed date of "Change role" and "Remove from the team". */
+			today: string;
+		};
 		TeamView: {
 			/** @description The short name, for example "M16 1". */
 			name: string;
@@ -1057,13 +1175,13 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description The players; the listed players of last season have the same role in this season */
+			/** @description The team; the listed players of last season have the same role in this season */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['PlayersView'];
+					'application/json': components['schemas']['TeamPageView'];
 				};
 			};
 			/** @description Not logged in */
@@ -1158,6 +1276,54 @@ export interface operations {
 			};
 		};
 	};
+	changeRoleFrom: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ChangeRole'];
+			};
+		};
+		responses: {
+			/** @description The team; the role on `from` ends the day before, the new role starts on `from` */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TeamPageView'];
+				};
+			};
+			/** @description `not_in_team`, `change_before_role_start`, `until_before_from`, `outside_season`, `roles_overlap` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	addRole: {
 		parameters: {
 			query?: never;
@@ -1174,13 +1340,13 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description The player */
+			/** @description The team */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['PlayerView'];
+					'application/json': components['schemas']['TeamPageView'];
 				};
 			};
 			/** @description `until_before_from`, `outside_season`, `roles_overlap` */
@@ -1248,6 +1414,54 @@ export interface operations {
 				content?: never;
 			};
 			/** @description No such player or role */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	leaveTeam: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['LeaveTeam'];
+			};
+		};
+		responses: {
+			/** @description The team; the role on `until` ends on that day */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TeamPageView'];
+				};
+			};
+			/** @description `not_in_team`, `outside_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
 			404: {
 				headers: {
 					[name: string]: unknown;
@@ -1566,6 +1780,33 @@ export interface operations {
 			};
 			/** @description The game list cannot be reached or is not understood; nothing is saved */
 			502: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	team: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The team of the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TeamPageView'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
 				headers: {
 					[name: string]: unknown;
 				};

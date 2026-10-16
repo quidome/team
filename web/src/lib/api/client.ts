@@ -40,6 +40,9 @@ export function messageFor(error: unknown, status: number): string {
 		until_before_from: 'The end must be after the start.',
 		outside_season: 'This date is outside the season.',
 		roles_overlap: 'This player already has a role on that date.',
+		change_before_role_start:
+			'The change must be after the start of the role. To change the role from its start, use "Correct" in the history.',
+		not_in_team: 'This player is not in the team on that date.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
 		weekly_trainings_overlap: 'There is already a weekly training on that day in these dates.',
@@ -164,10 +167,11 @@ export async function deletePlayer(id: number): Promise<void> {
 	if (!result.response.ok) throw new ApiError(messageFor(result.error, result.response.status));
 }
 
+/** "Add player" for a player from the list, and "Add to the team". */
 export async function addRole(
 	id: number,
 	role: { role: RoleKind; from: string; until: string | null }
-): Promise<Player> {
+): Promise<TeamPage> {
 	return dataOf(
 		await api.POST('/api/players/{id}/roles', { params: { path: { id } }, body: role })
 	);
@@ -187,8 +191,34 @@ export async function changeRole(
 }
 
 /** Brings these players of last season into this season, with the same role ("Add all"). */
-export async function carryPlayers(players: number[]): Promise<Players> {
+export async function carryPlayers(players: number[]): Promise<TeamPage> {
 	return dataOf(await api.POST('/api/players/carry', { body: { players } }));
+}
+
+export type TeamPage = components['schemas']['TeamPageView'];
+export type Member = components['schemas']['MemberView'];
+export type PlayerSummary = components['schemas']['PlayerSummary'];
+
+/** The team of the current season (attendance at training, story A). */
+export async function loadTeam(fetch: typeof globalThis.fetch): Promise<TeamPage> {
+	return dataOf(await api.GET('/api/team', { fetch }));
+}
+
+/** "Change role": the role on `from` ends the day before, the new role starts on `from`. */
+export async function changeRoleFrom(id: number, role: RoleKind, from: string): Promise<TeamPage> {
+	return dataOf(
+		await api.POST('/api/players/{id}/role-change', {
+			params: { path: { id } },
+			body: { role, from }
+		})
+	);
+}
+
+/** "Remove from the team": the role on `until` ends on that day. */
+export async function leaveTeam(id: number, until: string): Promise<TeamPage> {
+	return dataOf(
+		await api.POST('/api/players/{id}/team-leave', { params: { path: { id } }, body: { until } })
+	);
 }
 
 export type AbsenceReason = components['schemas']['AbsenceReason'];

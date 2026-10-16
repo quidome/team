@@ -272,11 +272,11 @@
         },
         "responses": {
           "200": {
-            "description": "The players; the listed players of last season have the same role in this season",
+            "description": "The team; the listed players of last season have the same role in this season",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlayersView"
+                  "$ref": "#/components/schemas/TeamPageView"
                 }
               }
             }
@@ -367,6 +367,57 @@
         }
       }
     },
+    "/api/players/{id}/role-change": {
+      "post": {
+        "tags": [
+          "team"
+        ],
+        "operationId": "changeRoleFrom",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRole"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The team; the role on `from` ends the day before, the new role starts on `from`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not_in_team`, `change_before_role_start`, `until_before_from`, `outside_season`, `roles_overlap`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          }
+        }
+      }
+    },
     "/api/players/{id}/roles": {
       "post": {
         "tags": [
@@ -397,11 +448,11 @@
         },
         "responses": {
           "200": {
-            "description": "The player",
+            "description": "The team",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlayerView"
+                  "$ref": "#/components/schemas/TeamPageView"
                 }
               }
             }
@@ -475,6 +526,57 @@
           },
           "404": {
             "description": "No such player or role"
+          }
+        }
+      }
+    },
+    "/api/players/{id}/team-leave": {
+      "post": {
+        "tags": [
+          "team"
+        ],
+        "operationId": "leaveTeam",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaveTeam"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The team; the role on `until` ends on that day",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not_in_team`, `outside_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
           }
         }
       }
@@ -769,6 +871,29 @@
         }
       }
     },
+    "/api/team": {
+      "get": {
+        "tags": [
+          "team"
+        ],
+        "operationId": "team",
+        "responses": {
+          "200": {
+            "description": "The team of the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/weekly-trainings": {
       "get": {
         "tags": [
@@ -1044,6 +1169,23 @@
           "into_schedule",
           "out_of_schedule"
         ]
+      },
+      "ChangeRole": {
+        "type": "object",
+        "required": [
+          "role",
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "The first day of the new role; the current role ends on the day before."
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          }
+        }
       },
       "ChangeView": {
         "type": "object",
@@ -1363,6 +1505,19 @@
           }
         }
       },
+      "LeaveTeam": {
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date",
+            "description": "The last day in the team."
+          }
+        }
+      },
       "Me": {
         "type": "object",
         "required": [
@@ -1372,6 +1527,42 @@
           "name": {
             "type": "string",
             "description": "The name to show."
+          }
+        }
+      },
+      "MemberView": {
+        "type": "object",
+        "description": "A player in a group of the team page, with a role.",
+        "required": [
+          "id",
+          "first_name",
+          "role",
+          "roles"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind",
+            "description": "Today's role (or the coming one); in \"left\", the last role of the season; in\n\"last_season\", the last role of last season."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleView"
+            },
+            "description": "The roles of the season shown (last season's for \"last_season\")."
           }
         }
       },
@@ -1448,6 +1639,29 @@
           },
           "role": {
             "$ref": "#/components/schemas/RoleKind"
+          }
+        }
+      },
+      "PlayerSummary": {
+        "type": "object",
+        "description": "A player that \"Add player\" offers.",
+        "required": [
+          "id",
+          "first_name"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -2007,6 +2221,77 @@
           }
         ],
         "description": "The state of the choice. `season` is always the current season."
+      },
+      "TeamPageView": {
+        "type": "object",
+        "description": "The team of the current season.",
+        "required": [
+          "season",
+          "today",
+          "season_first_day",
+          "season_last_day",
+          "proposed_from",
+          "members",
+          "left",
+          "last_season",
+          "candidates"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummary"
+            },
+            "description": "The players \"Add player\" offers: not hidden and not in the team this season; last season's\nteam first."
+          },
+          "last_season": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            },
+            "description": "Players who were in the team until the end of last season, have no role in this season and\nare not hidden: \"Add all\" brings them back."
+          },
+          "left": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            },
+            "description": "Players with a role earlier in the season and none today or later."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            },
+            "description": "Players with a role today or later in the season, sorted by first name."
+          },
+          "proposed_from": {
+            "type": "string",
+            "description": "The proposed start of a new role: the first training date of the season, or today when\ntrainings have started or there is no weekly training."
+          },
+          "season": {
+            "type": "string"
+          },
+          "season_first_day": {
+            "type": "string",
+            "description": "The first day of the season, for example \"2026-07-01\": the earliest date of a role."
+          },
+          "season_last_day": {
+            "type": "string",
+            "description": "The last day of the season, for example \"2027-06-30\": the latest date of a role."
+          },
+          "team_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the team chosen from the game list for the season, for example \"U14-1\";\n`null` while no team is chosen."
+          },
+          "today": {
+            "type": "string",
+            "description": "Today's Dutch date: the proposed date of \"Change role\" and \"Remove from the team\"."
+          }
+        }
       },
       "TeamView": {
         "type": "object",

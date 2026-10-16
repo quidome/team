@@ -9,6 +9,7 @@ pub mod readings;
 pub mod reasons;
 pub mod schedule;
 pub mod selection;
+pub mod team;
 pub mod weekly_trainings;
 
 use utoipa::OpenApi;
@@ -37,6 +38,9 @@ use utoipa::OpenApi;
         players::add_role,
         players::change_role,
         players::carry,
+        team::get,
+        team::role_change,
+        team::team_leave,
         reasons::list,
         reasons::add,
         reasons::change,

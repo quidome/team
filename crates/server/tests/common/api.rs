@@ -2,7 +2,7 @@
 
 use axum::body::Body;
 use axum::http::{Request, header};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use super::game_list::utc;
@@ -68,5 +68,18 @@ impl Coordinator {
         let (status, answer) = self.send(method, path, body).await;
         assert_eq!(status, 200, "{method} {path}: {answer}");
         answer
+    }
+
+    /// Adds a player with a role from `from` (for example "2026-09-01"); gives its id.
+    pub async fn add_player(&self, first: &str, role: &str, from: &str) -> i64 {
+        let answer = self
+            .ok(
+                "POST",
+                "/api/players",
+                Some(json!({ "first_name": first, "last_name": null,
+                             "role": { "role": role, "from": from } })),
+            )
+            .await;
+        answer["player"]["id"].as_i64().unwrap()
     }
 }
