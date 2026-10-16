@@ -5,7 +5,9 @@ use axum::Json;
 use axum::extract::{Query, State};
 use chrono::{NaiveDate, NaiveTime, Weekday};
 use serde::{Deserialize, Serialize};
-use team_core::{TrainingDay, TrainingError, proposed_dates, set_on, settings_change};
+use team_core::{
+    TrainingDay, TrainingError, proposed_dates, replaced_from, settings_change, shown_set,
+};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::app::AppState;
@@ -104,7 +106,7 @@ async fn current(state: &AppState) -> Result<TrainingSettings, AppError> {
             days: Vec::new(),
         });
     };
-    let days = set_on(&stored.sets, today)
+    let days = shown_set(&stored, today)
         .map(|set| set.days.iter().map(day_view).collect::<Result<Vec<_>, _>>())
         .transpose()?
         .unwrap_or_default();
@@ -198,7 +200,8 @@ pub async fn save(
         .await?
         .is_none_or(|stored| stored.sets.is_empty());
     let set = settings_change(season, body.first, body.last, days, today, first_save)?;
-    training_settings::save(&mut tx, season, body.first, body.last, &set).await?;
+    let replace_from = replaced_from(&set, today);
+    training_settings::save(&mut tx, season, body.first, body.last, &set, replace_from).await?;
     tx.commit().await.map_err(StoreError::from)?;
     Ok(Json(current(&state).await?))
 }

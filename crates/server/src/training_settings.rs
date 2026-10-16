@@ -66,14 +66,15 @@ pub async fn lock(tx: &mut PgConnection) -> Result<(), StoreError> {
 }
 
 /// Saves the first and the last training date of `season`, and `set`. The stored sets valid from
-/// the same date or later are removed: the newest save applies from its `valid_from` on. Run it in
-/// a transaction, after `lock`.
+/// `replace_from` or later are removed (see `team_core::replaced_from`). Run it in a transaction,
+/// after `lock`.
 pub async fn save(
     tx: &mut PgConnection,
     season: Season,
     first: NaiveDate,
     last: NaiveDate,
     set: &TrainingDaySet,
+    replace_from: NaiveDate,
 ) -> Result<(), StoreError> {
     sqlx::query!(
         "INSERT INTO training_seasons (season_year, first_date, last_date) VALUES ($1, $2, $3)
@@ -88,7 +89,7 @@ pub async fn save(
     sqlx::query!(
         "DELETE FROM training_days WHERE season_year = $1 AND valid_from >= $2",
         season.start_year(),
-        set.valid_from,
+        replace_from,
     )
     .execute(&mut *tx)
     .await?;

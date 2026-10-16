@@ -104,6 +104,21 @@ pub fn check_role(
     Ok(())
 }
 
+/// Checks a change of `changed`, a stored role, to a role of `season` from `from` until `until`:
+/// only a role of `season` is changed, then as `check_role`.
+pub fn check_change(
+    season: Season,
+    changed: &PlayerRole,
+    from: NaiveDate,
+    until: Option<NaiveDate>,
+    others: &[PlayerRole],
+) -> Result<(), PlayerError> {
+    if changed.season != season {
+        return Err(PlayerError::OutsideSeason);
+    }
+    check_role(season, from, until, others)
+}
+
 /// The proposed start of a new role: the first training date of the season, or today when
 /// trainings have started, or today when the season has no training settings.
 pub fn proposed_start(first_training: Option<NaiveDate>, today: NaiveDate) -> NaiveDate {
@@ -498,6 +513,26 @@ mod tests {
         assert_eq!(
             check_role(season(), date(2026, 6, 30), None, &[]),
             Err(PlayerError::OutsideSeason)
+        );
+    }
+
+    #[test]
+    fn only_a_role_of_the_season_is_changed() {
+        let last = last_season_role(date(2025, 9, 2), None);
+        assert_eq!(
+            check_change(season(), &last, date(2026, 9, 1), None, &[]),
+            Err(PlayerError::OutsideSeason)
+        );
+        let this = role(1, date(2026, 9, 1), None);
+        assert_eq!(
+            check_change(
+                season(),
+                &this,
+                date(2026, 9, 1),
+                Some(date(2026, 10, 1)),
+                &[last]
+            ),
+            Ok(())
         );
     }
 
