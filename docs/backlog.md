@@ -2,10 +2,9 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – design (epic, 3 stories; functional spec changed after the accept review of story A, approved again 2026-10-16)
-   - Next: `/vision` for the words player, role, hidden, weekly training and training day; then `/design` of the epic and of story A again.
-   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): design again (pages Players and Team, weekly trainings); built and reviewed in the old form on branch `feat/players-and-settings`.
-   - Then story B, trainings and attendance (also: a new season proposes last season's weekly trainings), and story C, the overview.
+1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; designed again 2026-10-16 for weekly trainings and the pages Players and Team)
+   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): design again (`/design docs/changes/2026-10-15-players-and-settings`); built and reviewed in the first form on branch `feat/players-and-settings`.
+   - Then story B, trainings and attendance (with "Change" of a training and the proposal of last season's weekly trainings), and story C, the overview.
 
 Small:
 - Set up and check a backup of the team database (TrueNAS snapshots or a dump off the cluster, with a test restore). Before story A of attendance at training, all data could be read again from the game list; players and attendance cannot. The coordinator chose to do this later (2026-10-15).
