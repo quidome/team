@@ -87,30 +87,54 @@ test('a player that no longer exists gives a general message', async ({ page }) 
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('set the training days and the reasons', async ({ page }) => {
+test('set the weekly trainings and the reasons', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/settings');
 	await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-	await page.getByRole('button', { name: 'Add training day' }).click();
-	const day = page.getByTestId('training-day');
-	await day.getByLabel('Day').selectOption('2');
-	await day.getByLabel('Start').fill('19:45');
-	await day.getByLabel('End').fill('21:00');
-	// Before the first save, the dates are the proposal for the chosen day.
-	await expect(page.getByLabel('First training')).toHaveValue('2026-09-01');
-	await expect(page.getByLabel('Last training')).toHaveValue('2027-05-25');
-	const proposals: string[] = [];
-	page.on('request', (request) => {
-		if (request.url().includes('/api/training-settings/proposal')) proposals.push(request.url());
-	});
-	await page.getByRole('button', { name: 'Save training days' }).click();
-	await expect(page.getByTestId('days-saved')).toHaveText('Saved.');
-	// After the save, a change of days keeps the saved dates (the new day is not saved).
-	await page.getByRole('button', { name: 'Add training day' }).click();
-	await expect(page.getByTestId('training-day')).toHaveCount(2);
-	await page.waitForTimeout(300);
-	expect(proposals).toEqual([]);
-	await expect(page.getByLabel('Last training')).toHaveValue('2027-05-25');
+	await expect(page.getByText('No weekly trainings yet.')).toBeVisible();
+
+	// Add: the window is the proposal for the chosen day.
+	await page.getByRole('button', { name: 'Add weekly training' }).click();
+	const form = page.getByTestId('weekly-form');
+	await form.getByLabel('Day').selectOption('2');
+	await expect(form.getByLabel('First training')).toHaveValue('2026-09-01');
+	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-25');
+	await expect(form.getByLabel('First training')).toHaveAttribute('min', '2026-07-01');
+	await expect(form.getByLabel('Last training')).toHaveAttribute('max', '2027-06-30');
+	await form.getByLabel('Start').fill('19:45');
+	await form.getByLabel('End').fill('21:00');
+	await form.getByRole('button', { name: 'Save weekly training' }).click();
+	const tuesday = page.getByTestId('weekly-training');
+	await expect(tuesday).toHaveText(/Tuesday 19:45–21:00\s*· Tue 1 Sept – Tue 25 May/);
+
+	// "Change": it was a Thursday.
+	await tuesday.getByRole('button', { name: 'Change' }).click();
+	await form.getByLabel('Day').selectOption('4');
+	await form.getByLabel('First training').fill('2026-09-03');
+	await form.getByLabel('Last training').fill('2027-05-27');
+	await form.getByRole('button', { name: 'Save weekly training' }).click();
+	const thursday = page.getByTestId('weekly-training');
+	await expect(thursday).toHaveText(/Thursday 19:45–21:00\s*· Thu 3 Sept – Thu 27 May/);
+
+	// A second Thursday in the same dates is refused.
+	await page.getByRole('button', { name: 'Add weekly training' }).click();
+	await form.getByLabel('Day').selectOption('4');
+	await expect(form.getByLabel('First training')).toHaveValue('2026-09-03');
+	await form.getByLabel('Start').fill('20:00');
+	await form.getByLabel('End').fill('21:30');
+	await form.getByRole('button', { name: 'Save weekly training' }).click();
+	await expect(page.getByRole('alert')).toHaveText(
+		'There is already a weekly training on Thursday in these dates.'
+	);
+	await form.getByRole('button', { name: 'Cancel' }).click();
+	await expect(page.getByTestId('weekly-training')).toHaveCount(1);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// Delete, after a confirmation.
+	page.once('dialog', (dialog) => void dialog.accept());
+	await thursday.getByRole('button', { name: 'Delete' }).click();
+	await expect(page.getByText('No weekly trainings yet.')).toBeVisible();
 
 	await page.getByLabel('New reason').fill('Family');
 	await page.getByRole('button', { name: 'Add reason' }).click();
@@ -122,11 +146,14 @@ test('set the training days and the reasons', async ({ page }) => {
 	await expect(holiday.getByLabel('Hidden')).toBeChecked();
 
 	await page.reload();
-	await expect(page.getByTestId('training-day').getByLabel('Start')).toHaveValue('19:45');
-	await expect(page.getByLabel('First training')).toHaveValue('2026-09-01');
+	await expect(page.getByText('No weekly trainings yet.')).toBeVisible();
+	await expect(page.locator('[data-reason="Holiday"]').getByLabel('Hidden')).toBeChecked();
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
-	expect(errors).toEqual([]);
+	// Only the refused second Thursday.
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 400 (Bad Request)'
+	]);
 });
 
 test('players of last season come back with "Add all"', async ({ page }) => {

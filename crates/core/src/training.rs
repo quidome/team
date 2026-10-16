@@ -1,33 +1,26 @@
-//! Training days: the days of the week the team trains, with their times, and the first and the
-//! last training date of a season. A change of days applies from a date, so the past keeps the
-//! days that were set then.
-
-use std::collections::HashSet;
+//! Weekly trainings: a day of the week with a start and an end time, in a window from a date until
+//! a date inside one season. A weekly training only suggests training days; a training exists only
+//! when the coordinator opens it (story B), and a later change of the weekly training does not
+//! touch it.
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime, Weekday};
 
 use crate::season::Season;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TrainingDay {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WeeklyTrainingId(pub i64);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WeeklyTraining {
+    pub id: WeeklyTrainingId,
+    pub season: Season,
     pub weekday: Weekday,
     pub start: NaiveTime,
     pub end: NaiveTime,
-}
-
-/// The training days that apply from `valid_from` until the next set.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrainingDaySet {
-    pub valid_from: NaiveDate,
-    pub days: Vec<TrainingDay>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrainingSeason {
-    pub season: Season,
-    pub first: NaiveDate,
-    pub last: NaiveDate,
-    pub sets: Vec<TrainingDaySet>,
+    /// The first day of the window.
+    pub from: NaiveDate,
+    /// The last day of the window.
+    pub until: NaiveDate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -36,107 +29,84 @@ pub enum TrainingError {
     EndBeforeStart,
     #[error("the last training date is before the first")]
     LastBeforeFirst,
-    #[error("no training days")]
-    NoTrainingDays,
-    #[error("a day of the week is a training day twice")]
-    DuplicateWeekday,
     #[error("a training date is outside the season")]
     OutsideSeason,
+    #[error("another weekly training on the same day overlaps")]
+    WeeklyTrainingsOverlap,
 }
 
-/// The proposed first and last training date: the first of `weekdays` on or after 1 September of
-/// the season, and the last on or before 31 May. `None` without weekdays.
-pub fn proposed_dates(season: Season, weekdays: &[Weekday]) -> Option<(NaiveDate, NaiveDate)> {
-    if weekdays.is_empty() {
-        return None;
-    }
-    let year = season.start_year();
-    let mut first = NaiveDate::from_ymd_opt(year, 9, 1)?;
-    while !weekdays.contains(&first.weekday()) {
-        first = first.succ_opt()?;
-    }
-    let mut last = NaiveDate::from_ymd_opt(year + 1, 5, 31)?;
-    while !weekdays.contains(&last.weekday()) {
-        last = last.pred_opt()?;
-    }
-    Some((first, last))
-}
-
-/// The set that applies on `date`: the one with the newest `valid_from` on or before it; before
-/// the first set, the first set.
-pub fn set_on(sets: &[TrainingDaySet], date: NaiveDate) -> Option<&TrainingDaySet> {
-    sets.iter()
-        .filter(|set| set.valid_from <= date)
-        .max_by_key(|set| set.valid_from)
-        .or_else(|| sets.iter().min_by_key(|set| set.valid_from))
-}
-
-/// The set the settings page shows: the one that applies on today, or on the first training date
-/// when that is later.
-pub fn shown_set(season: &TrainingSeason, today: NaiveDate) -> Option<&TrainingDaySet> {
-    set_on(&season.sets, today.max(season.first))
-}
-
-/// The first `valid_from` of the stored sets that a save of `set` replaces: the sets valid from
-/// `set`'s date or later, and every set that starts after today. A set that starts after today and
-/// before `set` would otherwise apply to no date (when the first training date moved later) or
-/// stay in force over the newest save.
-pub fn replaced_from(set: &TrainingDaySet, today: NaiveDate) -> NaiveDate {
-    today
-        .succ_opt()
-        .map_or(set.valid_from, |tomorrow| tomorrow.min(set.valid_from))
-}
-
-/// Every training date of the season, from the first to the last training date, each with the
-/// training day of the set that applies on it.
-pub fn training_dates(season: &TrainingSeason) -> Vec<(NaiveDate, TrainingDay)> {
-    let mut dates = Vec::new();
-    let mut date = season.first;
-    while date <= season.last {
-        if let Some(day) = set_on(&season.sets, date)
-            .and_then(|set| set.days.iter().find(|day| day.weekday == date.weekday()))
-        {
-            dates.push((date, *day));
-        }
-        match date.checked_add_days(Days::new(1)) {
-            Some(next) => date = next,
-            None => break,
-        }
-    }
-    dates
-}
-
-/// Checks a save of the settings of `season` and gives the set to store: valid from `today`, or
-/// from `first` when today is before it, or for the first save of the season (`first_save`): there
-/// is no past to keep then. `replaced_from` says which stored sets it replaces.
-pub fn settings_change(
+/// Checks a weekly training of `season`: the window inside the season, `until` not before `from`,
+/// `end` after `start`, and no overlap with `others` (the other weekly trainings of the season,
+/// without the one that is changed) on the same day of the week.
+pub fn check_weekly_training(
     season: Season,
-    first: NaiveDate,
-    last: NaiveDate,
-    days: Vec<TrainingDay>,
-    today: NaiveDate,
-    first_save: bool,
-) -> Result<TrainingDaySet, TrainingError> {
-    if Season::of(first) != season || Season::of(last) != season {
-        return Err(TrainingError::OutsideSeason);
-    }
-    if last < first {
-        return Err(TrainingError::LastBeforeFirst);
-    }
-    if days.is_empty() {
-        return Err(TrainingError::NoTrainingDays);
-    }
-    if days.iter().any(|day| day.end <= day.start) {
+    weekday: Weekday,
+    start: NaiveTime,
+    end: NaiveTime,
+    from: NaiveDate,
+    until: NaiveDate,
+    others: &[WeeklyTraining],
+) -> Result<(), TrainingError> {
+    if end <= start {
         return Err(TrainingError::EndBeforeStart);
     }
-    let mut weekdays = HashSet::new();
-    if !days.iter().all(|day| weekdays.insert(day.weekday)) {
-        return Err(TrainingError::DuplicateWeekday);
+    if until < from {
+        return Err(TrainingError::LastBeforeFirst);
     }
-    let mut days = days;
-    days.sort_by_key(|day| day.weekday.number_from_monday());
-    let valid_from = if first_save { first } else { today.max(first) };
-    Ok(TrainingDaySet { valid_from, days })
+    if Season::of(from) != season || Season::of(until) != season {
+        return Err(TrainingError::OutsideSeason);
+    }
+    if others
+        .iter()
+        .any(|other| other.weekday == weekday && other.from <= until && from <= other.until)
+    {
+        return Err(TrainingError::WeeklyTrainingsOverlap);
+    }
+    Ok(())
+}
+
+/// The proposed window for a weekly training on `weekday`: that day on or after 1 September of the
+/// season until that day on or before 31 May.
+pub fn proposed_window(season: Season, weekday: Weekday) -> Option<(NaiveDate, NaiveDate)> {
+    let year = season.start_year();
+    let mut from = NaiveDate::from_ymd_opt(year, 9, 1)?;
+    while from.weekday() != weekday {
+        from = from.succ_opt()?;
+    }
+    let mut until = NaiveDate::from_ymd_opt(year + 1, 5, 31)?;
+    while until.weekday() != weekday {
+        until = until.pred_opt()?;
+    }
+    Some((from, until))
+}
+
+/// The training days: every date in a window on the day of the week of its weekly training, sorted
+/// by date. A window without its day of the week in it suggests no training days.
+pub fn training_days(weekly: &[WeeklyTraining]) -> Vec<(NaiveDate, &WeeklyTraining)> {
+    let mut days = Vec::new();
+    for training in weekly {
+        let mut date = training.from;
+        while date.weekday() != training.weekday {
+            match date.succ_opt() {
+                Some(next) => date = next,
+                None => break,
+            }
+        }
+        while date <= training.until && date.weekday() == training.weekday {
+            days.push((date, training));
+            match date.checked_add_days(Days::new(7)) {
+                Some(next) => date = next,
+                None => break,
+            }
+        }
+    }
+    days.sort_by_key(|(date, _)| *date);
+    days
+}
+
+/// The first training date of the season: the first training day of its weekly trainings.
+pub fn first_training_date(weekly: &[WeeklyTraining]) -> Option<NaiveDate> {
+    training_days(weekly).first().map(|(date, _)| *date)
 }
 
 #[cfg(test)]
@@ -151,195 +121,155 @@ mod tests {
         NaiveTime::from_hms_opt(hour, minute, 0).expect("valid time")
     }
 
-    fn day(weekday: Weekday) -> TrainingDay {
-        TrainingDay {
-            weekday,
-            start: time(19, 45),
-            end: time(21, 0),
-        }
-    }
-
     fn season() -> Season {
         Season::from_start_year(2026)
     }
 
-    fn tuesdays() -> TrainingSeason {
-        TrainingSeason {
+    fn weekly(id: i64, weekday: Weekday, from: NaiveDate, until: NaiveDate) -> WeeklyTraining {
+        WeeklyTraining {
+            id: WeeklyTrainingId(id),
             season: season(),
-            first: date(2026, 9, 1),
-            last: date(2027, 5, 25),
-            sets: vec![TrainingDaySet {
-                valid_from: date(2026, 9, 1),
-                days: vec![day(Weekday::Tue)],
-            }],
+            weekday,
+            start: time(19, 45),
+            end: time(21, 0),
+            from,
+            until,
         }
     }
 
-    #[test]
-    fn the_proposal_is_the_first_training_day_of_september_and_the_last_of_may() {
-        assert_eq!(
-            proposed_dates(season(), &[Weekday::Tue]),
-            Some((date(2026, 9, 1), date(2027, 5, 25)))
-        );
-        assert_eq!(
-            proposed_dates(season(), &[Weekday::Thu, Weekday::Tue]),
-            Some((date(2026, 9, 1), date(2027, 5, 27)))
-        );
-        assert_eq!(proposed_dates(season(), &[]), None);
-    }
-
-    #[test]
-    fn a_season_of_tuesdays_has_39_training_dates() {
-        let dates = training_dates(&tuesdays());
-        assert_eq!(dates.len(), 39);
-        assert_eq!(dates.first().map(|(date, _)| *date), Some(date(2026, 9, 1)));
-        assert_eq!(dates.last().map(|(date, _)| *date), Some(date(2027, 5, 25)));
-        assert!(
-            dates
-                .iter()
-                .all(|(_, day)| day.start == time(19, 45) && day.end == time(21, 0))
-        );
-    }
-
-    #[test]
-    fn a_change_of_days_keeps_the_past() {
-        let mut season = tuesdays();
-        season.sets.push(TrainingDaySet {
-            valid_from: date(2027, 1, 5),
-            days: vec![day(Weekday::Thu)],
-        });
-        let dates: Vec<NaiveDate> = training_dates(&season)
-            .into_iter()
-            .map(|(d, _)| d)
-            .collect();
-        assert!(dates.contains(&date(2026, 12, 29)));
-        assert!(!dates.contains(&date(2027, 1, 5)));
-        assert!(dates.contains(&date(2027, 1, 7)));
-        assert!(!dates.contains(&date(2027, 1, 12)));
-    }
-
-    #[test]
-    fn a_change_in_the_season_applies_from_today() {
-        let set = settings_change(
+    fn check(
+        weekday: Weekday,
+        from: NaiveDate,
+        until: NaiveDate,
+        others: &[WeeklyTraining],
+    ) -> Result<(), TrainingError> {
+        check_weekly_training(
             season(),
-            date(2026, 9, 1),
-            date(2027, 5, 25),
-            vec![day(Weekday::Thu)],
-            date(2027, 1, 5),
-            false,
-        );
-        assert_eq!(set.map(|set| set.valid_from), Ok(date(2027, 1, 5)));
-    }
-
-    fn set(valid_from: NaiveDate, weekday: Weekday) -> TrainingDaySet {
-        TrainingDaySet {
-            valid_from,
-            days: vec![day(weekday)],
-        }
+            weekday,
+            time(19, 45),
+            time(21, 0),
+            from,
+            until,
+            others,
+        )
     }
 
     #[test]
-    fn a_save_replaces_the_sets_from_its_date_and_all_sets_after_today() {
-        // Before the season the first date moves later: the set of 1 Sep is replaced too.
+    fn two_weekly_trainings_on_the_same_day_never_overlap() {
+        let tuesday = [weekly(1, Weekday::Tue, date(2026, 9, 1), date(2027, 5, 25))];
         assert_eq!(
-            replaced_from(&set(date(2026, 9, 8), Weekday::Thu), date(2026, 8, 15)),
-            date(2026, 8, 16)
+            check(Weekday::Tue, date(2027, 1, 5), date(2027, 5, 25), &tuesday),
+            Err(TrainingError::WeeklyTrainingsOverlap)
         );
-        // In the season: from today on, the past stays.
         assert_eq!(
-            replaced_from(&set(date(2027, 1, 5), Weekday::Thu), date(2027, 1, 5)),
-            date(2027, 1, 5)
+            check(Weekday::Thu, date(2026, 9, 1), date(2027, 5, 25), &tuesday),
+            Ok(())
         );
-        // In the season, with the first date moved later than today.
+        // The weekly training that is changed is not in `others`.
         assert_eq!(
-            replaced_from(&set(date(2026, 11, 2), Weekday::Thu), date(2026, 10, 12)),
-            date(2026, 10, 13)
+            check(Weekday::Tue, date(2026, 9, 8), date(2027, 5, 25), &[]),
+            Ok(())
+        );
+        // A window that ends the day before the other starts.
+        let from_january = [weekly(2, Weekday::Tue, date(2027, 1, 5), date(2027, 5, 25))];
+        assert_eq!(
+            check(
+                Weekday::Tue,
+                date(2026, 9, 1),
+                date(2027, 1, 4),
+                &from_january
+            ),
+            Ok(())
         );
     }
 
     #[test]
-    fn the_page_shows_the_set_of_today_or_of_the_first_date() {
-        let mut season = TrainingSeason {
-            first: date(2026, 9, 8),
-            sets: vec![
-                set(date(2026, 9, 1), Weekday::Tue),
-                set(date(2026, 9, 8), Weekday::Thu),
-            ],
-            ..tuesdays()
-        };
-        let shown = |season: &TrainingSeason, today| {
-            shown_set(season, today).map(|set| set.days[0].weekday)
-        };
-        assert_eq!(shown(&season, date(2026, 8, 15)), Some(Weekday::Thu));
-        season.first = date(2026, 9, 1);
-        assert_eq!(shown(&season, date(2026, 8, 15)), Some(Weekday::Tue));
-        assert_eq!(shown(&season, date(2026, 9, 10)), Some(Weekday::Thu));
-    }
-
-    #[test]
-    fn a_change_before_the_first_date_applies_from_the_first_date() {
-        let set = settings_change(
-            season(),
-            date(2026, 9, 1),
-            date(2027, 5, 25),
-            vec![day(Weekday::Tue)],
-            date(2026, 8, 15),
-            false,
-        );
-        assert_eq!(set.map(|set| set.valid_from), Ok(date(2026, 9, 1)));
-    }
-
-    #[test]
-    fn the_first_save_in_the_season_applies_from_the_first_date() {
-        // The coordinator sets up the tool in October and enters the trainings since September.
-        let set = settings_change(
-            season(),
-            date(2026, 9, 1),
-            date(2027, 5, 25),
-            vec![day(Weekday::Tue)],
-            date(2026, 10, 15),
-            true,
-        );
-        assert_eq!(set.map(|set| set.valid_from), Ok(date(2026, 9, 1)));
-    }
-
-    #[test]
-    fn settings_are_checked() {
-        let save = |first, last, days| {
-            settings_change(season(), first, last, days, date(2026, 8, 15), true)
-        };
-        let late = TrainingDay {
-            weekday: Weekday::Tue,
-            start: time(21, 0),
-            end: time(19, 45),
-        };
+    fn a_weekly_training_is_checked() {
         assert_eq!(
-            save(date(2026, 9, 1), date(2027, 5, 25), vec![late]),
-            Err(TrainingError::EndBeforeStart)
+            check(Weekday::Tue, date(2026, 6, 30), date(2027, 5, 25), &[]),
+            Err(TrainingError::OutsideSeason)
         );
         assert_eq!(
-            save(date(2027, 5, 25), date(2026, 9, 1), vec![day(Weekday::Tue)]),
+            check(Weekday::Tue, date(2026, 9, 1), date(2027, 7, 1), &[]),
+            Err(TrainingError::OutsideSeason)
+        );
+        assert_eq!(
+            check(Weekday::Tue, date(2026, 9, 1), date(2026, 8, 31), &[]),
             Err(TrainingError::LastBeforeFirst)
         );
         assert_eq!(
-            save(date(2026, 9, 1), date(2027, 5, 25), vec![]),
-            Err(TrainingError::NoTrainingDays)
-        );
-        assert_eq!(
-            save(
+            check_weekly_training(
+                season(),
+                Weekday::Tue,
+                time(21, 0),
+                time(19, 45),
                 date(2026, 9, 1),
                 date(2027, 5, 25),
-                vec![day(Weekday::Tue), day(Weekday::Tue)]
+                &[]
             ),
-            Err(TrainingError::DuplicateWeekday)
+            Err(TrainingError::EndBeforeStart)
+        );
+    }
+
+    #[test]
+    fn the_proposed_window_is_the_first_day_of_september_and_the_last_of_may() {
+        assert_eq!(
+            proposed_window(season(), Weekday::Tue),
+            Some((date(2026, 9, 1), date(2027, 5, 25)))
         );
         assert_eq!(
-            save(
-                date(2026, 6, 30),
-                date(2027, 5, 25),
-                vec![day(Weekday::Tue)]
-            ),
-            Err(TrainingError::OutsideSeason)
+            proposed_window(season(), Weekday::Thu),
+            Some((date(2026, 9, 3), date(2027, 5, 27)))
         );
+    }
+
+    #[test]
+    fn a_tuesday_in_the_proposed_window_has_39_training_days() {
+        let tuesday = [weekly(1, Weekday::Tue, date(2026, 9, 1), date(2027, 5, 25))];
+        let days = training_days(&tuesday);
+        assert_eq!(days.len(), 39);
+        assert_eq!(days[0].0, date(2026, 9, 1));
+        assert_eq!(days[38].0, date(2027, 5, 25));
+        assert!(days.iter().all(|(day, _)| day.weekday() == Weekday::Tue));
+    }
+
+    #[test]
+    fn training_days_of_two_weekly_trainings_are_sorted_by_date() {
+        let both = [
+            weekly(1, Weekday::Thu, date(2026, 9, 1), date(2026, 9, 30)),
+            weekly(2, Weekday::Tue, date(2026, 9, 1), date(2026, 9, 30)),
+        ];
+        let days: Vec<NaiveDate> = training_days(&both).iter().map(|(day, _)| *day).collect();
+        assert_eq!(
+            days,
+            [
+                date(2026, 9, 1),
+                date(2026, 9, 3),
+                date(2026, 9, 8),
+                date(2026, 9, 10),
+                date(2026, 9, 15),
+                date(2026, 9, 17),
+                date(2026, 9, 22),
+                date(2026, 9, 24),
+                date(2026, 9, 29),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_window_without_its_day_has_no_training_days() {
+        // Wednesday 2 Sep to Monday 7 Sep holds no Tuesday.
+        let none = [weekly(1, Weekday::Tue, date(2026, 9, 2), date(2026, 9, 7))];
+        assert!(training_days(&none).is_empty());
+    }
+
+    #[test]
+    fn the_first_training_date_is_the_first_training_day() {
+        assert_eq!(first_training_date(&[]), None);
+        let both = [
+            weekly(1, Weekday::Tue, date(2026, 9, 8), date(2027, 5, 25)),
+            weekly(2, Weekday::Thu, date(2026, 9, 3), date(2027, 5, 27)),
+        ];
+        assert_eq!(first_training_date(&both), Some(date(2026, 9, 3)));
     }
 }

@@ -769,19 +769,19 @@
         }
       }
     },
-    "/api/training-settings": {
+    "/api/weekly-trainings": {
       "get": {
         "tags": [
-          "training_settings"
+          "weekly_trainings"
         ],
-        "operationId": "trainingSettings",
+        "operationId": "weeklyTrainings",
         "responses": {
           "200": {
-            "description": "The training settings of the current season",
+            "description": "The weekly trainings of the current season",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrainingSettings"
+                  "$ref": "#/components/schemas/WeeklyTrainings"
                 }
               }
             }
@@ -791,16 +791,16 @@
           }
         }
       },
-      "put": {
+      "post": {
         "tags": [
-          "training_settings"
+          "weekly_trainings"
         ],
-        "operationId": "saveTrainingSettings",
+        "operationId": "addWeeklyTraining",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SettingsChange"
+                "$ref": "#/components/schemas/WeeklyTrainingInput"
               }
             }
           },
@@ -808,17 +808,17 @@
         },
         "responses": {
           "200": {
-            "description": "The saved settings",
+            "description": "The weekly trainings of the current season",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrainingSettings"
+                  "$ref": "#/components/schemas/WeeklyTrainings"
                 }
               }
             }
           },
           "400": {
-            "description": "`end_before_start`, `last_before_first`, `no_training_days`, `duplicate_weekday`, `outside_season`, `invalid_weekday`, `invalid_time`"
+            "description": "`end_before_start`, `last_before_first`, `outside_season`, `weekly_trainings_overlap`, `invalid_weekday`, `invalid_time`"
           },
           "401": {
             "description": "Not logged in"
@@ -826,39 +826,127 @@
         }
       }
     },
-    "/api/training-settings/proposal": {
+    "/api/weekly-trainings/proposal": {
       "get": {
         "tags": [
-          "training_settings"
+          "weekly_trainings"
         ],
-        "operationId": "trainingDatesProposal",
+        "operationId": "weeklyTrainingProposal",
         "parameters": [
           {
-            "name": "weekdays",
+            "name": "weekday",
             "in": "query",
-            "description": "The chosen days of the week, for example \"2\" or \"2,4\".",
+            "description": "The day of the week, 1 (Monday) to 7 (Sunday).",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "The first chosen day in September and the last in May",
+            "description": "That day on or after 1 September until that day on or before 31 May",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Proposal"
+                  "$ref": "#/components/schemas/WindowProposal"
                 }
               }
             }
           },
           "400": {
-            "description": "`no_training_days`, `invalid_weekday`"
+            "description": "`invalid_weekday`"
           },
           "401": {
             "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/weekly-trainings/{id}": {
+      "put": {
+        "tags": [
+          "weekly_trainings"
+        ],
+        "operationId": "changeWeeklyTraining",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The weekly training",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklyTrainingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The weekly trainings of the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyTrainings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`end_before_start`, `last_before_first`, `outside_season`, `weekly_trainings_overlap`, `invalid_weekday`, `invalid_time`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such weekly training in the current season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "weekly_trainings"
+        ],
+        "operationId": "deleteWeeklyTraining",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The weekly training",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The weekly trainings of the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyTrainings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such weekly training in the current season"
           }
         }
       }
@@ -1468,21 +1556,6 @@
           }
         }
       },
-      "Proposal": {
-        "type": "object",
-        "required": [
-          "first",
-          "last"
-        ],
-        "properties": {
-          "first": {
-            "type": "string"
-          },
-          "last": {
-            "type": "string"
-          }
-        }
-      },
       "ReadingView": {
         "type": "object",
         "description": "One reading of the game list. A failed or held-back reading is a result, not an HTTP error.",
@@ -1935,30 +2008,6 @@
         ],
         "description": "The state of the choice. `season` is always the current season."
       },
-      "SettingsChange": {
-        "type": "object",
-        "required": [
-          "first",
-          "last",
-          "days"
-        ],
-        "properties": {
-          "days": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TrainingDayView"
-            }
-          },
-          "first": {
-            "type": "string",
-            "format": "date"
-          },
-          "last": {
-            "type": "string",
-            "format": "date"
-          }
-        }
-      },
       "TeamView": {
         "type": "object",
         "required": [
@@ -1977,21 +2026,31 @@
           }
         }
       },
-      "TrainingDayView": {
+      "WeeklyTrainingInput": {
         "type": "object",
-        "description": "A day of the week the team trains, with its times.",
+        "description": "A new or changed weekly training.",
         "required": [
           "weekday",
           "start",
-          "end"
+          "end",
+          "from",
+          "until"
         ],
         "properties": {
           "end": {
             "type": "string"
           },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
           "start": {
             "type": "string",
             "description": "For example \"19:45\"."
+          },
+          "until": {
+            "type": "string",
+            "format": "date"
           },
           "weekday": {
             "type": "integer",
@@ -2000,38 +2059,85 @@
           }
         }
       },
-      "TrainingSettings": {
+      "WeeklyTrainingView": {
         "type": "object",
+        "description": "A weekly training: a day of the week with its times, in a window.",
         "required": [
-          "season",
-          "saved",
-          "days"
+          "id",
+          "weekday",
+          "start",
+          "end",
+          "from",
+          "until"
         ],
         "properties": {
-          "days": {
+          "end": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "description": "The first day of the window, for example \"2026-09-01\"."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "start": {
+            "type": "string",
+            "description": "For example \"19:45\"."
+          },
+          "until": {
+            "type": "string",
+            "description": "The last day of the window."
+          },
+          "weekday": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 (Monday) to 7 (Sunday)."
+          }
+        }
+      },
+      "WeeklyTrainings": {
+        "type": "object",
+        "description": "The weekly trainings of the current season, sorted by the start of the window.",
+        "required": [
+          "season",
+          "season_first_day",
+          "season_last_day",
+          "weekly_trainings"
+        ],
+        "properties": {
+          "season": {
+            "type": "string"
+          },
+          "season_first_day": {
+            "type": "string",
+            "description": "The first day of the season, for example \"2026-07-01\": the earliest date of a window."
+          },
+          "season_last_day": {
+            "type": "string",
+            "description": "The last day of the season, for example \"2027-06-30\": the latest date of a window."
+          },
+          "weekly_trainings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/TrainingDayView"
-            },
-            "description": "The training days that apply today (before the first training date: the first ones)."
+              "$ref": "#/components/schemas/WeeklyTrainingView"
+            }
+          }
+        }
+      },
+      "WindowProposal": {
+        "type": "object",
+        "description": "The proposed window of a weekly training.",
+        "required": [
+          "from",
+          "until"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
           },
-          "first": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "last": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "saved": {
-            "type": "boolean",
-            "description": "`false` while nothing is saved for the season; then the dates are `null` and `days` is\nempty."
-          },
-          "season": {
+          "until": {
             "type": "string"
           }
         }

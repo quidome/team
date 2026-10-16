@@ -1,34 +1,28 @@
 <!--
-	Settings (attendance at training, story A): the training days of the season with their times, the
-	first and the last training date, and the reasons for an absence.
+	Settings (attendance at training, story A): the weekly trainings of the season (a day of the week
+	with its times, in a window) and the reasons for an absence.
 -->
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import {
 		ApiError,
 		addReason,
+		addWeeklyTraining,
 		changeReason,
-		proposeTrainingDates,
-		saveTrainingSettings,
+		changeWeeklyTraining,
+		deleteWeeklyTraining,
+		proposeWindow,
 		type AbsenceReason,
-		type TrainingDay
+		type WeeklyTraining,
+		type WeeklyTrainingInput
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { weekdays } from '#lib/players.js';
+	import { formatDay } from '#lib/schedule.js';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-
-	// Training days
-	let days = $state<TrainingDay[]>(untrack(() => structuredClone(data.settings?.days ?? [])));
-	let first = $state(untrack(() => data.settings?.first ?? ''));
-	let last = $state(untrack(() => data.settings?.last ?? ''));
-	let savingDays = $state(false);
-	let daysError = $state<string | null>(null);
-	let daysSaved = $state(false);
-	/** The dates are the proposal, not typed: a change of days proposes again. */
-	let proposed = $state(false);
 
 	function message(failure: unknown): string {
 		return failure instanceof ApiError
@@ -36,52 +30,91 @@
 			: 'Something went wrong. Please try again.';
 	}
 
-	function addDay() {
-		const used = new Set(days.map((day) => day.weekday));
-		const weekday = weekdays.find((candidate) => !used.has(candidate.value))?.value ?? 1;
-		days.push({ weekday, start: '', end: '' });
-		daysSaved = false;
-		void propose();
+	// Weekly trainings
+	let weekly = $state<WeeklyTraining[]>(
+		untrack(() => structuredClone(data.weekly?.weekly_trainings ?? []))
+	);
+	/** The weekly training in the form: `null` for a new one; the form is closed when `editing` is false. */
+	let editing = $state(false);
+	let editingId = $state<number | null>(null);
+	let form = $state<WeeklyTrainingInput>({
+		weekday: 2,
+		start: '',
+		end: '',
+		from: '',
+		until: ''
+	});
+	/** The window is the proposal, not typed: a change of the day proposes again. */
+	let windowProposed = $state(false);
+	let savingWeekly = $state(false);
+	let weeklyError = $state<string | null>(null);
+
+	function dayName(weekday: number): string {
+		return weekdays.find((candidate) => candidate.value === weekday)?.label ?? '';
 	}
 
-	function removeDay(index: number) {
-		days.splice(index, 1);
-		daysSaved = false;
-		void propose();
-	}
-
-	/** Before the first save, fill the dates with the proposal for the chosen days. */
 	async function propose() {
-		if (data.settings?.saved || days.length === 0) return;
-		if ((first || last) && !proposed) return;
+		if (form.from && form.until && !windowProposed) return;
 		try {
-			const proposal = await proposeTrainingDates(days.map((day) => day.weekday));
-			first = proposal.first;
-			last = proposal.last;
-			proposed = true;
+			const proposal = await proposeWindow(form.weekday);
+			form.from = proposal.from;
+			form.until = proposal.until;
+			windowProposed = true;
 		} catch {
 			// The dates can still be typed.
 		}
 	}
 
-	async function saveDays(event: SubmitEvent) {
-		event.preventDefault();
-		savingDays = true;
-		daysError = null;
-		daysSaved = false;
+	function startAdding() {
+		const used = new Set(weekly.map((training) => training.weekday));
+		const weekday = weekdays.find((candidate) => !used.has(candidate.value))?.value ?? 1;
+		form = { weekday, start: '', end: '', from: '', until: '' };
+		editingId = null;
+		windowProposed = false;
+		weeklyError = null;
+		editing = true;
+		void propose();
+	}
+
+	function startChanging(training: WeeklyTraining) {
+		const { weekday, start, end, from, until } = training;
+		form = { weekday, start, end, from, until };
+		editingId = training.id;
+		windowProposed = false;
+		weeklyError = null;
+		editing = true;
+	}
+
+	async function runWeekly(action: () => Promise<{ weekly_trainings: WeeklyTraining[] }>) {
+		savingWeekly = true;
+		weeklyError = null;
 		try {
-			const saved = await saveTrainingSettings(first, last, days);
-			days = structuredClone(saved.days);
-			first = saved.first ?? first;
-			last = saved.last ?? last;
-			// Saved dates are not a proposal: a later change of days keeps them.
-			proposed = false;
-			daysSaved = true;
+			weekly = (await action()).weekly_trainings;
+			return true;
 		} catch (failure) {
-			daysError = message(failure);
+			weeklyError = message(failure);
+			return false;
 		} finally {
-			savingDays = false;
+			savingWeekly = false;
 		}
+	}
+
+	async function saveWeekly(event: SubmitEvent) {
+		event.preventDefault();
+		const input = { ...form };
+		const id = editingId;
+		if (
+			await runWeekly(() =>
+				id === null ? addWeeklyTraining(input) : changeWeeklyTraining(id, input)
+			)
+		) {
+			editing = false;
+		}
+	}
+
+	function removeWeekly(training: WeeklyTraining) {
+		if (!confirm(`Delete the weekly training on ${dayName(training.weekday)}?`)) return;
+		void runWeekly(() => deleteWeeklyTraining(training.id));
 	}
 
 	// Reasons
@@ -136,7 +169,7 @@
 	<title>Settings · Team</title>
 </svelte:head>
 
-{#if !data.settings || !data.reasons}
+{#if !data.weekly || !data.reasons}
 	<section class="py-16 text-center">
 		<p class="text-muted-foreground">Log in to see the settings.</p>
 		<Button href="/auth/login" class="mt-4" data-sveltekit-reload>Log in</Button>
@@ -148,30 +181,66 @@
 			<Button href={resolve('/')} variant="ghost">Back</Button>
 		</div>
 
-		<form
+		<section
 			class="space-y-4 rounded-xl border bg-card p-4 shadow-xs"
-			onsubmit={saveDays}
-			aria-labelledby="training-heading"
+			aria-labelledby="weekly-heading"
 		>
 			<div>
-				<h2 id="training-heading" class="font-medium">Training days · {data.settings.season}</h2>
+				<h2 id="weekly-heading" class="font-medium">Weekly trainings · {data.weekly.season}</h2>
 				<p class="text-sm text-muted-foreground">
-					A change applies from today; earlier trainings keep their days.
+					A weekly training suggests a training on each of its days. A change corrects it for its
+					whole window; trainings that are opened keep their own date and times.
 				</p>
 			</div>
+			{#if weeklyError}
+				<p class="text-sm" role="alert">{weeklyError}</p>
+			{/if}
+			{#if weekly.length === 0}
+				<p class="text-sm text-muted-foreground">No weekly trainings yet.</p>
+			{:else}
+				<ul class="space-y-2">
+					{#each weekly as training (training.id)}
+						<li class="space-y-2 rounded-lg border p-3" data-testid="weekly-training">
+							<p class="text-sm tabular-nums">
+								<span class="font-medium"
+									>{dayName(training.weekday)} {training.start}–{training.end}</span
+								>
+								· {formatDay(training.from)} – {formatDay(training.until)}
+							</p>
+							<div class="flex gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									disabled={savingWeekly}
+									onclick={() => startChanging(training)}
+								>
+									Change
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									disabled={savingWeekly}
+									onclick={() => removeWeekly(training)}
+								>
+									Delete
+								</Button>
+							</div>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 
-			{#each days as day, index (index)}
-				<div class="space-y-2 rounded-lg border p-3" data-testid="training-day">
+			{#if editing}
+				<form
+					class="space-y-3 rounded-lg border p-3"
+					onsubmit={saveWeekly}
+					data-testid="weekly-form"
+				>
 					<label class="block space-y-1">
 						<span class="text-sm">Day</span>
-						<select
-							class={field}
-							bind:value={day.weekday}
-							onchange={() => {
-								daysSaved = false;
-								void propose();
-							}}
-						>
+						<select class={field} bind:value={form.weekday} onchange={() => void propose()}>
 							{#each weekdays as weekday (weekday.value)}
 								<option value={weekday.value}>{weekday.label}</option>
 							{/each}
@@ -180,51 +249,48 @@
 					<div class="flex gap-2">
 						<label class="block min-w-0 flex-1 space-y-1">
 							<span class="text-sm">Start</span>
-							<input class={field} type="time" bind:value={day.start} required />
+							<input class={field} type="time" bind:value={form.start} required />
 						</label>
 						<label class="block min-w-0 flex-1 space-y-1">
 							<span class="text-sm">End</span>
-							<input class={field} type="time" bind:value={day.end} required />
+							<input class={field} type="time" bind:value={form.end} required />
 						</label>
 					</div>
-					<Button type="button" variant="ghost" size="sm" onclick={() => removeDay(index)}>
-						Remove day
-					</Button>
-				</div>
-			{/each}
-			<Button type="button" variant="outline" onclick={addDay}>Add training day</Button>
-
-			<div class="grid gap-2 sm:grid-cols-2">
-				<label class="block min-w-0 space-y-1">
-					<span class="text-sm">First training</span>
-					<input
-						class={field}
-						type="date"
-						bind:value={first}
-						oninput={() => (proposed = false)}
-						required
-					/>
-				</label>
-				<label class="block min-w-0 space-y-1">
-					<span class="text-sm">Last training</span>
-					<input
-						class={field}
-						type="date"
-						bind:value={last}
-						oninput={() => (proposed = false)}
-						required
-					/>
-				</label>
-			</div>
-
-			{#if daysError}
-				<p class="text-sm" role="alert">{daysError}</p>
+					<div class="grid gap-2 sm:grid-cols-2">
+						<label class="block min-w-0 space-y-1">
+							<span class="text-sm">First training</span>
+							<input
+								class={field}
+								type="date"
+								bind:value={form.from}
+								min={data.weekly.season_first_day}
+								max={data.weekly.season_last_day}
+								oninput={() => (windowProposed = false)}
+								required
+							/>
+						</label>
+						<label class="block min-w-0 space-y-1">
+							<span class="text-sm">Last training</span>
+							<input
+								class={field}
+								type="date"
+								bind:value={form.until}
+								min={data.weekly.season_first_day}
+								max={data.weekly.season_last_day}
+								oninput={() => (windowProposed = false)}
+								required
+							/>
+						</label>
+					</div>
+					<div class="flex gap-2">
+						<Button type="submit" disabled={savingWeekly}>Save weekly training</Button>
+						<Button type="button" variant="ghost" onclick={() => (editing = false)}>Cancel</Button>
+					</div>
+				</form>
+			{:else}
+				<Button type="button" variant="outline" onclick={startAdding}>Add weekly training</Button>
 			{/if}
-			{#if daysSaved}
-				<p class="text-sm" role="status" data-testid="days-saved">Saved.</p>
-			{/if}
-			<Button type="submit" disabled={savingDays}>Save training days</Button>
-		</form>
+		</section>
 
 		<section class="space-y-4 rounded-xl border bg-card p-4 shadow-xs" aria-labelledby="reasons">
 			<div>

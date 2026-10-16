@@ -1,11 +1,13 @@
--- Players, their roles in the team of a season, the reasons for an absence, and the training days
--- of each season (attendance at training, story A; decision 0019).
+-- The club's players, their roles in the team of a season, the reasons for an absence, and the
+-- weekly trainings of each season (attendance at training, story A; decision 0019).
 
--- A player is the person: a name, with no dates.
+-- A player is a person of the club: a name, with no dates. A hidden player is no longer offered as
+-- a choice; its history stays.
 CREATE TABLE players (
     id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     first_name  text NOT NULL CHECK (btrim(first_name) <> ''),
     last_name   text,
+    hidden      boolean NOT NULL DEFAULT false,
     created_at  timestamptz NOT NULL
 );
 
@@ -43,22 +45,19 @@ INSERT INTO reasons (name, valid, position) VALUES
     ('Work', false, 5),
     ('No reason', false, 6);
 
--- The first and the last training date of a season.
-CREATE TABLE training_seasons (
-    season_year  integer PRIMARY KEY,
-    first_date   date NOT NULL,
-    last_date    date NOT NULL,
-    CHECK (last_date >= first_date)
-);
-
--- The training days of a season, in sets: a set applies from `valid_from` until the next set, so
--- a change of days keeps the past. One training time for each day of the week (1 = Monday).
-CREATE TABLE training_days (
-    season_year  integer NOT NULL REFERENCES training_seasons,
-    valid_from   date NOT NULL,
+-- A weekly training: a day of the week (1 = Monday) with a start and an end time, in a window
+-- inside one season. It only suggests training days; a training exists only when it is opened
+-- (story B). The core checks that two weekly trainings on the same day never overlap, under an
+-- advisory lock.
+CREATE TABLE weekly_trainings (
+    id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    season_year  integer NOT NULL,
     weekday      smallint NOT NULL CHECK (weekday BETWEEN 1 AND 7),
     start_time   time NOT NULL,
     end_time     time NOT NULL,
+    from_date    date NOT NULL,
+    until_date   date NOT NULL,
     CHECK (end_time > start_time),
-    PRIMARY KEY (season_year, valid_from, weekday)
+    CHECK (until_date >= from_date)
 );
+CREATE INDEX weekly_trainings_season ON weekly_trainings (season_year);

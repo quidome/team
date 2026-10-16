@@ -364,9 +364,11 @@ async fn every_new_route_needs_a_login_and_changes_need_the_origin(pool: PgPool)
         ("GET", "/api/reasons"),
         ("POST", "/api/reasons"),
         ("PUT", "/api/reasons/1"),
-        ("GET", "/api/training-settings"),
-        ("PUT", "/api/training-settings"),
-        ("GET", "/api/training-settings/proposal?weekdays=2"),
+        ("GET", "/api/weekly-trainings"),
+        ("POST", "/api/weekly-trainings"),
+        ("PUT", "/api/weekly-trainings/1"),
+        ("DELETE", "/api/weekly-trainings/1"),
+        ("GET", "/api/weekly-trainings/proposal?weekday=2"),
     ];
     for (method, path) in routes {
         let (status, _) = coordinator
@@ -418,10 +420,10 @@ async fn add_all_brings_last_seasons_players_back(pool: PgPool) {
     coordinator.log_in_again().await;
     coordinator
         .ok(
-            "PUT",
-            "/api/training-settings",
-            Some(json!({ "first": "2026-09-01", "last": "2027-05-25",
-                         "days": [{ "weekday": 2, "start": "19:45", "end": "21:00" }] })),
+            "POST",
+            "/api/weekly-trainings",
+            Some(json!({ "weekday": 2, "start": "19:45", "end": "21:00",
+                         "from": "2026-09-01", "until": "2027-05-25" })),
         )
         .await;
     let list = coordinator.ok("GET", "/api/players", None).await;
@@ -477,10 +479,10 @@ async fn after_add_all_in_summer_the_players_stay_in_the_team_and_can_leave(pool
     coordinator.log_in_again().await;
     coordinator
         .ok(
-            "PUT",
-            "/api/training-settings",
-            Some(json!({ "first": "2026-09-01", "last": "2027-05-25",
-                         "days": [{ "weekday": 2, "start": "19:45", "end": "21:00" }] })),
+            "POST",
+            "/api/weekly-trainings",
+            Some(json!({ "weekday": 2, "start": "19:45", "end": "21:00",
+                         "from": "2026-09-01", "until": "2027-05-25" })),
         )
         .await;
     coordinator

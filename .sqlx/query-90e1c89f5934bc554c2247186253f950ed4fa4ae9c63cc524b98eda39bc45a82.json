@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO weekly_trainings (season_year, weekday, start_time, end_time, from_date,\n                                       until_date)\n         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int2",
+        "Time",
+        "Time",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "90e1c89f5934bc554c2247186253f950ed4fa4ae9c63cc524b98eda39bc45a82"
+}
