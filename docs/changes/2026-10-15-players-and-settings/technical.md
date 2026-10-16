@@ -178,7 +178,9 @@ Decisions that apply: 0001, 0002, 0004, 0007, 0014; the epic's architecture (pla
 - [x] Fix 2: R3 and R9 (two saves at once) – a settings save removes the stored sets from its valid-from date on, under a lock
 - [x] Fix 3: R5 – the test of two role saves at once always catches a missing lock
 - [x] Fix 4: R6, R7, R8, R9 (the other two points) – roles only in the current season, the detail page, the 404 sentence, the proposed end, the settings page after the first save
-- [ ] Review build again
+- [x] Review build again (2026-10-16): not ready, findings R10–R12
+- [x] Review accept (2026-10-16): needs correction, findings A1–A5
+- [x] Fix 5: R10, R11, R12 – a settings save also replaces the sets that start after today, the page shows the set of today or the first date; "Add to the team" proposes the proposed start; the season rule of a changed role and "Add all" go through the core checks
 
 ## Deviations
 None from `functional.md` (as changed on 2026-10-15). The design reads the spec more strictly within its words:
@@ -329,3 +331,178 @@ contain player names", and decision 0019, as the specs plan.
 **Verdict:** not ready to close. R1 and R3 are bugs against the spec's intent that the tests do not
 see; R1 breaks "Add all" and every role change from the second season on, and is the base story B
 builds on. R4 and R5 belong with the fix of R1.
+
+### Build review again, 2026-10-16
+By a fresh agent (`/review build`). The arguments held only the mode and the change folder.
+Read: the diff `main...feat/players-and-settings` (905a767 and the fix commit ff065be; nothing
+uncommitted; `main` is one docs commit ahead, a9aec5d, which this branch does not touch), this
+folder, the epic's `functional.md`, `docs/architecture.md`, the decision records, `CLAUDE.md`,
+`docs/language.md`. Ran in the repository: `cargo fmt --check`, `cargo clippy --workspace
+--all-targets -D warnings`, `cargo test --workspace`, `cargo sqlx prepare --workspace --check`,
+`npm run check && npm run lint && npm run build`, `npx playwright test` (39 passed), and
+`team openapi` compared with `web/openapi.json` (same); all pass. Probes and mutations ran in a
+copy of the tree (`git archive HEAD`) in the scratchpad; nothing in the repository changed. (The
+copy shared the repository's `target/`; a mutated `team_core` was left in it, so the stale
+artifacts of `team_core` and `team` were removed with `cargo clean -p` and everything above was
+run again on a clean build.)
+
+**The fixes of R1–R9: checked.**
+- R1: run. With the old meaning of an open role (`last_day` = `NaiveDate::MAX`) the two new API
+  tests fail; with the fix they pass. `last_day` is now the one meaning in `covers`, `check_role`
+  and `stayed_until_end`.
+- R2, R4: trace. `one()` and the list both go through core `place`; `proposed_start` is in the
+  core; `api/players.rs` loads and maps.
+- R3: run. With the old query (`valid_from = $2`) `before_the_season_the_last_save_wins` and
+  `a_save_removes_the_sets_from_its_date_on` fail. But see R10: the fix covers only sets on or
+  after the new date.
+- R5: run. Without `players::lock` in `save_role` the test failed 3 of 3 runs.
+- R9 (two saves at once): run. Without `training_settings::lock` `a_save_waits_for_another_save`
+  fails.
+- R6, R7, R8, R9 (other points): trace through the screens and `client.ts`; the browser tests for
+  them pass. The new 404 sentence also replaces the club sentence for `confirm-gone`, which is
+  better there.
+
+**R10 – a save of the settings that moves the first training date later keeps an older set in
+force on the screen, and a save of the screen as shown brings it back (bug, medium; sibling of
+R3). Run.** The save removes only the sets valid from the new set's date or later. When the new
+date is later than an older set's date and later than today, that older set stays. Before the
+season (clock 15 Aug 2026): save Tuesday with first 1 Sep, then Thursday with first 8 Sep. The
+answer of the second save, and `GET`, give **Tuesday**: `set_on(today)` finds no set on or before
+15 Aug and takes the first set (1 Sep, Tuesday, which `training_dates` never uses any more, since
+the season now starts on 8 Sep). The settings page puts the answer in its fields, so right after
+saving Thursday it shows Tuesday. Saving the page as shown (for example only the last date
+changed) stores Tuesday from 8 Sep: on 10 Sep `GET` gives Tuesday; the Thursday change is lost
+without a sign. The same in the season: on 12 Oct with Tuesday from 1 Sep, a save of Thursday
+with first 2 Nov answers Tuesday. The spec: a change applies from the day it is made, earlier
+dates keep the days set then; here a set that applies to no date is shown and wins. The test of
+R3 checks `GET` only on 10 Sep, after the new date, so it cannot see this. Suggest: one rule in the
+core for which stored sets a save replaces (all sets that start after today, as well as those
+from the new date on, since no date before `first` is a training date), and let `GET` show the set
+of `max(today, first)`; a test of the probe above that checks the answer of the save and `GET`
+before the first date.
+- 2026-10-16: fixed. Core `training::replaced_from` (a save replaces the stored sets from its own date on and every set that starts after today) and `training::shown_set` (the set of today, or of the first date when that is later); `training_settings::save` takes the date from which it replaces. Core tests of both; API tests `a_first_date_moved_later_shows_and_keeps_the_last_save` (the probe, with the answer, `GET` before the first date, and a save of the page as shown) and `in_the_season_a_first_date_moved_later_keeps_the_past`. Both API tests fail with the old rule.
+
+**R11 – "Add to the team" on the player page proposes today, not the proposed start (bug,
+low). Trace.** `players/[id]/+page.svelte` `startReturning` sets the date to `today` for a player
+with no roles in the season ("Add to the team"), while "Add player" and "Add to this season" use
+`proposed_from` (the first training date, or today when trainings have started). The spec
+(story 1): "the tool proposes the first training date of the season, or today when the season's
+trainings have started". In August a player from "Other players", or a player of last season
+opened from a link, gets a role from today and not from 1 Sep. For "Back in the team" (the
+player had a role earlier in the season) today is the right proposal. Suggest: `proposed_from`
+when the player has no roles in the season, `today` otherwise.
+- 2026-10-16: fixed. "Add to the team" (no roles in the season) proposes `proposed_from`; "Back in the team" still proposes today. The browser test of a player of last season checks the proposed date (replaced answer, 3 Nov).
+
+**R12 – small rules still in the server (decision 0001, low). Trace.** "A role of another season
+cannot be changed" (`stored.season != season` in `save_role`) is a product rule outside
+`check_role`; and "the roles of this season and the season before" is filtered twice in
+`api/players.rs` (`roles_around` and `carry`). `carry` inserts a role without `check_role`; that is
+safe today (`roles_to_carry` asks for no role in the season, and an open role of last season ends
+on 30 June), but it is a second path that writes a role without the one check. Suggest: move the
+season rule into `check_role` (for example with the season of the changed role) and let `carry`
+call `check_role` too.
+- 2026-10-16: fixed. Core `players::check_change` (only a role of the season is changed, then `check_role`), with a unit test; `carry` calls `check_role` before it writes; one function `roles_around` gives the roles of this season and the season before, for `one()` and `carry`.
+
+**Checked and found right.** Every new route still needs a login (tests for 401 and 403 pass);
+logs carry ids only (`player_logs` passes); no `unwrap`/`expect` outside tests (clippy);
+`.sqlx/` matches the queries (`cargo sqlx prepare --check`); the migration only adds tables;
+`web/openapi.json` matches the code. The claims in **Progress** and the fix notes under **Review
+findings** (each new test fails without its fix) are true where they were run (R1, R3, R5, R9).
+
+**Gap in the plan, not in this build.** Story 2 of the epic: "A new season asks for its training
+days and dates again, with the days of last season and new proposed dates filled in." Neither
+this story nor the epic's split names a step for it; the settings page of a new season starts
+empty. For `/review accept` or the design of story B.
+
+**Docs made false.** None by the fixes. At Close, as before: `docs/architecture.md` (core
+`players::place`, `proposed_start`, `Season::previous`/`first_day`/`last_day`; the server
+modules, migration `0005`, the routes, the pages), the `CLAUDE.md` module list, and decision 0019.
+
+**Verdict:** not ready to close. R1–R9 are fixed and their tests guard them. R10 is the same bug
+as R3 on the other side of the new date, and loses a change of training days without a sign; fix
+it before Close. R11 and R12 are small and can go with it.
+
+### Accept review, 2026-10-16
+By a fresh agent (`/review accept`). The arguments held only the mode and the change folder.
+Read: the epic's `functional.md` (stories 1, 2 settings part, 4; the Interface and the warnings)
+and `idea.md`, this folder's `change.md` and the objective and requirements here, the diff
+`main...HEAD` (905a767, ff065be) and the screens. The view below was formed before reading
+**Deviations** and the earlier findings. Ran on HEAD: `cargo test -p team_core` (135 passed) and
+the four new server test files (31 passed); one probe as an extra test in a copy of the tree
+(`git archive HEAD`, own `CARGO_TARGET_DIR`, in the scratchpad), against the local PostgreSQL.
+Nothing in the repository was changed. The browser tests were not run (the second build review ran
+them on the same commit). During this review the working tree held uncommitted fixes of R10–R12;
+they were read where they touch a finding (A1), not judged.
+
+**A1 – a mistake in the training days, made during the season, can never be corrected; the
+screen hides it (concerning deviation). Run.** The tool starts now, in October, and the
+coordinator enters the trainings since 1 September (functional, Context). The first save applies
+from the first training date (deviation of step 3), but every later save applies from today. So a
+mistake in the first save, corrected a minute later, stays in force for all earlier dates. Probe,
+clock 12 Oct 2026: save Wednesday 19:00–21:00 from 1 Sep, then Tuesday 19:45–21:00 on the same
+day. Stored sets `[(1 Sep, Wed), (12 Oct, Tue)]`; `training_dates` gives Wed 2 Sep … Wed 7 Oct at
+19:00, then Tue 13 Oct at 19:45. The answer of the save, and the page, show Tuesday 19:45, so it
+looks corrected. No screen shows the earlier set, and no save can change it: the first date is the
+only lever, and moving it changes the season, not the days. Story B builds the list of past
+training days and "N training days not opened" (story 5) on these sets, so the list the
+coordinator works through from the sheet would show six Wednesdays. The uncommitted R10 fix
+(`replaced_from` = the earlier of tomorrow and the set's date) gives the same result in the
+season. The spec's words are met ("the change applies from that day on"), but they are about a
+real change of schedule; the spec leaves open how a *mistake* is corrected, and its own warning
+says "every mistake must be correctable in the app" (Steve). That is a product choice, not a
+build fix: for example "a correction applies to the whole season" next to "a change from today",
+or saves on the day of the first save replace it.
+
+**A2 – the start and the kind of a role cannot be corrected on the screens (concerning
+deviation). Search.** `changeRole(` in `web/src/routes` is called only by "Left the team" and
+"Undo", both with the stored `from` and `role`; `addRole(` only by "Back in the team" / "Add to the
+team". The API can change both (`PUT /api/players/{id}/roles/{role}`). Story 1 expects a start date
+to move ("A role starts (or its start is moved earlier) …", and the answer to S8: "Moving 'in the
+team since' or the date a player left keeps the absences"). A player added from the proposed date
+who joined on 3 Nov, or added as "Plays games" by mistake, can now only be deleted and added again.
+That works in story A, but from story B on a player with absences cannot be deleted, so the mistake
+stays and counts in the totals. No story of the epic names this screen. Needs a place: this story,
+or a line in story B's scope (with B's message "This player now counts as there at N earlier
+trainings").
+
+**A3 – a new season does not fill in last season's training days (neutral drift, unassigned).
+Trace.** Story 2: "A new season … asks for its training days and dates again, with the days of
+last season and new proposed dates filled in." In a new season `GET /api/training-settings` gives
+`saved: false` and no days, so the page starts empty (the dates follow the proposal once a day is
+chosen). The build review already noted that no story has a step for it. Harmless once a year for
+one Tuesday, but it must be given to story B or the backlog, or it is lost at Close.
+
+**A4 – navigation from the start page (neutral drift). Trace.** The spec: the start page links to
+"Attendance", and "Attendance" links to "Players" and the settings. Story A puts "Players ·
+Settings" on the start page, since "Attendance" does not exist yet. Right for now; story C should
+decide whether the line stays or moves.
+
+**A5 – the settings page says "A change applies from today; earlier trainings keep their days."
+(neutral drift, small). Trace.** Before the first training date, and for the first save, a change
+applies from the first training date. The sentence is wrong in exactly the case the coordinator
+meets first (setting up in October, entering the past). Follows the answer to A1.
+
+**Faithful adaptations** (trace): one training time for each day of the week; players and
+settings only for the current season (the spec says "the chosen season"; earlier seasons come with
+story C's overview); "Other players" (folded) for players with no role in this or last season;
+"Players of last season" lists only players who stayed until 30 June, the ones "Add all" brings
+back; a role's end is its last day, so a change of role "on the same day" is an end on the 14th and
+a start on the 15th, which the data allows; a player whose role starts later in the season is shown
+with the team; the same-name warning after the save; "Left the team" proposes today, or the role's
+start when later; the 404 sentence. R11 (the proposed start of "Add to the team") is a real
+difference from story 1 and is already a build finding.
+
+**Checked and found as meant** (trace through the screens, the API and the tests that ran): first
+name required, last name optional, names trimmed, shown by name only and sorted by first name
+(`ORDER BY lower(first_name)`); a role from a proposed date (first training date, or today when
+later), "Left the team" with a date and "Undo", a new role on return, no overlap ("This player
+already has a role on that date."), at the latest 30 June; "Add all" and "Add to this season" with
+the same kind of role from the first training date or today; "Delete player" after a confirmation;
+training days with start and end time, more than one day, the proposal of the first Tuesday of
+September and the last of May, the errors for times and dates; the six reasons in order and with
+their weight, add (last), rename, valid / not valid, hide and show again, unique names without case.
+
+**Verdict: needs correction** (next: `/discover review:`). A1 needs a product rule for correcting
+the training days during the season before story B builds the list of past trainings on them, and
+the tool starts in the season now. A2 needs a place in this story or in story B's scope. A3 needs an
+owner. The rest of story A is what was meant.

@@ -30,6 +30,17 @@ fn set(valid_from: NaiveDate, weekday: Weekday) -> TrainingDaySet {
     }
 }
 
+/// `training_settings::save`, replacing the stored sets from `set`'s date on.
+async fn store(
+    tx: &mut sqlx::PgConnection,
+    season: Season,
+    first: NaiveDate,
+    last: NaiveDate,
+    set: &TrainingDaySet,
+) -> Result<(), team::db::StoreError> {
+    training_settings::save(tx, season, first, last, set, set.valid_from).await
+}
+
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn the_migration_adds_the_six_preset_reasons_in_order(pool: PgPool) {
     let all: Vec<(String, bool, bool)> = reasons::all(&pool)
@@ -128,10 +139,10 @@ async fn a_second_set_is_kept_next_to_the_first_and_the_same_date_replaces(pool:
     let first = date(2026, 9, 1);
     let last = date(2027, 5, 25);
     let mut tx = pool.begin().await.unwrap();
-    training_settings::save(&mut tx, season(), first, last, &set(first, Weekday::Tue))
+    store(&mut tx, season(), first, last, &set(first, Weekday::Tue))
         .await
         .unwrap();
-    training_settings::save(
+    store(
         &mut tx,
         season(),
         first,
@@ -141,7 +152,7 @@ async fn a_second_set_is_kept_next_to_the_first_and_the_same_date_replaces(pool:
     .await
     .unwrap();
     // A second change on the same day replaces the set of that day.
-    training_settings::save(
+    store(
         &mut tx,
         season(),
         first,
@@ -184,11 +195,9 @@ async fn a_save_removes_the_sets_from_its_date_on(pool: PgPool) {
         set(date(2026, 9, 8), Weekday::Tue),
         set(date(2026, 10, 6), Weekday::Wed),
     ] {
-        training_settings::save(&mut tx, season(), first, last, &set)
-            .await
-            .unwrap();
+        store(&mut tx, season(), first, last, &set).await.unwrap();
     }
-    training_settings::save(
+    store(
         &mut tx,
         season(),
         first,

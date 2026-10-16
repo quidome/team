@@ -224,3 +224,81 @@ async fn a_save_waits_for_another_save(pool: PgPool) {
     let (status, _) = save.await;
     assert_eq!(status, 200);
 }
+
+/// The `valid_from` dates of the stored sets of 2026-2027.
+async fn stored_from(coordinator: &Coordinator) -> Vec<String> {
+    let mut db = coordinator.harness.pool.acquire().await.unwrap();
+    training_settings::for_season(&mut db, Season::from_start_year(2026))
+        .await
+        .unwrap()
+        .unwrap()
+        .sets
+        .iter()
+        .map(|set| set.valid_from.to_string())
+        .collect()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_first_date_moved_later_shows_and_keeps_the_last_save(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool).await;
+    let thursday = json!({ "weekday": 4, "start": "19:00", "end": "20:30" });
+
+    // Before the season.
+    coordinator.harness.clock.set(utc(2026, 8, 15, 12, 0));
+    coordinator.log_in_again().await;
+    coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-01", "last": "2027-05-25", "days": [tuesday()] })),
+        )
+        .await;
+    let saved = coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-08", "last": "2027-05-25", "days": [thursday] })),
+        )
+        .await;
+    assert_eq!(saved["days"], json!([thursday]));
+    let settings = coordinator.ok("GET", "/api/training-settings", None).await;
+    assert_eq!(settings["days"], json!([thursday]));
+    assert_eq!(stored_from(&coordinator).await, ["2026-09-08"]);
+    // Saving the page as shown keeps Thursday.
+    coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-08", "last": "2027-05-27", "days": [thursday] })),
+        )
+        .await;
+    coordinator.harness.clock.set(utc(2026, 9, 10, 12, 0));
+    coordinator.log_in_again().await;
+    let settings = coordinator.ok("GET", "/api/training-settings", None).await;
+    assert_eq!(settings["days"], json!([thursday]));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn in_the_season_a_first_date_moved_later_keeps_the_past(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    let thursday = json!({ "weekday": 4, "start": "19:00", "end": "20:30" });
+    coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-09-01", "last": "2027-05-25", "days": [tuesday()] })),
+        )
+        .await;
+    let saved = coordinator
+        .ok(
+            "PUT",
+            "/api/training-settings",
+            Some(json!({ "first": "2026-11-02", "last": "2027-05-25", "days": [thursday] })),
+        )
+        .await;
+    assert_eq!(saved["days"], json!([thursday]));
+    assert_eq!(
+        stored_from(&coordinator).await,
+        ["2026-09-01", "2026-11-02"]
+    );
+}

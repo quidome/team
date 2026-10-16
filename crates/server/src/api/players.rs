@@ -6,9 +6,10 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use sqlx::PgExecutor;
 use team_core::{
-    Group, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_role,
-    clean_name, place, proposed_start, roles_to_carry,
+    Group, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleId, Season,
+    check_change, check_role, clean_name, place, proposed_start, roles_to_carry,
 };
 use utoipa::ToSchema;
 
@@ -170,11 +171,11 @@ fn player_view(player: Player, placement: &Placement) -> PlayerView {
 
 /// The roles of `player` in the current season and the season before.
 async fn roles_around(
-    state: &AppState,
+    db: impl PgExecutor<'_>,
     player: PlayerId,
     season: Season,
 ) -> Result<Vec<PlayerRole>, StoreError> {
-    Ok(players::roles_of(&state.pool, player)
+    Ok(players::roles_of(db, player)
         .await?
         .into_iter()
         .filter(|role| role.season == season || role.season == season.previous())
@@ -188,7 +189,7 @@ async fn one(state: &AppState, id: PlayerId) -> Result<PlayerView, AppError> {
         .ok_or(AppError::NotFound)?;
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let roles = roles_around(state, id, season).await?;
+    let roles = roles_around(&state.pool, id, season).await?;
     Ok(player_view(player, &place(&roles, id, season, today)))
 }
 
@@ -401,8 +402,7 @@ pub async fn change_role(
 }
 
 /// Adds a role (`role` is `None`) or changes one, under the player's lock, so two saves at the same
-/// time cannot make an overlap. Only roles of the current season are saved; a changed role must be
-/// of the current season too.
+/// time cannot make an overlap. Only roles of the current season are saved or changed.
 async fn save_role(
     state: &AppState,
     player: PlayerId,
@@ -415,20 +415,14 @@ async fn save_role(
         return Err(AppError::NotFound);
     }
     let roles = players::roles_of(&mut *tx, player).await?;
-    if let Some(id) = role {
-        let stored = roles
-            .iter()
-            .find(|stored| stored.id == id)
-            .ok_or(AppError::NotFound)?;
-        if stored.season != season {
-            return Err(PlayerError::OutsideSeason.into());
-        }
-    }
-    let others: Vec<PlayerRole> = roles
+    let (changed, others): (Vec<PlayerRole>, Vec<PlayerRole>) = roles
         .into_iter()
-        .filter(|stored| Some(stored.id) != role)
-        .collect();
-    check_role(season, body.from, body.until, &others)?;
+        .partition(|stored| Some(stored.id) == role);
+    match (role, changed.first()) {
+        (None, _) => check_role(season, body.from, body.until, &others)?,
+        (Some(_), Some(changed)) => check_change(season, changed, body.from, body.until, &others)?,
+        (Some(_), None) => return Err(AppError::NotFound),
+    }
     match role {
         None => {
             players::insert_role(
@@ -483,12 +477,9 @@ pub async fn carry(
         if !players::lock(&mut tx, id).await? {
             continue;
         }
-        let roles: Vec<PlayerRole> = players::roles_of(&mut *tx, id)
-            .await?
-            .into_iter()
-            .filter(|role| role.season == season || role.season == season.previous())
-            .collect();
+        let roles = roles_around(&mut *tx, id, season).await?;
         if let Some((_, role)) = roles_to_carry(&roles, season).first() {
+            check_role(season, from, None, &roles)?;
             players::insert_role(&mut *tx, id, season, *role, from, None).await?;
             tracing::info!(player = id.0, "player carried into the season");
         }

@@ -114,8 +114,10 @@
 		leaving = true;
 	}
 
+	/** "Add to the team" proposes the start of a new role; "Back in the team" proposes today. */
 	function startReturning() {
-		returnFrom = data.players?.today ?? '';
+		returnFrom =
+			(data.player?.roles.length ? data.players?.today : data.players?.proposed_from) ?? '';
 		returnRole = newest?.role ?? data.player?.role ?? 'plays_games';
 		returning = true;
 	}

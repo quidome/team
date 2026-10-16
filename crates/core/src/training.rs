@@ -71,6 +71,22 @@ pub fn set_on(sets: &[TrainingDaySet], date: NaiveDate) -> Option<&TrainingDaySe
         .or_else(|| sets.iter().min_by_key(|set| set.valid_from))
 }
 
+/// The set the settings page shows: the one that applies on today, or on the first training date
+/// when that is later.
+pub fn shown_set(season: &TrainingSeason, today: NaiveDate) -> Option<&TrainingDaySet> {
+    set_on(&season.sets, today.max(season.first))
+}
+
+/// The first `valid_from` of the stored sets that a save of `set` replaces: the sets valid from
+/// `set`'s date or later, and every set that starts after today. A set that starts after today and
+/// before `set` would otherwise apply to no date (when the first training date moved later) or
+/// stay in force over the newest save.
+pub fn replaced_from(set: &TrainingDaySet, today: NaiveDate) -> NaiveDate {
+    today
+        .succ_opt()
+        .map_or(set.valid_from, |tomorrow| tomorrow.min(set.valid_from))
+}
+
 /// Every training date of the season, from the first to the last training date, each with the
 /// training day of the set that applies on it.
 pub fn training_dates(season: &TrainingSeason) -> Vec<(NaiveDate, TrainingDay)> {
@@ -92,7 +108,7 @@ pub fn training_dates(season: &TrainingSeason) -> Vec<(NaiveDate, TrainingDay)> 
 
 /// Checks a save of the settings of `season` and gives the set to store: valid from `today`, or
 /// from `first` when today is before it, or for the first save of the season (`first_save`): there
-/// is no past to keep then. The stored sets valid from the same date or later are replaced by it.
+/// is no past to keep then. `replaced_from` says which stored sets it replaces.
 pub fn settings_change(
     season: Season,
     first: NaiveDate,
@@ -213,6 +229,51 @@ mod tests {
             false,
         );
         assert_eq!(set.map(|set| set.valid_from), Ok(date(2027, 1, 5)));
+    }
+
+    fn set(valid_from: NaiveDate, weekday: Weekday) -> TrainingDaySet {
+        TrainingDaySet {
+            valid_from,
+            days: vec![day(weekday)],
+        }
+    }
+
+    #[test]
+    fn a_save_replaces_the_sets_from_its_date_and_all_sets_after_today() {
+        // Before the season the first date moves later: the set of 1 Sep is replaced too.
+        assert_eq!(
+            replaced_from(&set(date(2026, 9, 8), Weekday::Thu), date(2026, 8, 15)),
+            date(2026, 8, 16)
+        );
+        // In the season: from today on, the past stays.
+        assert_eq!(
+            replaced_from(&set(date(2027, 1, 5), Weekday::Thu), date(2027, 1, 5)),
+            date(2027, 1, 5)
+        );
+        // In the season, with the first date moved later than today.
+        assert_eq!(
+            replaced_from(&set(date(2026, 11, 2), Weekday::Thu), date(2026, 10, 12)),
+            date(2026, 10, 13)
+        );
+    }
+
+    #[test]
+    fn the_page_shows_the_set_of_today_or_of_the_first_date() {
+        let mut season = TrainingSeason {
+            first: date(2026, 9, 8),
+            sets: vec![
+                set(date(2026, 9, 1), Weekday::Tue),
+                set(date(2026, 9, 8), Weekday::Thu),
+            ],
+            ..tuesdays()
+        };
+        let shown = |season: &TrainingSeason, today| {
+            shown_set(season, today).map(|set| set.days[0].weekday)
+        };
+        assert_eq!(shown(&season, date(2026, 8, 15)), Some(Weekday::Thu));
+        season.first = date(2026, 9, 1);
+        assert_eq!(shown(&season, date(2026, 8, 15)), Some(Weekday::Tue));
+        assert_eq!(shown(&season, date(2026, 9, 10)), Some(Weekday::Thu));
     }
 
     #[test]

@@ -176,7 +176,10 @@ test('a player of last season has no roles of this season yet', async ({ page })
 	await page.route('**/api/players', async (route) => {
 		if (route.request().method() !== 'GET') return route.fallback();
 		const response = await route.fetch();
-		await route.fulfill({ json: { ...(await response.json()), last_season: [rowan] } });
+		// A proposed start that is not today, as in summer before the first training date.
+		await route.fulfill({
+			json: { ...(await response.json()), last_season: [rowan], proposed_from: '2026-11-03' }
+		});
 	});
 	await page.goto('/players/9001');
 	await expect(page.getByTestId('player-name')).toHaveText('Rowan');
@@ -184,5 +187,6 @@ test('a player of last season has no roles of this season yet', async ({ page })
 	await expect(page.getByRole('button', { name: 'Left the team' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Add to the team' }).click();
 	await expect(page.getByLabel('Only trains')).toBeChecked();
+	await expect(page.getByLabel('In the team from')).toHaveValue('2026-11-03');
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
