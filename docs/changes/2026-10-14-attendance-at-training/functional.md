@@ -274,9 +274,7 @@ The coordinator types in the players once (no import from the sheet).
 
 ## Open questions
 - Settled 2026-10-15 (Vision, with the coordinator): **player** now "has a first name, and usually a last name" (`docs/language.md`); 3 players in the coordinator's sheet have no last name.
-- For `/vision` (2026-10-16): the meaning of **player** ("a member of the team") – now a person the coordinator keeps, in the team of a season through a **role** ("plays games" or "only trains", from a date until a date), which is not in the word list yet either. Also **hidden** for a player (as for a reason).
-- For `/vision` (2026-10-16): a new word **weekly training** – a day of the week with a start and an end time, in a window from a date until a date, that suggests a training on each of its days. With it, **training day** means only a date in the list (this settles the double meaning of note S10). "Schedule" stays the word for the games.
-- For `/vision`: the meaning of **training** ("a training session of the team") does not say that a training counts only when it was opened or added. Probably no change is needed; the spec says it.
+- Settled 2026-10-16 (Vision, with the coordinator): **player** is a person the coordinator keeps, in the team through a **role**; new words **role**, **hidden**, **weekly training** and **training day**; **training** exists, and counts, only when opened or added (`docs/language.md`).
 
 ## Spec review
 Reviewed 2026-10-15 by a fresh agent (`/review spec`). Read: this spec, `idea.md`, `change.md`,
