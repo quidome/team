@@ -1,218 +1,216 @@
 # Technical spec: Players and settings
 
-**Status**: in progress
+**Status**: approved (designed again 2026-10-16; the first form, built and reviewed on 2026-10-15 and 2026-10-16, is replaced)
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
-**Date**: 2026-10-15
+**Date**: 2026-10-15, designed again 2026-10-16
 
 ## Objective
-Let the coordinator keep the players with their roles in the season, the training days with their
-times and dates, and the reasons for an absence, so that story B can mark attendance.
+Let the coordinator keep the club's players, the team of the current season with each player's
+role, the weekly trainings, and the reasons for an absence, so that story B can mark attendance.
 
 ## Requirements summary
 Story A of the epic [Attendance at training](../2026-10-14-attendance-at-training/technical.md),
-from functional stories 1, 2 (settings part) and 4:
+from functional stories 1, 2 (the weekly trainings) and 4, as approved again on 2026-10-16. Words
+from `docs/language.md` (player, role, hidden, weekly training, training day).
 
-1. **Players.** A player is the person: a first name (required) and a last name (optional), with no dates. Names are trimmed; an empty last name means no last name. Two players with the same first and last name are allowed, with a warning "There is already a player with this name." A player can be deleted (story B adds: only without absences).
-2. **Roles.** A role is "plays games" or "only trains" in the team of one season (1 July – 30 June), from a date and until a date (empty while it continues). The proposed start is the first training date of the season, or today when trainings have started (or today when the season has no settings). Roles of one player never overlap. "Left the team" sets the end (proposed: today); "Undo" clears it. A player who comes back gets a new role. A change of role within a season (one role ends, another starts the same day) is allowed by the data; no screen for it now.
-3. **Players page.** For the current season: the players with a role today (sorted by first name, with "Plays games" or "Only trains"), "Left the team" (a role earlier in the season, none today), and in a new season "Players of last season" with "Add to this season" for each and "Add all" (same role as at the end of last season, from the first training date, or today when later).
-4. **Training settings** (current season): one or more days of the week, each with a start and an end time (for example Tuesday 19:45–21:00); the first and the last training date, proposed as the first chosen training day in September and the last in May. A change of days applies from the day it is made; earlier dates keep the days set then.
-5. **Reasons.** Presets in this order: School, Ill, Injured (valid), Holiday, Work, No reason (not valid). Add (last), rename, valid / not valid, hide (still listed with "hidden"). Names unique without case and outer spaces.
-6. **Navigation.** The start page shows "Players · Settings" below the team header, also before a team is chosen.
-7. Only the coordinator (login, decision 0007). Logs never contain player names.
+The model (coordinator, 2026-10-16): the **club** has the players; a **team** exists for one
+season and is the team chosen from the game list for that season; a player is in the team of a
+season through a **role**. One club for the whole tool, and one team per season. Roles and weekly
+trainings are stored by season, so they belong to the team of their season without a separate
+link, and can be entered before the team is chosen.
 
-Decisions that apply: 0001, 0002, 0004, 0007, 0014; the epic's architecture (players are not linked to the game list choice; attendance stored as absences only, from story B).
+1. **Players page** (`/players`): all players, sorted by first name, each with "Plays games" / "Only trains" when in the team today, else "Not in the team"; "Add player" (first name required, last name optional; trimmed; an empty last name is none); the switch "Show hidden players" (off: hidden players are not listed). The warning "There is already a player with this name." after a save with the same first and last name.
+2. **Player page** (`/players/[id]`): the name (change and save), the switch "Hidden", the history (all roles of all seasons, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct"), "Correct" on a role of the current season (kind, start, end; the same checks as a new role), "Delete player" (after a confirmation; story B adds: only without absences). Roles of an earlier season are shown, not corrected.
+3. **Hidden**: a hidden player is not offered in "Add player" of the team page and not in "Add all". Hiding changes nothing else: a hidden player in the team stays in the team, with its history.
+4. **Team page** (`/team`, current season): the heading with the chosen team's name and the season ("U14-1 · 2026-2027"), or "Team not chosen yet" with a link to choose it (coordinator, 2026-10-16). The players in the team today or later in the season (sorted by first name, with the role), then "Left the team" (a role earlier in the season, none today or later). "Add player": a player from the list (not hidden, not in the team, last season's team first) or a new player, with a role and a date. A tap on a player: "Change role" (new role and a date, proposed today: the current role ends the day before, the new one starts on the date) and "Remove from the team" (a date, proposed today, or the start of the role when later). Under "Left the team": "Add to the team" (a role and a date, proposed the day after the end, or today when later). In a new season: last season's team (stayed until 30 June, not hidden) with "Add all": the same role, from the proposed date.
+5. **Proposed start of a role**: the first training date of the season (the first training day of its weekly trainings) until a training of the season is opened, then today; with no weekly training, today. Story A has no trainings, so it always uses the first training date when there is one; story B completes the rule.
+6. **Weekly trainings** (`/settings`, current season): add (a day of the week, a start and an end time, a window from a date until a date inside the season; the proposed window is that day on or after 1 September until that day on or before 31 May), "Change" (everything), "Delete", the list sorted by the start of the window ("Tuesday 19:45–21:00 · Tue 1 Sep – Tue 25 May"). More than one at a time; not two on the same day of the week with overlapping windows ("There is already a weekly training on Tuesday in these dates.").
+7. **Reasons**: presets in this order: School, Ill, Injured (valid), Holiday, Work, No reason (not valid). Add (last), rename, valid / not valid, hide (still listed with "hidden"). Names unique without case and outer spaces. As built.
+8. **Navigation**: the start page shows "Team · Players · Settings" below the team header, also before a team is chosen.
+9. Only the coordinator (login, decision 0007). Logs never contain player names.
+
+Decisions that apply: 0001, 0002, 0004 (read as "applied on the cluster", see Decisions), 0007, 0012 (the choice kept for each season), 0014; the epic's architecture (absences only, from story B; weekly trainings only suggest training days).
 
 ## Current state
-- Core: `Season` (`of`, `start_year`, `from_start_year`, `Display` "2026-2027"); validation errors as `thiserror` enums; no players or trainings.
-- Server: `clock::today_in_netherlands`, `clock::current_season`; `db.rs` (`MIGRATOR`, `StoreError`); `AppError::BadRequest(&'static str)` gives `{"error": "<code>"}`; protected `/api` router in `app.rs`; OpenAPI paths listed in `api/mod.rs`. The schema name `Reason` is taken (`api/selection.rs`).
-- Migrations `0001`–`0004`.
-- Front end: start page `web/src/routes/+page.svelte` (team header, "Game list" card, schedule); typed client and `messageFor` in `web/src/lib/api/client.ts`; shadcn-svelte parts `button`, `badge`, `separator`, `toggle`, `toggle-group`.
-- Tests: core unit tests; `#[sqlx::test(migrator = "team::db::MIGRATOR")]`; `crates/server/tests/common/` (`Harness` with `clock.set`, `log_in`, `send`; `LogBuffer` for log tests); browser tests in `web/e2e/` (projects `choose` then `logged-in`, server clock `DEV_NOW=2026-10-12T10:00:00Z`, fresh database each run).
+On branch `feat/players-and-settings` (merged with `main` up to 9f9efe6), the first form of this
+story is built and reviewed (commits 905a767, ff065be, 7895c6f):
+- Migration `0005_players_and_settings.sql`: `players` (no `hidden`), `player_roles`, `reasons` (6 presets), `training_seasons`, `training_days`.
+- Core: `season.rs` (`previous`, `first_day`, `last_day`); `players.rs` (`Player`, `Role`, `PlayerRole::last_day`, `role_on`, `check_role`, `check_change`, `proposed_start(first, today)`, `Group`, `Placement`, `place`, `roles_to_carry`); `training.rs` (sets valid from a date, `proposed_dates`, `set_on`, `shown_set`, `replaced_from`, `training_dates`, `settings_change`); `reasons.rs` (`clean_reason_name`).
+- Server: `players.rs` (storage, `lock` with `SELECT … FOR UPDATE`), `reasons.rs`, `training_settings.rs` (with an advisory lock); `api/players.rs` (`GET /api/players` with the groups `players`, `left`, `last_season`, `others`; add, rename, delete, roles, carry), `api/reasons.rs`, `api/training_settings.rs`; `followed_teams::for_season` gives the team choice of a season (with the team name).
+- Front end: `/players`, `/players/[id]`, `/settings`; the start page line "Players · Settings"; `client.ts` with the sentences; `lib/players.ts`.
+- Tests: core unit tests (135 in the crate), `tests/players.rs` (15), `tests/settings.rs` (9), `tests/players_storage.rs`, `tests/player_logs.rs`, `web/e2e/players.e2e.ts` (39 browser tests in all).
+- The full first-form spec (steps, deviations) is in git at 7895c6f; its review findings are kept below.
 
 ## Steps
 
-### Step 1: Core rules
-- **Goal**: the rules for names, roles, training days and reasons, without I/O.
-- **Changes**: new modules in `crates/core`, exported from `lib.rs`:
+### Step 1: Weekly trainings, end to end
+- **Goal**: weekly trainings replace the season's training days in the stored data, the core, the API and the settings page.
+- **First**: `just db-down`, `just db-up`, `just migrate` (local databases ran the old `0005`).
+- **Changes**:
+  - Rewrite `migrations/0005_players_and_settings.sql` with its final tables: `players` gets `hidden boolean NOT NULL DEFAULT false`; `player_roles` and `reasons` as now; `training_seasons` and `training_days` go; new `weekly_trainings (id bigint identity PK, season_year integer NOT NULL, weekday smallint NOT NULL CHECK (weekday BETWEEN 1 AND 7), start_time time NOT NULL, end_time time NOT NULL, from_date date NOT NULL, until_date date NOT NULL, CHECK (end_time > start_time), CHECK (until_date >= from_date))`, index on `(season_year)`.
+  - Core `training.rs`, rewritten:
+
+    ```rust
+    pub struct WeeklyTrainingId(pub i64);
+    pub struct WeeklyTraining { pub id: WeeklyTrainingId, pub season: Season, pub weekday: Weekday,
+                                pub start: NaiveTime, pub end: NaiveTime,
+                                pub from: NaiveDate, pub until: NaiveDate }
+    /// The window inside `season`, until ≥ from, end > start, no overlap with `others` (the other
+    /// weekly trainings of the season, without the one that is changed) on the same day of the week.
+    pub fn check_weekly_training(season: Season, weekday: Weekday, start: NaiveTime, end: NaiveTime,
+                                 from: NaiveDate, until: NaiveDate, others: &[WeeklyTraining])
+                                 -> Result<(), TrainingError>;
+    /// That day on or after 1 September until that day on or before 31 May.
+    pub fn proposed_window(season: Season, weekday: Weekday) -> Option<(NaiveDate, NaiveDate)>;
+    /// Every date in a window on its day of the week, sorted by date.
+    pub fn training_days(weekly: &[WeeklyTraining]) -> Vec<(NaiveDate, &WeeklyTraining)>;
+    pub fn first_training_date(weekly: &[WeeklyTraining]) -> Option<NaiveDate>;
+    pub enum TrainingError { EndBeforeStart, LastBeforeFirst, OutsideSeason, WeeklyTrainingsOverlap }
+    ```
+
+    The sets valid from a date, `proposed_dates`, `set_on`, `shown_set`, `replaced_from`, `training_dates` and `settings_change` go. A window without its day of the week in it is allowed (no training days).
+  - Server `weekly_trainings.rs` replaces `training_settings.rs`: `for_season`, `insert`, `update` (false when the id is not of the season), `delete`, `lock` (an advisory lock, key "team" "wktr" in ASCII). `api/weekly_trainings.rs` replaces `api/training_settings.rs`:
+    - `GET /api/weekly-trainings` → `WeeklyTrainings { season, season_first_day, season_last_day, weekly_trainings: [WeeklyTrainingView { id, weekday, start, end, from, until }] }`, sorted by `from`, then by day of the week.
+    - `GET /api/weekly-trainings/proposal?weekday=2` → `{ from, until }`.
+    - `POST /api/weekly-trainings` `{ weekday, start, end, from, until }`, `PUT /api/weekly-trainings/{id}` (same body), `DELETE /api/weekly-trainings/{id}` → `WeeklyTrainings`. The season is the current season; each save in one transaction: `lock`, read the others, `check_weekly_training`, write.
+    - Errors: `end_before_start`, `last_before_first`, `outside_season`, `weekly_trainings_overlap`, `invalid_weekday`, `invalid_time`; unknown id → 404.
+  - `/api/training-settings` and its proposal route go. `api/players.rs` `proposed_from` uses `first_training_date` of the season's weekly trainings (`proposed_start(first, today)` stays until step 2).
+  - `/settings`: the weekly trainings (list, "Add weekly training" with the proposed window filled when a day is chosen, "Change", "Delete" after a confirmation); the reasons stay. `client.ts`: load and save functions; the sentence "There is already a weekly training on Tuesday in these dates." (the day from the request), "The last training date must be after the first.", "The end time must be after the start time.", "This date is outside the season."; the sentences of `no_training_days` and `duplicate_weekday` go. The date fields have the season's first and last day as limits.
+  - `sqlx migrate run`, `just prepare`, `just api-types`.
+- **Tests**:
+  - Core: `check_weekly_training` (Tuesday Tue 1 Sep 2026 – Tue 25 May 2027 with a Tuesday from Tue 5 Jan 2027 in `others` → `WeeklyTrainingsOverlap`; Tuesday and Thursday with the same window → ok; the weekly training itself left out of `others` → ok; from 30 Jun 2026 or until 1 Jul 2027 → `OutsideSeason`; until before from → `LastBeforeFirst`; end 19:45 and start 21:00 → `EndBeforeStart`); `proposed_window` (Tuesday → Tue 1 Sep 2026 – Tue 25 May 2027; Thursday → Thu 3 Sep 2026 – Thu 27 May 2027); `training_days` (Tuesday in the proposed window → 39 dates; Tuesday and Thursday → sorted by date, Tue 1 Sep before Thu 3 Sep); `first_training_date` (none without weekly trainings; Thursday from Thu 3 Sep and Tuesday from Tue 8 Sep → Thu 3 Sep).
+  - Storage (`tests/players_storage.rs`): the 3 tests of training-day sets go; a weekly training is read back; `update` with an id of another season → false.
+  - API (`tests/weekly_trainings.rs`, replaces `tests/settings.rs`): nothing saved → an empty list; the proposal for Tuesday; add Tuesday 19:45–21:00 → listed; an overlapping Tuesday → 400 `weekly_trainings_overlap`, nothing stored; "Change" to Thursday → listed as Thursday; delete → empty; unknown id → 404; a save waits while another connection holds the lock (the method of the first form's settings lock test); the proposed start in `GET /api/players` is Tue 1 Sep on 12 Oct with a Tuesday weekly training, and today without one.
+  - Routes: the new routes in the login (401) and `Origin` (403) test; the old training-settings routes leave it.
+  - Browser (`players.e2e.ts`): the settings part rewritten: add Tuesday 19:45–21:00 with the proposed window (Tue 1 Sep 2026 – Tue 25 May 2027), change it, "Delete"; the reasons part stays; no sideways scroll at 320 pixels, `expectAccessible`.
+
+### Step 2: Core rules for players
+- **Goal**: the rules of the team page, "Change role", hidden and the proposed start, without I/O.
+- **Changes** (`crates/core/src/players.rs`):
 
   ```rust
-  // players.rs
-  pub struct PlayerId(pub i64);
-  pub struct Player { pub id: PlayerId, pub first_name: String, pub last_name: Option<String> }
-  pub enum Role { PlaysGames, OnlyTrains }
-  pub struct RoleId(pub i64);
-  pub struct PlayerRole { pub id: RoleId, pub player: PlayerId, pub season: Season, pub role: Role,
+  pub struct Player { pub id: PlayerId, pub first_name: String,
+                      pub last_name: Option<String>, pub hidden: bool }
+  pub struct Member<'a> { pub player: &'a Player, pub role: Role, pub roles: Vec<&'a PlayerRole> }
+  pub struct Team<'a> {
+      pub members: Vec<Member<'a>>,     // a role today or later in the season
+      pub left: Vec<Member<'a>>,        // a role earlier in the season, none today or later
+      pub last_season: Vec<Member<'a>>, // stayed until 30 June last season, no role now, not hidden
+      pub candidates: Vec<&'a Player>,  // not hidden, not in members or left; last season's team first
+  }
+  pub fn team<'a>(players: &'a [Player], roles: &'a [PlayerRole], season: Season,
+                  today: NaiveDate) -> Team<'a>;
+  pub struct RoleChange { pub ended_until: NaiveDate, pub role: Role,
                           pub from: NaiveDate, pub until: Option<NaiveDate> }
-  pub fn clean_name(first: &str, last: Option<&str>) -> Result<(String, Option<String>), PlayerError>;
-  pub fn role_on(roles: &[PlayerRole], player: PlayerId, date: NaiveDate) -> Option<&PlayerRole>;
-  /// until ≥ from; from and until inside the season; no overlap with `others` (same player).
-  pub fn check_role(season: Season, role: Role, from: NaiveDate, until: Option<NaiveDate>,
-                    others: &[PlayerRole]) -> Result<(), PlayerError>;
-  pub enum PlayerError { FirstNameRequired, UntilBeforeFrom, OutsideSeason, RolesOverlap }
-
-  // training.rs
-  pub struct TrainingDay { pub weekday: Weekday, pub start: NaiveTime, pub end: NaiveTime }
-  pub struct TrainingDaySet { pub valid_from: NaiveDate, pub days: Vec<TrainingDay> }
-  pub struct TrainingSeason { pub season: Season, pub first: NaiveDate, pub last: NaiveDate,
-                              pub sets: Vec<TrainingDaySet> }
-  pub fn proposed_dates(season: Season, weekdays: &[Weekday]) -> Option<(NaiveDate, NaiveDate)>;
-  pub fn training_dates(season: &TrainingSeason) -> Vec<(NaiveDate, TrainingDay)>;
-  /// Checks a whole settings save (dates in the season, last ≥ first, days valid) and gives the
-  /// set to store: valid from today, or from `first` when today is before it; a set with the
-  /// same valid-from date is replaced.
-  pub fn settings_change(season: Season, first: NaiveDate, last: NaiveDate, days: Vec<TrainingDay>,
-                         today: NaiveDate) -> Result<TrainingDaySet, TrainingError>;
-  pub enum TrainingError { EndBeforeStart, LastBeforeFirst, NoTrainingDays, DuplicateWeekday, OutsideSeason }
-
-  // reasons.rs
-  pub fn clean_reason_name(name: &str, others: &[&str]) -> Result<String, ReasonError>;
-  pub enum ReasonError { NameRequired, NameTaken }
+  /// `current` ends on the day before `date`; the new role starts on `date` and keeps the planned
+  /// end of `current`.
+  pub fn change_role(season: Season, current: &PlayerRole, role: Role, date: NaiveDate,
+                     others: &[PlayerRole]) -> Result<RoleChange, PlayerError>;
+  pub fn proposed_start(first_training: Option<NaiveDate>, training_opened: bool,
+                        today: NaiveDate) -> NaiveDate;
+  pub enum PlayerError { FirstNameRequired, UntilBeforeFrom, OutsideSeason, RolesOverlap,
+                         ChangeBeforeRoleStart, NotInTeam }
   ```
 
-  `proposed_dates`: the first chosen weekday on or after 1 September of the season's start year, and the last chosen weekday on or before 31 May of the next year. `training_dates`: every date from `first` to `last` whose weekday is in the set valid on that date (the set with the newest `valid_from` on or before the date; dates before the first set use the first set).
-- **Tests** (unit tests, fixed dates):
-  - `clean_name`: `"  Avery "` → `"Avery"`; empty or spaces → `FirstNameRequired`; last name `""` or `"  "` → `None`.
-  - `role_on`, role from 1 Sep 2026 with no end: 31 Aug → none, 1 Sep and 12 Oct → the role. Role ended 15 Nov: 15 Nov → the role, 16 Nov → none. Roles 1 Sep–15 Nov and from 10 Jan 2027: 1 Dec → none, 10 Jan → the second.
-  - `check_role`: until before from → `UntilBeforeFrom`; until 30 Jun 2027 → ok; until 1 Jul 2027 or from 30 Jun 2026 → `OutsideSeason`; second role from 15 Nov when the first ends 15 Nov → `RolesOverlap`; from 16 Nov → ok; an open role (no end) and a later role → `RolesOverlap`.
-  - `proposed_dates`: Tuesday in 2026-2027 → Tue 1 Sep 2026, Tue 25 May 2027; Tuesday and Thursday → Tue 1 Sep 2026, Thu 27 May 2027.
-  - `training_dates`: Tuesdays 1 Sep 2026 – 25 May 2027 → 39 dates, each 19:45–21:00. With a Thursday set valid from 5 Jan 2027: Tuesdays up to 29 Dec 2026, Thursdays from 7 Jan 2027.
-  - `settings_change`: on 5 Jan 2027 → valid from 5 Jan; on 15 Aug 2026 (before the first date 1 Sep) → valid from 1 Sep; errors `EndBeforeStart`, `LastBeforeFirst`, `NoTrainingDays`, `DuplicateWeekday` (Tuesday twice), `OutsideSeason` (first date in 2025-2026).
-  - `clean_reason_name`: `" Family "` → `"Family"`; `"school"` with "School" in `others` → `NameTaken`; empty → `NameRequired`.
+  - `team` uses `place` for each player (`Group::Team` → members, `Left` → left, `LastSeason` → last season unless hidden), each group sorted by first name (without case); `candidates`: not hidden and in `LastSeason` or `Other`, the `LastSeason` ones first. A hidden player in the team stays in `members`.
+  - `change_role` refuses: `current` of another season or `date` outside the season → `OutsideSeason`; `date` ≤ `current.from` → `ChangeBeforeRoleStart`; `date` after `current.until` → `UntilBeforeFrom`; the new role overlapping `others` → `RolesOverlap`.
+  - `proposed_start`: `first_training` when it is some and `training_opened` is false, else `today`.
+  - `roles_to_carry` is replaced by `team(…).last_season` (the kind is `Member::role`).
+  - Server: `players.rs` storage reads and writes `hidden` (new players: false); `api/players.rs` passes `false` as `training_opened` and uses `team` for its groups (the routes keep their shape until steps 3 and 4).
+- **Tests** (core unit tests, fixed dates; `place`, `check_role`, `check_change` tests stay):
+  - `change_role`: a role from Tue 1 Sep 2026, change on Sun 1 Nov 2026 → ended until Sat 31 Oct, new from Sun 1 Nov, until none; a role until Wed 31 Mar 2027 → the new role until Wed 31 Mar 2027; on Tue 1 Sep → `ChangeBeforeRoleStart`; on Thu 1 Apr 2027 (after the end) → `UntilBeforeFrom`; a role of 2025-2026 → `OutsideSeason`; an overlap with another role from Sun 15 Nov → `RolesOverlap`.
+  - `team`: a player after `change_role` (two roles, the newest from Sun 1 Nov; today 12 Oct and 2 Nov) is in `members`, not in `left`; a hidden player with a role today is in `members`; a hidden player who stayed last season is in neither `last_season` nor `candidates`; candidates: last season's team before others, each part by first name; a player under "Left the team" is not a candidate.
+  - `proposed_start`: (Tue 1 Sep, false, Mon 12 Oct) → Tue 1 Sep; (Tue 1 Sep, true, Mon 12 Oct) → Mon 12 Oct; (none, false, Mon 12 Oct) → Mon 12 Oct.
+  - The first-form tests of `roles_to_carry` move to `team().last_season` (14 roles, one ended 10 Mar 2026 → 13; the newest role's kind).
 
-### Step 2: Migration and storage
-- **Goal**: the tables and the functions that read and write them.
+### Step 3: The team page
+- **Goal**: the coordinator works with the team of the current season on one page.
 - **Changes**:
-  - `migrations/0005_players_and_settings.sql`:
-    - `players (id bigint identity PK, first_name text NOT NULL CHECK (btrim(first_name) <> ''), last_name text, created_at timestamptz NOT NULL)`;
-    - `player_roles (id bigint identity PK, player_id bigint NOT NULL REFERENCES players ON DELETE CASCADE, season_year integer NOT NULL, role text NOT NULL CHECK (role IN ('plays_games','only_trains')), from_date date NOT NULL, until_date date, CHECK (until_date IS NULL OR until_date >= from_date))`, index on `(player_id)` and `(season_year)`;
-    - `reasons (id bigint identity PK, name text NOT NULL, valid boolean NOT NULL, hidden boolean NOT NULL DEFAULT false, position integer NOT NULL)`, unique index on `lower(btrim(name))`; the 6 presets inserted with positions 1–6;
-    - `training_seasons (season_year integer PK, first_date date NOT NULL, last_date date NOT NULL, CHECK (last_date >= first_date))`;
-    - `training_days (season_year integer NOT NULL REFERENCES training_seasons, valid_from date NOT NULL, weekday smallint NOT NULL CHECK (weekday BETWEEN 1 AND 7), start_time time NOT NULL, end_time time NOT NULL, CHECK (end_time > start_time), PRIMARY KEY (season_year, valid_from, weekday))`.
-  - Storage modules in `crates/server/src/`: `players.rs` (list players with roles of two seasons; insert, update, delete a player; insert, update a role; `lock_player` with `SELECT … FOR UPDATE`; `same_name_exists`), `reasons.rs` (list, insert at the end, update), `training_settings.rs` (read a season with its sets; save first/last and replace or add a set). Unique violations on the reason name map to a store error the API turns into `reason_name_taken`.
-  - `sqlx migrate run`, then `just prepare`; commit `.sqlx/`.
-- **Tests** (`#[sqlx::test]`): the 6 reasons in order with School, Ill, Injured valid; a player with two roles is read back with both; a second set for a season is stored next to the first, a set with the same valid-from replaces it; deleting a player deletes its roles.
+  - `GET /api/team` → `TeamView { season, team_name: Option<String>, today, season_first_day, season_last_day, proposed_from, members: [MemberView], left: [MemberView], last_season: [MemberView], candidates: [PlayerSummary] }`; `MemberView { id, first_name, last_name, role, roles: [RoleView] }` (the roles of the shown season); `PlayerSummary { id, first_name, last_name }`. `team_name` from `followed_teams::for_season` (none without a choice or without a team).
+  - `POST /api/players/{id}/roles` `{ role, from, until }` ("Add player" for a player from the list, "Add to the team") → `TeamView` (was `PlayerView`); `POST /api/players` keeps its body and answers `{ player, same_name }` as now.
+  - `POST /api/players/{id}/role-change` `{ role, from }` → `TeamView`. In one transaction: lock the player, read its roles, the role that covers `from` (none → `not_in_team`), `change_role`, update that role's end, insert the new role. Both or neither.
+  - `POST /api/players/{id}/team-leave` `{ until }` → `TeamView`: under the lock, the role that covers `until` (none → `not_in_team`), `check_change` with the new end, update.
+  - `POST /api/players/carry` `{ players: [ids] }` → `TeamView`: only players in `last_season` (so not hidden); others are skipped.
+  - Errors: `change_before_role_start` ("The change must be after the start of the role. To change the role from its start, use "Correct" in the history."), `not_in_team` ("This player is not in the team on that date."); unknown player → 404.
+  - `/team`: the heading ("U14-1 · 2026-2027", or "Team not chosen yet" with a link to `/choose`); the members (name, badge), "Left the team"; "Add player" (a choice of candidates or "New player" with first and last name; a role; "In the team from" with `proposed_from`); a tap on a member opens "Change role" (role, "From", proposed today) and "Remove from the team" ("Last day in the team", proposed today, or the role's start when later); under "Left the team" "Add to the team" (role, date proposed the day after the end, or today when later); in a new season "Players of last season" with "Add all". Date fields with the season's first and last day as limits.
+  - Start page: the line "Team · Players · Settings".
+  - `just api-types`.
+- **Tests**:
+  - API (`tests/team.rs`, clock 12 Oct 2026 unless said): a player added with a role from Tue 1 Sep is in `members`; `team_name` is the chosen team's name, and none without a choice; "Change role" on Sun 1 Nov (clock 2 Nov): `members` with two roles, the first until Sat 31 Oct; "Change role" refused by an overlap (a later role from Sun 15 Nov exists) → 400 `roles_overlap`, both roles unchanged; "Change role" while another connection holds the player's lock waits, then answers (the method of fix 3); "Change role" on the role's start → `change_before_role_start`; "Remove from the team" on Thu 15 Oct (clock 20 Oct) → under `left`; "Remove from the team" for a player without a role on that date → `not_in_team`; "Add to the team" after "Left the team" → a new role, in `members`; "Add all" in summer (clock 15 Aug 2026, last season's roles) leaves out a hidden player; a hidden player in the team stays in `members`; the first form's R1 tests (after "Add all" in summer the players stay in the team; last season's players join during the season) on `GET /api/team`.
+  - Routes: the new routes in the 401 and 403 test; the log test: no player name after "Change role".
+  - Browser: `/team`: "Add player" (new player, "Only trains", the proposed Tue 1 Sep on the server clock 12 Oct) listed; the same name again shows the warning; "Change role" from a date; "Remove from the team", the player is under "Left the team"; "Add to the team"; "Add all" with a replaced answer (`page.route`, as in the first form); the heading "Team not chosen yet" with a replaced answer; the start page links; no sideways scroll at 320 pixels, `expectAccessible`.
 
-### Step 3: API
-- **Goal**: the routes, behind the login, with the error codes.
-- **Changes**: new files `api/players.rs`, `api/reasons.rs`, `api/training_settings.rs`; routes on the protected router in `app.rs`; paths in `api/mod.rs`; `just api-types`.
-  - `GET /api/players` → `PlayersView { season, players: [PlayerView], left: [PlayerView], last_season: [PlayerView], others: [PlayerView] }` (`others`: players with no role in this or the previous season, for example added without a role or from an older season); `PlayerView { id, first_name, last_name, role (today's, or the last in the season for `left`, or last season's for `last_season`), roles: [RoleView { id, role, from, until }] }`. `last_season` stays empty until step 5.
-  - `POST /api/players` `{ first_name, last_name, role: { role, from } | null }` → `{ player: PlayerView, same_name: bool }`.
-  - `PUT /api/players/{id}` `{ first_name, last_name }` → `{ player, same_name }`.
-  - `DELETE /api/players/{id}` → 204.
-  - `POST /api/players/{id}/roles` `{ role, from, until }` and `PUT /api/players/{id}/roles/{role_id}` `{ role, from, until }` → `PlayerView`. The season is the season of `from`. In one transaction: `lock_player`, read the player's other roles, `check_role`, write.
-  - `GET /api/reasons` → `[AbsenceReason { id, name, valid, hidden }]` by position; `POST /api/reasons` `{ name, valid }` and `PUT /api/reasons/{id}` `{ name, valid, hidden }` → the list.
-  - `GET /api/training-settings` → `TrainingSettings { season, saved, first, last, days: [TrainingDayView { weekday, start, end }] }` (the set valid today, or the first set before the first date); `saved: false` with empty days and `null` dates when nothing is saved. `GET /api/training-settings/proposal?weekdays=2,4` → `{ first, last }`. `PUT /api/training-settings` `{ first, last, days }` → `TrainingSettings`.
-  - Errors (`AppError::BadRequest`): `first_name_required`, `until_before_from`, `outside_season`, `roles_overlap`, `end_before_start`, `last_before_first`, `no_training_days`, `duplicate_weekday`, `reason_name_required`, `reason_name_taken`. Unknown player, role or reason → 404. The weekday in JSON is 1 (Monday) to 7 (Sunday); times as `"19:45"`.
-  - Logs: ids only.
-- **Tests** (`crates/server/tests/players.rs`, `tests/settings.rs`, clock 12 Oct 2026 unless said):
-  - a player with a role from 1 Sep is under `players` with `plays_games`; the same name again → `same_name: true`;
-  - "Left the team" with `until` 15 Oct, clock 20 Oct → under `left`; `until: null` → back under `players`;
-  - a player added without a role → under `others`;
-  - a new role from 1 Nov, clock 2 Nov → under `players` with two roles;
-  - an overlapping role → 400 `roles_overlap`, nothing stored; two role saves for one player at the same time (two tasks) → one stored, the other `roles_overlap`;
-  - `DELETE` removes the player and its roles;
-  - reasons: add "Family" (not valid) comes last; rename "Work" to "work" ok; rename to "school" → `reason_name_taken`; hide "Holiday" → listed with `hidden: true`;
-  - settings: `GET` with nothing saved → `saved: false`; proposal for Tuesday → 1 Sep 2026 and 25 May 2027; `PUT` Tuesday 19:45–21:00 saved; with the clock at 5 Jan 2027 a `PUT` with Thursday adds a set valid from 5 Jan and keeps the first;
-  - every new route without login → 401; every changing route without `Origin` → 403;
-  - the log after adding and renaming a player has no player name (`LogBuffer`, own test file `tests/player_logs.rs`).
-
-### Step 4: Screens
-- **Goal**: the coordinator can type in players and settings.
-- **Changes** (`web/`):
-  - `src/routes/players/+page.svelte` (+ `+page.ts`): the players with a role (name, badge "Plays games" / "Only trains"), "Left the team", "Other players" (folded; a tap opens the player, where a role can be given), "Add player" (first name, last name, "Plays games" / "Only trains", from with the proposed date). The warning "There is already a player with this name." after a save with `same_name`.
-  - `src/routes/players/[id]/+page.svelte`: the name (change and save), the roles of the season (role, from, until), "Left the team" (date, proposed today) / "Undo", "Back in the team" (a new role from a date), "Delete player" (with a confirmation).
-  - `src/routes/settings/+page.svelte`: the training days (day of the week, start and end time; add and remove a day), the first and the last training date (filled from the proposal when nothing is saved), "Save"; the reasons (name, valid / not valid, hide / show, rename; "Add reason").
-  - Start page: the line "Players · Settings" below the team header, shown with a login also before a team is chosen.
-  - `client.ts`: load and save functions; `messageFor` sentences: "A first name is needed.", "The end must be after the start.", "This date is outside the season.", "This player already has a role on that date.", "The end time must be after the start time.", "The last training date must be after the first.", "Choose at least one training day.", "This day is already a training day.", "A name is needed.", "There is already a reason with this name."
-  - Phone first: large rows and fields, no sideways scroll at 320 pixels; date and time fields use the browser's own inputs.
-- **Tests** (`web/e2e/players.e2e.ts`, project `logged-in`, after the existing tests of that project): add a player with a first name only, "Only trains", from the proposed date, shown in the list; the same name again shows the warning; open the player, "Left the team", then "Undo"; `/settings`: Tuesday 19:45–21:00 with the proposed dates (Tue 1 Sep 2026 – Tue 25 May 2027), save; add "Family"; hide "Holiday"; the start page shows "Players · Settings"; no sideways scroll at 320 pixels and `expectAccessible` on both pages.
-
-### Step 5: "Add all"
-- **Goal**: last season's players come back in a new season with one tap.
+### Step 4: The players page and the player page
+- **Goal**: all players, hidden, and the history with "Correct".
 - **Changes**:
-  - Core `players::roles_to_carry(last_season_roles: &[PlayerRole], current: &[PlayerRole], season: Season, start: NaiveDate) -> Vec<(PlayerId, Role)>`: for each player with a role in the previous season whose newest role there has no end before 30 June, and with no role in `season`, the same role kind. `start` is the first training date of the season, or today when later, or today without settings.
-  - `GET /api/players` fills `last_season`.
-  - `POST /api/players/carry` `{ players: [ids] }` → `PlayersView`: starts the carried roles from `start` for the listed players (all of `last_season` for "Add all"); players that already have a role in the season are skipped.
-  - `/players`: in a new season, "Players of last season" with "Add to this season" for each and "Add all".
-- **Tests**: core: 14 roles in 2025-2026, one ended 10 Mar 2026 → 13 carried with the same kinds; `start` 1 Sep 2026 when today is 15 Aug 2026 with settings, today (12 Oct) when later, today without settings. API (clock 15 Aug 2026, roles in 2025-2026): `last_season` lists them; "Add all" gives roles, `last_season` becomes empty; a second "Add all" adds nothing.
+  - `GET /api/players` → `PlayersList { season, players: [PlayerListItem { id, first_name, last_name, hidden, role_today: RoleKind | null }] }`, sorted by first name. The groups of the first form (`players`, `left`, `last_season`, `others`, `proposed_from`, `today`) go from this route.
+  - `GET /api/players/{id}` → `PlayerDetail { id, first_name, last_name, hidden, season, season_first_day, season_last_day, history: [HistoryRole { id, season, role, from, until, correctable }] }` (newest first; `correctable` for roles of the current season).
+  - `PUT /api/players/{id}` `{ first_name, last_name, hidden }` → `{ player: PlayerDetail, same_name }`.
+  - `PUT /api/players/{id}/roles/{role}` ("Correct") → `PlayerDetail`; `check_change` as now (only a role of the current season).
+  - `DELETE /api/players/{id}` as now.
+  - `/players`: the list (name, badge or "Not in the team", "hidden" for a hidden player), "Show hidden players", "Add player" (name only; the warning after a save with `same_name`); a tap opens the player.
+  - `/players/[id]`: the name (save), "Hidden", the history with "Correct" (kind, from, until; date limits of the season), "Delete player" (confirmation).
+  - The first-form pages and their code go (the groups, `last_season` on the players page, the detail page's "Left the team" and "Back in the team" now on `/team`).
+  - `just api-types`.
+- **Tests**:
+  - API (`tests/players.rs`, adapted): `GET /api/players` lists all players with `hidden` and `role_today`; `GET /api/players/{id}` gives the history of two seasons, newest first, `correctable` only for this season; "Correct" of a role of last season → `outside_season`; "Correct" with an overlap → `roles_overlap`; `PUT` with `hidden: true` → listed with `hidden`, still in `members` of `GET /api/team`; delete removes the player and its roles; the first-form tests of names, errors, overlap and two saves at once stay, on the new routes.
+  - Browser: `/players`: add a player with a first name only; a hidden player is shown only with "Show hidden players"; `/players/[id]`: "Hidden", "Correct" of the start date (the history shows the new date), "Delete player"; no sideways scroll at 320 pixels, `expectAccessible`.
 
 ## Decisions
 | Decision | Reason | Decision record? |
 |----------|--------|------------------|
-| A player is the person; a role in a season has a start and an end; not linked to the game list choice | Players join, leave and come back; roles change; the team's game list name changes each season (coordinator, 2026-10-15) | yes, 0019 at Close |
-| Training days have a valid-from date; a change applies from today (or from the first date before the season starts); a change on the same day replaces | The past does not change (spec note S10); no pile of sets | in 0019 |
-| No overlap of roles is checked in the core under a row lock, not by a database constraint | An `EXCLUDE` constraint needs the extension `btree_gist` on the cluster | in 0019 |
-| One training time for each day of the week | The spec has one training a day | no |
-| The proposal of the training dates is a server route | One rule (in the core), not again in TypeScript | no |
+| The club has the players; a team exists for one season and is the team chosen from the game list for that season; a player is in the team through a role | The coordinator's model (2026-10-16) | yes, 0019 at Close |
+| One club for the whole tool; players have no stored link to a club | One coordinator, the only user (coordinator, 2026-10-16: "as long as I'm the only user") | in 0019 |
+| Roles and weekly trainings are stored by season, not linked to the team choice; they can be entered before the team is chosen | One team per season, so the season finds the team; attendance does not wait for a choice | in 0019 |
+| Weekly trainings with a window only suggest training days | A mistake is corrected for the whole window (accept review A1) | in 0019 |
+| "Change role" and "Remove from the team" act on the role that covers the given date; the new role keeps the planned end of the old one | The screen cannot change an old role by mistake; a planned end stays | no |
+| No overlap of weekly trainings on one day is checked in the core under an advisory lock | An `EXCLUDE` constraint needs `btree_gist` on the cluster; the same as for roles | in 0019 |
+| Migration `0005` is rewritten; "an applied file is never edited" (decision 0004) means applied on the cluster | The first form was never merged or released (coordinator, 2026-10-16) | one line in 0019 |
+| `PUT /api/players/{id}` with the whole player (name and hidden), not `PATCH` | Like the first form's rename; the epic left the detail to the story | no |
 | The schema name `AbsenceReason` | `Reason` is taken in the OpenAPI description | no |
 | Deleting a player is always allowed in story A | Absences exist only from story B, which adds `player_has_absences` | no |
 
 ## Not in scope
-- Trainings, absences, the start page card and the list of training days (story B); totals (story C).
-- A screen to change a role within a season (the data allows it).
-- Settings for a season other than the current one.
-- Reordering reasons.
-- A backup of the database (backlog).
+- Trainings, absences, the start page card, the list of training days, "Change" of a training, the proposal of last season's weekly trainings in a new season (story B); totals (story C).
+- Weekly trainings or roles of a season other than the current one (shown in the history, not changed).
+- Reordering reasons; a backup of the database (backlog).
 
 ## Test plan
-- **Existing tests that must still pass**: all of `just check`; the browser tests of the start page (the new link line must not move what they check).
+- **Existing tests that must still pass**: all of `just check`; the browser tests of the start page (the link line must not move what they check).
+- **First-form tests**: what stays, changes or goes is named in each step; each step's progress note lists the tests it removed and why.
 - **New tests**: per step, above.
-- **Checks**: `just check`; `sqlx migrate run` and `just prepare` after step 2; `just api-types` after step 3.
+- **Checks**: `just check` after each step; `sqlx migrate run` and `just prepare` after step 1; `just api-types` after steps 1, 3 and 4.
 
 ## Compatibility and performance
-- The migration adds tables only; the running app works on it (decision 0004).
+- The migration adds tables only; the running app works on it (decision 0004). Local databases that ran the first `0005` are made again before step 1.
 - The start page gets one line of links; nothing else changes for the games.
-- From step 4 the coordinator stores names of players (children) on the cluster: no names in logs (test), no backup yet (accepted, backlog).
-- Load: about 15 players and a few roles each season.
+- The coordinator stores names of players (children) on the cluster: no names in logs (test), no backup yet (accepted, backlog).
+- Load: about 15 players, a few roles each season, one or two weekly trainings (about 40 training days).
 
 ## Progress
-- [x] Step 1: core rules
-- [x] Step 2: migration and storage
-- [x] Step 3: API
-- [x] Step 4: screens
-- [x] Step 5: "Add all"
-- [x] All checks pass (`just check`, 2026-10-15; 36 browser tests)
-- [x] Review build (2026-10-15): not ready, findings R1–R9 below
-- [x] Fix 1: R1, R2, R4 – an open role ends on the last day of its season; the grouping of the players page and the proposed start of a role in the core
-- [x] Fix 2: R3 and R9 (two saves at once) – a settings save removes the stored sets from its valid-from date on, under a lock
-- [x] Fix 3: R5 – the test of two role saves at once always catches a missing lock
-- [x] Fix 4: R6, R7, R8, R9 (the other two points) – roles only in the current season, the detail page, the 404 sentence, the proposed end, the settings page after the first save
-- [x] Review build again (2026-10-16): not ready, findings R10–R12
-- [x] Review accept (2026-10-16): needs correction, findings A1–A5
-- [x] Fix 5: R10, R11, R12 – a settings save also replaces the sets that start after today, the page shows the set of today or the first date; "Add to the team" proposes the proposed start; the season rule of a changed role and "Add all" go through the core checks
+- [x] First form: steps 1–5, fixes 1–5, build review twice, accept review (2026-10-15/16; replaced by this design)
+- [ ] Step 1: weekly trainings, end to end
+- [ ] Step 2: core rules for players
+- [ ] Step 3: the team page
+- [ ] Step 4: the players page and the player page
+- [ ] Review build
+- [ ] Review accept
 
 ## Deviations
-None from `functional.md` (as changed on 2026-10-15). The design reads the spec more strictly within its words:
-- One training time for each day of the week.
-- Settings only for the current season.
-- Without saved settings the proposed start of a role is today.
-- A player with no role in this or the previous season is listed under "Other players" (folded), where it can get a role or be deleted.
+None from `functional.md` (as approved again on 2026-10-16, with the two additions of this design
+written into it: the team page heading with the team name, and "Team not chosen yet").
 
-Implement:
-- 2026-10-15, step 1: `check_role` takes no `role` argument (the kind of role is not part of any check); `training::set_on` (the set that applies on a date) is public, because story B needs it for the start page card.
-- 2026-10-15, step 2: the reason name also has `CHECK (btrim(name) <> '')` in the table; `StoreError::is_unique_violation` (in `db.rs`) tells the API that a reason name is taken. The storage of reasons uses its own type `StoredReason` (the core has only the name rule).
-- 2026-10-15, step 3:
-  - The first save of a season's settings applies from the first training date, also when it is made during the season (`settings_change` gets `first_save`). Found by a test: the coordinator sets up the tool in October and enters the trainings since September; with "valid from today" the stored set would start on the day of the save.
-  - Two extra error codes for input the screen should never send: `invalid_weekday` (not 1–7) and `invalid_time` (not "HH:MM").
-  - `GET /api/players` already fills `last_season` (the grouping is one rule); the route "Add all" stays in step 5.
-  - Test helper `tests/common/api.rs` (`Coordinator`: a logged-in harness that sends JSON).
-- 2026-10-15, step 4:
-  - `GET /api/players` also gives `today` and `proposed_from` (the proposed start of a role), so the screens use the server's clock, not the phone's; the browser tests run with the server's clock at 12 October 2026.
-  - Until step 5, last season's players are listed under "Other players".
-  - Before the first save of the settings, a change of the chosen days proposes the dates again (unless the coordinator typed dates).
-  - The proposal route marks `weekdays` as a query parameter in the OpenAPI description (`#[into_params(parameter_in = Query)]`).
-  - A hidden reason has a dashed border, not a lower opacity (the accessibility test failed on contrast); date and time fields can shrink, and the two training dates stand below each other on a phone (no sideways scroll at 320 pixels).
-- 2026-10-15, step 5:
-  - `roles_to_carry(roles, season)` gives the players and their kinds of role; the start date is the same as `proposed_from` (the first training date, or today when later, or today without settings), worked out in the API, not in the core.
-  - "Players of last season" lists only the players who stayed until the end of last season (the ones "Add all" brings back); a player who left early last season is under "Other players", where "Add to the team" works. Otherwise "Add to this season" would do nothing for such a player.
-  - A player whose role starts later in the season (for example after "Add all" in August, from 1 September) is listed with the current players, not under "Left the team".
-  - A browser test with replaced answers checks the part "Players of last season" and the request of "Add all" (the browser server's clock has no last season).
-- 2026-10-16, fix 1: the browser test of "Add all" failed 2 of 6 runs ("Response has been disposed": a load of the list was still under way when the test ended). It now removes its replaced answers at the end (`page.unrouteAll({ behavior: 'ignoreErrors' })`); 6 runs passed. `Season::previous` replaces the three copies of "the season before".
-- 2026-10-16, fix 2: the lock of the settings is an advisory lock, not `SELECT … FOR UPDATE` on `training_seasons`: before the first save there is no row to lock.
-- 2026-10-16, fix 4: a role of another season cannot be changed (not only not added), so "Undo" on a role of last season gives `outside_season`. `Season::first_day` is new. The new sentence for a 404 is "This no longer exists. Load the page again." (not in the spec's list of sentences).
+The design reads the spec more strictly within its words:
+- A weekly training's window is inside one season, and every save is for the current season.
+- A window without its day of the week in it is allowed; it suggests no training days.
+- "Change role" and "Remove from the team" act on the role that covers the given date; the new role keeps the planned end of the old role.
+- "Add player" from the list offers players in "Players of last season" and "Other players" (not hidden); a player under "Left the team" is added again with "Add to the team".
 
-## Review findings
+## Review findings of the first form
+Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed
+again under **Review findings** at the end.
+
 Build review, 2026-10-15, by a fresh agent (`/review build`). The arguments held only the mode
 and the change folder. Read: the diff `main...feat/players-and-settings` (one commit, 905a767;
 nothing uncommitted), this folder, the epic's `functional.md` and `technical.md`,
@@ -506,3 +504,5 @@ their weight, add (last), rename, valid / not valid, hide and show again, unique
 the training days during the season before story B builds the list of past trainings on them, and
 the tool starts in the season now. A2 needs a place in this story or in story B's scope. A3 needs an
 owner. The rest of story A is what was meant.
+
+## Review findings
