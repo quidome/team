@@ -12,7 +12,7 @@ The backend is Rust (`crates/`), the front end is Svelte (`web/`), the data is i
 Enter the pinned Nix development shell, start the local database, and apply the migrations:
 
 ```sh
-nix develop path:.
+nix develop
 cp .env.example .env
 just db-up
 just migrate
