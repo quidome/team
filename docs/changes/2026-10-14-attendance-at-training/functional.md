@@ -1,8 +1,8 @@
 # Functional spec: Attendance at training
 
-**Status**: approved
+**Status**: approved (changed after the accept review of story A, approved again 2026-10-16 after the fifth spec review)
 **Change**: docs/changes/2026-10-14-attendance-at-training
-**Date**: 2026-10-15
+**Date**: 2026-10-15, changed 2026-10-16
 
 ## Context
 The tool is for one coordinator who runs one youth team in a club. Today it reads the club's
@@ -32,63 +32,88 @@ valid or not valid.
 
 ## User stories
 
-### Story 1: Keep the players
-**As a** coordinator, **I want to** keep the players and when each one is in the team, **so
-that** I can mark their attendance without typing names, and the totals are fair to players who
-join or leave during the season.
+### Story 1: Keep the players and the team
+**As a** coordinator, **I want to** keep the players and who is in the team when, **so that** I
+can mark their attendance without typing names, and the totals are fair to players who join,
+change role or leave during the season.
 
 A player is the person: a name, with no dates. What has a start and an end is the player's role
 in the team of a season: "plays games" or "only trains" (coordinator, 2026-10-15). Both roles come
-to training.
+to training. The roles of a player, one after the other, are the player's history. The
+coordinator works on two pages (coordinator, 2026-10-16): **Players**, all players the coordinator
+ever entered, and **Team**, the team of the current season.
 
 #### Acceptance criteria
-- [ ] The coordinator can add a player with a first name (required) and a last name (optional), and change both later. A player has no dates.
-- [ ] The coordinator can give a player a role in the current season: "plays games" or "only trains", from a date (the tool proposes the first training date of the season, or today when the season's trainings have started).
-- [ ] The coordinator can end a player's role with a date (the tool proposes today), and undo the end. A role ends at the latest at the end of its season (30 June).
-- [ ] A player who leaves and comes back in the same season gets a new role from the date of return; the time between does not count.
-- [ ] A player shows at a training, and counts for it, only when the date of the training is inside one of the player's roles. So a player who joined in November has no missed trainings in September and October.
-- [ ] Absences outside a player's roles (for example after the role end was moved earlier) are kept, but do not count; they count again when the dates are changed back.
-- [ ] A new season starts with no players in a role. The players page shows the players of last season with "Add to this season" for each, and "Add all": each gets the same role as at the end of last season, from the first training date of the new season (or today).
-- [ ] Players are shown by name only: first name and last name. Two players with the same first name are told apart by the last name.
-- [ ] The players page shows, for the chosen season, the players with a role now (sorted by first name, with "Plays games" or "Only trains"), then "Left the team" with the players whose role in the season ended.
+Players:
+- [ ] The page "Players" lists all players, sorted by first name, each with "Plays games" or "Only trains" when the player is in the team today, else "Not in the team". "Add player" adds a player with a first name (required) and a last name (optional).
+- [ ] A tap on a player opens the player: the name (change and save), the switch "Hidden", the history, and "Delete player".
+- [ ] A hidden player is not listed on "Players" (unless the switch "Show hidden players" is on) and is not offered when a player is added to the team. Hiding changes nothing else: the history, the team and the totals stay. For example a player who left the club.
+- [ ] The history lists the player's roles, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct". A role of the current season has "Correct": the kind, the start date and the end date (empty while the role continues), filled in with the stored values. A correction applies to the whole role, with the same checks as a new role. For example a player added from the proposed date who joined on 3 November, or added as "Plays games" by mistake. Roles of an earlier season are shown but cannot be corrected.
 
-A change of role within a season (from "only trains" to "plays games") is the end of one role and
-the start of the other on the same day. The stored data must allow it; a screen for it comes later.
+Team:
+- [ ] The page "Team" shows, for the current season, the players in the team today or later in the season (sorted by first name, with "Plays games" or "Only trains"), then "Left the team" with the players who had a role earlier in the season and have none today or later in the season. A player after "Change role" stays in the team.
+- [ ] "Add player" on the team page adds a player to the team: a player from the list (not hidden, not in the team; last season's team first), or a new player (first name and last name), with a role and the date from which the player is in the team. The tool proposes the first training date of the season until the coordinator has opened a training of the season, and today after that; with no weekly training yet, today (coordinator, 2026-10-16). So when the coordinator sets up in October and then enters the trainings since 1 September, all players are proposed from 1 September.
+- [ ] A tap on a player of the team gives "Change role" and "Remove from the team".
+- [ ] "Change role" (new role and a date, proposed today) ends the current role on the day before that date and starts the new role on it. So the history keeps both, for example "Only trains" until 31 October and "Plays games" from 1 November.
+- [ ] "Remove from the team" (a date, proposed today, or the start of the role when that is later) ends the role on that date. A mistake is undone in the history ("Correct", end date empty).
+- [ ] A player under "Left the team" can be added again ("Add to the team", with a role and a date, proposed the day after the end, or today when later): a new role from the date of return; the time between does not count.
+- [ ] A role ends at the latest at the end of its season (30 June). A new season starts with no players in the team. The team page shows the players of last season's team with "Add all": each gets the same role as at the end of last season, from the proposed date (as for "Add player"). Hidden players are not added.
+
+Everywhere:
+- [ ] A player shows at a training, and counts for it, only when the date of the training is inside one of the player's roles. So a player who joined in November has no missed trainings in September and October.
+- [ ] Absences outside a player's roles (for example after the end of a role was moved earlier) are kept, but do not count; they count again when the dates are changed back.
+- [ ] Players are shown by name only: first name and last name. Two players with the same first name are told apart by the last name.
 
 #### Behaviour
-At the start of the season the coordinator opens "Players", taps "Add player" and types the 14
+At the start of the season the coordinator opens "Team", taps "Add player" and types the 14
 players once, each with "Plays games" or "Only trains". For a player who joined later, the
-coordinator sets the date the role started. When a player leaves, the coordinator opens the player
-and taps "Left the team" (with the date). Next season, the coordinator taps "Add all" (or adds
-players one by one) and ends the roles of those who did not come back.
+coordinator sets the date the role started. When a player moves from "only trains" to "plays
+games", the coordinator taps the player, "Change role", and the date. When a player leaves, the
+coordinator taps the player, "Remove from the team", and the date. Next season, the coordinator
+taps "Add all" (or adds players one by one) and removes those who did not come back. A player who
+left the club is set to "Hidden" on the page "Players".
 
 #### Errors and edge cases
 - No first name: the player cannot be saved; the tool says "A first name is needed."
-- A role end before its start: not saved ("The end must be after the start.").
+- The end of a role before its start: not saved ("The end must be after the start.").
+- "Change role" on a date that is not after the start of the current role: not saved ("The change must be after the start of the role. To change the role from its start, use "Correct" in the history.").
 - Two roles of one player that overlap in time: not saved ("This player already has a role on that date.").
 - Two players with the same first and last name: allowed (the coordinator knows who is who), but the tool warns "There is already a player with this name."
-- A player with no absences can be deleted at any time ("Delete player", after a confirmation), for example a player added by mistake. "There" is not stored for each player, so nothing is lost. A player with absences can only end the role.
-- A role starts (or its start is moved earlier) while trainings on or after that date are already entered: "there" is the default, so the player now counts as there at those trainings. On save the tool says "This player now counts as there at N earlier trainings." and lists them, so the coordinator can mark absences.
+- A player with no absences can be deleted at any time ("Delete player", after a confirmation), for example a player added by mistake. "There" is not stored for each player, so nothing is lost. A player with absences can only be removed from the team or hidden.
+- A role starts (or its start is moved earlier, also with "Correct") while trainings on or after that date are already entered: "there" is the default, so the player now counts as there at those trainings. On save the tool says "This player now counts as there at N earlier trainings." and lists them, so the coordinator can mark absences.
 
-### Story 2: Training days and trainings
+### Story 2: Weekly trainings and trainings
 **As a** coordinator, **I want** the tool to know when the team trains, **so that** today's
 training is ready to mark without setting it up each time.
 
+A **weekly training** (word for `/vision`, see Open questions) is a day of the week with a start
+and an end time, in a window from a date until a date, for example "Tuesday 19:45–21:00, from Tue
+1 Sep until Tue 25 May". In its window it suggests a training on each of its days: these dates
+are the **training days** of the season. A weekly training only suggests: a training exists only
+when the coordinator opens it (coordinator, 2026-10-16). Once opened, a training has its own date
+and times, and a later change of the weekly training does not touch it.
+
 #### Acceptance criteria
-- [ ] The coordinator sets the training days of the week (one or more), each with a start and an end time (for example Tuesday 19:45–21:00), and the first and the last training date of the season.
-- [ ] When the training days are set for the first time, the tool proposes the first training day in September as the first date and the last training day in May as the last date. The coordinator can change both.
-- [ ] Between the first and the last training date, the start page shows a card "Training" for the next training: today's training until midnight (so attendance can still be entered at home after the training), else the next training day or extra training. A cancelled training shows on the card too, as "Training · Tue 20 Oct · Cancelled". For example "Training · Tue 20 Oct · 19:45".
-- [ ] Outside that period, and when no training days are set, the start page shows no training card. The coordinator can still open trainings from the page "Attendance".
+- [ ] The coordinator can add a weekly training: a day of the week, a start and an end time, and a window from a date until a date, inside the season. A team that trains twice a week has two weekly trainings.
+- [ ] For a new weekly training the tool proposes the window from that day of the week on or after 1 September until that day of the week on or before 31 May. The coordinator can change both dates.
+- [ ] The coordinator can change everything of a weekly training ("Change": the day, the times and the window), and delete it. A mistake is corrected by a change, for the whole window. A real change of schedule is the end of one weekly training (its window ends) and a new one (for example Thursday from Thu 7 Jan).
+- [ ] A change or delete of a weekly training never changes or deletes an opened training: only the training days that are not opened follow it.
+- [ ] The settings page lists the weekly trainings of the season, sorted by the start of the window, for example "Tuesday 19:45–21:00 · Tue 1 Sep – Tue 25 May".
+- [ ] The first training date of the season is the first training day of all its weekly trainings (story 1 uses it for the proposed start of a role).
+- [ ] The start page shows a card "Training" for the next training: today's training until midnight (so attendance can still be entered at home after the training), else the next training day or training. A cancelled training shows on the card too, as "Training · Tue 20 Oct · Cancelled". For example "Training · Tue 20 Oct · 19:45".
+- [ ] With no coming training day or training in the season, the start page shows no training card. The coordinator can still open trainings from the page "Attendance".
 - [ ] The coordinator can open the next training at any time, also days before it, to note an absence in advance.
-- [ ] Opening a training makes it exist, with every player there (coordinator, 2026-10-15). From then on it counts. A training day that the coordinator never opened does not exist and does not count anywhere.
-- [ ] The page "Attendance" lists every training day of the season, from the first to the last training date: "Coming" (today and later, nearest first) above "Past" (newest first). Each day shows each with "Not opened", "All there", "N absent" or "Cancelled", and the extra trainings. So the coordinator can enter past trainings (for example all trainings since 1 September) one after the other, and prepare coming ones: note an absence weeks ahead, or cancel a holiday break in advance.
+- [ ] Opening a training day makes the training exist, with the date and times of its weekly training at that moment and with every player there (coordinator, 2026-10-15). From then on it counts. A training day that the coordinator never opened does not exist and does not count anywhere.
+- [ ] The page "Attendance" lists every training day and every training of the season: "Coming" (today and later, nearest first) above "Past" (newest first). Each shows "Not opened", "All there", "N absent" or "Cancelled". A date has at most one row: a training on a training day is that day's row. So the coordinator can enter past trainings (for example all trainings since 1 September) one after the other, and prepare coming ones: note an absence weeks ahead, or cancel a holiday break in advance.
 - [ ] "Cancel training" marks a training as cancelled (coordinator, 2026-10-15), for example a holiday or a training cancelled at the last moment. A training day can be cancelled from the list without opening it. A cancelled training stays in the list, like a normal training, with the label "Cancelled". It does not count in the totals.
 - [ ] The list of training days and trainings has a switch "Show cancelled", on by default. Off, the list hides cancelled trainings (coordinator, 2026-10-15).
 - [ ] "Undo cancel" makes a cancelled training a normal training again. Absences noted before the cancel are kept while it is cancelled (not counted), and count again after the undo.
-- [ ] "Add training" makes a training on any date (an extra training), with the start and end time of the training day, or times the coordinator types.
-- [ ] Only an extra training can be deleted ("Delete training", after a confirmation: "Delete the training of Thu 22 Oct? Its attendance is removed."), for example one added on a wrong date. A training on a training day cannot be deleted; it can only be cancelled.
-- [ ] Training days and "today" are in Dutch local time, the same as the games.
-- [ ] A new season (from 1 July, as for the games) asks for its training days and dates again, with the days of last season and new proposed dates filled in.
+- [ ] "Add training" makes a training on any date of the season that has no training yet (an extra training), with the times of a weekly training on that day of the week, or times the coordinator types.
+- [ ] "Change" on a training changes its date and its times; the attendance stays (coordinator, 2026-10-16). For example trainings opened while a weekly training said Wednesday or 19:00 by mistake.
+- [ ] The coordinator can delete any training by hand ("Delete training", after a confirmation: "Delete the training of Thu 22 Oct? Its attendance is removed."), for example one opened or added on a wrong date (coordinator, 2026-10-16). Nothing else ever deletes a training. When the date is a training day, it shows as "Not opened" again. A holiday is cancelled, not deleted: a deleted training day counts as not opened.
+- [ ] Trainings and attendance of an earlier season can still be opened, entered, changed and cancelled (coordinator, 2026-10-16), for example the last training of May found in July. Its weekly trainings and roles are fixed.
+- [ ] Weekly trainings, training days and "today" are in Dutch local time, the same as the games.
+- [ ] A new season (from 1 July, as for the games) has no weekly trainings. The settings page proposes the weekly trainings of last season with new proposed windows (story B of the epic builds this).
 
 #### Behaviour
 On Tuesday at 19:40 the coordinator opens the tool. The start page shows "Training · Tue 20 Oct ·
@@ -96,12 +121,22 @@ On Tuesday at 19:40 the coordinator opens the tool. The start page shows "Traini
 the coordinator reads in the chat that a player cannot come next Tuesday, opens the card
 "Training · Tue 27 Oct" and marks that player.
 
+Setting up in October: the coordinator adds the weekly training "Tuesday 19:45–21:00" with the
+proposed window Tue 1 Sep – Tue 25 May, and then enters the trainings since 1 September. A
+Wednesday typed by mistake is corrected with "Change"; the list of training days follows at once.
+
 #### Errors and edge cases
 - The training is cancelled after the coordinator already opened it (for example to note an absence in advance): the coordinator taps "Cancel training"; the noted absence is kept, and counts again if the cancel is undone.
-- The coordinator opens a past training day by mistake while it was a holiday: it now counts with everyone there; "Cancel training" makes it not count.
-- The last training date is before the first: the tool does not save it and says "The last training date must be after the first."
-- The coordinator changes the training days in the middle of the season: the change applies from that day on. Earlier dates keep the training days that were set then, so the list and "N training days not opened" do not change for the past. Opened and cancelled trainings stay.
+- The coordinator opens a past training day by mistake while it was a holiday: it now counts with everyone there; "Cancel training" makes it not count. ("Delete training" would make it "Not opened" again, so it would count as not opened above the totals.)
+- The end of a window before its start: the tool does not save it and says "The last training date must be after the first."
+- A window outside the season: not saved ("This date is outside the season.").
+- Two weekly trainings on the same day of the week with windows that overlap: not saved ("There is already a weekly training on Tuesday in these dates."). Weekly trainings on different days may overlap.
 - A start time after the end time: the tool does not save it ("The end time must be after the start time.").
+- "Add training", or "Change" of a training, to a date that already has a training: not saved ("There is already a training on this date."). "Change" to a date outside the season: not saved ("This date is outside the season.").
+- A training on a date before every player's role (for example a window moved earlier): the training screen says "No player has a role on this date."
+- A weekly training is changed (or deleted) while some of its training days are opened or cancelled: those trainings stay, with their times and attendance. A training on a date that is no longer a training day shows in the list like an extra training.
+- A weekly training is changed so that a date with an extra training becomes a training day (for example extra trainings on the real Tuesdays, while the weekly training said Wednesday by mistake): the date has one row, the training, with its attendance kept.
+- The times of a weekly training change after a coming training was opened (for example to note an absence in advance): that training keeps its times.
 
 ### Story 3: Mark attendance at a training
 **As a** coordinator, **I want to** mark in seconds who is not at training and why, **so that**
@@ -160,8 +195,8 @@ and why they were not, **so that** I understand the effort each player gives to 
 - [ ] The page "Attendance" shows, for the current season, one row for each player who could be at one or more trainings of the season: the name, "there" (count), "absent, valid" (count), "absent, not valid" (count), and "of N trainings".
 - [ ] Only trainings up to and including today count. A training in the future with an absence noted in advance does not count yet.
 - [ ] For each player, only the trainings (opened or added) at which the player had a role count (story 1). A player who joined later has no missed trainings before that date.
-- [ ] Players whose role in the season ended show in a separate group "Left the team", with the totals of their trainings.
-- [ ] The page also lists the training days and trainings of the season (story 2), newest first; a tap opens the training (story 3).
+- [ ] Players who had a role earlier in the season and have none today or later in the season show in a separate group "Left the team", with the totals of their trainings.
+- [ ] The page also lists the training days and trainings of the season (story 2), "Coming" above "Past"; a tap opens the training (story 3).
 - [ ] The season runs from 1 July to 30 June (Dutch time), the same as for the games. An earlier season can be chosen on the same page.
 - [ ] With no trainings in the season yet: "No trainings yet this season."
 - [ ] When past training days are still "Not opened", the page says so above the totals: "3 training days not opened", with a link to the first of them. So the coach sees when the totals are not complete.
@@ -177,12 +212,13 @@ the player missed, with the date and the reason.
 
 ## Interface
 Screens (phone first, also usable on a computer):
-- **Start page** (`/`): below the team header, a compact card "Training · Tue 20 Oct · 19:45" with "Not opened yet", "All there", "N absent" or "Cancelled". A tap opens the training (and so makes it exist, story 2). It shows only between the first and the last training date, and takes one line so the next games stay high on the first screen.
-- **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Cancel training" or "Undo cancel", and "Delete training" for an extra training only.
+- **Start page** (`/`): below the team header, a compact card "Training · Tue 20 Oct · 19:45" with "Not opened yet", "All there", "N absent" or "Cancelled". A tap opens the training (and so makes it exist, story 2). It shows only when the season has a coming training day or training, and takes one line so the next games stay high on the first screen.
+- **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Change" (date and times), "Cancel training" or "Undo cancel", and "Delete training".
 - **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date). A tap on a player shows the trainings that player missed.
-- **Players**: the list of players, "Add player", the players of last season with "Add to this season" and "Add all" (in a new season), and for each player: first name, last name, the roles of the season ("Plays games" or "Only trains", from and until), "Left the team" (with a date), and "Delete player" when the player has no absences.
-- **Training days and reasons** (settings): the training days of the week with start and end time, the first and the last training date of the season, and the list of reasons with valid / not valid, "Add reason", rename, hide.
-- Navigation: the start page links to "Attendance"; "Attendance" links to "Players" and the settings.
+- **Players**: all players, sorted by first name, with the role today or "Not in the team", "Add player" and the switch "Show hidden players". A tap opens the player: first name, last name, "Hidden", the history (the roles, newest first, "Correct" for a role of the current season), and "Delete player" when the player has no absences.
+- **Team** (current season): the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); in a new season the players of last season's team with "Add all". A tap on a player gives "Change role" and "Remove from the team" (each with a date), or "Add to the team" under "Left the team".
+- **Weekly trainings and reasons** (settings): the weekly trainings of the season (day, start and end time, window), "Add weekly training", "Change" and "Delete" for each, and the list of reasons with valid / not valid, "Add reason", rename, hide.
+- Navigation: the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings.
 
 Example of the training screen:
 
@@ -193,7 +229,7 @@ Tue 20 Oct · 19:45–21:00 · 2 absent
   Casey                   there
   Dana Smit               No reason
   …
-  [ Cancel training ]
+  [ Change ]  [ Cancel training ]  [ Delete training ]
 ```
 
 ## Consistency
@@ -204,14 +240,19 @@ Tue 20 Oct · 19:45–21:00 · 2 absent
 - Like the list of changes, a tap acts at once and the screen shows the result; errors are short sentences.
 
 ## What changes for existing users
-No breaking changes. The start page gets one more card (between the first and last training
-date). Until the coordinator adds players and training days, nothing else changes. The schedule,
+No breaking changes. The start page gets one more card (when the season has a coming training day
+or training). Until the coordinator adds players and weekly trainings, nothing else changes. The schedule,
 the "Game list" card and the list of changes stay as they are.
 
 The coordinator types in the players once (no import from the sheet).
 
 ## Warnings from architect and engineer
 - **[Steve]** Players, trainings and attendance are the first data that only exist in the tool: unlike games, they cannot be read again from a source. The backup of the database must cover them, and every mistake must be correctable in the app.
+- **[Steve]** (2026-10-16) A change of a weekly training can make a date that was a training day stop being one, also for trainings that were already opened or cancelled. The result for the user must be the one in story 2 (they stay), never a training that disappears or loses its attendance.
+- **[Steve]** (2026-10-16) Story A of the epic already stores the training days in another form (sets of days, valid from a date, and a first and last date of the season). It is not merged or released, so its stored form can still change without loss.
+- **[Bruce]** (2026-10-16) The training days are worked out from the weekly trainings each time, not stored. Two weekly trainings on the same day must never overlap, also when two screens save at the same time; opening a training day twice, or from two screens, must still make one training.
+- **[Bruce]** (2026-10-16) "Change role" changes two roles at once (the end of one, the start of the next): both or neither are saved. "Change role", "Remove from the team" and "Correct" on two screens: the last save wins, and the check for overlap must use the stored roles.
+- **[Steve]** (2026-10-16) `docs/language.md` says a player is "a member of the team"; with the page "Players" a player can also be outside the team. The word is for `/vision`.
 - **[Steve]** Training days, "today" and the season must use Dutch local time, the same rules as the games, also on the nights the clock changes.
 - **[Bruce]** "Saved at once" on a phone in a sports hall: the network can be slow or gone. A tap that was not saved must never look saved, and a late answer of an earlier tap must not overwrite a newer tap.
 - **[Bruce]** The same training open on two screens: the last tap wins; a screen that is shown again must show the stored marks.
@@ -233,6 +274,8 @@ The coordinator types in the players once (no import from the sheet).
 
 ## Open questions
 - Settled 2026-10-15 (Vision, with the coordinator): **player** now "has a first name, and usually a last name" (`docs/language.md`); 3 players in the coordinator's sheet have no last name.
+- For `/vision` (2026-10-16): the meaning of **player** ("a member of the team") – now a person the coordinator keeps, in the team of a season through a **role** ("plays games" or "only trains", from a date until a date), which is not in the word list yet either. Also **hidden** for a player (as for a reason).
+- For `/vision` (2026-10-16): a new word **weekly training** – a day of the week with a start and an end time, in a window from a date until a date, that suggests a training on each of its days. With it, **training day** means only a date in the list (this settles the double meaning of note S10). "Schedule" stays the word for the games.
 - For `/vision`: the meaning of **training** ("a training session of the team") does not say that a training counts only when it was opened or added. Probably no change is needed; the spec says it.
 
 ## Spec review
@@ -287,6 +330,93 @@ Notes:
 - **S10 – story 2, "training day" has two meanings.** It means a day of the week in the settings ("training days of the week", "Tuesday 19:45–21:00") and a dated day in the list ("a training day that the coordinator never opened", "3 training days not opened"). With edge case 4 (the days change in the middle of the season) this matters for the user: the list and the count of days not opened must follow the days that were valid on each date, or a change from Tuesday to Thursday in January shows the Thursdays of September as "Not opened" and drops the Tuesdays. "From then on" says the intent; Design should see it as a rule of the count. `/vision` may want a word for the dated day next to **training**. (Trace: story 2 criteria 1, 7, edge case 4; story 5 criterion 8.)
 - **S11 – outside this spec: the login in the hall.** A login lasts 8 hours (`docs/product/login.md`), and trainings are a week apart, so each Tuesday in the hall starts with a login before the first tap. With a passkey this may take seconds, but core value 1 measures the whole path, not only the taps. Not a change to this spec; worth a line in `docs/ideas.md` or a check in real use. (Trace: `login.md` "A login lasts 8 hours"; story 2 behaviour.)
 
+### Third review (2026-10-16)
+A third fresh agent (`/review spec`) read the spec as changed after the accept review of story A
+(A1, A2), with its uncommitted diff against the approved version. Read: this spec, `idea.md`,
+`change.md`, `docs/vision.md`, `docs/language.md`, `docs/product/schedule.md`. Not read: any
+`technical.md`. Each note is checked by a trace through these documents; nothing was run. The
+arguments held only the mode and the change folder. Stories 3–5 did not change; they are checked
+again only for effects of the changes.
+
+| Story | What the user is doing here | Verdict | Note |
+|---|---|---|---|
+| 1 Keep the players | Typing the players once, then fixing a role typed wrong (wrong start date, wrong kind) so the totals are fair. | serves – note | "Change" closes the gap A2 found: a proposed start that was not true can now be moved. See S14, S15. |
+| 2 Training days and trainings | Setting the training days once, fixing a mistake in them later for the whole season, or recording a real change of schedule from a date. | serves – note | "Applies from" with a preview line and the full list of saves makes every mistake visible and correctable, which A1 lacked. See S12, S13, S16. |
+| 3 Mark attendance at a training | In the hall, two taps per absent player. | serves | No change. |
+| 4 Reasons | One tap for a reason with a weight. | serves | No change. |
+| 5 Season totals | As coach, seeing who comes and who misses. | serves | A correction of the training days moves which dates are "Not opened"; the count above the totals follows it (story 2 edge case), so incomplete totals stay visible. |
+
+No story conflicts with the vision. Both changes serve Steve's warning "every mistake must be
+correctable in the app" and core value 1 ("the stored data is the truth and must be right").
+
+Notes:
+- **S12 – story 2, a correction erases a later real change.** "Every earlier save that applied from that date or later is replaced." So the coordinator who in January fixes a wrong time of the autumn (a save from Tue 1 Sep) also removes a change of schedule saved from Tue 5 Jan, and must type it again. The rule is simple and the user can recover, but only if the preview line names *every* save it replaces, not only one as in the example. Suggest: the criterion says the line lists all saves that the save replaces ("This replaces Wednesday 19:00–21:00 from Tue 1 Sep and Thursday 19:00–20:30 from Tue 5 Jan."). (Trace: story 2 criteria "Applies from" and the preview line.)
+- **S13 – story 2, an extra training on a date that becomes a training day.** The spec covers one direction of a correction (a date that stops being a training day keeps its training, as an extra training). The twin is not covered: while the training days are wrong (Wednesday typed for Tuesday), the coordinator who enters the past may use "Add training" on the real Tuesdays. After the correction those Tuesdays are training days too. Does the list then show one training or two on that date, and can the former extra training still be deleted ("a training on a training day cannot be deleted")? For the user the expected result is one training on that date, with its attendance kept. Suggest one sentence in the edge case. (Trace: story 2 criteria "Add training", "Only an extra training can be deleted", edge case "corrects a mistake".)
+- **S14 – story 1, "Change" only in the current season.** The players page can show an earlier season ("for the chosen season") and "Attendance" shows its totals, but a role of an earlier season cannot be corrected. A wrong start found after 30 June stays wrong in last season's totals, and "Add all" copies last season's kind into the new season (where it can be changed). Low weight in the first season; worth saying on purpose, as the spec does for the screen of a real role change. (Trace: story 1 criteria "Change", "Add all", players page; story 5 "An earlier season can be chosen".)
+- **S15 – story 1, the real change of role has a way, but no name.** A player who moves from "only trains" to "plays games" in November can be recorded now by ending the role ("Left the team", 31 Oct) and giving a new role from 1 Nov. The spec allows this but does not say it, and the button is called "Left the team" for a player who did not leave. With "Change" right next to the role, the coordinator will likely use it, and the history (only trained in September and October) is lost. Harmless in this change (nothing uses the kind yet), but attendance at games will read it. Suggest: the behaviour says how a real change is entered for now, or a line in `docs/ideas.md` keeps the later screen from being forgotten. (Trace: story 1 note under the criteria, behaviour, Interface "Players".)
+- **S16 – story 2, what "Applies from" covers.** The same settings form holds the training days, their times, and the first and last training date of the season. The spec does not say whether a change of the first or last training date also goes through "Applies from" (it reads as if not: those are dates of the season, not of a period), nor what moving the first training date later does to the save that applied from the old first date. Also open: whether a coming training that is already opened (an absence noted in advance) keeps its time when the times of its training day change from today; the card and the training screen show that time. Small, but Design must choose, and the coordinator sees the result. (Trace: story 2 criteria 1, "Applies from", edge case "changes … from today"; Interface "Training days and reasons".)
+
+### Fourth review (2026-10-16)
+A fourth fresh agent (`/review spec`) read the spec as changed after the third review (weekly
+trainings, "Change" of a role, roles of earlier seasons), with its uncommitted diff against the
+approved version. Read: this spec, `idea.md`, `change.md`, `docs/vision.md`, `docs/language.md`,
+`docs/ideas.md`, all of `docs/product/`. Not read: any `technical.md`. Each note is checked by a
+trace through these documents; the weekdays of the example dates were checked with `date` (Tue 1
+Sep 2026, Tue 25 May 2027, Tue 20 Oct, Tue 5 Jan: all right). The arguments held only the mode and
+the change folder. Stories 3 and 4 did not change; they are checked only for effects of the
+changes.
+
+| Story | What the user is doing here | Verdict | Note |
+|---|---|---|---|
+| 1 Keep the players | Typing the players once, fixing a role typed wrong with "Change", and recording a real change of role through "Left the team" and back. | serves – note | "Change" with its form sentence answers A2 and S15 well. The path the form sentence prescribes fails with the proposed dates, and its button has no place in the Interface. See S17, S18, S19. |
+| 2 Weekly trainings and trainings | Setting up the weekly training once, then entering the trainings since 1 September from the sheet, and fixing a mistake in the setup. | serves – note | "A weekly training only suggests" is simpler than "Applies from" and keeps every opened training safe: no correction can lose attendance. The other side of that rule: a mistake that already reached opened trainings cannot be corrected without losing their attendance. See S20, S21, S22. |
+| 3 Mark attendance at a training | In the hall, two taps per absent player. | serves | No change. "Delete training" now sits at the bottom of every training next to "Cancel training"; the confirmation guards it. |
+| 4 Reasons | One tap for a reason with a weight. | serves | No change. |
+| 5 Season totals | As coach, seeing who comes and who misses. | serves – note | The real change of role now goes through "Left the team", so a player in the team can have an ended role. See S18. |
+
+No story conflicts with the vision. "A weekly training only suggests; any training can be deleted
+by hand" fits core value 1 and Steve's warning that every mistake must be correctable. The new
+word **weekly training** (and **training day** with one meaning) is used throughout the spec but is
+not in `docs/language.md`; under basic rule 6 `/vision` must settle it before Design uses it, as it
+did for **player** (Open questions say so).
+
+Notes:
+- **S17 – story 1, the prescribed path for a real change of role fails with the proposed dates.** The "Change" form tells the coordinator: use "Left the team" and then "Back in the team" with the new role. "Left the team" proposes today as the end; a new role proposes today as the start once trainings have started (criterion 2). With both proposals taken, the two roles share today, and the save fails: "This player already has a role on that date." The note under the criteria says the new role starts "on the next day". So the one path the tool itself recommends gives an error unless the coordinator changes a date. Suggest: for a player whose role ended, the new role proposes the day after the end (or the end proposes yesterday). (Trace: story 1 criteria 2, 3, 4 (form sentence), edge case "Two roles … overlap"; note under the criteria.)
+- **S18 – story 1 and 5, "Back in the team" and the group "Left the team".** The form sentence names a button "Back in the team", but the Interface "Players" lists only "Left the team" and "Change" for each role; nothing says where the coordinator gives a second role to a player of the current season (only "Add player", and "Add to this season" for last season's players). Also, with S15 answered, a player who moves from "only trains" to "plays games" in November has an ended role and a role now. The players page puts players "whose role in the season ended" under "Left the team", and story 5 shows them "in a separate group 'Left the team'". Read as written, that player shows in both groups, or in "Left the team" while still in the team. For the coach, a player who never left must not show as left. Suggest: "Left the team" holds only players with no role now (on the players page and in the totals), and the Interface names "Back in the team" for a player in that group. (Trace: story 1 criteria 4, 6, 11, Interface "Players"; story 5 criterion 4.)
+- **S19 – story 1, what "an earlier season can only be looked at" covers.** The sentence is in the criterion on roles, but reads wider. Attendance lets the coordinator choose an earlier season and tap a training (story 5), and story 3 lets a past training be "marked or corrected … also weeks later". Not said: in July, can the coordinator still correct a mark of a May training, cancel or delete a training of last season, or open a "Not opened" day of last season (which makes it exist and count)? If attendance of an earlier season can still be changed while its roles cannot, a wrong start of a role found after 30 June stays in the totals while the marks around it can be fixed. Either answer is fine for one coordinator; the user should know which, and opening a day of last season only to look must not create a training. Suggest: one sentence saying whether trainings and marks of an earlier season can be changed. (Trace: story 1 criterion 5; story 3 criterion 8; story 5 criteria 5, 6; Bruce's warning on opening.)
+- **S20 – story 2, a mistake that reached opened trainings cannot be corrected without losing attendance.** The behaviour says: set up in October, enter the trainings since 1 September, and "A Wednesday typed by mistake is corrected with 'Change'; the list of training days follows at once." But the Wednesdays that were opened while entering the past stay, as extra trainings with their attendance, and the real Tuesdays show as "Not opened". A wrong time works the same way: the opened trainings keep the wrong time on the training screen and on the card (edge case "The times … change after a coming training was opened"). The only way to correct an opened training's date or times is "Delete training", which removes its attendance, and entering it again. The order in the behaviour (set up, then enter seven weeks) is the order in which this happens, and the list of a season then shows seven extra Wednesday trainings next to seven "Not opened" Tuesdays. Suggest: the training screen lets the coordinator change the date and times of a training (with the same check "There is already a training on this date."), so a mistake is corrected with its attendance kept; or the behaviour says plainly that opened trainings must be deleted and entered again. (Trace: story 2 intro "Once opened … does not touch it", criteria 4, 10, 16; edge cases 8, 10; behaviour "Setting up in October"; Steve's warning "every mistake must be correctable".)
+- **S21 – story 2 with story 1, a training before the roles' start shows no players.** A role's start is a date, proposed as the first training date of the season when the player is added (story 1). When later the window of a weekly training is moved earlier (a preseason from 25 Aug), or an extra training is added before the first training date, no player has a role on that date: the training shows no players and counts for no one, and the coordinator must "Change" all 14 roles. The roles were not wrong; only the proposal was taken when the window was different. This was possible before (first training date moved), but the new rules invite it: "Add training" on any date of the season, and every window can be changed at any time. Suggest at least one edge case that says what the coordinator sees: for example a training with no players says "No players in the team on this date." with a link to "Players". (Trace: story 1 criteria 2, 7, 9; story 2 criteria 3, 6, 15; story 3 criteria 1, 9.)
+- **S22 – story 2, "Cancel" or "Delete" for a past holiday opened by mistake.** The edge case offers both as equal. They are not equal for the user: after "Delete training" the day is "Not opened" again and stays in "N training days not opened" above the totals for the rest of the season, so the count never reaches zero. Suggest the edge case says "Cancel training" for a holiday and "Delete training" for a day opened instead of another. (Trace: story 2 criterion 16, edge case 2; story 5 criterion 8.)
+
+### Fifth review (2026-10-16)
+A fifth fresh agent (`/review spec`) read the spec as changed after the fourth review (pages
+"Players" and "Team", "Change role", "Remove from the team", "Change" on a training, trainings of
+an earlier season open). Read: this spec (with its uncommitted diff against the approved
+version), `idea.md`, `change.md`, `docs/vision.md`, `docs/language.md`, `docs/ideas.md`, all of
+`docs/product/`. Not read: any `technical.md`. Each note is checked by a trace through these
+documents; the weekdays of the example dates were checked with `date`. The arguments held only
+the mode and the change folder. Stories 3 and 4 did not change; they are checked only for effects
+of the changes.
+
+| Story | What the user is doing here | Verdict | Note |
+|---|---|---|---|
+| 1 Keep the players and the team | Typing the 14 players once (in October, for a season that started on 1 September), then recording joins, a move to "plays games", and leaves, each from a date. | serves – note | "Change role" and "Remove from the team" with the proposals "day before" / "day after" answer S17 and S18: the real change of role no longer fails on its own proposals. See S23, S24, S25. |
+| 2 Weekly trainings and trainings | Setting up the weekly training once, entering the trainings since 1 September, fixing a wrong day or time on trainings already entered. | serves | "Change" on a training (S20) makes the Wednesday-for-Tuesday mistake correctable with attendance kept: change the weekly training, then move each opened Wednesday to its Tuesday, which becomes that day's row. Small text point in S26. |
+| 3 Mark attendance at a training | In the hall, two taps per absent player. | serves | No change in the marking. S26 (example screen). |
+| 4 Reasons | One tap for a reason with a weight. | serves | No change. |
+| 5 Season totals | As coach, seeing who comes and who misses. | serves – note | See S24 (a player who changed role must not show as left) and S26. |
+
+No story conflicts with the vision. Still open under basic rule 6: `docs/language.md` says a player
+is "a member of the team" and has no **role**, **hidden**, **weekly training** or **training day**
+(checked by reading the word list). The spec uses all of them throughout; `/vision` must settle
+them before Design, as the Open questions say.
+
+Notes:
+- **S23 – story 1, the proposed start date at the first use.** The Context names the first use: in October the coordinator enters all trainings since 1 September from the sheet. "Add player" proposes "the first training date of the season, or today when the season's trainings have started". In October the season's trainings have started (a weekly training with the proposed window starts on Tue 1 Sep), so each of the 14 players is proposed from today. Taken as proposed, every training since 1 September then says "No player has a role on this date", and the coordinator must change the date 14 times, or "Correct" 14 roles. If the players come before the weekly training, there is no first training date, and the spec does not say what is proposed. The rule fits a player who joins mid-season, not the one setup the spec is written for. Suggest: "started" means that a training of the season has been opened (so the first setup proposes the first training date, a later joiner today), and say what is proposed when the season has no weekly training yet. (Trace: Context, story 1 criterion "Add player" on the team page, story 2 criterion "first training date", edge case "No player has a role on this date"; behaviour "Setting up in October".)
+- **S24 – story 1 and 5, "Left the team" after "Change role".** The team page and story 5 still put in "Left the team" "the players whose role in the season ended". After "Change role" on 1 November, the player's first role ended on 31 October, so read as written the player shows in "Left the team" (and in the totals' group "Left the team") while still in the team. The answer to S18 meant "players with no role now", but the criteria were not changed to say so. For the coach a player who moved up must not look like a player who left. Suggest in both places: "the players with no role today or later in the season". (Trace: story 1 Team criterion 1, story 5 criterion 4, answers S17/S18.)
+- **S25 – story 1, "Add all" and hidden players.** "Hidden" is for "a player who left the club", and a hidden player "is not offered when a player is added to the team". "Add all" in a new season adds "the players of last season's team"; it does not say that it skips hidden players. A player hidden in June comes back in July unless the coordinator sees and removes them. Suggest: the list under "Add all" and the button leave out hidden players (or show them apart). Also not said: whether a player who is hidden while still in a role shows at the trainings (as read: yes, "hiding changes nothing else"); that is consistent, but then hiding is not a way to take a player out of the team. (Trace: story 1 criteria "Hidden", "Add all", behaviour last sentence.)
+- **S26 – text that disagrees with the rest.** (a) Story 5 says the page lists the training days "newest first"; story 2 and the Interface say "Coming" (nearest first) above "Past" (newest first). (b) Story 2 criterion 3 gives "Thursday from 5 Jan"; Tue 5 Jan 2027 is a Tuesday (checked with `date`), so the window of that example starts on a day that is not its day of the week. (c) The example training screen shows only "[ Cancel training ]"; the Interface puts "Change", "Cancel training" or "Undo cancel", and "Delete training" at the bottom. None changes what the user gets, but Design reads the text literally. (Trace: story 5 criterion 5, story 2 criteria 3 and "Attendance", Interface "Training" and the example.)
+
 ## Answers to the spec review (2026-10-15)
 Decided with the coordinator; the stories above are changed to match.
 - **S1:** fixed. (The rule is widened by S7: a player with no absences can be deleted.)
@@ -315,3 +445,54 @@ a new season starts with no players in a role, and "Add to this season" / "Add a
 season's players back. A change of role within a season must be possible in the stored data; its
 screen comes later. Story 1 and the parts of stories 3 and 5 and the Interface that named "in the
 team since" are changed. The answers to S2, S7 and S8 still hold, now for roles.
+
+## Change after the accept review of story A (2026-10-16)
+The accept review of story A (`docs/changes/2026-10-15-players-and-settings/technical.md`, A1 and
+A2) found two mistakes the coordinator could not correct in the app. Decided with the coordinator,
+after the third spec review (S12–S16):
+- **Weekly trainings (A1, S12, S13, S16).** Before, the season had training days of the week with
+  a first and a last training date, and a change applied from today, so a mistake corrected later
+  stayed in force for all earlier dates and was hidden. Now the coordinator keeps **weekly
+  trainings**: a day of the week with times and a window, more than one at the same time. A
+  weekly training only suggests trainings; a change corrects it for its whole window, and a real
+  change of schedule is the end of one and a new one. Opened trainings have their own date and
+  times and are never changed or deleted by a weekly training; any training can be deleted by
+  hand. The season's first and last training date go; each window has its own. (A first proposal,
+  "Applies from" on a save, was replaced by this before it was approved.) Changed: story 2 (all),
+  Interface, What changes, warnings.
+- **Players and team (A2, S14, S15, S17, S18).** Story 1 now has two pages: "Players" (all
+  players, with "Hidden" and the history, where "Correct" fixes a role typed wrong) and "Team"
+  (the team of the current season, with "Add player", "Change role" and "Remove from the team",
+  each with a date). "Change role" records a real change of role, so the history stays right.
+  Roles of an earlier season cannot be corrected. Changed: story 1 (all), Interface, warnings.
+- **Trainings (S19–S22).** "Change" on a training fixes its date and times and keeps its
+  attendance; trainings of an earlier season stay open; a training with no player in a role says
+  so; a holiday is cancelled, not deleted. Changed: story 2, Interface.
+- **New season (A3).** "A new season proposes last season's weekly trainings" (story 2) is not
+  built in story A; story B takes it.
+
+The sentence on the settings page "A change applies from today; earlier trainings keep their
+days." goes (A5).
+
+## Answers to the third spec review (2026-10-16)
+Decided with the coordinator; the stories above are changed to match.
+- **S12:** replaced: there is no "Applies from"; a change of a weekly training corrects only that weekly training.
+- **S13:** fixed. A date has at most one row; an extra training on a date that becomes a training day is that day's training, with its attendance kept. Any training can be deleted by hand, nothing else deletes one.
+- **S14:** on purpose: roles of an earlier season cannot be changed (story 1).
+- **S15:** fixed. The "Change" form says how a real change of role from a date is entered; its own screen still comes later.
+- **S16:** replaced: the season's first and last training date go (each window has its own); an opened training keeps its times when its weekly training changes.
+
+## Answers to the fourth spec review (2026-10-16)
+Decided with the coordinator; the stories above are changed to match.
+- **S17, S18:** replaced: "Change role" (new role and a date) ends the current role the day before and starts the new one; "Remove from the team" ends the role; the page "Team" holds both. "Left the team" is only the group of players whose role ended.
+- **S19:** trainings and attendance of an earlier season stay open; its roles and weekly trainings are fixed.
+- **S20:** fixed. "Change" on a training changes its date and times; the attendance stays.
+- **S21:** fixed. The training screen says "No player has a role on this date."
+- **S22:** fixed. A holiday is cancelled; "Delete training" is for a training opened or added on a wrong date.
+
+## Answers to the fifth spec review (2026-10-16)
+Decided with the coordinator; the stories above are changed to match.
+- **S23:** fixed. The proposed start in the team is the first training date of the season until a training of the season is opened, then today; with no weekly training, today. "Add all" uses the same date.
+- **S24:** fixed. "Left the team" (story 1 and 5) is a player with a role earlier in the season and none today or later.
+- **S25:** fixed. "Add all" leaves out hidden players.
+- **S26:** fixed. Story 5 lists "Coming" above "Past"; the example is "Thursday from Thu 7 Jan"; the example training screen shows "Change", "Cancel training" and "Delete training".

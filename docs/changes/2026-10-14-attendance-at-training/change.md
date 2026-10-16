@@ -1,7 +1,7 @@
 ---
 title: Attendance at training
 type: feature
-stage: implement
+stage: design
 closure: review accept   # epic: each story has its own closure; a fresh agent checks the whole result after story C
 created: 2026-10-14
 ---
@@ -20,3 +20,8 @@ the team. This is the first change with players in the tool.
 | 2026-10-15 | design | functional spec approved after two spec reviews (all stories serve); coordinator's decisions: opening a training makes it exist with everyone there, cancel instead of delete (with undo, shown as cancelled, filter "Show cancelled"), "in the team since" for players who join later, the whole season in the list, last name optional (word player) |
 | 2026-10-15 | design | spec changed after approval (coordinator, no third review): a player has no dates; a role (plays games or only trains) in the team of a season has a start and an end; a new season starts with no roles, "Add all" brings last season's players back |
 | 2026-10-15 | implement | technical spec approved: epic with 3 stories (A players and settings, B trainings and attendance, C the overview); attendance stored as absences only; no backup yet (coordinator's choice) |
+| 2026-10-16 | discover | review of the accept findings A1 and A2 of story A: functional spec changed (training days apply from a chosen date, all training days of the season shown; "Change" for a role); A3 (a new season fills in last season's training days) goes to story B; spec review pending |
+| 2026-10-16 | discover | third spec review (S12–S16): coordinator replaced "Applies from" by weekly trainings (a day of the week with times in a window, more than one at a time; they only suggest trainings; opened trainings are independent; any training can be deleted by hand); roles of earlier seasons cannot be changed; word "weekly training" for /vision; fourth spec review pending |
+| 2026-10-16 | discover | fourth spec review (S17–S22): coordinator split story 1 into the pages "Players" (all players, "Hidden", the history with "Correct") and "Team" ("Add player", "Change role" and "Remove from the team" with a date); "Change" on a training; trainings of an earlier season stay open; words player, role, hidden and weekly training for /vision; fifth spec review pending |
+| 2026-10-16 | discover | fifth spec review: all stories serve (notes S23–S26, fixed; coordinator: the proposed start is the first training date until a training of the season is opened); waiting for approval, then /vision for the words player, role, hidden, weekly training and training day |
+| 2026-10-16 | design | functional spec approved again (coordinator); before design: /vision for the words player, role, hidden, weekly training and training day; then the epic's technical spec and story A are designed again |
