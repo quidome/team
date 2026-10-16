@@ -100,7 +100,7 @@ Each story has its own change folder and its own `/design`.
 | One training per date; any training can be deleted by hand; "extra" is worked out, not stored | Coordinator's rules (2026-10-16, spec review S13); one row per date in the list | no |
 | Opening a training stores it with everyone there; safe to send twice | Coordinator's rule (2026-10-15); two screens make one training | no |
 | Cancel for a holiday; delete for a training opened or added on a wrong date | A deleted training day counts as not opened (spec review S22) | no |
-| Players are not linked to the game list choice | The team gets a new name each season; attendance must work without a game list choice | in 0019 |
+| The club has the players; a team exists for one season and is the team chosen from the game list for that season; roles and weekly trainings are stored by season, so they belong to it without a separate link, and can be entered before the team is chosen. One club for the whole tool. | The coordinator's model (2026-10-16, during /design of story A; replaces "players are not linked to the game list choice"); one team per season; one club while the coordinator is the only user | in 0019 |
 | Story A rewrites its migration `0005`; "an applied file is never edited" (decision 0004) means applied on the cluster | The first form of story A was never merged or released (coordinator, 2026-10-16) | no; one line in 0019 |
 | No backup before story A goes live | Coordinator's choice (2026-10-15): later | no; a backlog line and a debt line at the close of story A |
 
