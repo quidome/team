@@ -1,5 +1,5 @@
 // Words for players, roles and training days (attendance at training, story A).
-import type { Player, RoleKind } from '#lib/api/client.js';
+import type { RoleKind } from '#lib/api/client.js';
 
 export const roleLabels: Record<RoleKind, string> = {
 	plays_games: 'Plays games',
@@ -7,7 +7,7 @@ export const roleLabels: Record<RoleKind, string> = {
 };
 
 /** "Avery Jansen", or "Casey" without a last name. */
-export function fullName(player: Pick<Player, 'first_name' | 'last_name'>): string {
+export function fullName(player: { first_name: string; last_name?: string | null }): string {
 	return player.last_name ? `${player.first_name} ${player.last_name}` : player.first_name;
 }
 

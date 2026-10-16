@@ -205,11 +205,11 @@
         "operationId": "players",
         "responses": {
           "200": {
-            "description": "The players for the current season",
+            "description": "All players, hidden ones too, sorted by first name",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlayersView"
+                  "$ref": "#/components/schemas/PlayersList"
                 }
               }
             }
@@ -288,11 +288,47 @@
       }
     },
     "/api/players/{id}": {
+      "get": {
+        "tags": [
+          "players"
+        ],
+        "operationId": "player",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The player with its history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          }
+        }
+      },
       "put": {
         "tags": [
           "players"
         ],
-        "operationId": "renamePlayer",
+        "operationId": "changePlayer",
         "parameters": [
           {
             "name": "id",
@@ -309,7 +345,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NameChange"
+                "$ref": "#/components/schemas/PlayerChange"
               }
             }
           },
@@ -372,7 +408,7 @@
         "tags": [
           "team"
         ],
-        "operationId": "changeRoleFrom",
+        "operationId": "changeRole",
         "parameters": [
           {
             "name": "id",
@@ -474,7 +510,7 @@
         "tags": [
           "players"
         ],
-        "operationId": "changeRole",
+        "operationId": "correctRole",
         "parameters": [
           {
             "name": "id",
@@ -509,17 +545,17 @@
         },
         "responses": {
           "200": {
-            "description": "The player",
+            "description": "The player with its history",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlayerView"
+                  "$ref": "#/components/schemas/PlayerDetail"
                 }
               }
             }
           },
           "400": {
-            "description": "`until_before_from`, `outside_season`, `roles_overlap`"
+            "description": "`until_before_from`, `outside_season` (also for a role of another season), `roles_overlap`"
           },
           "401": {
             "description": "Not logged in"
@@ -1385,6 +1421,45 @@
           "source_format"
         ]
       },
+      "HistoryRole": {
+        "type": "object",
+        "description": "A role in a player's history.",
+        "required": [
+          "id",
+          "season",
+          "role",
+          "from",
+          "correctable"
+        ],
+        "properties": {
+          "correctable": {
+            "type": "boolean",
+            "description": "Only a role of the current season can be corrected."
+          },
+          "from": {
+            "type": "string",
+            "description": "The first day, for example \"2026-09-01\"."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the role, for example \"2026-2027\"."
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last day; `null` while the role continues."
+          }
+        }
+      },
       "HoldKind": {
         "type": "string",
         "enum": [
@@ -1566,23 +1641,6 @@
           }
         }
       },
-      "NameChange": {
-        "type": "object",
-        "required": [
-          "first_name"
-        ],
-        "properties": {
-          "first_name": {
-            "type": "string"
-          },
-          "last_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
       "NewPlayer": {
         "type": "object",
         "required": [
@@ -1642,6 +1700,116 @@
           }
         }
       },
+      "PlayerChange": {
+        "type": "object",
+        "required": [
+          "first_name",
+          "hidden"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "A hidden player is not offered in \"Add player\" of the team page and not in \"Add all\"."
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PlayerDetail": {
+        "type": "object",
+        "description": "One player with the history of all seasons.",
+        "required": [
+          "id",
+          "first_name",
+          "hidden",
+          "season",
+          "season_first_day",
+          "season_last_day",
+          "history"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryRole"
+            },
+            "description": "All roles of all seasons, newest first."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "season": {
+            "type": "string",
+            "description": "The current season, for example \"2026-2027\"."
+          },
+          "season_first_day": {
+            "type": "string",
+            "description": "The first day of the current season: the earliest date of a corrected role."
+          },
+          "season_last_day": {
+            "type": "string",
+            "description": "The last day of the current season: the latest date of a corrected role."
+          }
+        }
+      },
+      "PlayerListItem": {
+        "type": "object",
+        "description": "A player in the list of all players.",
+        "required": [
+          "id",
+          "first_name",
+          "hidden"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_today": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RoleKind",
+                "description": "The role today; `null` when the player is not in the team today."
+              }
+            ]
+          }
+        }
+      },
       "PlayerSummary": {
         "type": "object",
         "description": "A player that \"Add player\" offers.",
@@ -1665,108 +1833,22 @@
           }
         }
       },
-      "PlayerView": {
+      "PlayersList": {
         "type": "object",
-        "required": [
-          "id",
-          "first_name",
-          "roles"
-        ],
-        "properties": {
-          "first_name": {
-            "type": "string"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "last_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "role": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/RoleKind",
-                "description": "Today's role (or the coming one); in \"left\", the last role of the season; in \"last_season\", the last role of\nlast season; `null` in \"others\"."
-              }
-            ]
-          },
-          "roles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RoleView"
-            },
-            "description": "The roles of the season shown (last season's for \"last_season\")."
-          }
-        }
-      },
-      "PlayersView": {
-        "type": "object",
-        "description": "The players for the current season.",
+        "description": "All players of the club, sorted by first name.",
         "required": [
           "season",
-          "season_first_day",
-          "season_last_day",
-          "today",
-          "proposed_from",
-          "players",
-          "left",
-          "last_season",
-          "others"
+          "players"
         ],
         "properties": {
-          "last_season": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlayerView"
-            },
-            "description": "Players who were in the team until the end of last season and have no role in this season:\n\"Add all\" brings them back."
-          },
-          "left": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlayerView"
-            },
-            "description": "Players whose roles in the season all ended before today."
-          },
-          "others": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlayerView"
-            },
-            "description": "Players with no role in this season who are not in `last_season`."
-          },
           "players": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PlayerView"
-            },
-            "description": "Players with a role today or later in the season, sorted by first name."
-          },
-          "proposed_from": {
-            "type": "string",
-            "description": "The proposed start of a new role: the first training date of the season, or today when\ntrainings have started or nothing is set."
+              "$ref": "#/components/schemas/PlayerListItem"
+            }
           },
           "season": {
             "type": "string"
-          },
-          "season_first_day": {
-            "type": "string",
-            "description": "The first day of the season, for example \"2026-07-01\": the earliest date of a role."
-          },
-          "season_last_day": {
-            "type": "string",
-            "description": "The last day of the season, for example \"2027-06-30\": the latest date of a role."
-          },
-          "today": {
-            "type": "string",
-            "description": "Today's Dutch date: the proposed end for \"Left the team\"."
           }
         }
       },
@@ -1892,7 +1974,7 @@
               "null"
             ],
             "format": "date",
-            "description": "`null` while the role continues; \"Left the team\" sets it, \"Undo\" clears it."
+            "description": "`null` while the role continues."
           }
         }
       },
@@ -1962,7 +2044,7 @@
         ],
         "properties": {
           "player": {
-            "$ref": "#/components/schemas/PlayerView"
+            "$ref": "#/components/schemas/PlayerDetail"
           },
           "same_name": {
             "type": "boolean"

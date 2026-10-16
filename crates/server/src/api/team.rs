@@ -160,7 +160,7 @@ fn covering(
 #[utoipa::path(
     post,
     path = "/api/players/{id}/role-change",
-    operation_id = "changeRoleFrom",
+    operation_id = "changeRole",
     params(("id" = i64, Path, description = "The player")),
     request_body = ChangeRole,
     responses(

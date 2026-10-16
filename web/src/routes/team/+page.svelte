@@ -11,7 +11,7 @@
 		addPlayer,
 		addRole,
 		carryPlayers,
-		changeRoleFrom,
+		changeRole,
 		leaveTeam,
 		type Member,
 		type RoleKind,
@@ -139,7 +139,7 @@
 
 	function act(event: SubmitEvent, member: Member) {
 		event.preventDefault();
-		if (action === 'change') return run(() => changeRoleFrom(member.id, actionRole, actionDate));
+		if (action === 'change') return run(() => changeRole(member.id, actionRole, actionDate));
 		if (action === 'leave') return run(() => leaveTeam(member.id, actionDate));
 		if (action === 'return')
 			return run(() => addRole(member.id, { role: actionRole, from: actionDate, until: null }));

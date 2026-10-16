@@ -30,7 +30,7 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
         .ok(
             "PUT",
             &format!("/api/players/{id}"),
-            Some(json!({ "first_name": "Zephyrina", "last_name": "Quistorpe" })),
+            Some(json!({ "first_name": "Zephyrina", "last_name": "Quistorpe", "hidden": true })),
         )
         .await;
     coordinator
@@ -41,6 +41,9 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
         )
         .await;
     coordinator.ok("GET", "/api/players", None).await;
+    coordinator
+        .ok("GET", &format!("/api/players/{id}"), None)
+        .await;
     coordinator.ok("GET", "/api/team", None).await;
 
     let text = log.text();

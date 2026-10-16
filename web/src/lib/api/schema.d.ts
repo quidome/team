@@ -157,8 +157,8 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		get?: never;
-		put: operations['renamePlayer'];
+		get: operations['player'];
+		put: operations['changePlayer'];
 		post?: never;
 		delete: operations['deletePlayer'];
 		options?: never;
@@ -175,7 +175,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		post: operations['changeRoleFrom'];
+		post: operations['changeRole'];
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -206,7 +206,7 @@ export interface paths {
 			cookie?: never;
 		};
 		get?: never;
-		put: operations['changeRole'];
+		put: operations['correctRole'];
 		post?: never;
 		delete?: never;
 		options?: never;
@@ -520,6 +520,20 @@ export interface components {
 		DifferenceView: 'date' | 'start_time' | 'start_time_known' | 'place' | 'home_and_away' | 'team';
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
+		/** @description A role in a player's history. */
+		HistoryRole: {
+			/** @description Only a role of the current season can be corrected. */
+			correctable: boolean;
+			/** @description The first day, for example "2026-09-01". */
+			from: string;
+			/** Format: int64 */
+			id: number;
+			role: components['schemas']['RoleKind'];
+			/** @description The season of the role, for example "2026-2027". */
+			season: string;
+			/** @description The last day; `null` while the role continues. */
+			until?: string | null;
+		};
 		/** @enum {string} */
 		HoldKind: 'empty' | 'far_fewer';
 		/** @description Why a reading was held back: `now` games instead of `before`. */
@@ -579,10 +593,6 @@ export interface components {
 			/** @description The roles of the season shown (last season's for "last_season"). */
 			roles: components['schemas']['RoleView'][];
 		};
-		NameChange: {
-			first_name: string;
-			last_name?: string | null;
-		};
 		NewPlayer: {
 			first_name: string;
 			last_name?: string | null;
@@ -597,6 +607,37 @@ export interface components {
 			from: string;
 			role: components['schemas']['RoleKind'];
 		};
+		PlayerChange: {
+			first_name: string;
+			/** @description A hidden player is not offered in "Add player" of the team page and not in "Add all". */
+			hidden: boolean;
+			last_name?: string | null;
+		};
+		/** @description One player with the history of all seasons. */
+		PlayerDetail: {
+			first_name: string;
+			hidden: boolean;
+			/** @description All roles of all seasons, newest first. */
+			history: components['schemas']['HistoryRole'][];
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			/** @description The current season, for example "2026-2027". */
+			season: string;
+			/** @description The first day of the current season: the earliest date of a corrected role. */
+			season_first_day: string;
+			/** @description The last day of the current season: the latest date of a corrected role. */
+			season_last_day: string;
+		};
+		/** @description A player in the list of all players. */
+		PlayerListItem: {
+			first_name: string;
+			hidden: boolean;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			role_today?: null | components['schemas']['RoleKind'];
+		};
 		/** @description A player that "Add player" offers. */
 		PlayerSummary: {
 			first_name: string;
@@ -604,40 +645,10 @@ export interface components {
 			id: number;
 			last_name?: string | null;
 		};
-		PlayerView: {
-			first_name: string;
-			/** Format: int64 */
-			id: number;
-			last_name?: string | null;
-			role?: null | components['schemas']['RoleKind'];
-			/** @description The roles of the season shown (last season's for "last_season"). */
-			roles: components['schemas']['RoleView'][];
-		};
-		/** @description The players for the current season. */
-		PlayersView: {
-			/**
-			 * @description Players who were in the team until the end of last season and have no role in this season:
-			 *     "Add all" brings them back.
-			 */
-			last_season: components['schemas']['PlayerView'][];
-			/** @description Players whose roles in the season all ended before today. */
-			left: components['schemas']['PlayerView'][];
-			/** @description Players with no role in this season who are not in `last_season`. */
-			others: components['schemas']['PlayerView'][];
-			/** @description Players with a role today or later in the season, sorted by first name. */
-			players: components['schemas']['PlayerView'][];
-			/**
-			 * @description The proposed start of a new role: the first training date of the season, or today when
-			 *     trainings have started or nothing is set.
-			 */
-			proposed_from: string;
+		/** @description All players of the club, sorted by first name. */
+		PlayersList: {
+			players: components['schemas']['PlayerListItem'][];
 			season: string;
-			/** @description The first day of the season, for example "2026-07-01": the earliest date of a role. */
-			season_first_day: string;
-			/** @description The last day of the season, for example "2027-06-30": the latest date of a role. */
-			season_last_day: string;
-			/** @description Today's Dutch date: the proposed end for "Left the team". */
-			today: string;
 		};
 		/** @description One reading of the game list. A failed or held-back reading is a result, not an HTTP error. */
 		ReadingView: {
@@ -675,7 +686,7 @@ export interface components {
 			role: components['schemas']['RoleKind'];
 			/**
 			 * Format: date
-			 * @description `null` while the role continues; "Left the team" sets it, "Undo" clears it.
+			 * @description `null` while the role continues.
 			 */
 			until?: string | null;
 		};
@@ -705,7 +716,7 @@ export interface components {
 		};
 		/** @description A saved player, with the warning that another player has the same name. */
 		SavedPlayer: {
-			player: components['schemas']['PlayerView'];
+			player: components['schemas']['PlayerDetail'];
 			same_name: boolean;
 		};
 		ScheduleAnswer: {
@@ -1106,13 +1117,13 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The players for the current season */
+			/** @description All players, hidden ones too, sorted by first name */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['PlayersView'];
+					'application/json': components['schemas']['PlayersList'];
 				};
 			};
 			/** @description Not logged in */
@@ -1193,7 +1204,44 @@ export interface operations {
 			};
 		};
 	};
-	renamePlayer: {
+	player: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The player with its history */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['PlayerDetail'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	changePlayer: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1205,7 +1253,7 @@ export interface operations {
 		};
 		requestBody: {
 			content: {
-				'application/json': components['schemas']['NameChange'];
+				'application/json': components['schemas']['PlayerChange'];
 			};
 		};
 		responses: {
@@ -1276,7 +1324,7 @@ export interface operations {
 			};
 		};
 	};
-	changeRoleFrom: {
+	changeRole: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1372,7 +1420,7 @@ export interface operations {
 			};
 		};
 	};
-	changeRole: {
+	correctRole: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -1390,16 +1438,16 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description The player */
+			/** @description The player with its history */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['PlayerView'];
+					'application/json': components['schemas']['PlayerDetail'];
 				};
 			};
-			/** @description `until_before_from`, `outside_season`, `roles_overlap` */
+			/** @description `until_before_from`, `outside_season` (also for a role of another season), `roles_overlap` */
 			400: {
 				headers: {
 					[name: string]: unknown;

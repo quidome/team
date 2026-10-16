@@ -1,17 +1,11 @@
 <!--
-	The players of the team in the current season (attendance at training, story A): the players with
-	a role today, "Left the team", players of last season, other players, and "Add player".
+	All players of the club (attendance at training, story A): each with the role today or "Not in
+	the team", "Show hidden players", and "Add player" (a name only; the team page gives roles).
 -->
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		ApiError,
-		addPlayer,
-		carryPlayers,
-		type Player,
-		type RoleKind
-	} from '#lib/api/client.js';
+	import { ApiError, addPlayer } from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { fullName, roleLabels } from '#lib/players.js';
@@ -19,37 +13,17 @@
 
 	let { data }: PageProps = $props();
 
+	let showHidden = $state(false);
 	let adding = $state(false);
 	let firstName = $state('');
 	let lastName = $state('');
-	let role = $state<RoleKind>('plays_games');
-	let from = $state('');
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let warning = $state<string | null>(null);
-	let othersOpen = $state(false);
 
-	/** "Add all" or "Add to this season": the same role as at the end of last season. */
-	async function carry(players: number[]) {
-		busy = true;
-		error = null;
-		try {
-			await carryPlayers(players);
-			await invalidateAll();
-		} catch (failure) {
-			error =
-				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
-		} finally {
-			busy = false;
-		}
-	}
-
-	function startAdding() {
-		adding = true;
-		error = null;
-		warning = null;
-		from = data.players?.proposed_from ?? '';
-	}
+	const shown = $derived(
+		(data.players?.players ?? []).filter((player) => showHidden || !player.hidden)
+	);
 
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
@@ -57,10 +31,7 @@
 		error = null;
 		warning = null;
 		try {
-			const saved = await addPlayer(firstName, lastName.trim() ? lastName : null, {
-				role,
-				from
-			});
+			const saved = await addPlayer(firstName, lastName.trim() ? lastName : null, null);
 			if (saved.same_name) warning = 'There is already a player with this name.';
 			firstName = '';
 			lastName = '';
@@ -81,21 +52,6 @@
 <svelte:head>
 	<title>Players · Team</title>
 </svelte:head>
-
-{#snippet row(player: Player)}
-	<li>
-		<a
-			href={resolve('/players/[id]', { id: String(player.id) })}
-			class="flex min-h-12 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
-			data-testid="player"
-		>
-			<span class="min-w-0 truncate font-medium">{fullName(player)}</span>
-			{#if player.role}
-				<Badge variant="secondary">{roleLabels[player.role]}</Badge>
-			{/if}
-		</a>
-	</li>
-{/snippet}
 
 {#if !data.players}
 	<section class="py-16 text-center">
@@ -131,30 +87,6 @@
 					<span class="text-sm">Last name (optional)</span>
 					<input class={field} bind:value={lastName} autocomplete="off" />
 				</label>
-				<fieldset class="space-y-2">
-					<legend class="text-sm">Role</legend>
-					<div class="flex gap-2">
-						{#each Object.entries(roleLabels) as [value, label] (value)}
-							<label
-								class="flex min-h-11 flex-1 items-center gap-2 rounded-md border px-3 has-checked:border-primary has-checked:bg-primary/10"
-							>
-								<input type="radio" name="role" {value} bind:group={role} />
-								<span class="text-sm">{label}</span>
-							</label>
-						{/each}
-					</div>
-				</fieldset>
-				<label class="block space-y-1">
-					<span class="text-sm">In the team from</span>
-					<input
-						class={field}
-						type="date"
-						bind:value={from}
-						min={data.players?.season_first_day}
-						max={data.players?.season_last_day}
-						required
-					/>
-				</label>
 				{#if error}
 					<p class="text-sm" role="alert">{error}</p>
 				{/if}
@@ -164,94 +96,41 @@
 				</div>
 			</form>
 		{:else}
-			<Button onclick={startAdding}>Add player</Button>
-		{/if}
-
-		{#if data.players.last_season.length > 0}
-			<section
-				aria-labelledby="last-season-heading"
-				class="space-y-3 rounded-xl border bg-card p-4 shadow-xs"
-				data-testid="last-season"
+			<Button onclick={() => ((adding = true), (error = null), (warning = null))}>Add player</Button
 			>
-				<div class="flex items-center justify-between gap-3">
-					<h2 id="last-season-heading" class="font-medium">Players of last season</h2>
-					<Button
-						size="sm"
-						disabled={busy}
-						onclick={() => carry(data.players?.last_season.map((player) => player.id) ?? [])}
-					>
-						Add all
-					</Button>
-				</div>
-				{#if error && !adding}
-					<p class="text-sm" role="alert">{error}</p>
-				{/if}
-				<ul class="space-y-2">
-					{#each data.players.last_season as player (player.id)}
-						<li class="flex min-h-12 items-center justify-between gap-3">
-							<span class="min-w-0 truncate">
-								{fullName(player)}
-								{#if player.role}
-									<span class="text-sm text-muted-foreground">· {roleLabels[player.role]}</span>
-								{/if}
-							</span>
-							<Button
-								variant="outline"
-								size="sm"
-								disabled={busy}
-								aria-label="Add {fullName(player)} to this season"
-								onclick={() => carry([player.id])}
-							>
-								Add to this season
-							</Button>
-						</li>
-					{/each}
-				</ul>
-			</section>
 		{/if}
 
-		{#if data.players.players.length === 0}
-			<p class="text-sm text-muted-foreground" data-testid="no-players">
-				No players in the team yet.
-			</p>
+		<label class="flex min-h-11 items-center gap-3 text-sm">
+			<input type="checkbox" role="switch" bind:checked={showHidden} class="size-5" />
+			Show hidden players
+		</label>
+
+		{#if shown.length === 0}
+			<p class="text-sm text-muted-foreground" data-testid="no-players">No players yet.</p>
 		{:else}
 			<ul class="space-y-2" aria-label="Players">
-				{#each data.players.players as player (player.id)}
-					{@render row(player)}
+				{#each shown as player (player.id)}
+					<li>
+						<a
+							href={resolve('/players/[id]', { id: String(player.id) })}
+							class="flex min-h-12 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-xs"
+							data-testid="player"
+						>
+							<span class="min-w-0 truncate font-medium">
+								{fullName(player)}
+								{#if player.hidden}
+									<span class="text-sm font-normal text-muted-foreground">· hidden</span>
+								{/if}
+							</span>
+							{#if player.role_today}
+								<Badge variant="secondary">{roleLabels[player.role_today]}</Badge>
+							{:else}
+								<Badge variant="outline">Not in the team</Badge>
+							{/if}
+						</a>
+					</li>
 				{/each}
 			</ul>
-		{/if}
-
-		{#if data.players.left.length > 0}
-			<section aria-labelledby="left-heading" class="space-y-2">
-				<h2 id="left-heading" class="text-lg font-semibold tracking-tight">Left the team</h2>
-				<ul class="space-y-2" data-testid="left">
-					{#each data.players.left as player (player.id)}
-						{@render row(player)}
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
-		{#if data.players.others.length > 0}
-			<section class="space-y-2">
-				<Button
-					variant="ghost"
-					class="w-full justify-between"
-					aria-expanded={othersOpen}
-					onclick={() => (othersOpen = !othersOpen)}
-				>
-					Other players ({data.players.others.length})
-					<span aria-hidden="true">{othersOpen ? '−' : '+'}</span>
-				</Button>
-				{#if othersOpen}
-					<ul class="space-y-2" data-testid="others">
-						{#each data.players.others as player (player.id)}
-							{@render row(player)}
-						{/each}
-					</ul>
-				{/if}
-			</section>
 		{/if}
 	</section>
 {/if}

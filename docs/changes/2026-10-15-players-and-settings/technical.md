@@ -193,7 +193,7 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 - [x] Step 1: weekly trainings, end to end (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 39 browser tests)
 - [x] Step 2: core rules for players (2026-10-16; `just check` passes, 39 browser tests)
 - [x] Step 3: the team page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
-- [ ] Step 4: the players page and the player page
+- [x] Step 4: the players page and the player page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 40 browser tests)
 - [ ] Review build
 - [ ] Review accept
 
@@ -228,6 +228,14 @@ Implement:
   - Moved from `tests/players.rs` to `tests/team.rs`, on `GET /api/team`: the "Add all" test (with the hidden player of step 2 in it), the two R1 tests, and "last season's players join during the season". The test helper `Coordinator::add_player` replaces the local `add`.
   - The team page has no "Add to this season" for one player of last season (the first form had it): "Add player" offers last season's team first. "Players of last season" shows each player's role.
   - The browser tests of the team page are in `web/e2e/players.e2e.ts` (one database, in order); the test adds a Tuesday weekly training again, because the settings test deletes its own.
+- 2026-10-16, step 4:
+  - Operation names: with the first-form "Correct" route renamed, "Change role" (`POST /api/players/{id}/role-change`) is now `changeRole` (step 3 had `changeRoleFrom`); "Correct" is `correctRole`; `PUT /api/players/{id}` is `changePlayer`; `GET /api/players/{id}` is `player`. The body of `PUT /api/players/{id}` is `PlayerChange`.
+  - `POST /api/players` keeps its body; its answer `{ player, same_name }` now carries `PlayerDetail` (the first-form `PlayerView` is gone).
+  - `PUT /api/players/{id}` saves the name and "Hidden" in one transaction with `players::update_name` and `players::set_hidden` (the function of step 2).
+  - `role_today` is the role on today only; a player whose role starts later shows "Not in the team", as the spec words it.
+  - The history shows the season after a role of an earlier season ("· 2025-2026"); in "Correct", an empty "Until" means the role continues. The players page shows the warning of the same name on the page itself.
+  - Removed first-form tests: in `tests/players.rs` the tests of the groups (`a_player_without_a_role_is_under_others`, `left_the_team_and_undo`, `back_in_the_team_is_a_new_role`; the team page tests of step 3 cover them); in the browser the tests of the first-form player page ("Left the team" and "Undo", its proposal, the "Add to the team" of a player of last season) and "Add all" on `/players` (now on `/team`). The weekly trainings test of the proposed start reads `GET /api/team`.
+  - The browser test of "Correct" uses the player of the team page test (the tests run in order on one database).
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed
