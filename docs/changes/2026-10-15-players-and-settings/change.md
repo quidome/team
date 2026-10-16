@@ -1,7 +1,7 @@
 ---
 title: Players and settings
 type: feature
-stage: implement
+stage: design
 closure: review build + accept   # stored data rebuilt, new transactions with locks, the user behaviour changed after the first accept review
 created: 2026-10-15
 ---
@@ -22,3 +22,4 @@ keeps the list of reasons for an absence.
 | 2026-10-16 | implement | accept review: needs correction (A1–A5); /discover review: changes the epic's functional spec for A1 and A2; this story gets an extra step after the new spec is approved and designed |
 | 2026-10-16 | design | the epic's functional spec was changed and approved again (pages Players and Team, weekly trainings); this story goes back to design after /vision |
 | 2026-10-16 | implement | designed again and approved: 4 steps (weekly trainings end to end, core rules for players, the team page, the players page and the player page); migration 0005 rewritten; the team page shows the chosen team; closure review build + accept |
+| 2026-10-16 | design | second build and accept review: not ready (R13–R17, A6–A10); the epic's story 1 changed and approved again for A6–A10, R13 and R17; this story goes to /design for the new rules, with R14, R15, R16 and the stale comments |
