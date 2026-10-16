@@ -102,3 +102,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-14 | Where we are: games from the game list is released (v0.2.0) and runs on the cluster |
 | 2026-10-14 | Attendance: the reason for each absence matters (it shows how invested a player is); attendance at games follows attendance at training; words player, attendance and reason |
 | 2026-10-15 | Word player: a first name, and usually a last name (the last name is optional) |
+| 2026-10-16 | Words for attendance at training: player is a person (in the team through a role); new words role, hidden, weekly training and training day; training exists only when opened or added |
