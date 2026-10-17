@@ -1034,14 +1034,11 @@
         "parameters": [
           {
             "name": "season",
-            "in": "path",
+            "in": "query",
             "description": "For example \"2026-2027\"; the current season when left out.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           }
         ],

@@ -50,6 +50,7 @@ pub struct TrainingList {
 }
 
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct SeasonQuery {
     /// For example "2026-2027"; the current season when left out.
     pub season: Option<String>,

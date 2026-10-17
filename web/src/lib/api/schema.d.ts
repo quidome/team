@@ -2205,12 +2205,12 @@ export interface operations {
 	};
 	trainings: {
 		parameters: {
-			query?: never;
-			header?: never;
-			path: {
+			query?: {
 				/** @description For example "2026-2027"; the current season when left out. */
-				season: string | null;
+				season?: string;
 			};
+			header?: never;
+			path?: never;
 			cookie?: never;
 		};
 		requestBody?: never;

@@ -61,6 +61,14 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// Trainings need the weekly training these tests add; they run after the player tests,
+			// whose settings test starts with no weekly training.
+			name: 'trainings',
+			testMatch: 'trainings.e2e.ts',
+			dependencies: ['logged-in'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }
