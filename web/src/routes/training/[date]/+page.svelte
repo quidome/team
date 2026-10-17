@@ -9,6 +9,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import type { ResolvedPathname } from '$app/types';
 	import {
 		ApiError,
 		cancelTraining,
@@ -179,11 +180,17 @@
 		error = null;
 		try {
 			await deleteTraining(page.date);
-			await goto(resolve('/attendance'));
+			await goto(attendanceOf(page.season));
 		} catch (failure) {
 			error = message(failure);
 			busy = false;
 		}
+	}
+
+	/** The page "Attendance" of the training's season, so "Back" returns to the season it came
+	 * from. */
+	function attendanceOf(season: string): ResolvedPathname {
+		return resolve(`/attendance?season=${encodeURIComponent(season)}`);
 	}
 
 	function reasonName(page: TrainingDay, id: number): string {
@@ -229,7 +236,7 @@
 					{topLine(page, shown)}
 				</p>
 			</div>
-			<Button href={resolve('/attendance')} variant="ghost">Back</Button>
+			<Button href={attendanceOf(page.season)} variant="ghost">Back</Button>
 		</div>
 
 		{#if notSaved}

@@ -1,8 +1,8 @@
 <!--
-	Attendance (attendance at training, story B): every training day and training of the current
-	season, "Coming" above "Past". A tap on a row opens the training (and so makes it exist).
-	"Cancel training" on a day that is not opened, "Show cancelled", and "Add training". Story C adds
-	the totals.
+	Attendance (attendance at training, stories B and C): every training day and training of the
+	chosen season (the current one by default, `?season=` in the address), "Coming" above "Past". A
+	tap on a row opens the training (and so makes it exist). "Cancel training" on a day that is not
+	opened, "Show cancelled", and "Add training" (only in the current season).
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -11,6 +11,7 @@
 		ApiError,
 		addTraining,
 		cancelTraining,
+		loadAttendance,
 		loadTraining,
 		loadTrainings,
 		openTraining,
@@ -19,13 +20,14 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { statusText } from '#lib/trainings.js';
-	import { onMount, untrack } from 'svelte';
+	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	// Replaced after a cancel on this page.
-	let list = $state(untrack(() => data.list));
+	// From the load (a new season in the address loads again); replaced after a cancel on this page.
+	let list = $derived(data.list);
+	let overview = $derived(data.overview);
 
 	const showCancelledKey = 'team.attendance.showCancelled';
 	let showCancelled = $state(true);
@@ -82,7 +84,11 @@
 		error = null;
 		try {
 			await cancelTraining(row.date);
-			list = await loadTrainings(fetch);
+			const season = list?.season;
+			[list, overview] = await Promise.all([
+				loadTrainings(fetch, season),
+				loadAttendance(fetch, season)
+			]);
 		} catch (failure) {
 			error = message(failure);
 		} finally {
@@ -110,6 +116,10 @@
 		} catch {
 			// The times can still be typed.
 		}
+	}
+
+	function chooseSeason(season: string) {
+		goto(resolve(`/attendance?season=${encodeURIComponent(season)}`));
 	}
 
 	async function add(event: SubmitEvent) {
@@ -181,18 +191,40 @@
 	</ul>
 {/snippet}
 
-{#if !list}
+{#if data.invalidSeason}
+	<section class="space-y-4 py-16 text-center">
+		<p data-testid="invalid-season">This season cannot be read.</p>
+		<Button href={resolve('/attendance')} variant="outline">Current season</Button>
+	</section>
+{:else if !list || !overview}
 	<section class="py-16 text-center">
 		<p class="text-muted-foreground">Log in to see the trainings.</p>
 		<Button href="/auth/login" class="mt-4" data-sveltekit-reload>Log in</Button>
 	</section>
 {:else}
 	{@const page = list}
+	{@const current = overview.season === overview.current_season}
 	<section class="space-y-6">
 		<div class="flex items-center justify-between gap-3">
 			<h1 class="text-2xl font-semibold tracking-tight">Attendance · {page.season}</h1>
 			<Button href={resolve('/')} variant="ghost">Back</Button>
 		</div>
+
+		{#if overview.seasons.length > 1}
+			<label class="flex items-center gap-3 text-sm">
+				Season
+				<select
+					class="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-base shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+					value={overview.season}
+					onchange={(event) => chooseSeason(event.currentTarget.value)}
+					data-testid="season-choice"
+				>
+					{#each overview.seasons as season (season)}
+						<option value={season}>{season}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 
 		{#if adding}
 			<form
@@ -231,7 +263,7 @@
 					<Button type="button" variant="ghost" onclick={() => (adding = false)}>Cancel</Button>
 				</div>
 			</form>
-		{:else}
+		{:else if current}
 			<Button onclick={startAdding}>Add training</Button>
 		{/if}
 

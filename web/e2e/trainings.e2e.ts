@@ -312,7 +312,7 @@ test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async (
 		void dialog.accept();
 	});
 	await page.getByRole('button', { name: 'Delete training' }).click();
-	await expect(page).toHaveURL(/\/attendance$/);
+	await expect(page).toHaveURL(/\/attendance\?season=2026-2027$/);
 	expect(messages).toEqual(['Delete the training of Tue 3 Nov? Its attendance is removed.']);
 	await expect(page.locator('[data-date="2026-11-03"]').getByTestId('training-status')).toHaveText(
 		'Not opened'
@@ -406,4 +406,39 @@ test("a new season proposes last season's weekly trainings", async ({ page }) =>
 	).toBeVisible();
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 	expect(errors).toEqual([]);
+});
+
+// The overview (attendance at training, story C), on the data of the tests above.
+test.describe('the overview', () => {
+	test('an earlier season can be chosen, and "Back" returns to it', async ({ page }) => {
+		const errors = watchConsole(page);
+		// 2025-2026 has no data, but a season in the address is in the choice.
+		await page.goto('/attendance?season=2025-2026');
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2025-2026');
+		await expect(page.getByRole('button', { name: 'Add training' })).toHaveCount(0);
+		const choice = page.getByTestId('season-choice');
+		await expect(choice).toHaveValue('2025-2026');
+		await choice.selectOption('2026-2027');
+		await expect(page).toHaveURL(/\/attendance\?season=2026-2027$/);
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2026-2027');
+		await expect(page.getByRole('button', { name: 'Add training' })).toBeVisible();
+
+		// The last training day of May 2026 belongs to 2025-2026.
+		await page.goto('/training/2026-05-26');
+		await page.getByRole('link', { name: 'Back' }).click();
+		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
+		await expectAccessible(page);
+		await expectNoHorizontalScroll(page, 320);
+		expect(errors).toEqual([]);
+	});
+
+	test('a season that cannot be read', async ({ page }) => {
+		const errors = watchConsole(page);
+		await page.goto('/attendance?season=abc');
+		await expect(page.getByTestId('invalid-season')).toHaveText('This season cannot be read.');
+		await page.getByRole('link', { name: 'Current season' }).click();
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2026-2027');
+		// The answer 400 shows in the console as a failed request.
+		expect(errors.filter((line) => !line.includes('400'))).toEqual([]);
+	});
 });

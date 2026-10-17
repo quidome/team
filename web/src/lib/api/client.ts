@@ -71,6 +71,7 @@ export function messageFor(error: unknown, status: number): string {
 		not_a_training_day: 'This date is not a training day.',
 		reason_hidden: 'This reason is hidden.',
 		invalid_date: 'This date cannot be read.',
+		invalid_season: 'This season cannot be read.',
 		player_has_absences:
 			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
@@ -355,9 +356,25 @@ export type TrainingRow = components['schemas']['TrainingRow'];
 export type TrainingDay = components['schemas']['TrainingDay'];
 export type AtTraining = components['schemas']['AtTrainingView'];
 
-/** The training days and trainings of the current season, one row per date. */
-export async function loadTrainings(fetch: typeof globalThis.fetch): Promise<TrainingList> {
-	return dataOf(await api.GET('/api/trainings', { fetch }));
+/** The training days and trainings of a season (the current one when left out), one row per
+ * date. */
+export async function loadTrainings(
+	fetch: typeof globalThis.fetch,
+	season?: string
+): Promise<TrainingList> {
+	return dataOf(await api.GET('/api/trainings', { fetch, params: { query: { season } } }));
+}
+
+export type AttendanceOverview = components['schemas']['AttendanceOverview'];
+export type PlayerTotals = components['schemas']['PlayerTotalsView'];
+
+/** The totals of each player in a season (the current one when left out), the training days not
+ * opened and the seasons to choose from. */
+export async function loadAttendance(
+	fetch: typeof globalThis.fetch,
+	season?: string
+): Promise<AttendanceOverview> {
+	return dataOf(await api.GET('/api/attendance', { fetch, params: { query: { season } } }));
 }
 
 /** The card on the start page: the next training, or null. */
