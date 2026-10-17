@@ -1,6 +1,6 @@
 //! Attendance at training: who is at a training, and the absences with their reason. "There" is
 //! not stored: a player is there when the training exists, the player has a role on its date, and
-//! there is no absence (decision 0019).
+//! there is no absence (decision 0020).
 
 use chrono::NaiveDate;
 

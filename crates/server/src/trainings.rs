@@ -1,4 +1,4 @@
-//! Trainings and absences (tables `trainings`, `absences`; decision 0019).
+//! Trainings and absences (tables `trainings`, `absences`; decision 0020).
 
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use sqlx::PgExecutor;
