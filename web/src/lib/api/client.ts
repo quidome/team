@@ -387,3 +387,45 @@ export async function addTraining(date: string, start: string, end: string): Pro
 export async function cancelTraining(date: string): Promise<TrainingDay> {
 	return dataOf(await api.POST('/api/trainings/{date}/cancel', { params: { path: { date } } }));
 }
+
+export type Marked = components['schemas']['Marked'];
+
+/** Marks a player absent at the training of `date` with a reason; the last mark wins. */
+export async function markAbsent(date: string, player: number, reason: number): Promise<Marked> {
+	return dataOf(
+		await api.PUT('/api/trainings/{date}/absences/{player}', {
+			params: { path: { date, player } },
+			body: { reason }
+		})
+	);
+}
+
+/** Marks a player there again (safe to send twice). */
+export async function markThere(date: string, player: number): Promise<Marked> {
+	return dataOf(
+		await api.DELETE('/api/trainings/{date}/absences/{player}', {
+			params: { path: { date, player } }
+		})
+	);
+}
+
+/** "Change": the date and times of a training; the attendance stays. */
+export async function changeTraining(
+	date: string,
+	change: { date: string; start: string; end: string }
+): Promise<TrainingDay> {
+	return dataOf(
+		await api.PUT('/api/trainings/{date}', { params: { path: { date } }, body: change })
+	);
+}
+
+/** "Undo cancel". */
+export async function uncancelTraining(date: string): Promise<TrainingDay> {
+	return dataOf(await api.POST('/api/trainings/{date}/uncancel', { params: { path: { date } } }));
+}
+
+/** "Delete training": the training and its attendance. */
+export async function deleteTraining(date: string): Promise<void> {
+	const result = await api.DELETE('/api/trainings/{date}', { params: { path: { date } } });
+	if (!result.response.ok) throw apiError(result.error, result.response.status);
+}

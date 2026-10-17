@@ -232,7 +232,7 @@ On `main` (b558232 and later), story A is built and on the cluster:
 - [x] Step 1: the data and the rules, read only (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 159 core tests, 42 browser tests)
 - [x] Step 2: the writes of a training (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 3: the page "Attendance" and the card (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 48 browser tests)
-- [ ] Step 4: marking and the training page
+- [x] Step 4: marking and the training page (2026-10-17; `just check` passes; 53 browser tests)
 - [ ] Step 5: the parts of stories 1 and 4
 - [ ] Review build
 - [ ] Review accept
@@ -265,5 +265,12 @@ Implement:
   - On the list, the button of a row that is not opened reads "Cancel" (its accessible name is "Cancel training of Tue 20 Oct"), so the row fits at 320 pixels.
   - A season with no training days and no trainings shows "No training days or trainings this season. Add a weekly training in Settings." (the spec names no empty state for the list in story B; story C adds "No trainings yet this season." to the totals).
   - The card is on the start page in every state with a login (it needs no chosen team), below the line of links, which now starts with "Attendance".
+- 2026-10-17, step 4:
+  - The top line ("N absent", "All there") counts the marks on the screen, so it changes with each tap at once; the answer of a tap (`Marked.absent`) is not needed for it.
+  - A failed tap puts back the player's last stored state only when it is the player's newest tap; an older failed tap only shows "Not saved. Try again.", and the newest tap decides the row.
+  - The queues are plain objects, not reactive (they are not shown).
+  - "Change" to another date goes to the page of the new date (the address is replaced, so "Back" does not lead to the old date).
+  - Browser tests: "Change" moves the extra training of Thu 22 Oct to Wed 21 Oct (not Tue 6 Oct to Wed 7 Oct as planned: Tue 6 Oct holds the marks of the other tests); "Delete training" deletes the training of Tue 3 Nov from step 3. With no reasons, a player who is there gets no choices, and an absent player only "There".
+  - Mutation check: with the queue removed, the test of the late answer fails (the whole test file run; with `-g` alone the test lacks the player of the tests before it).
 
 ## Review findings

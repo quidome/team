@@ -136,3 +136,162 @@ test('a tap on the card opens the next training', async ({ page }) => {
 	await expect(page.getByTestId('training-card')).toHaveText(/All there/);
 	expect(errors).toEqual([]);
 });
+
+test('mark a player absent with a reason, and there again', async ({ page }) => {
+	const errors = watchConsole(page);
+	// Yara only trains, from 1 September (the proposed date).
+	await page.goto('/team');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	const form = page.getByTestId('add-player');
+	await form.getByLabel('Player').selectOption({ label: 'New player' });
+	await form.getByLabel('First name').fill('Yara');
+	await form.getByLabel('Only trains').check();
+	await form.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByTestId('member').filter({ hasText: 'Yara' })).toBeVisible();
+
+	await page.goto('/training/2026-10-06');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await expect(yara.getByTestId('reasons').getByRole('button').first()).toHaveText('School');
+	await yara.getByRole('button', { name: 'Ill' }).click();
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await expect(page.getByTestId('training-top')).toHaveText('1 absent');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// Stored: also after a reload.
+	await page.reload();
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await expect(yara.getByTestId('reasons').getByRole('button').first()).toHaveText('There');
+	await yara.getByRole('button', { name: 'There' }).click();
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	await expect(page.getByTestId('training-top')).toHaveText('All there');
+	await page.reload();
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	expect(errors).toEqual([]);
+});
+
+test('a tap that cannot be saved shows the old state and "Not saved. Try again."', async ({
+	page
+}) => {
+	const errors = watchConsole(page);
+	await page.route('**/api/trainings/2026-10-06/absences/*', (route) =>
+		route.fulfill({ status: 500, json: { error: 'internal' } })
+	);
+	await page.goto('/training/2026-10-06');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'School' }).click();
+	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	await expect(page.getByTestId('training-top')).toHaveText('All there');
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.reload();
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 500 (Internal Server Error)'
+	]);
+});
+
+test('a second tap waits for the first, so a late answer never overwrites it', async ({ page }) => {
+	const errors = watchConsole(page);
+	const order: string[] = [];
+	let first = true;
+	await page.route('**/api/trainings/2026-10-06/absences/*', async (route) => {
+		if (first) {
+			first = false;
+			order.push('first sent');
+			// A slow network: the first answer comes late.
+			await new Promise((done) => setTimeout(done, 1000));
+			await route.continue();
+			order.push('first answered');
+		} else {
+			order.push('second sent');
+			await route.continue();
+		}
+	});
+	await page.goto('/training/2026-10-06');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'School' }).click();
+	await expect(yara.getByTestId('player-mark')).toHaveText('School');
+	// Before the first answer: another reason.
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'Ill' }).click();
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await expect.poll(() => order).toEqual(['first sent', 'first answered', 'second sent']);
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.reload();
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	expect(errors).toEqual([]);
+});
+
+test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Cancel training' }).click();
+	await expect(page.getByTestId('training-top')).toHaveText('Cancelled');
+	// A cancelled training keeps its absence and can still be marked.
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await page.getByRole('button', { name: 'Undo cancel' }).click();
+	await expect(page.getByTestId('training-top')).toHaveText('1 absent');
+
+	// "Change" of the extra training of Thu 22 Oct to Wed 21 Oct.
+	await page.goto('/training/2026-10-22');
+	await page.getByRole('button', { name: 'Change' }).click();
+	const change = page.getByTestId('change-training');
+	await expect(change.getByLabel('Date')).toHaveValue('2026-10-22');
+	await change.getByLabel('Date').fill('2026-10-21');
+	await change.getByRole('button', { name: 'Save' }).click();
+	await expect(page).toHaveURL(/\/training\/2026-10-21$/);
+	await expect(page.getByTestId('training-heading')).toHaveText('Wed 21 Oct · 19:00–20:30');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// "Delete training" of Tue 3 Nov, after the confirmation.
+	await page.goto('/training/2026-11-03');
+	const messages: string[] = [];
+	page.once('dialog', (dialog) => {
+		messages.push(dialog.message());
+		void dialog.accept();
+	});
+	await page.getByRole('button', { name: 'Delete training' }).click();
+	await expect(page).toHaveURL(/\/attendance$/);
+	expect(messages).toEqual(['Delete the training of Tue 3 Nov? Its attendance is removed.']);
+	await expect(page.locator('[data-date="2026-11-03"]').getByTestId('training-status')).toHaveText(
+		'Not opened'
+	);
+	await expect(page.locator('[data-date="2026-10-21"]')).toContainText('extra');
+	expect(errors).toEqual([]);
+});
+
+test('no player with a role, and no reasons', async ({ page }) => {
+	const errors = watchConsole(page);
+	let players = false;
+	await page.route('**/api/trainings/2026-10-06', async (route) => {
+		const day = await (await route.fetch()).json();
+		await route.fulfill({
+			json: players
+				? {
+						...day,
+						reasons: day.reasons.map((reason: object) => ({ ...reason, hidden: true }))
+					}
+				: { ...day, players: [] }
+		});
+	});
+	await page.goto('/training/2026-10-06');
+	await expect(page.getByTestId('no-players')).toHaveText('No player has a role on this date.');
+	players = true;
+	await page.reload();
+	await expect(page.getByTestId('no-reasons')).toHaveText('No reasons. Add one in Reasons.');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await expect(yara.getByTestId('reasons').getByRole('button')).toHaveText(['There']);
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	expect(errors).toEqual([]);
+});
