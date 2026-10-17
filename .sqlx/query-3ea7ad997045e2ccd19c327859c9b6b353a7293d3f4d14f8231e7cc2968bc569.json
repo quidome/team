@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM player_roles WHERE id = $2 AND player_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ea7ad997045e2ccd19c327859c9b6b353a7293d3f4d14f8231e7cc2968bc569"
+}

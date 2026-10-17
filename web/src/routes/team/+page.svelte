@@ -1,7 +1,8 @@
 <!--
 	The team of the current season (attendance at training, story A): the players in the team with
 	their role, "Change role" and "Remove from the team", "Left the team" with "Add to the team",
-	"Add player", and in a new season the players of last season with "Add all".
+	"Add player", and in a new season the players of last season with "Add all". "Remove from the team"
+	asks first when it also removes a role, and "Last day today" shows on the row.
 -->
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
@@ -15,11 +16,12 @@
 		leaveTeam,
 		type Member,
 		type RoleKind,
+		type RoleView,
 		type TeamPage
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { dayAfter, fullName, later, roleLabels } from '#lib/players.js';
+	import { dayAfter, fullName, roleLabels } from '#lib/players.js';
 	import { formatDay } from '#lib/schedule.js';
 	import type { PageProps } from './$types';
 
@@ -52,11 +54,14 @@
 			: 'Something went wrong. Please try again.';
 	}
 
-	async function run(work: () => Promise<TeamPage | null>) {
+	/** Runs an action. Its answer replaces the page; `null` loads it again; `undefined` means the
+	 * coordinator stopped it (the form stays open). */
+	async function run(work: () => Promise<TeamPage | null | undefined>) {
 		busy = true;
 		error = null;
 		try {
 			const page = await work();
+			if (page === undefined) return;
 			if (page) team = page;
 			else await invalidateAll();
 			open = null;
@@ -70,15 +75,6 @@
 
 	function otherRole(kind: RoleKind): RoleKind {
 		return kind === 'plays_games' ? 'only_trains' : 'plays_games';
-	}
-
-	/** The role that covers today, or else the coming one. */
-	function currentRole(member: Member, today: string) {
-		return (
-			member.roles.find((r) => r.from <= today && (!r.until || today <= r.until)) ??
-			member.roles.find((r) => r.from > today) ??
-			null
-		);
 	}
 
 	function toggle(member: Member) {
@@ -121,37 +117,57 @@
 		error = null;
 	}
 
-	function startLeave(member: Member) {
-		const today = team?.today ?? '';
+	function startLeave() {
 		action = 'leave';
-		actionDate = later(today, currentRole(member, today)?.from ?? today);
+		actionDate = team?.today ?? '';
 		error = null;
 	}
 
 	function startReturn(member: Member) {
-		const today = team?.today ?? '';
-		const until = member.roles.at(-1)?.until;
 		action = 'return';
 		actionRole = member.role;
-		actionDate = until ? later(dayAfter(until), today) : today;
+		actionDate = team?.today ?? '';
 		error = null;
+	}
+
+	/** "Remove from the team"; when it also removes roles, only after a confirmation that names
+	 * them (the server says which). */
+	async function leave(id: number, from: string): Promise<TeamPage | undefined> {
+		try {
+			return (await leaveTeam(id, from, [])).team;
+		} catch (failure) {
+			if (!(failure instanceof ApiError) || failure.code !== 'confirm_removal') throw failure;
+			const roles = (failure.body as { roles?: RoleView[] }).roles ?? [];
+			const named = roles.map((r) => `"${roleText(r)}"`).join(' and ');
+			if (!confirm(`This also removes ${named}.`)) return undefined;
+			return (
+				await leaveTeam(
+					id,
+					from,
+					roles.map((r) => r.id)
+				)
+			).team;
+		}
 	}
 
 	function act(event: SubmitEvent, member: Member) {
 		event.preventDefault();
 		if (action === 'change') return run(() => changeRole(member.id, actionRole, actionDate));
-		if (action === 'leave') return run(() => leaveTeam(member.id, actionDate));
+		if (action === 'leave') return run(() => leave(member.id, actionDate));
 		if (action === 'return')
 			return run(() => addRole(member.id, { role: actionRole, from: actionDate, until: null }));
 	}
 
+	/** "Only trains · Tue 1 Sept – Sun 11 Oct", or "Plays games · from Sun 1 Nov". */
+	function roleText(r: RoleView): string {
+		const dates = r.until
+			? `${formatDay(r.from)} – ${formatDay(r.until)}`
+			: `from ${formatDay(r.from)}`;
+		return `${roleLabels[r.role]} · ${dates}`;
+	}
+
 	function rolesLine(member: Member): string {
-		return member.roles
-			.map(
-				(r) =>
-					`${roleLabels[r.role]} · ${r.until ? `${formatDay(r.from)} – ${formatDay(r.until)}` : `from ${formatDay(r.from)}`}`
-			)
-			.join(', ');
+		return member.roles.map(roleText).join(', ');
 	}
 
 	const field =
@@ -192,19 +208,30 @@
 		<label class="block space-y-1">
 			<span class="text-sm">
 				{action === 'leave'
-					? 'Last day in the team'
+					? 'Not in the team from'
 					: action === 'change'
 						? 'From'
 						: 'In the team from'}
 			</span>
-			<input
-				class={field}
-				type="date"
-				bind:value={actionDate}
-				min={page.season_first_day}
-				max={page.season_last_day}
-				required
-			/>
+			<span class="flex gap-2">
+				<input
+					class={field}
+					type="date"
+					bind:value={actionDate}
+					min={page.season_first_day}
+					max={page.season_last_day}
+					required
+				/>
+				{#if action === 'leave'}
+					<Button
+						type="button"
+						variant="outline"
+						onclick={() => (actionDate = dayAfter(page.today))}
+					>
+						Tomorrow
+					</Button>
+				{/if}
+			</span>
 		</label>
 		{#if error}
 			<p class="text-sm" role="alert">{error}</p>
@@ -231,7 +258,12 @@
 			onclick={() => toggle(member)}
 		>
 			<span class="min-w-0 truncate font-medium">{fullName(member)}</span>
-			<Badge variant={left ? 'outline' : 'secondary'}>{roleLabels[member.role]}</Badge>
+			<span class="flex shrink-0 items-center gap-2">
+				{#if member.last_day_today}
+					<span class="text-xs text-muted-foreground" data-testid="last-day">Last day today</span>
+				{/if}
+				<Badge variant={left ? 'outline' : 'secondary'}>{roleLabels[member.role]}</Badge>
+			</span>
 		</button>
 		{#if open === member.id}
 			<div class="border-t px-4 pt-3 pb-4">
@@ -246,9 +278,7 @@
 							<Button variant="outline" onclick={() => startReturn(member)}>Add to the team</Button>
 						{:else}
 							<Button variant="outline" onclick={() => startChange(member)}>Change role</Button>
-							<Button variant="outline" onclick={() => startLeave(member)}>
-								Remove from the team
-							</Button>
+							<Button variant="outline" onclick={startLeave}>Remove from the team</Button>
 						{/if}
 					</div>
 				{/if}

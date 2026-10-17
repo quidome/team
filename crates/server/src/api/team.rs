@@ -7,11 +7,16 @@ use axum::extract::{Path, State};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
-    Member, PlayerId, PlayerRole, Season, change_role, check_change, proposed_start, role_on, team,
+    Member, PlayerId, PlayerRole, RoleDates, RoleId, change_role, proposed_start, remove_from_team,
+    team,
 };
 use utoipa::ToSchema;
 
 use super::players::{RoleKind, RoleView, day, role_view};
+use axum::http::StatusCode;
+use serde_json::json;
+use sqlx::PgConnection;
+
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
@@ -78,6 +83,9 @@ pub struct Refusal {
     /// For `role_starts_later`: the start of the player's later role, for example "2026-11-02".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date: Option<String>,
+    /// For `confirm_removal`: the roles "Remove from the team" would remove, in order of start.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roles: Option<Vec<RoleView>>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -90,9 +98,50 @@ pub struct ChangeRole {
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct LeaveTeam {
-    /// The last day in the team.
+    /// "Not in the team from": the first day without the team.
     #[schema(value_type = String, format = Date)]
-    pub until: NaiveDate,
+    pub from: NaiveDate,
+    /// The ids of the roles the coordinator confirmed to remove (roles that start on `from` or
+    /// later); empty at first.
+    #[serde(default)]
+    pub removes: Vec<i64>,
+}
+
+/// A role without its id, as "Undo" sends it back.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct RoleDatesView {
+    pub role: RoleKind,
+    #[schema(value_type = String, format = Date)]
+    pub from: NaiveDate,
+    /// `null` while the role continues.
+    #[schema(value_type = Option<String>, format = Date)]
+    pub until: Option<NaiveDate>,
+}
+
+impl From<&RoleDates> for RoleDatesView {
+    fn from(role: &RoleDates) -> Self {
+        RoleDatesView {
+            role: role.role.into(),
+            from: role.from,
+            until: role.until,
+        }
+    }
+}
+
+/// What "Undo" sends back after "Remove from the team": the date of the removal and the
+/// player's roles of the season from before it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UndoRemoval {
+    #[schema(value_type = String, format = Date)]
+    pub from: NaiveDate,
+    pub roles: Vec<RoleDatesView>,
+}
+
+/// The answer of "Remove from the team".
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LeftTeam {
+    pub team: TeamPageView,
+    pub undo: UndoRemoval,
 }
 
 fn member_view(member: &Member) -> MemberView {
@@ -152,26 +201,6 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<TeamPageView>, Ap
     Ok(Json(load(&state).await?))
 }
 
-/// Splits the player's roles into the role of `season` that covers `date` and the others;
-/// `not_in_team` when there is none. (Step 6 moves "Remove from the team" into the core.)
-fn covering(
-    mut roles: Vec<PlayerRole>,
-    player: PlayerId,
-    season: Season,
-    date: NaiveDate,
-) -> Result<(PlayerRole, Vec<PlayerRole>), AppError> {
-    let id = role_on(&roles, player, date)
-        .filter(|role| role.season == season)
-        .map(|role| role.id);
-    match roles.iter().position(|role| Some(role.id) == id) {
-        Some(index) => {
-            let current = roles.swap_remove(index);
-            Ok((current, roles))
-        }
-        None => Err(AppError::BadRequest("not_in_team")),
-    }
-}
-
 #[utoipa::path(
     post,
     path = "/api/players/{id}/role-change",
@@ -198,20 +227,8 @@ pub async fn role_change(
     }
     let roles = players::roles_of(&mut *tx, player).await?;
     let change = change_role(season, &roles, body.role.into(), body.from)?;
-    let Some(current) = roles.iter().find(|role| role.id == change.ended) else {
-        return Err(AppError::BadRequest("not_in_team"));
-    };
     // Both or neither: the end of the current role and the new role.
-    players::update_role(
-        &mut *tx,
-        player,
-        current.id,
-        season,
-        current.role,
-        current.from,
-        Some(change.ended_until),
-    )
-    .await?;
+    end_role(&mut tx, &roles, change.ended, change.ended_until).await?;
     players::insert_role(
         &mut *tx,
         player,
@@ -233,17 +250,18 @@ pub async fn role_change(
     params(("id" = i64, Path, description = "The player")),
     request_body = LeaveTeam,
     responses(
-        (status = 200, description = "The team; the role on `until` ends on that day", body = TeamPageView),
-        (status = 400, description = "`not_in_team`, `outside_season`"),
+        (status = 200, description = "The team, and what \"Undo\" sends back; from `from` on the player has no roles in the season", body = LeftTeam),
+        (status = 400, description = "`not_in_team`, `outside_season`", body = Refusal),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player"),
+        (status = 409, description = "`confirm_removal`: the removal removes roles that are not in `removes`; nothing is saved", body = Refusal),
     )
 )]
 pub async fn team_leave(
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Json(body): Json<LeaveTeam>,
-) -> Result<Json<TeamPageView>, AppError> {
+) -> Result<Json<LeftTeam>, AppError> {
     let player = PlayerId(id);
     let season = current_season(state.clock.as_ref());
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
@@ -251,19 +269,61 @@ pub async fn team_leave(
         return Err(AppError::NotFound);
     }
     let roles = players::roles_of(&mut *tx, player).await?;
-    let (current, others) = covering(roles, player, season, body.until)?;
-    check_change(season, &current, current.from, Some(body.until), &others)?;
-    players::update_role(
-        &mut *tx,
-        player,
-        current.id,
-        season,
-        current.role,
-        current.from,
-        Some(body.until),
-    )
-    .await?;
+    let removal = remove_from_team(season, &roles, body.from)?;
+    if removal
+        .removed
+        .iter()
+        .any(|role| !body.removes.contains(&role.id.0))
+    {
+        let removed: Vec<RoleView> = removal.removed.iter().map(|role| role_view(role)).collect();
+        return Err(AppError::Refused {
+            status: StatusCode::CONFLICT,
+            code: "confirm_removal",
+            details: json!({ "roles": removed }),
+        });
+    }
+    let before: Vec<RoleDatesView> = roles
+        .iter()
+        .filter(|role| role.season == season)
+        .map(|role| RoleDatesView::from(&RoleDates::from(role)))
+        .collect();
+    // All or nothing: the end of one role and the removal of the others.
+    if let Some((ended, until)) = removal.ended {
+        end_role(&mut tx, &roles, ended, until).await?;
+    }
+    for role in &removal.removed {
+        players::delete_role(&mut *tx, player, role.id).await?;
+    }
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = player.0, "player left the team");
-    Ok(Json(load(&state).await?))
+    Ok(Json(LeftTeam {
+        team: load(&state).await?,
+        undo: UndoRemoval {
+            from: body.from,
+            roles: before,
+        },
+    }))
+}
+
+/// Gives the stored role `id` (one of `roles`) the end `until`.
+async fn end_role(
+    tx: &mut PgConnection,
+    roles: &[PlayerRole],
+    id: RoleId,
+    until: NaiveDate,
+) -> Result<(), AppError> {
+    let Some(role) = roles.iter().find(|role| role.id == id) else {
+        return Err(AppError::BadRequest("not_in_team"));
+    };
+    players::update_role(
+        tx,
+        role.player,
+        role.id,
+        role.season,
+        role.role,
+        role.from,
+        Some(until),
+    )
+    .await?;
+    Ok(())
 }

@@ -127,17 +127,7 @@ test('the team page: add a player, change the role, remove from and add to the t
 	page
 }) => {
 	const errors = watchConsole(page);
-	// A Tuesday weekly training: the proposed start of a role is its first date, Tue 1 Sep.
-	await page.goto('/settings');
-	await page.getByRole('button', { name: 'Add weekly training' }).click();
-	const weekly = page.getByTestId('weekly-form');
-	await weekly.getByLabel('Day').selectOption('2');
-	await expect(weekly.getByLabel('First training')).toHaveValue('2026-09-01');
-	await weekly.getByLabel('Start').fill('19:45');
-	await weekly.getByLabel('End').fill('21:00');
-	await weekly.getByRole('button', { name: 'Save weekly training' }).click();
-	await expect(page.getByTestId('weekly-training')).toHaveCount(1);
-
+	// "In the team from" is proposed as 1 September of the season.
 	await page.goto('/team');
 	await page.getByRole('button', { name: 'Add player' }).click();
 	const form = page.getByTestId('add-player');
@@ -172,7 +162,7 @@ test('the team page: add a player, change the role, remove from and add to the t
 		'Only trains · Tue 1 Sept – Sun 11 Oct, Plays games · from Mon 12 Oct'
 	);
 
-	// "Remove from the team" on Thu 1 Oct: under "Left the team".
+	// "Remove from the team" from tomorrow: still in the team today, on its last day.
 	await page.getByRole('button', { name: 'Add player' }).click();
 	await form.getByLabel('Player').selectOption({ label: 'New player' });
 	await form.getByLabel('First name').fill('Tess');
@@ -180,15 +170,25 @@ test('the team page: add a player, change the role, remove from and add to the t
 	const tess = page.getByTestId('member').filter({ hasText: 'Tess' });
 	await tess.getByRole('button', { name: /Tess/ }).click();
 	await tess.getByRole('button', { name: 'Remove from the team' }).click();
-	await expect(tess.getByLabel('Last day in the team')).toHaveValue('2026-10-12');
-	await tess.getByLabel('Last day in the team').fill('2026-10-01');
+	await expect(tess.getByLabel('Not in the team from')).toHaveValue('2026-10-12');
+	await tess.getByRole('button', { name: 'Tomorrow' }).click();
+	await expect(tess.getByLabel('Not in the team from')).toHaveValue('2026-10-13');
+	await tess.getByRole('button', { name: 'Remove from the team' }).click();
+	await expect(tess.getByTestId('last-day')).toHaveText('Last day today');
+
+	// From today: under "Left the team" at once.
+	await tess.getByRole('button', { name: /Tess/ }).click();
+	await tess.getByRole('button', { name: 'Remove from the team' }).click();
 	await tess.getByRole('button', { name: 'Remove from the team' }).click();
 	const left = page.getByTestId('left-player').filter({ hasText: 'Tess' });
 	await expect(left).toBeVisible();
 	await expect(tess).toHaveCount(0);
-
-	// "Add to the team": proposed the day after the end, or today when later.
 	await left.getByRole('button', { name: /Tess/ }).click();
+	await expect(left.getByTestId('member-roles')).toHaveText(
+		'Plays games · Tue 1 Sept – Sun 11 Oct'
+	);
+
+	// "Add to the team": proposed today.
 	await left.getByRole('button', { name: 'Add to the team' }).click();
 	await expect(left.getByLabel('In the team from')).toHaveValue('2026-10-12');
 	await left.getByRole('button', { name: 'Add to the team' }).click();
@@ -198,6 +198,55 @@ test('the team page: add a player, change the role, remove from and add to the t
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 	expect(errors).toEqual([]);
+});
+
+test('"Remove from the team" asks first when it also removes a later role', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/team');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	const form = page.getByTestId('add-player');
+	await form.getByLabel('Player').selectOption({ label: 'New player' });
+	await form.getByLabel('First name').fill('Vic');
+	await form.getByLabel('Only trains').check();
+	await form.getByRole('button', { name: 'Save' }).click();
+	const vic = page.getByTestId('member').filter({ hasText: 'Vic' });
+
+	// A planned "Change role" from Sun 1 Nov.
+	await vic.getByRole('button', { name: /Vic/ }).click();
+	await vic.getByRole('button', { name: 'Change role' }).click();
+	await vic.getByLabel('From').fill('2026-11-01');
+	await vic.getByRole('button', { name: 'Change role' }).click();
+	await vic.getByRole('button', { name: /Vic/ }).click();
+	await expect(vic.getByTestId('member-roles')).toHaveText(
+		'Only trains · Tue 1 Sept – Sat 31 Oct, Plays games · from Sun 1 Nov'
+	);
+
+	// From today: the confirmation names the later role. Cancel keeps everything.
+	await vic.getByRole('button', { name: 'Remove from the team' }).click();
+	const messages: string[] = [];
+	page.once('dialog', (dialog) => {
+		messages.push(dialog.message());
+		void dialog.dismiss();
+	});
+	await vic.getByRole('button', { name: 'Remove from the team' }).click();
+	await expect.poll(() => messages).toEqual(['This also removes "Plays games · from Sun 1 Nov".']);
+	await expect(vic.getByLabel('Not in the team from')).toBeVisible();
+
+	page.once('dialog', (dialog) => void dialog.accept());
+	await vic.getByRole('button', { name: 'Remove from the team' }).click();
+	const left = page.getByTestId('left-player').filter({ hasText: 'Vic' });
+	await expect(left).toBeVisible();
+	await left.getByRole('button', { name: /Vic/ }).click();
+	await expect(left.getByTestId('member-roles')).toHaveText(
+		'Only trains · Tue 1 Sept – Sun 11 Oct'
+	);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	// The two answers that ask for the confirmation.
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 409 (Conflict)',
+		'Failed to load resource: the server responded with a status of 409 (Conflict)'
+	]);
 });
 
 test('the team page shows the chosen team, or that it is not chosen yet', async ({ page }) => {

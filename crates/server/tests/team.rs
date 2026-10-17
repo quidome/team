@@ -338,12 +338,15 @@ async fn remove_from_the_team_and_add_again(pool: PgPool) {
         .ok(
             "POST",
             &format!("/api/players/{id}/team-leave"),
-            Some(json!({ "until": "2026-10-15" })),
+            Some(json!({ "from": "2026-10-16" })),
         )
         .await;
-    // Until Thu 15 Oct, so still in the team on Mon 12 Oct.
-    assert_eq!(names(&page["members"]), ["Blake"]);
-    assert_eq!(page["members"][0]["roles"][0]["until"], "2026-10-15");
+    // Not in the team from Fri 16 Oct, so still in the team on Mon 12 Oct.
+    assert_eq!(names(&page["team"]["members"]), ["Blake"]);
+    assert_eq!(
+        page["team"]["members"][0]["roles"][0]["until"],
+        "2026-10-15"
+    );
 
     on(&mut coordinator, 2026, 10, 20).await;
     let page = coordinator.ok("GET", "/api/team", None).await;
@@ -373,14 +376,39 @@ async fn remove_from_the_team_needs_a_role_on_that_date(pool: PgPool) {
         .await;
     let path = format!("/api/players/{id}/team-leave");
     let answer = coordinator
-        .send("POST", &path, Some(json!({ "until": "2026-08-31" })))
+        .send("POST", &path, Some(json!({ "from": "2027-07-01" })))
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "outside_season" })));
+    // A role that already ends on the day before: nothing to end or remove.
+    coordinator
+        .ok("POST", &path, Some(json!({ "from": "2026-10-12" })))
+        .await;
+    let answer = coordinator
+        .send("POST", &path, Some(json!({ "from": "2026-10-12" })))
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_in_team" })));
+    let casey = coordinator
+        .ok(
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": "Casey", "last_name": null, "role": null })),
+        )
+        .await["player"]["id"]
+        .as_i64()
+        .unwrap();
+    let answer = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{casey}/team-leave"),
+            Some(json!({ "from": "2026-10-12" })),
+        )
         .await;
     assert_eq!(answer, (400, json!({ "error": "not_in_team" })));
     let (status, _) = coordinator
         .send(
             "POST",
             "/api/players/999999/team-leave",
-            Some(json!({ "until": "2026-10-15" })),
+            Some(json!({ "from": "2026-10-15" })),
         )
         .await;
     assert_eq!(status, 404);
@@ -428,7 +456,7 @@ async fn add_all_brings_last_seasons_team_back(pool: PgPool) {
         .ok(
             "POST",
             &format!("/api/players/{casey}/team-leave"),
-            Some(json!({ "until": "2026-03-10" })),
+            Some(json!({ "from": "2026-03-11" })),
         )
         .await;
     // Dana left the club.
@@ -499,7 +527,7 @@ async fn after_add_all_in_summer_the_players_stay_in_the_team_and_can_leave(pool
         .ok(
             "POST",
             &format!("/api/players/{avery}/team-leave"),
-            Some(json!({ "until": "2026-09-30" })),
+            Some(json!({ "from": "2026-10-01" })),
         )
         .await;
     on(&mut coordinator, 2026, 10, 2).await;
@@ -599,4 +627,200 @@ async fn last_seasons_team_stays_until_one_of_them_has_a_role(pool: PgPool) {
         .await;
     assert!(page["last_season"].as_array().unwrap().is_empty());
     assert_eq!(names(&page["candidates"]), ["Blake"]);
+}
+
+fn leave(from: &str, removes: &[i64]) -> Option<Value> {
+    Some(json!({ "from": from, "removes": removes }))
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn remove_from_today_puts_the_player_under_left_at_once(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let id = coordinator
+        .add_player("Avery", "only_trains", "2026-09-01")
+        .await;
+    let answer = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/team-leave"),
+            leave("2026-10-12", &[]),
+        )
+        .await;
+    assert_eq!(
+        stored_roles(&pool, id).await,
+        [(date(2026, 9, 1), Some(date(2026, 10, 11)))]
+    );
+    assert!(answer["team"]["members"].as_array().unwrap().is_empty());
+    assert_eq!(names(&answer["team"]["left"]), ["Avery"]);
+    // What "Undo" sends back: the roles of the season from before.
+    assert_eq!(
+        answer["undo"],
+        json!({ "from": "2026-10-12",
+                "roles": [{ "role": "only_trains", "from": "2026-09-01", "until": null }] })
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn remove_with_a_later_role_asks_first(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let id = coordinator
+        .add_player("Avery", "only_trains", "2026-09-01")
+        .await;
+    // A planned "Change role" from Sun 1 Nov.
+    coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/role-change"),
+            change("plays_games", "2026-11-01"),
+        )
+        .await;
+    let later = players::roles_of(&pool, PlayerId(id)).await.unwrap()[1]
+        .id
+        .0;
+    let before = stored_roles(&pool, id).await;
+    let path = format!("/api/players/{id}/team-leave");
+    let answer = coordinator
+        .send("POST", &path, leave("2026-10-12", &[]))
+        .await;
+    assert_eq!(
+        answer,
+        (
+            409,
+            json!({ "error": "confirm_removal",
+                    "roles": [{ "id": later, "role": "plays_games",
+                                "from": "2026-11-01", "until": null }] })
+        )
+    );
+    assert_eq!(stored_roles(&pool, id).await, before);
+
+    // Confirmed: the role ends on Sun 11 Oct, the later role goes.
+    let answer = coordinator
+        .ok("POST", &path, leave("2026-10-12", &[later]))
+        .await;
+    assert_eq!(
+        stored_roles(&pool, id).await,
+        [(date(2026, 9, 1), Some(date(2026, 10, 11)))]
+    );
+    assert_eq!(names(&answer["team"]["left"]), ["Avery"]);
+    assert_eq!(answer["undo"]["roles"].as_array().unwrap().len(), 2);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn remove_after_add_all_leaves_nothing_in_the_season(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    on(&mut coordinator, 2026, 3, 1).await;
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2025-09-02")
+        .await;
+    on(&mut coordinator, 2026, 8, 15).await;
+    coordinator
+        .ok(
+            "POST",
+            "/api/players/carry",
+            Some(json!({ "players": [avery] })),
+        )
+        .await;
+    let role = players::roles_of(&pool, PlayerId(avery)).await.unwrap()[1]
+        .id
+        .0;
+    // Avery did not come back: "Not in the team from" today.
+    let answer = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{avery}/team-leave"),
+            leave("2026-08-15", &[role]),
+        )
+        .await;
+    assert_eq!(stored_roles(&pool, avery).await, [(date(2025, 9, 2), None)]);
+    let team = &answer["team"];
+    assert!(team["members"].as_array().unwrap().is_empty());
+    assert!(team["left"].as_array().unwrap().is_empty());
+    assert_eq!(names(&team["candidates"]), ["Avery"]);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_last_day_today_is_shown(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    let id = coordinator
+        .add_player("Avery", "plays_games", "2026-09-01")
+        .await;
+    let page = coordinator.ok("GET", "/api/team", None).await;
+    assert_eq!(page["members"][0]["last_day_today"], false);
+    // "Tomorrow": not in the team from Tue 13 Oct, so today is the last day.
+    let answer = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/team-leave"),
+            leave("2026-10-13", &[]),
+        )
+        .await;
+    assert_eq!(names(&answer["team"]["members"]), ["Avery"]);
+    assert_eq!(answer["team"]["members"][0]["last_day_today"], true);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn remove_from_the_team_waits_for_the_players_lock(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let id = coordinator
+        .add_player("Avery", "plays_games", "2026-09-01")
+        .await;
+
+    // Another save holds the player's lock and has ended the role, but not committed yet.
+    let mut first = pool.begin().await.unwrap();
+    assert!(players::lock(&mut first, PlayerId(id)).await.unwrap());
+    let role = players::roles_of(&mut *first, PlayerId(id)).await.unwrap()[0].id;
+    players::update_role(
+        &mut *first,
+        PlayerId(id),
+        role,
+        Season::from_start_year(2026),
+        Role::PlaysGames,
+        date(2026, 9, 1),
+        Some(date(2026, 10, 15)),
+    )
+    .await
+    .unwrap();
+
+    // The removal from Sun 1 Nov waits, then sees the ended role: nothing to end or remove.
+    let path = format!("/api/players/{id}/team-leave");
+    let second = coordinator.send("POST", &path, leave("2026-11-01", &[]));
+    tokio::pin!(second);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut second).await;
+    assert!(waited.is_err(), "the removal did not wait for the lock");
+    first.commit().await.unwrap();
+    assert_eq!(second.await, (400, json!({ "error": "not_in_team" })));
+    assert_eq!(
+        stored_roles(&pool, id).await,
+        [(date(2026, 9, 1), Some(date(2026, 10, 15)))]
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn remove_saves_all_or_nothing(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let id = coordinator
+        .add_player("Avery", "only_trains", "2026-09-01")
+        .await;
+    coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/role-change"),
+            change("plays_games", "2026-11-01"),
+        )
+        .await;
+    let later = players::roles_of(&pool, PlayerId(id)).await.unwrap()[1]
+        .id
+        .0;
+    let before = stored_roles(&pool, id).await;
+    // The end of the current role is written, then the delete of the later role fails.
+    refuse_role_writes(&pool, "DELETE").await;
+    let (status, _) = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{id}/team-leave"),
+            leave("2026-10-12", &[later]),
+        )
+        .await;
+    assert_eq!(status, 500);
+    assert_eq!(stored_roles(&pool, id).await, before);
 }
