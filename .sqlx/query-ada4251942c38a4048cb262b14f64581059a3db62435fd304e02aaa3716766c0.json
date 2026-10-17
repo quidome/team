@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT season_year AS \"year!\" FROM player_roles\n           UNION SELECT season_year FROM weekly_trainings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "year!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ada4251942c38a4048cb262b14f64581059a3db62435fd304e02aaa3716766c0"
+}

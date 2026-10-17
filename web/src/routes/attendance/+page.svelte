@@ -7,7 +7,7 @@
 	shows the trainings it missed.
 -->
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		ApiError,
@@ -66,6 +66,13 @@
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
+
+	// Another season (or a return to the page) starts clean: no open form, error or missed list.
+	afterNavigate(() => {
+		adding = false;
+		error = null;
+		expanded = [];
+	});
 
 	function message(failure: unknown): string {
 		return failure instanceof ApiError
@@ -293,6 +300,15 @@
 					No trainings yet this season.
 				</p>
 			{:else}
+				{#if overview.team.length === 0 && overview.left.length === 0}
+					<p class="text-sm text-muted-foreground" data-testid="no-player-totals">
+						No player had a role at these trainings.
+						{#if current}
+							Add players in
+							<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>.
+						{/if}
+					</p>
+				{/if}
 				{@render totals(overview.team, 'team-totals')}
 				{#if overview.left.length > 0}
 					<h3 class="pt-2 font-semibold">Left the team</h3>

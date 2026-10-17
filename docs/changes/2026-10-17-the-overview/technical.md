@@ -1,6 +1,6 @@
 # Technical spec: The overview
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-17-the-overview
 **Date**: 2026-10-17
@@ -255,3 +255,92 @@ the epic's Interface line about the links from "Attendance" (D1), and the limit 
 training" for an earlier season written into the epic spec (D8).
 
 ## Review findings
+
+### Build review (2026-10-17)
+Independent reviewer, fresh context. Input: `/review build docs/changes/2026-10-17-the-overview`
+(no other text given). Read: the diff `main..feat/the-overview` (4 commits, nothing uncommitted
+apart from untracked local files), this change folder, `docs/architecture.md`, decisions 0001,
+0014, 0018, 0020, `CLAUDE.md`, `AGENTS.md`, `docs/language.md`. Runs: `cargo test -p team_core
+attendance` (18 passed), `cargo test -p team --test attendance` (5 passed), `--test player_logs`
+(1 passed), `just api-types-check` (no diff), `just check-web` (passes). The browser tests and
+`check-sqlx` were not run.
+
+Overall: the counting rule sits in the core and reuses `role_on`, `place` and `season_list`, as the
+design says; the server only moves data; the route is behind the login and in the 401/403 and log
+tests; no `unwrap`/`expect` outside tests; no names in logs. No bug against the spec's intent was
+found in the counting. The findings are small.
+
+| # | Finding | Weight | How checked |
+|---|---------|--------|-------------|
+| R1 | **The season rule is written a second time, in SQL.** `trainings::seasons` (`crates/server/src/trainings.rs`) works out the season of a training date in the query (`EXTRACT(YEAR …) - CASE WHEN EXTRACT(MONTH …) < 7 …`). The rule "a season starts on 1 July" is a product rule in `team_core::Season::of` (decision 0001: rules in the core, the server only moves data; decision 0014: the conversion of seasons is in one place in the core). Server test 3 pins the two copies together today, but a change of `FIRST_MONTH` would not reach the SQL. Simpler and inside the rules: select the distinct training dates (or `season_year` of roles and weekly trainings plus the dates) and map the dates with `Season::of` in Rust. | low (no wrong answer now) | Read of the diff; search `grep -rn "EXTRACT" crates/server/src` (only this query); read of `crates/core/src/season.rs` and decisions 0001, 0014 |
+| R2 | **Page state outlives a change of season.** SvelteKit keeps the page component when only `?season=` changes, which is why `list` and `overview` became `$derived`; but `adding`, `error` and `expanded` stay `$state` and are not reset. So: open "Add training", then choose an earlier season → the form stays open in the earlier season (the `{#if adding}` branch comes before `{:else if current}`); a "Save" there is refused by the server (`outside_season`, `api/trainings.rs` checks against the current season), so no wrong data, but the page offers what D8 says it does not. An error line of one season also stays on the next. Reset `adding` and `error` when `data` changes (or hide the form when not `current`). | low | Trace of `web/src/routes/attendance/+page.svelte` (`chooseSeason` → `goto` on the same route; `{#if adding} … {:else if current}`); server side read in `crates/server/src/api/trainings.rs` (`add` uses `current_season`). Not run in a browser |
+| R3 | **"Totals" can be an empty heading.** When the season has trainings (`trainings > 0`) but no player has a role on any of their dates (for example trainings opened before players were added, or only on dates outside every role), the page shows the heading "Totals" with an empty list and no line, while the spec's "No trainings yet this season." does not apply. Small and rare; a line such as "No players in the team at these trainings." or hiding the heading would avoid a page that looks broken. Not a spec rule, so for the coordinator to decide. | low | Trace: `season_overview` skips rows with `trainings == 0`; the page renders `totals(overview.team, …)` when `overview.trainings !== 0` |
+| R4 | **A browser test that cannot fail.** In "a cancelled training does not count …", the check "Show cancelled off hides the row, not the totals" (`of 4 trainings` after the switch) cannot fail: the switch only filters rows on the page (`shown()`), the totals are not loaded again and do not read it. Harmless; it documents intent rather than testing it. | info | Read of `web/e2e/trainings.e2e.ts` and `shown()` in `+page.svelte` |
+| R5 | **Claims in this spec.** True as far as checked: 15 core tests named as in the plan (18 pass with the older attendance tests); 5 server tests plus the route in `tests/players.rs` and `tests/player_logs.rs`; 2 + 4 browser tests (6, not the planned 8: the 320-pixel check is folded into the missed-list test and the SQL helper was dropped, both written under Deviations); `query_season` used by both routes; API types up to date. The planned "1 training day not opened" text has no test (said under Deviations). `MissedView.valid` is sent but not used by the page (the spec asks only date and reason); harmless. Not checked: "64 browser tests" and `just check` as a whole. | info | Runs listed above; count of tests in the diff |
+| R6 | **Docs the diff made false (for /close).** `docs/architecture.md`: the known-limits lines "The start page links to … (story C … decides)" and "A training of an earlier season is opened only by its address until story C …" are now settled; the "Trainings and attendance" section lacks `GET /api/attendance`, `season_overview`, `trainings::seasons`, `query_season` and `Player::sort_key`. `docs/product/trainings-and-attendance.md`: "Earlier seasons … For now such a training is opened by its address" is false now, and the server address list lacks `GET /api/attendance`; "Back" on a training now returns to that training's season. Decision 0020's consequence "until story C adds the choice of season" is history (records are not edited). Code comments touched by the diff are correct. | info (/close) | Search of `docs/architecture.md` and `docs/product/trainings-and-attendance.md` for `story C`, `address`, `/api/` |
+
+`#[allow(clippy::too_many_arguments)]` on `season_overview` (Deviations, step 1) is the only such
+allow in the crates (`grep -rn too_many_arguments crates`); acceptable for one pure function, noted
+only so a second one is a choice.
+
+**Verdict: passes the build review.** No finding blocks Close; R1 and R2 are small fixes worth
+doing before Close, R3 is a question for the coordinator, R6 is work for /close.
+
+Answers of the builder:
+- R1 – 2026-10-17: fixed. `trainings::seasons` reads the `season_year` of roles and weekly trainings and the distinct training dates, and maps the dates with `Season::of` in Rust; no season rule in SQL. Server test `the_seasons_follow_the_date_rule` passes unchanged; `just prepare` again.
+- R2 – 2026-10-17: fixed. `afterNavigate` on `/attendance` closes "Add training" and clears the error line and the open missed lists, so a change of season (by the choice or by the browser's back) starts clean. Browser test "an earlier season can be chosen, and "Back" returns to it" now opens the form with an error ("There is already a training on this date.") in 2026-2027 and goes back to 2025-2026: no form, no error. Without the reset the test fails (checked by removing it and running all browser tests).
+- R3 – 2026-10-17: fixed (the coordinator's choice: a line). When trainings count but no player had a role at any of them, "Totals" says "No player had a role at these trainings." and, in the current season, "Add players in Team." with a link. Browser test "trainings at which no player had a role" (the answer of `/api/attendance` replaced: such a season needs trainings before any role).
+- R4 – 2026-10-17: not changed. The check guards against a later change that would make "Show cancelled" filter the totals as well; it documents the rule of story 2 ("hides the row") on the screen.
+- R5 – 2026-10-17: nothing to fix. `MissedView.valid` stays in the answer; the page may mark lines later without an API change.
+- R6 – 2026-10-17: for /close.
+
+### Accept review (2026-10-17)
+Independent reviewer, fresh context. Input: `/review accept docs/changes/2026-10-17-the-overview`
+(no other text given). This folder has no `functional.md` or `idea.md`; as `change.md` says, the
+functional spec is the epic's (`../2026-10-14-attendance-at-training/functional.md`, story 5, the
+parts of stories 1–3 the totals use, and the Interface line of "Attendance"), with the epic's
+`idea.md`. Read: those, `change.md`, the objective and requirements of this spec, and the diff
+`main...feat/the-overview`; the view below was formed before reading **Deviations** and the build
+review. Runs: `cargo test -p team_core attendance` (18 passed), `cargo test -p team --test
+attendance` (5 passed), `npx playwright test` (64 passed, among them the 6 of "the overview").
+Not run: the server against the dev database (`serve` starts the nightly reading, which writes),
+so the page was seen only through the browser tests. This review covers story C; the epic's own
+`review accept` of the whole result is a separate run.
+
+The intent of the idea ("afterwards, the coach looks at the season totals to see who comes
+regularly and who misses trainings without a valid reason") and of story 5 is met: the totals are
+worked out from the stored data at each request, so they follow role changes, cancels, and
+reasons changed between valid and not valid; the line of days not opened tells the coach when the
+totals are not complete; and an earlier season can be chosen and its trainings reached.
+
+| # | Point (criterion or open point) | Built | Sort | How checked |
+|---|---------------------------------|-------|------|-------------|
+| A1 | Story 5: one row for each player who could be at one or more trainings, with "there", "absent, valid", "absent, not valid", "of N trainings", sorted by first name | A row for a player with a role on the date of at least one training that counts; hidden players too; two lines per row ("Name … of 10 trainings" / "9 there · 1 absent, valid · 0 absent, not valid") instead of the one line of the Behaviour example | faithful adaptation | Trace of `season_overview` (`crates/core/src/attendance.rs`, `trainings == 0` → no row); core tests `a_row_needs_a_training_that_counts_and_hidden_players_have_rows`, `the_rows_are_sorted_by_first_name_then_last_name`; browser test "the totals change while past trainings are entered" |
+| A2 | Only trainings up to and including today; only at dates inside a role; a cancelled training does not count; a reason changed moves the counts; absences outside a role kept, not counted | All five in the core rule; nothing stored for the totals | faithful | Read of `season_overview`; core tests 2–7 and 15 (run); server test `the_overview_of_the_current_season` (reason changed with `PUT /api/reasons/{id}`); browser test of cancel and "Undo cancel" |
+| A3 | "Left the team" with the totals of their trainings; a player after "Change role" once in the team | `place` on today (on 30 June for an earlier season): the same rule as the page "Team" | faithful adaptation (the 30 June reading for an earlier season is what keeps the group meaningful) | Core tests `a_player_after_change_role_is_counted_once_in_the_team`, `a_player_who_left_is_in_left_the_team_and_one_who_came_back_is_in_the_team`, `an_earlier_season_groups_on_its_last_day`. "Left the team" on the page is not in a browser test (the group is rendered by the same snippet as the team) |
+| A4 | "3 training days not opened" above the totals, with a link to the first of them | Training days before today with no training, from the same `season_list` as the list; the link goes to the oldest day's training page, which shows "Not opened" and asks for "Open training" before the day counts | faithful adaptation: one more tap than a row of the list, but it keeps Bruce's warning ("the coordinator must see clearly that a day is Not opened before opening it") and the link cannot open a holiday by mistake | Browser test (11 → 10 → … → 7, link to Tue 1 Sep, "Open training"); `web/src/routes/training/[date]/+page.svelte` lines ~252–255 |
+| A5 | "No trainings yet this season." | When no training up to today is left after cancels | faithful | Core test `no_training_counts_yet`, server test `no_trainings_yet`, browser test on 2025-2026 |
+| A6 | A tap on a player shows the missed trainings, with date and reason | Inline under the row, newest first, "No missed trainings." when none; only absences that count (coordinator's choice) so the list adds up to the two absent counts; valid / not valid is not marked per line (the counts show it) | faithful | Browser test "a tap on a player shows the trainings it missed" (also 320 px, accessibility) |
+| A7 | An earlier season can be chosen on the same page | A select box (shown only with more than one season), the season in the address; "Back" and "Delete training" on a training return to the training's season; "Add training" only in the current season | faithful adaptation (the "Back" rule fills a gap the spec left open); the limit on "Add training" is neutral drift already noted as D8 | Browser test "an earlier season can be chosen, and "Back" returns to it"; server test `an_earlier_season_can_be_chosen`. An earlier season **with data** is only covered by the server test, not on the screen (Deviations, step 3) |
+| A8 | The list of training days and trainings stays ("Coming" above "Past", cancel, "Show cancelled", "Add training") | Unchanged, under a new heading "Trainings", below the totals; after "Cancel" on a row the totals load again | faithful adaptation. On a phone the totals (about 14 two-line rows) now push the list one screen down; entering past trainings goes through the "not opened" link or a scroll. The weekly path (the card on the start page) is not touched, so this does not cost the hall use | Read of `+page.svelte`; existing browser tests of story B pass |
+| A9 | Interface: "Attendance" links to "Team", "Players" and the settings | Not built; the start page keeps its line | neutral drift, the coordinator's own choice (D1); the epic's Interface line must not stay as a promise after /close | `change.md` log; search of `+page.svelte` for `href` (only "Back" to `/` and the training links) |
+| A10 | Phone first, no sideways scroll at 320 px; only the coordinator | Checked at 320 px with an open missed list; the route is behind the login and in the 401/403 test | faithful | Browser tests (run); `tests/players.rs` route list |
+| A11 | Page state after a change of season (build review R2) | An open "Add training" form and an error line stay when another season is chosen; the server refuses a save outside the current season | concerning only in a small way: the screen offers in an earlier season what the design says it does not; no wrong data. Worth the small fix of R2 before Close | Trace (as R2); not run |
+| A12 | Trainings exist but no player had a role at any of them (build review R3) | The heading "Totals" with nothing under it | neutral drift; rare (players come before past trainings in the setup the spec describes) and for the coordinator to decide | Trace of `season_overview` and the `{#if overview.trainings === 0}` branch |
+
+Differences from my view found in **Deviations**: none that I had not seen; D2–D7 match what I
+found built. The deviations that change what the coordinator sees (D1, D8) are the coordinator's
+choices and are already notes for /close.
+
+**Verdict: accepted with notes.** What was built is what was meant: the coach can see each
+player's effort over the trainings that count, can trust that the counts follow later changes,
+and is told when days are still not opened. Notes: A11 (fix with R2 before Close), A12 (a
+question for the coordinator), A9 and D8 (the epic spec's Interface and the "Add training" limit
+put into words at /close), and the check by hand against the sheet after the release, which the
+test plan already names.
+
+Answers of the builder:
+- A11 – 2026-10-17: fixed with R2.
+- A12 – 2026-10-17: fixed with R3 (the coordinator's choice: a line with a link to Team).
+- A3, A7 – 2026-10-17: not changed. "Left the team" and an earlier season with data are covered in the core and server tests; the browser tests cannot make data in an earlier season (Deviations, step 3), and "Left the team" uses the same snippet as the team.
+- A9, D8 – 2026-10-17: for /close (the epic's Interface line about links from "Attendance"; the limit of "Add training" in words).
