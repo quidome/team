@@ -1025,6 +1025,113 @@
         }
       }
     },
+    "/api/trainings": {
+      "get": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "trainings",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "For example \"2026-2027\"; the current season when left out.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training days and trainings of the season, one row per date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/trainings/next": {
+      "get": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "nextTraining",
+        "responses": {
+          "200": {
+            "description": "Today's training until midnight, else the next training day or training of the current season; `null` when there is none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TrainingRow"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/trainings/{date}": {
+      "get": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "training",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date, for example 2026-10-13",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training of the date with its players, or nothing yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/weekly-trainings": {
       "get": {
         "tags": [
@@ -1233,6 +1340,41 @@
           },
           "valid": {
             "type": "boolean"
+          }
+        }
+      },
+      "AtTrainingView": {
+        "type": "object",
+        "description": "A player at a training.",
+        "required": [
+          "id",
+          "first_name",
+          "role"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The reason of the absence; `null` when the player is there."
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
           }
         }
       },
@@ -2582,6 +2724,182 @@
             "type": "integer",
             "format": "int64",
             "description": "The source's team number."
+          }
+        }
+      },
+      "Times": {
+        "type": "object",
+        "description": "The times of a training.",
+        "required": [
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          }
+        }
+      },
+      "TrainingDay": {
+        "type": "object",
+        "description": "One date: its training with the players, or nothing yet.",
+        "required": [
+          "date",
+          "season",
+          "absent",
+          "players",
+          "reasons"
+        ],
+        "properties": {
+          "absent": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "date": {
+            "type": "string"
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AtTrainingView"
+            },
+            "description": "The players with a role on the date, sorted by first name; empty while not opened."
+          },
+          "proposed_times": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Times",
+                "description": "The times \"Add training\" proposes: the training day's, or a weekly training's on the same\nday of the week; `null` when there are none."
+              }
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbsenceReason"
+            },
+            "description": "All reasons in their order, also the hidden ones (they still show on old absences)."
+          },
+          "season": {
+            "type": "string"
+          },
+          "training": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TrainingView",
+                "description": "`null` while no training exists on the date."
+              }
+            ]
+          }
+        }
+      },
+      "TrainingList": {
+        "type": "object",
+        "description": "The list of a season: today and later, nearest first; before today, newest first.",
+        "required": [
+          "season",
+          "today",
+          "season_first_day",
+          "season_last_day",
+          "coming",
+          "past"
+        ],
+        "properties": {
+          "coming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainingRow"
+            }
+          },
+          "past": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrainingRow"
+            }
+          },
+          "season": {
+            "type": "string"
+          },
+          "season_first_day": {
+            "type": "string"
+          },
+          "season_last_day": {
+            "type": "string"
+          },
+          "today": {
+            "type": "string"
+          }
+        }
+      },
+      "TrainingRow": {
+        "type": "object",
+        "description": "One row of the list: a training, or a training day that is not opened.",
+        "required": [
+          "date",
+          "start",
+          "end",
+          "status",
+          "absent",
+          "opened",
+          "extra"
+        ],
+        "properties": {
+          "absent": {
+            "type": "integer",
+            "description": "The number of absences of players with a role on the date (0 when not opened).",
+            "minimum": 0
+          },
+          "date": {
+            "type": "string",
+            "description": "For example \"2026-10-13\"."
+          },
+          "end": {
+            "type": "string"
+          },
+          "extra": {
+            "type": "boolean",
+            "description": "A training on a date that is not a training day."
+          },
+          "opened": {
+            "type": "boolean",
+            "description": "A training exists on the date (also when it is cancelled)."
+          },
+          "start": {
+            "type": "string",
+            "description": "For example \"19:45\"."
+          },
+          "status": {
+            "type": "string",
+            "description": "`not_opened`, `all_there`, `absent` or `cancelled`."
+          }
+        }
+      },
+      "TrainingView": {
+        "type": "object",
+        "description": "An opened training.",
+        "required": [
+          "start",
+          "end",
+          "cancelled"
+        ],
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
           }
         }
       },

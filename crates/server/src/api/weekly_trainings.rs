@@ -77,6 +77,8 @@ impl From<TrainingError> for AppError {
             TrainingError::LastBeforeFirst => "last_before_first",
             TrainingError::OutsideSeason => "outside_season",
             TrainingError::WeeklyTrainingsOverlap => "weekly_trainings_overlap",
+            TrainingError::TrainingExists => "training_exists",
+            TrainingError::NotATrainingDay => "not_a_training_day",
         })
     }
 }

@@ -1,6 +1,7 @@
 //! Product rules of the team coordinator tool. No I/O: see decision 0001.
 
 pub mod access;
+pub mod attendance;
 pub mod club;
 pub mod comparison;
 pub mod game;
@@ -14,6 +15,7 @@ pub mod team_choice;
 pub mod training;
 
 pub use access::{Identity, may_access};
+pub use attendance::{Absence, AtTraining, AttendanceError, check_mark, now_there, players_at};
 pub use club::{Club, ClubNumber, search_clubs};
 pub use comparison::{
     Change, ChangeKind, ChangeUpdate, Counts, Difference, GameChange, ListedChange, OpenChange,
@@ -28,7 +30,7 @@ pub use players::{
     RoleDates, RoleId, TeamPage, change_role, check_change, check_role, clean_name, place,
     proposed_start, remove_from_team, role_on, team, undo_removal,
 };
-pub use reasons::{ReasonError, clean_reason_name};
+pub use reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
 pub use season::{Season, SeasonError};
 pub use team_choice::{
@@ -36,6 +38,7 @@ pub use team_choice::{
     choice_state, choose_team, own_teams, same_choice, schedule_target,
 };
 pub use training::{
-    TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, proposed_window,
-    training_days,
+    DayStatus, SeasonList, SeasonRow, Training, TrainingError, TrainingId, WeeklyProposal,
+    WeeklyTraining, WeeklyTrainingId, absent_count, check_training, check_weekly_training,
+    day_times, proposals_from, proposed_times, proposed_window, season_list, training_days,
 };

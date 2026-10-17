@@ -1,6 +1,6 @@
 # Technical spec: Trainings and attendance
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-17-trainings-and-attendance
 **Date**: 2026-10-17
@@ -229,7 +229,7 @@ On `main` (b558232 and later), story A is built and on the cluster:
 - The data exists only in the tool and has no backup yet (accepted, backlog).
 
 ## Progress
-- [ ] Step 1: the data and the rules, read only
+- [x] Step 1: the data and the rules, read only (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 159 core tests, 42 browser tests)
 - [ ] Step 2: the writes of a training
 - [ ] Step 3: the page "Attendance" and the card
 - [ ] Step 4: marking and the training page
@@ -247,5 +247,12 @@ The design reads the spec more strictly within its words:
 - A mark for a player with no role on the date is refused.
 - "This player now counts as there at N earlier trainings" lists every training the role now covers and did not cover before, also an opened training in the future (an absence noted in advance), without cancelled trainings and trainings where the player has an absence. "Change role", "Remove from the team" and "Undo" give no such message (they never add a covered date that was not covered before, except "Undo", which restores).
 - Last season's weekly trainings are proposed one per day of the week (the newest of that day), so two proposals never overlap.
+
+Implement:
+- 2026-10-17, step 1:
+  - Core `absent_count(training, absences, roles)` is public: `season_list` uses it, and so does the training page (and step 2's `Marked`), so "N absent" has one rule.
+  - `TrainingList` also gives `season_first_day` and `season_last_day`, for the limits of the date field of "Add training" (step 3), as `TeamPageView` does.
+  - The server tests of step 1 write trainings and absences with plain SQL, because the write routes come in step 2.
+  - Added beyond the step's list: the server test `a_date_or_season_that_cannot_be_read_is_refused` (`invalid_date`, `invalid_season`).
 
 ## Review findings
