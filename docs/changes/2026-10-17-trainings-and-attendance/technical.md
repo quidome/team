@@ -1,6 +1,6 @@
 # Technical spec: Trainings and attendance
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-10-17-trainings-and-attendance
 **Date**: 2026-10-17
@@ -234,8 +234,9 @@ On `main` (b558232 and later), story A is built and on the cluster:
 - [x] Step 3: the page "Attendance" and the card (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 48 browser tests)
 - [x] Step 4: marking and the training page (2026-10-17; `just check` passes; 53 browser tests)
 - [x] Step 5: the parts of stories 1 and 4 (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 56 browser tests)
-- [ ] Review build
-- [ ] Review accept
+- [x] Review build (2026-10-17: R1–R7; all fixed or answered)
+- [x] Review accept (2026-10-17: accepted with notes, A1–A6; all fixed or answered)
+- [x] Fixes after the reviews (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 159 core tests, 58 browser tests)
 
 ## Deviations
 None from `functional.md`.
@@ -278,5 +279,171 @@ Implement:
   - The message uses "1 earlier training" for one training ("This player now counts as there at 1 earlier training: …"), and the dates as on the schedule. On the team page, "Add player" for a new player loads the team page and shows the message from the new player's answer.
   - The proposals of last season are shown above the list of weekly trainings, each with "Add" (its accessible name names the day and times); after "Add" the answer has no proposals, so the part goes.
   - Mutation check: with `ON DELETE CASCADE` for the player in migration `0006`, `a_player_with_absences_cannot_be_deleted` fails (the delete answers 204).
+- 2026-10-17, fixes after the reviews (wider than the plan; the coordinator chose the answers to A3 and A6):
+  - Proposals of last season: only those that ran until its end, one per day of the week without a weekly training in the season (R1, A1, A6).
+  - The training page: a "saving…" mark on a row while a tap waits, and a time limit of 10 s for a tap (A3); answers of a reload or an action that were sent before a tap do not undo it (R2).
+  - `PlayerDetail.has_absences`; "Delete player" only without absences (A4).
+  - `api/format.rs` for the date and time helpers (R4); the sentence of `invalid_date` (R5).
+  - Mutation checks: without the check of the reload, and without the time limit, their browser tests fail.
 
 ## Review findings
+
+### Build review (2026-10-17)
+Input: mode `build`, this change folder; no other text was given. Read: the diff against `main`
+(5 commits, nothing uncommitted apart from untracked local files), this folder, the epic's
+`functional.md` where the intent was in doubt, `docs/architecture.md`, decisions 0001 and 0018,
+`CLAUDE.md`. Run: `cargo test -p team_core -p team` (all pass, `tests/trainings.rs` 17 tests),
+`cargo clippy --all-targets -D warnings` (clean), `just api-types-check` (no difference). The
+browser tests were not run.
+
+No finding breaks a decision: rules sit in the core (`season_list`, `absent_count`,
+`check_training`, `day_times`, `proposed_times`, `proposals_from`, `players_at`, `now_there`,
+`check_mark`), the server only moves data, the routes are on the protected router, one training per
+date is guarded by the unique index, `CASCADE`/`RESTRICT` guard the absences, and logs carry dates
+and ids only.
+
+- **R1 – "Last season's weekly trainings" offers only the first one (bug against the spec's intent).**
+  `api/weekly_trainings.rs` `load` gives `proposals` only while the season has no weekly trainings
+  (`if stored.is_empty()`). With a Tuesday and a Thursday last season, "Add" on Tuesday makes the
+  answer's `proposals` empty, so the settings page drops the Thursday proposal before it is added.
+  The epic says "the settings page proposes the weekly trainings of last season" (plural), and
+  `proposals_from` deliberately returns one per day of the week. Suggest: leave out only the
+  proposals whose day of the week already has a weekly training in the season (or that overlap one
+  by `check_weekly_training`), and stop proposing once none is left. Siblings: the browser test
+  replaces the answer with a single proposal, and the server test
+  `last_seasons_weekly_trainings_are_proposed` checks "after Add empty" with one weekly training,
+  so neither can see this. Checked by trace (`load`, `settings/+page.svelte` `runWeekly`
+  sets `proposals = answer.proposals`); not run.
+  - 2026-10-17: fixed. Core `proposals_from(last, current, season)` leaves out only the days of the week that have a weekly training in the season, so the second proposal stays after "Add" of the first. Core test with Tuesday and Thursday; server test `last_seasons_weekly_trainings_are_proposed` with two days (Thursday still proposed after "Add" of Tuesday).
+- **R2 – A reload on "shown again" can overwrite a newer tap on the screen.** In
+  `training/[date]/+page.svelte` the `visibilitychange` handler checks `waiting > 0` before it sends
+  `loadTraining`, not when the answer comes. Phone unlocked in the hall, a tap at once on a slow
+  network: the reload's answer (read before the tap was stored) replaces `day`, and so `shown` and
+  `stored`; if it comes after the tap's answer, the row shows the old state although the tap was
+  saved (the opposite of "a late answer never overwrites a newer tap"; it never shows an unsaved
+  mark as saved). The same holds for the answer of "Cancel training" / "Undo cancel" (`run`) while
+  a tap is waiting. Suggest: drop a page answer when a tap started after the request was sent (a
+  counter of taps compared before and after), or keep the shown marks of players with a tap since.
+  Checked by trace; not reproduced.
+  - 2026-10-17: fixed. Every tap is counted; the answer of the reload when the page is shown again is used only when no tap was made since it was sent, and an action ("Open", "Cancel training", "Undo cancel") keeps the marks on the screen when a tap was made while it ran. Browser test `a reload that was sent before a tap does not undo the tap` (the reload held back 1.5 s); it fails without the check.
+- **R3 – Decision number 0019 now means two decisions.** Migration `0005` (applied, cannot be
+  edited) calls the players decision "decision 0019"; decision 0018 records that this was the
+  number planned before Close. The new code uses "decision 0019" for the attendance decision
+  (`migrations/0006_trainings.sql`, `crates/server/src/trainings.rs`,
+  `crates/core/src/attendance.rs`), and the Decisions table plans 0019 at Close. A reader of `0005`
+  who follows "0019" lands on the attendance decision. For Close: either say so in decision 0019
+  (as 0018 does for `0005`), or give the new record another number and fix the three new comments.
+  Checked by search (`grep -rn 0019 crates web/src migrations`).
+  - 2026-10-17: not fixed here: a choice for Close (the header of the applied migration `0005` cannot change).
+- **R4 – Small helpers built a third time.** `api/trainings.rs` defines `day`, `clock_time` and
+  `time` again; `api/weekly_trainings.rs` has the same three and `api/players.rs` has `day`.
+  `trainings::day` and `path_date` are `pub(crate)` but used nowhere else. Not a rule break; one
+  shared place (for example in `api/mod.rs`) keeps the date and time formats from drifting. Checked
+  by search (`grep -rn "fn day(\|fn clock_time(\|fn time(" crates/server/src`).
+  - 2026-10-17: fixed. `api/format.rs` holds `day`, `clock_time`, `time` and `path_date`; the API files use it.
+- **R5 – `invalid_date` has no sentence.** Step 3 lists the sentence of `invalid_date` for
+  `client.ts`; `messageFor` has none, so a date that cannot be read answers "Something went wrong.
+  Please try again." Low weight: the screens send dates from date fields. Checked by search in
+  `web/src/lib/api/client.ts`.
+  - 2026-10-17: fixed. `client.ts` says "This date cannot be read." for `invalid_date`.
+- **R6 – Claims checked.** The "checks pass" lines hold today (tests, clippy and api types run
+  above). The concurrency tests of "open" and "Add training" hold an insert open on another
+  connection and assert the request waits, so they can fail (read in `tests/trainings.rs`); the
+  `tokio::join!` deviation is a real improvement. The mutation checks were not repeated. The browser
+  test of the late answer depends on the marks of the tests before it in the file (the builder says
+  so); it is not wrong, but it fails alone with `-g`, unlike the pattern of self-contained tests.
+  - 2026-10-17: not changed: the training browser tests share one database and run in order on purpose (their own Playwright project after the player tests); each step's notes name what a test uses from the tests before it.
+- **R7 – Docs the diff made false (for Close).** `docs/architecture.md` (core `training`,
+  `attendance`, server `trainings.rs`, `api/trainings`, migration `0006`, the pages `/attendance`
+  and `/training/[date]`, the start page card) and the Architecture list in `CLAUDE.md` do not yet
+  name the new parts; Close updates them. In this spec, step 1 names storage `absences_of`; the
+  code has `absences_at`. Checked by reading.
+  - 2026-10-17: not fixed here: the living documents are updated at Close.
+
+Not findings (checked, intended or documented): a mark is not under the player's lock (a race with
+a role change can only leave an absence outside a role, which decision 0018 keeps and does not
+count); "Delete player" is shown always and refused with the spec's sentence (the Interface says
+"when the player has no absences": for the accept review); `Marked.absent` is unused by the front
+end (deviation, step 4).
+
+**Verdict**: no blocker against the project's rules. R1 is a bug against the spec's intent and
+should be fixed before Close; R2 is a narrow but real case of the hall scenario; R3 needs a choice
+at Close; R4–R7 are small.
+
+### Accept review (2026-10-17)
+Input: mode `accept`, this change folder; no other text was given. Read: `change.md`, the epic's
+`functional.md` (stories 1–4, Interface, warnings, the changes after approval), this spec's
+objective and requirements, the diff against `main` (the pages `/attendance`, `/training/[date]`,
+the start page card, `/team`, `/players/[id]`, `/settings`, `client.ts`, the core `training` and
+`attendance`, the routes). View formed before reading **Deviations** and the build review. Run:
+`cargo test -p team --test trainings` (17 pass). The app and the browser tests were not run (the
+browser tests share the dev database).
+
+What matches the intent (checked by reading the pages against the criteria): opening by a tap
+stores the training with everyone there, and a page load never writes; one row per date with
+"Coming" above "Past"; "Not opened" / "All there" / "N absent" / "Cancelled"; "Cancel" on a day
+that is not opened; "Show cancelled" on by default; "Add training" with proposed or typed times;
+"Change" keeps the attendance; "Delete training" with the spec's confirmation; "Undo cancel" with
+the absences kept; the card with "Not opened yet" and "Cancelled" (no time then), until midnight;
+one tap per mark, "There" on top for an absent player, hidden reasons not offered but still shown;
+hidden players with a role are at the training; rows 48 pixels high; "No player has a role on this
+date." and "No reasons. Add one in Reasons."; "now counts as there" with the dates after "Add
+player", "Add to the team", "Add all" and "Correct"; last season's weekly trainings on `/settings`.
+The October setup (weekly training, then Tue 1 Sep onward, one tap per Tuesday or "Cancel" for a
+holiday) works as the spec's Behaviour tells it.
+
+- **A1 – Concerning deviation: a team that trains twice a week gets only one of last season's
+  weekly trainings proposed.** Same cause as R1, judged here against the user: story 2 says "A team
+  that trains twice a week has two weekly trainings" and "the settings page proposes the weekly
+  trainings of last season". `load` in `api/weekly_trainings.rs` proposes only while the season has
+  none (`if stored.is_empty()`), and `/settings` replaces `proposals` with each answer, so after
+  "Add" on the first proposal the second is gone for good; the coordinator must type it by hand
+  without being told. It does not bite the coordinator's own team (Tuesday only) and not before 1
+  July 2027, but it is a wrong result, not a choice. Fix in the build (no spec change): drop only
+  the proposals whose day already has a weekly training in the season. Checked by trace; not run.
+  - 2026-10-17: fixed with R1.
+- **A2 – Neutral drift: an earlier season's training is reachable only by typing its address.**
+  The spec's example is "the last training of May found in July". From 1 July the list shows the
+  new season, and nothing on the screens leads to 2026-2027 (only `/training/2027-05-25` by hand).
+  The deviation says so and the coordinator chose it (2026-10-17), with the choice of season in
+  story C. Faithful only if story C is released before 1 July 2027; otherwise the criterion is not
+  met for the user. Checked by reading `/attendance` (`loadTrainings` without a season) and
+  `+page.ts`.
+  - 2026-10-17: not changed (the coordinator's choice, 2026-10-17); a backlog line asks for story C before 1 July 2027.
+- **A3 – Neutral drift: a waiting tap looks the same as a saved one.** The spec wants the row to
+  change at once and "show the old state again" on a failure, so showing the tap before the answer
+  is intended. But nothing marks a tap that is still waiting, and requests have no time limit
+  (search `timeout|AbortSignal|signal` in `client.ts`: none). On a weak hall network the row shows
+  "Ill" for as long as the browser waits; when it then fails, "Not saved. Try again." appears on a
+  phone that may be back in the pocket, and leaving the page drops the message (no warning while a
+  tap waits). The list then shows the stored count, so the error is visible later, but not marked
+  as such. This is at the edge of the warning "a tap that was not saved must never look saved".
+  Suggest for a later step or story C: a quiet "saving" mark on a waiting row, a time limit on
+  mark requests, or a warning when leaving with a waiting or failed tap. R2 is the other side of
+  the same scenario. Checked by reading `training/[date]/+page.svelte`; not run.
+  - 2026-10-17: fixed (coordinator's choice: a "saving" mark and a time limit of 10 s). The row shows "saving…" while a tap of that player waits; a tap without an answer after 10 s (`TAP_TIMEOUT_MS`, `AbortSignal.timeout`) counts as not saved: the row shows the stored state and "Not saved. Try again.". Browser test `a tap without an answer for 10 seconds counts as not saved`; it fails without the time limit. A tap that reaches the server after its time limit is saved there but shown as not saved until the page loads again: never a mark that looks saved when it is not.
+- **A4 – Neutral drift: "Delete player" shows also for a player with absences.** The Interface says
+  the player page has "Delete player" "when the player has no absences"; the page shows it always,
+  asks "This cannot be undone.", and only then refuses with the spec's sentence. The outcome is
+  safe and the sentence tells what to do; one useless confirmation. Checked by reading
+  `players/[id]/+page.svelte` and `api/players.rs` `delete`.
+  - 2026-10-17: fixed. `PlayerDetail.has_absences`; the player page offers "Delete player" only without absences (the server still refuses it). Server test (in `a_player_with_absences_cannot_be_deleted`) and browser test `a player with absences is not offered "Delete player"`.
+- **A5 – Faithful adaptations.** "Add training" only in the current season (the spec lists open,
+  enter, change and cancel for an earlier season, not add); "Open" refused on a date that is not a
+  training day (the screens offer it only for training days; a typed address of such a date gets
+  "This date is not a training day."); a mark for a player with no role refused (never offered);
+  "now counts as there" also lists an opened future training (the spec says "on or after that
+  date"; the word "earlier" in the sentence is the spec's own); one proposal per day of the week;
+  the empty list's sentence pointing to Settings; "extra" on the row of an extra training; the
+  card in every state with a login. None changes what the coordinator meant.
+  - 2026-10-17: nothing to fix.
+- **A6 – Neutral, for later.** When last season moved a weekly training ("Tuesday until January,
+  Thursday from Thu 7 Jan", the spec's own example of a real change), both days are proposed for
+  the new season, also the Tuesday that was given up. The coordinator can leave it, so no harm;
+  worth a thought in story C or at Learn. Checked by reading `proposals_from`.
+  - 2026-10-17: fixed (coordinator's choice): only the weekly trainings that ran until the end of last season (their window ends in its last week of training days) are proposed. Core test: Tuesday until January and Thursday from January → only Thursday.
+
+**Verdict**: **accepted with notes.** What was built is what the coordinator meant for trainings,
+the list, the card and marking. A1 must be fixed in the build before Close (as R1); A2 depends on
+story C coming before 1 July 2027; A3 is worth a small follow-up for the hall scenario; A4–A6 need
+no action now.

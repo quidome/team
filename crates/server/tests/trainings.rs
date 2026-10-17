@@ -717,10 +717,17 @@ async fn a_player_with_absences_cannot_be_deleted(pool: PgPool) {
         .send("DELETE", &format!("/api/players/{avery}"), None)
         .await;
     assert_eq!(answer, (400, json!({ "error": "player_has_absences" })));
-    let (status, _) = coordinator
-        .send("GET", &format!("/api/players/{avery}"), None)
+    // The page offers "Delete player" only without absences.
+    let player = coordinator
+        .ok("GET", &format!("/api/players/{avery}"), None)
         .await;
-    assert_eq!(status, 200);
+    assert_eq!(player["has_absences"], true);
+    assert_eq!(
+        coordinator
+            .ok("GET", &format!("/api/players/{blake}"), None)
+            .await["has_absences"],
+        false
+    );
     assert_eq!(stored_absences(&pool).await, 1);
     // Blake has no absences: deleted.
     let (status, _) = coordinator

@@ -218,15 +218,66 @@ test('a second tap waits for the first, so a late answer never overwrites it', a
 	await yara.getByRole('button', { name: /Yara/ }).click();
 	await yara.getByRole('button', { name: 'School' }).click();
 	await expect(yara.getByTestId('player-mark')).toHaveText('School');
+	await expect(yara.getByTestId('saving')).toHaveText('saving…');
 	// Before the first answer: another reason.
 	await yara.getByRole('button', { name: /Yara/ }).click();
 	await yara.getByRole('button', { name: 'Ill' }).click();
 	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
 	await expect.poll(() => order).toEqual(['first sent', 'first answered', 'second sent']);
 	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 	await page.reload();
 	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	expect(errors).toEqual([]);
+});
+
+test('a tap without an answer for 10 seconds counts as not saved', async ({ page }) => {
+	test.setTimeout(60_000);
+	const errors = watchConsole(page);
+	// The answer never comes (the network in the hall is gone).
+	await page.route('**/api/trainings/2026-10-06/absences/*', () => new Promise(() => {}));
+	await page.goto('/training/2026-10-06');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'School' }).click();
+	await expect(yara.getByTestId('player-mark')).toHaveText('School');
+	await expect(yara.getByTestId('saving')).toBeVisible();
+	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.', {
+		timeout: 15_000
+	});
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.reload();
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	expect(errors.filter((line) => !line.includes('ERR_ABORTED'))).toEqual([]);
+});
+
+test('a reload that was sent before a tap does not undo the tap', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/training/2026-10-06');
+	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
+	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
+	// The reload when the phone comes back is slow; its answer still says "Ill".
+	await page.route('**/api/trainings/2026-10-06', async (route) => {
+		const answer = await route.fetch();
+		await new Promise((done) => setTimeout(done, 1500));
+		await route.fulfill({ response: answer });
+	});
+	const reloaded = page.waitForResponse('**/api/trainings/2026-10-06');
+	await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'There' }).click();
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
+	await reloaded;
+	await page.waitForTimeout(200);
+	await expect(yara.getByTestId('player-mark')).toHaveText('there');
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	// Back to "Ill" for the tests after this one.
+	await yara.getByRole('button', { name: /Yara/ }).click();
+	await yara.getByRole('button', { name: 'Ill' }).click();
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
 	expect(errors).toEqual([]);
 });
 
@@ -314,20 +365,17 @@ test('a player added from 1 September counts as there at the trainings since', a
 	expect(errors).toEqual([]);
 });
 
-test('a player with absences cannot be deleted', async ({ page }) => {
+test('a player with absences is not offered "Delete player"', async ({ page }) => {
 	const errors = watchConsole(page);
-	// Yara is absent ("Ill") on Tue 6 Oct.
+	// Yara is absent ("Ill") on Tue 6 Oct; Zane has no absences.
 	await page.goto('/players');
 	await page.getByTestId('player').filter({ hasText: 'Yara' }).click();
-	page.once('dialog', (dialog) => void dialog.accept());
-	await page.getByRole('button', { name: 'Delete player' }).click();
-	await expect(page.getByRole('alert')).toHaveText(
-		'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.'
-	);
 	await expect(page.getByTestId('player-name')).toHaveText('Yara');
-	expect(errors).toEqual([
-		'Failed to load resource: the server responded with a status of 400 (Bad Request)'
-	]);
+	await expect(page.getByRole('button', { name: 'Delete player' })).toHaveCount(0);
+	await page.goto('/players');
+	await page.getByTestId('player').filter({ hasText: 'Zane' }).click();
+	await expect(page.getByRole('button', { name: 'Delete player' })).toBeVisible();
+	expect(errors).toEqual([]);
 });
 
 test("a new season proposes last season's weekly trainings", async ({ page }) => {

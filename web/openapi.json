@@ -2400,11 +2400,16 @@
           "season_first_day",
           "season_last_day",
           "history",
-          "now_there"
+          "now_there",
+          "has_absences"
         ],
         "properties": {
           "first_name": {
             "type": "string"
+          },
+          "has_absences": {
+            "type": "boolean",
+            "description": "The player has absences, so \"Delete player\" is not offered."
           },
           "hidden": {
             "type": "boolean"
@@ -3473,7 +3478,7 @@
             "items": {
               "$ref": "#/components/schemas/WeeklyProposalView"
             },
-            "description": "Only while the season has no weekly trainings: last season's, one per day of the week, each\nwith the new proposed window. Saved with \"Add\"."
+            "description": "Last season's weekly trainings that ran until its end, one per day of the week that has no\nweekly training yet in this season, each with the new proposed window. Saved with \"Add\"."
           },
           "season": {
             "type": "string"

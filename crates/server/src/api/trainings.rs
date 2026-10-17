@@ -4,7 +4,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{NaiveDate, NaiveTime};
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
     AttendanceError, DayStatus, PlayerId, ReasonId, Season, SeasonRow, Training, absent_count,
@@ -12,6 +12,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
+use super::format::{clock_time, day, path_date, time};
 use super::players::RoleKind;
 use super::reasons::{AbsenceReason, view as reason_view};
 use crate::app::AppState;
@@ -140,23 +141,6 @@ fn taken(error: StoreError) -> AppError {
     } else {
         error.into()
     }
-}
-
-fn time(text: &str) -> Result<NaiveTime, AppError> {
-    NaiveTime::parse_from_str(text, "%H:%M").map_err(|_| AppError::BadRequest("invalid_time"))
-}
-
-pub(crate) fn day(date: NaiveDate) -> String {
-    date.format("%Y-%m-%d").to_string()
-}
-
-fn clock_time(time: NaiveTime) -> String {
-    time.format("%H:%M").to_string()
-}
-
-/// A date in a path, for example "2026-10-13"; else `invalid_date`.
-pub(crate) fn path_date(text: &str) -> Result<NaiveDate, AppError> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").map_err(|_| AppError::BadRequest("invalid_date"))
 }
 
 fn row_view(row: &SeasonRow) -> TrainingRow {

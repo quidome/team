@@ -12,7 +12,8 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use super::players::{NowThere, RoleKind, RoleView, day, role_view};
+use super::format::day;
+use super::players::{NowThere, RoleKind, RoleView, role_view};
 use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgConnection;

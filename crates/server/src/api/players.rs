@@ -14,6 +14,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
+use super::format::day;
 use super::team::{self, TeamPageView};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
@@ -108,6 +109,8 @@ pub struct PlayerDetail {
     /// After a save of a role: the trainings at which the player now counts as there. Empty
     /// otherwise.
     pub now_there: Vec<NowThere>,
+    /// The player has absences, so "Delete player" is not offered.
+    pub has_absences: bool,
 }
 
 /// A player who counts as "there" at trainings after a role started or its start moved earlier.
@@ -195,10 +198,6 @@ impl From<PlayerError> for AppError {
     }
 }
 
-pub(crate) fn day(date: NaiveDate) -> String {
-    date.format("%Y-%m-%d").to_string()
-}
-
 pub(crate) fn role_view(role: &PlayerRole) -> RoleView {
     RoleView {
         id: role.id.0,
@@ -268,6 +267,7 @@ async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError
             })
             .collect(),
         now_there: Vec::new(),
+        has_absences: trainings::player_has_absences(&state.pool, id).await?,
     })
 }
 

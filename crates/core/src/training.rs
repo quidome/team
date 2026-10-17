@@ -217,12 +217,31 @@ pub struct WeeklyProposal {
     pub until: NaiveDate,
 }
 
-/// Last season's weekly trainings (`last`) for `season`: for each day of the week the one with the
-/// latest window, with the proposed window of `season`; sorted by the start of the window. So two
-/// proposals never overlap.
-pub fn proposals_from(last: &[WeeklyTraining], season: Season) -> Vec<WeeklyProposal> {
+/// Last season's weekly trainings (`last`) proposed for `season`: those that ran until the end of
+/// last season (their window ends in the last week of its training days), one per day of the week
+/// (the newest), each with the proposed window of `season`, sorted by the start of the window. A day
+/// of the week that already has a weekly training in `season` (`current`) gets no proposal. So a
+/// day given up during last season is not proposed, and two proposals never overlap.
+pub fn proposals_from(
+    last: &[WeeklyTraining],
+    current: &[WeeklyTraining],
+    season: Season,
+) -> Vec<WeeklyProposal> {
+    let Some(latest) = last.iter().map(|training| training.until).max() else {
+        return Vec::new();
+    };
     let mut newest: BTreeMap<u32, &WeeklyTraining> = BTreeMap::new();
     for training in last {
+        let to_the_end = training
+            .until
+            .checked_add_days(Days::new(7))
+            .is_none_or(|week_later| week_later > latest);
+        let taken = current
+            .iter()
+            .any(|other| other.weekday == training.weekday);
+        if !to_the_end || taken {
+            continue;
+        }
         let key = training.weekday.number_from_monday();
         if newest
             .get(&key)
@@ -674,7 +693,7 @@ mod tests {
             time(19, 45),
         )];
         assert_eq!(
-            proposals_from(&one, season()),
+            proposals_from(&one, &[], season()),
             [WeeklyProposal {
                 weekday: Weekday::Tue,
                 start: time(19, 45),
@@ -683,7 +702,7 @@ mod tests {
                 until: date(2027, 5, 25),
             }]
         );
-        // A change of schedule in January: one proposal, with the newest times.
+        // Two Tuesdays (other times from January): one proposal, with the newest times.
         let two = [
             of_last(
                 1,
@@ -700,10 +719,10 @@ mod tests {
                 time(20, 0),
             ),
         ];
-        let proposals = proposals_from(&two, season());
+        let proposals = proposals_from(&two, &[], season());
         assert_eq!(proposals.len(), 1);
         assert_eq!(proposals[0].start, time(20, 0));
-        // Tuesday and Thursday: two, sorted by the start of the window.
+        // Tuesday and Thursday until the end: two, sorted by the start of the window.
         let both = [
             of_last(
                 1,
@@ -720,10 +739,37 @@ mod tests {
                 time(19, 45),
             ),
         ];
-        let days: Vec<Weekday> = proposals_from(&both, season())
-            .iter()
-            .map(|proposal| proposal.weekday)
-            .collect();
-        assert_eq!(days, [Weekday::Tue, Weekday::Thu]);
+        let days = |proposals: Vec<WeeklyProposal>| -> Vec<Weekday> {
+            proposals.iter().map(|proposal| proposal.weekday).collect()
+        };
+        assert_eq!(
+            days(proposals_from(&both, &[], season())),
+            [Weekday::Tue, Weekday::Thu]
+        );
+        // A day that has a weekly training in the new season is not proposed again.
+        let tuesday = [weekly(9, Weekday::Tue, date(2026, 9, 1), date(2027, 5, 25))];
+        assert_eq!(
+            days(proposals_from(&both, &tuesday, season())),
+            [Weekday::Thu]
+        );
+        // Moved from Tuesday to Thursday in January: the given-up Tuesday is not proposed.
+        let moved = [
+            of_last(
+                1,
+                Weekday::Tue,
+                date(2025, 9, 2),
+                date(2026, 1, 6),
+                time(19, 45),
+            ),
+            of_last(
+                2,
+                Weekday::Thu,
+                date(2026, 1, 8),
+                date(2026, 5, 28),
+                time(19, 45),
+            ),
+        ];
+        assert_eq!(days(proposals_from(&moved, &[], season())), [Weekday::Thu]);
+        assert!(proposals_from(&[], &[], season()).is_empty());
     }
 }

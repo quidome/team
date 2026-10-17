@@ -221,3 +221,17 @@ pub async fn unmark(
     .await?;
     Ok(())
 }
+
+/// Whether `player` has an absence at any training ("Delete player" is then refused).
+pub async fn player_has_absences(
+    db: impl PgExecutor<'_>,
+    player: PlayerId,
+) -> Result<bool, StoreError> {
+    let found = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM absences WHERE player_id = $1) AS "found!""#,
+        player.0
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(found)
+}

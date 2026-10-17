@@ -183,21 +183,27 @@ async fn last_seasons_weekly_trainings_are_proposed(pool: PgPool) {
     coordinator
         .ok("POST", "/api/weekly-trainings", Some(tuesday()))
         .await;
-    // While the season has weekly trainings, nothing is proposed.
-    let list = coordinator.ok("GET", "/api/weekly-trainings", None).await;
+    let thursday = json!({ "weekday": 4, "start": "19:00", "end": "20:30",
+                           "from": "2026-09-03", "until": "2027-05-27" });
+    let list = coordinator
+        .ok("POST", "/api/weekly-trainings", Some(thursday))
+        .await;
+    // Last season (2025-2026) had no weekly trainings: nothing is proposed.
     assert_eq!(list["proposals"], json!([]));
 
-    // The next season: last season's Tuesday with the new proposed window.
+    // The next season: both of last season's weekly trainings, with new windows.
     coordinator.harness.clock.set(utc(2027, 8, 15, 12, 0));
     coordinator.log_in_again().await;
     let list = coordinator.ok("GET", "/api/weekly-trainings", None).await;
     assert_eq!(list["season"], "2027-2028");
     assert_eq!(
         list["proposals"],
-        json!([{ "weekday": 2, "start": "19:45", "end": "21:00",
+        json!([{ "weekday": 4, "start": "19:00", "end": "20:30",
+                 "from": "2027-09-02", "until": "2028-05-25" },
+               { "weekday": 2, "start": "19:45", "end": "21:00",
                  "from": "2027-09-07", "until": "2028-05-30" }])
     );
-    // Saved with "Add": no longer proposed.
+    // Tuesday saved with "Add": Thursday is still proposed.
     let list = coordinator
         .ok(
             "POST",
@@ -206,5 +212,9 @@ async fn last_seasons_weekly_trainings_are_proposed(pool: PgPool) {
                          "from": "2027-09-07", "until": "2028-05-30" })),
         )
         .await;
-    assert_eq!(list["proposals"], json!([]));
+    assert_eq!(
+        list["proposals"],
+        json!([{ "weekday": 4, "start": "19:00", "end": "20:30",
+                 "from": "2027-09-02", "until": "2028-05-25" }])
+    );
 }

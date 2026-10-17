@@ -2,6 +2,7 @@
 
 pub mod changes;
 pub mod clubs;
+pub(crate) mod format;
 pub mod health;
 pub mod me;
 pub mod players;

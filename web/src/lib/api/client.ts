@@ -70,6 +70,7 @@ export function messageFor(error: unknown, status: number): string {
 		training_exists: 'There is already a training on this date.',
 		not_a_training_day: 'This date is not a training day.',
 		reason_hidden: 'This reason is hidden.',
+		invalid_date: 'This date cannot be read.',
 		player_has_absences:
 			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
@@ -393,21 +394,28 @@ export async function cancelTraining(date: string): Promise<TrainingDay> {
 
 export type Marked = components['schemas']['Marked'];
 
-/** Marks a player absent at the training of `date` with a reason; the last mark wins. */
+/** A tap without an answer after this time counts as not saved (a weak network in the hall). */
+export const TAP_TIMEOUT_MS = 10_000;
+
+/** Marks a player absent at the training of `date` with a reason; the last mark wins. Fails after
+ * `TAP_TIMEOUT_MS` without an answer. */
 export async function markAbsent(date: string, player: number, reason: number): Promise<Marked> {
 	return dataOf(
 		await api.PUT('/api/trainings/{date}/absences/{player}', {
 			params: { path: { date, player } },
-			body: { reason }
+			body: { reason },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
 		})
 	);
 }
 
-/** Marks a player there again (safe to send twice). */
+/** Marks a player there again (safe to send twice). Fails after `TAP_TIMEOUT_MS` without an
+ * answer. */
 export async function markThere(date: string, player: number): Promise<Marked> {
 	return dataOf(
 		await api.DELETE('/api/trainings/{date}/absences/{player}', {
-			params: { path: { date, player } }
+			params: { path: { date, player } },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
 		})
 	);
 }
