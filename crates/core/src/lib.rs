@@ -15,7 +15,10 @@ pub mod team_choice;
 pub mod training;
 
 pub use access::{Identity, may_access};
-pub use attendance::{Absence, AtTraining, AttendanceError, check_mark, now_there, players_at};
+pub use attendance::{
+    Absence, AtTraining, AttendanceError, Missed, PlayerTotals, SeasonOverview, check_mark,
+    now_there, players_at, season_overview,
+};
 pub use club::{Club, ClubNumber, search_clubs};
 pub use comparison::{
     Change, ChangeKind, ChangeUpdate, Counts, Difference, GameChange, ListedChange, OpenChange,
