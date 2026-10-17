@@ -81,26 +81,17 @@ Never apply it by hand. The image keeps this contract:
 | Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET` |
 | Other settings | `ORIGIN`, `SESSION_TTL_SECONDS`, `DEV_AUTH_BYPASS` and `DEV_NOW` (a start moment for the clock, for example `2026-10-12T10:00:00Z`; both ignored by release builds), optional `TEAM_ACCESS_ROLE` (default `team_coordinator`), `GAME_LIST_URL` (default `https://db.basketball.nl`; the cluster uses the default), `HOST`, `PORT`, `WEB_DIR` |
 
-### Switching from the old app (once)
+### Switching from the old app (done)
 
-Do this **before** the first image of the new app reaches `main` (decision 0006), so the new
-migrations never run against the old database:
+The new app uses its own, empty database (decision 0006). On the cluster this was done on
+2026-10-17, when the first migration of the new app clashed with a table of the old app
+(`players`): the database `team` of the old app was dropped and made again, empty, with the same
+name, so `DATABASE_URL` in Vault did not change. The new app's migrations then ran from the start.
 
-1. Back up the old database `team` to a file outside the cluster:
-   ```sh
-   kubectl exec -n productivity team-postgresql-0 -- \
-     pg_dump --format=custom --no-owner -U team team > team-old-app.dump
-   ```
-   Check it: `pg_restore --list team-old-app.dump | head`.
-2. Create the new database:
-   ```sh
-   kubectl exec -n productivity team-postgresql-0 -- \
-     psql -U team -d postgres -c 'CREATE DATABASE team_v2 OWNER team'
-   ```
-3. In Vault `kv/productivity/team`, set `DATABASE_URL` to
-   `postgresql://team:<password>@team-postgresql.productivity.svc.cluster.local:5432/team_v2`,
-   then sync through Argo CD.
-4. In Pocket ID, client `team-coordinator`: allow the `groups` scope; make sure you are in the
-   group `team_coordinator`; optionally limit the client to that group.
-5. After the new app works: delete the old database
-   (`psql -U team -d postgres -c 'DROP DATABASE team'`).
+```sh
+kubectl exec -n productivity team-postgresql-0 -- \
+  psql -U team -d postgres -c 'DROP DATABASE team WITH (FORCE)' -c 'CREATE DATABASE team OWNER team'
+```
+
+Pocket ID, client `team-coordinator`: the `groups` scope is allowed, and the coordinator is in the
+group `team_coordinator` (decision 0007).

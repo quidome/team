@@ -134,7 +134,6 @@ pull requests read them. GitHub does not use Nix; locally the Nix shell gives th
 - A first reading of a season accepts an empty game list, also for a club number the source does not know; accepted because the number comes only from a saved, checked choice (decision 0015).
 - Each login with a wrong ID token signature makes one extra request to Pocket ID (to fetch its keys again). Limit it if it is ever abused.
 - `npm audit` reports 5 low findings in the front-end libraries (the bits-ui chain, a cookie library); they do not apply to static files. Check again when the libraries update.
-- The old database `team` of the replaced app is still on the PostgreSQL server; delete it (backlog, small).
 - Old `build-…` and `sha-…` images are never removed from the registry. Fix: a cleanup job (idea in `docs/ideas.md`).
 - GitHub actions from other parties are fixed to a major version, not to an exact commit. Fix together with automatic dependency updates (idea in `docs/ideas.md`).
 - The cluster follows the moving name `latest`; pinning to a fixed version is planned in the `gitops-lab` README before production use.
