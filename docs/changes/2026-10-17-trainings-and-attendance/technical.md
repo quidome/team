@@ -231,7 +231,7 @@ On `main` (b558232 and later), story A is built and on the cluster:
 ## Progress
 - [x] Step 1: the data and the rules, read only (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 159 core tests, 42 browser tests)
 - [x] Step 2: the writes of a training (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
-- [ ] Step 3: the page "Attendance" and the card
+- [x] Step 3: the page "Attendance" and the card (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 48 browser tests)
 - [ ] Step 4: marking and the training page
 - [ ] Step 5: the parts of stories 1 and 4
 - [ ] Review build
@@ -259,5 +259,11 @@ Implement:
   - "Add training" and "Change" take the times as "19:45" text (as the weekly trainings), so a time that cannot be read answers `invalid_time`.
   - "Open" of a date that already has a training (also an extra training) answers that training and writes nothing.
   - Logs: "training opened", "training added", "training changed", "training cancelled", "training cancel undone", "training deleted", "absence marked", "absence removed", with the date and the player id only.
+- 2026-10-17, step 3:
+  - The season parameter of `GET /api/trainings` was described as a path parameter in the OpenAPI description (step 1); it is now a query parameter (`parameter_in = Query`), as the front end needs.
+  - The browser tests of trainings are a Playwright project of their own (`trainings`, after `logged-in`): they share the database, and the settings test of the players expects no weekly training at its start.
+  - On the list, the button of a row that is not opened reads "Cancel" (its accessible name is "Cancel training of Tue 20 Oct"), so the row fits at 320 pixels.
+  - A season with no training days and no trainings shows "No training days or trainings this season. Add a weekly training in Settings." (the spec names no empty state for the list in story B; story C adds "No trainings yet this season." to the totals).
+  - The card is on the start page in every state with a login (it needs no chosen team), below the line of links, which now starts with "Attendance".
 
 ## Review findings

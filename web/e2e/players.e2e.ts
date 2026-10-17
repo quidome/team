@@ -5,9 +5,10 @@ import { expectAccessible, expectNoHorizontalScroll, watchConsole } from './help
 
 test.describe.configure({ mode: 'serial' });
 
-test('the start page links to the team, players and settings', async ({ page }) => {
+test('the start page links to attendance, the team, players and settings', async ({ page }) => {
 	await page.goto('/');
 	const links = page.getByTestId('team-links');
+	await expect(links.getByRole('link', { name: 'Attendance' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Team' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Players' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Settings' })).toBeVisible();

@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { loadSchedule } from '#lib/api/client.js';
+	import { ApiError, loadSchedule, openTraining, type TrainingRow } from '#lib/api/client.js';
 	import ChooseTeam from '#lib/components/ChooseTeam.svelte';
 	import ReadGameList from '#lib/components/ReadGameList.svelte';
 	import Schedule from '#lib/components/Schedule.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { unseenLine } from '#lib/changes.js';
+	import { formatDay } from '#lib/schedule.js';
+	import { statusText } from '#lib/trainings.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -16,6 +18,23 @@
 	let schedule = $derived(data.schedule);
 	let hasReading = $derived(Boolean(data.readings?.last_good));
 	let scheduleError = $state(false);
+
+	let opening = $state(false);
+	let trainingError = $state<string | null>(null);
+
+	/** A tap on the card opens the training (and so makes it exist), then shows it. */
+	async function openNext(next: TrainingRow) {
+		opening = true;
+		trainingError = null;
+		try {
+			if (!next.opened) await openTraining(next.date);
+			await goto(resolve('/training/[date]', { date: next.date }));
+		} catch (failure) {
+			trainingError =
+				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
+			opening = false;
+		}
+	}
 
 	/** After a good reading. A failure here is not a failed reading, so the card does not show it. */
 	async function refreshSchedule() {
@@ -35,12 +54,35 @@
 
 {#snippet links()}
 	<nav aria-label="Team" class="text-sm" data-testid="team-links">
+		<a href={resolve('/attendance')} class="font-medium underline underline-offset-4">Attendance</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/players')} class="font-medium underline underline-offset-4">Players</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/settings')} class="font-medium underline underline-offset-4">Settings</a>
 	</nav>
+	{#if data.nextTraining}
+		{@const next = data.nextTraining}
+		<button
+			type="button"
+			class="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2 text-left text-sm shadow-xs disabled:opacity-60"
+			disabled={opening}
+			onclick={() => openNext(next)}
+			data-testid="training-card"
+		>
+			<span class="min-w-0 truncate">
+				<span class="font-medium">Training · {formatDay(next.date)}</span>
+				{#if next.status !== 'cancelled'}
+					<span class="text-muted-foreground">· {next.start}</span>
+				{/if}
+			</span>
+			<span class="shrink-0 text-muted-foreground">{statusText(next, true)}</span>
+		</button>
+		{#if trainingError}
+			<p class="mt-1 text-sm" role="alert">{trainingError}</p>
+		{/if}
+	{/if}
 {/snippet}
 
 {#if data.selection?.state === 'not_chosen'}

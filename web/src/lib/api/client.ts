@@ -67,6 +67,9 @@ export function messageFor(error: unknown, status: number): string {
 		not_in_team: 'This player is not in the team on that date.',
 		same_role: 'The player already has this role.',
 		confirm_removal: 'This player was changed in the meantime. Please try again.',
+		training_exists: 'There is already a training on this date.',
+		not_a_training_day: 'This date is not a training day.',
+		reason_hidden: 'This reason is hidden.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
@@ -341,4 +344,46 @@ export async function changeWeeklyTraining(
 
 export async function deleteWeeklyTraining(id: number): Promise<WeeklyTrainings> {
 	return dataOf(await api.DELETE('/api/weekly-trainings/{id}', { params: { path: { id } } }));
+}
+
+export type TrainingList = components['schemas']['TrainingList'];
+export type TrainingRow = components['schemas']['TrainingRow'];
+export type TrainingDay = components['schemas']['TrainingDay'];
+export type AtTraining = components['schemas']['AtTrainingView'];
+
+/** The training days and trainings of the current season, one row per date. */
+export async function loadTrainings(fetch: typeof globalThis.fetch): Promise<TrainingList> {
+	return dataOf(await api.GET('/api/trainings', { fetch }));
+}
+
+/** The card on the start page: the next training, or null. */
+export async function loadNextTraining(
+	fetch: typeof globalThis.fetch
+): Promise<TrainingRow | null> {
+	const result = await api.GET('/api/trainings/next', { fetch });
+	if (!result.response.ok) throw apiError(result.error, result.response.status);
+	return result.data ?? null;
+}
+
+/** One date: its training with the players, or nothing yet. */
+export async function loadTraining(
+	fetch: typeof globalThis.fetch,
+	date: string
+): Promise<TrainingDay> {
+	return dataOf(await api.GET('/api/trainings/{date}', { fetch, params: { path: { date } } }));
+}
+
+/** Opens a training day: the training exists from now on (safe to send twice). */
+export async function openTraining(date: string): Promise<TrainingDay> {
+	return dataOf(await api.PUT('/api/trainings/{date}/open', { params: { path: { date } } }));
+}
+
+/** "Add training" on a date without a training. */
+export async function addTraining(date: string, start: string, end: string): Promise<TrainingDay> {
+	return dataOf(await api.POST('/api/trainings', { body: { date, start, end } }));
+}
+
+/** "Cancel training"; a training day that is not opened gets a cancelled training. */
+export async function cancelTraining(date: string): Promise<TrainingDay> {
+	return dataOf(await api.POST('/api/trainings/{date}/cancel', { params: { path: { date } } }));
 }
