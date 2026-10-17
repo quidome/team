@@ -267,6 +267,9 @@ test('"Undo" for a player whose roles were all removed, and "Change role" to the
 	const form = page.getByTestId('add-player');
 	await form.getByLabel('Player').selectOption({ label: 'New player' });
 	await form.getByLabel('First name').fill('Wren');
+	await expect(form.getByLabel('In the team from')).toHaveValue('2026-09-01');
+	await form.getByRole('button', { name: 'Today' }).click();
+	await expect(form.getByLabel('In the team from')).toHaveValue('2026-10-12');
 	await form.getByLabel('In the team from').fill('2026-11-02');
 	await form.getByRole('button', { name: 'Save' }).click();
 	const wren = page.getByTestId('member').filter({ hasText: 'Wren' });
@@ -344,8 +347,14 @@ test('the team page brings last season\'s players back with "Add all"', async ({
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 	await part.getByRole('button', { name: 'Add all' }).click();
+	const addAll = part.getByTestId('add-all');
+	await expect(addAll.getByLabel('In the team from')).toHaveValue('2026-09-01');
+	await addAll.getByRole('button', { name: 'Today' }).click();
+	await expect(addAll.getByLabel('In the team from')).toHaveValue('2026-10-12');
+	await expectNoHorizontalScroll(page, 320);
+	await addAll.getByRole('button', { name: 'Add all' }).click();
 	await expect(part).toHaveCount(0);
-	expect(sent).toEqual([{ players: [9001, 9002] }]);
+	expect(sent).toEqual([{ players: [9001, 9002], from: '2026-10-12' }]);
 	expect(errors).toEqual([]);
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 });

@@ -272,7 +272,7 @@
         },
         "responses": {
           "200": {
-            "description": "The team; the listed players of last season have the same role in this season",
+            "description": "The team; the listed players of last season have the same role in this season, from `from`",
             "content": {
               "application/json": {
                 "schema": {
@@ -280,6 +280,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "`outside_season`; no player is added"
           },
           "401": {
             "description": "Not logged in"
@@ -1236,9 +1239,15 @@
       "CarryRequest": {
         "type": "object",
         "required": [
-          "players"
+          "players",
+          "from"
         ],
         "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "\"In the team from\": the first day of their roles in this season."
+          },
           "players": {
             "type": "array",
             "items": {
