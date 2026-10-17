@@ -1,9 +1,9 @@
 # Technical spec: Players and settings
 
-**Status**: in progress (designed again 2026-10-16; the first form, built and reviewed on 2026-10-15 and 2026-10-16, is replaced)
+**Status**: approved (designed again 2026-10-16, steps 1–4 built; steps 5–9 designed and approved 2026-10-17 after the second build and accept review)
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
-**Date**: 2026-10-15, designed again 2026-10-16
+**Date**: 2026-10-15, designed again 2026-10-16, steps 5–9 on 2026-10-17
 
 ## Objective
 Let the coordinator keep the club's players, the team of the current season with each player's
@@ -11,7 +11,7 @@ role, the weekly trainings, and the reasons for an absence, so that story B can 
 
 ## Requirements summary
 Story A of the epic [Attendance at training](../2026-10-14-attendance-at-training/technical.md),
-from functional stories 1, 2 (the weekly trainings) and 4, as approved again on 2026-10-16. Words
+from functional stories 1, 2 (the weekly trainings) and 4, as approved again on 2026-10-16 (story 1 changed after the second reviews of this story, approved after the sixth spec review). Words
 from `docs/language.md` (player, role, hidden, weekly training, training day).
 
 The model (coordinator, 2026-10-16): the **club** has the players; a **team** exists for one
@@ -22,9 +22,15 @@ link, and can be entered before the team is chosen.
 
 1. **Players page** (`/players`): all players, sorted by first name, each with "Plays games" / "Only trains" when in the team today, else "Not in the team"; "Add player" (first name required, last name optional; trimmed; an empty last name is none); the switch "Show hidden players" (off: hidden players are not listed). The warning "There is already a player with this name." after a save with the same first and last name.
 2. **Player page** (`/players/[id]`): the name (change and save), the switch "Hidden", the history (all roles of all seasons, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sep – Sat 31 Oct"), "Correct" on a role of the current season (kind, start, end; the same checks as a new role), "Delete player" (after a confirmation; story B adds: only without absences). Roles of an earlier season are shown, not corrected.
-3. **Hidden**: a hidden player is not offered in "Add player" of the team page and not in "Add all". Hiding changes nothing else: a hidden player in the team stays in the team, with its history.
-4. **Team page** (`/team`, current season): the heading with the chosen team's name and the season ("U14-1 · 2026-2027"), or "Team not chosen yet" with a link to choose it (coordinator, 2026-10-16). The players in the team today or later in the season (sorted by first name, with the role), then "Left the team" (a role earlier in the season, none today or later). "Add player": a player from the list (not hidden, not in the team, last season's team first) or a new player, with a role and a date. A tap on a player: "Change role" (new role and a date, proposed today: the current role ends the day before, the new one starts on the date) and "Remove from the team" (a date, proposed today, or the start of the role when later). Under "Left the team": "Add to the team" (a role and a date, proposed the day after the end, or today when later). In a new season: last season's team (stayed until 30 June, not hidden) with "Add all": the same role, from the proposed date.
-5. **Proposed start of a role**: the first training date of the season (the first training day of its weekly trainings) until a training of the season is opened, then today; with no weekly training, today. Story A has no trainings, so it always uses the first training date when there is one; story B completes the rule.
+3. **Hidden**: only keeps lists short; it is not a status (coordinator, 2026-10-16). A hidden player is left out of the list on "Players" (unless "Show hidden players" is on), the choices of "Add player" on the team page, and "Players of last season" (so "Add all" does not add it). Nothing else changes: a hidden player in the team stays in the team, and a hidden player under "Left the team" keeps "Add to the team".
+4. **Team page** (`/team`, current season): the heading with the chosen team's name and the season ("U14-1 · 2026-2027"), or "Team not chosen yet" with a link to choose it (coordinator, 2026-10-16). The players in the team today or later in the season (sorted by first name, with the role), then "Left the team" (a role earlier in the season, none today or later). "Add player": a player from the list (not hidden, not in the team, last season's team first) or a new player, with a role and "In the team from".
+   - **"Change role"** (the new role and "From", the first day of the new role, filled with today) acts on the role that covers the date: it ends on the day before; the new role starts on the date and keeps the planned end of the old role. A later planned role stays. Refused: a date on the start of the role ("The change must be after the start of the role. To change the role from its start, use "Correct" in the history."); the same role ("The player already has this role."); no role on the date but one later in the season ("This player's role starts on Mon 2 Nov. To change it, use "Correct" in the history."); no role on the date and none later ("This player is not in the team on that date.").
+   - **"Remove from the team"** asks "Not in the team from" (the first day without the team), filled with today, with a button "Tomorrow". From that date the player has no roles in the season: the role that covers the day before and the date ends on the day before; every role that starts on the date or later is removed. Nothing to end or remove: refused ("This player is not in the team on that date."). When the removal removes a role, the tool first asks for a confirmation that names it ("This also removes "Plays games · from Sun 1 Nov"."); a removal that only ends a role is saved at once. A player with a role earlier in the season is under "Left the team" at once; a player whose roles of the season all start on the date or later has nothing left in the season (in no group, back in the choices of "Add player").
+   - **"Undo"** after a removal, until the coordinator leaves the team page: the player's roles of the season come back exactly as they were (kinds and dates). Refused when another screen changed the player's roles in the meantime ("This player was changed in the meantime. Use "Correct" in the history."). Later, a mistake is put right with "Correct" and "Add to the team"; there is no "Delete" for a role in the history.
+   - **"Last day today"** in the row of a player in the team whose role today ends today, with no later role in the season; not on 30 June.
+   - Under "Left the team": **"Add to the team"** (a role and "In the team from", filled with today).
+   - **"Players of last season"** (last season's team, not hidden) with **"Add all"** shows while no player of last season's team has a role in the season; a newcomer added first does not make it go. "Add all" asks "In the team from"; each player gets the same role as at the end of last season, from that date.
+5. **Proposed dates**: "In the team from" of "Add player" and "Add all" is filled with 1 September of the season, with a button "Today"; "Add to the team" and "Change role" with today; "Not in the team from" with today, with "Tomorrow". (The first training date is no longer used: changed after the sixth spec review, 2026-10-16.)
 6. **Weekly trainings** (`/settings`, current season): add (a day of the week, a start and an end time, a window from a date until a date inside the season; the proposed window is that day on or after 1 September until that day on or before 31 May), "Change" (everything), "Delete", the list sorted by the start of the window ("Tuesday 19:45–21:00 · Tue 1 Sep – Tue 25 May"). More than one at a time; not two on the same day of the week with overlapping windows ("There is already a weekly training on Tuesday in these dates.").
 7. **Reasons**: presets in this order: School, Ill, Injured (valid), Holiday, Work, No reason (not valid). Add (last), rename, valid / not valid, hide (still listed with "hidden"). Names unique without case and outer spaces. As built.
 8. **Navigation**: the start page shows "Team · Players · Settings" below the team header, also before a team is chosen.
@@ -41,6 +47,12 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 - Front end: `/players`, `/players/[id]`, `/settings`; the start page line "Players · Settings"; `client.ts` with the sentences; `lib/players.ts`.
 - Tests: core unit tests (135 in the crate), `tests/players.rs` (15), `tests/settings.rs` (9), `tests/players_storage.rs`, `tests/player_logs.rs`, `web/e2e/players.e2e.ts` (39 browser tests in all).
 - The full first-form spec (steps, deviations) is in git at 7895c6f; its review findings are kept below.
+
+Steps 1–4 of this design are built (2baa9c9 to df54748) and reviewed a second time (064ef52: A6–A10,
+R13–R17). What steps 5–9 change:
+- Core `players.rs`: `change_role(season, current, role, date, others)` (the server picks `current`); `proposed_start(first_training, training_opened, today)`; `TeamPage` with `last_season` = every player of last season's team without a role in the season; `PlayerError::NotInTeam` is never made; the comments on `Group`, `Placement` and `place` still speak of the players page. `training.rs`: `first_training_date`, used only by the proposed start.
+- Server `api/team.rs`: `covering` (the role of the season on a date, else `not_in_team`), `role_change`, `team_leave` (`{ until }`: ends the covering role on that date, nothing else); `api/players.rs`: `proposed_from` (from the weekly trainings), `carry` (`{ players }`, from `proposed_from`, players locked in the order sent). `AppError::BadRequest(&'static str)` gives `{ "error": code }` only. Storage has no delete of a role.
+- `/team`: "Last day in the team" (proposed today, or the role's start when later), `currentRole` (a copy of `place`), "Add all" without a date. `/settings`: `propose()` returns at once when a window is in the form and `windowProposed` is false, so "Change" of the day keeps the old day's window (R15). `client.ts`: `ApiError` holds only the message.
 
 ## Steps
 
@@ -157,6 +169,92 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
   - API (`tests/players.rs`, adapted): `GET /api/players` lists all players with `hidden` and `role_today`; `GET /api/players/{id}` gives the history of two seasons, newest first, `correctable` only for this season; "Correct" of a role of last season → `outside_season`; "Correct" with an overlap → `roles_overlap`; `PUT` with `hidden: true` → listed with `hidden`, still in `members` of `GET /api/team`; delete removes the player and its roles; the first-form tests of names, errors, overlap and two saves at once stay, on the new routes.
   - Browser: `/players`: add a player with a first name only; a hidden player is shown only with "Show hidden players"; `/players/[id]`: "Hidden", "Correct" of the start date (the history shows the new date), "Delete player"; no sideways scroll at 320 pixels, `expectAccessible`.
 
+### Step 5: Core rules and "Change role"
+- **Goal**: every rule of the changed story 1 is in the core (decision 0001, R14); "Change role" uses it end to end; the proposed start is 1 September.
+- **Changes**:
+  - Core `crates/core/src/players.rs`:
+
+    ```rust
+    pub enum PlayerError { FirstNameRequired, UntilBeforeFrom, OutsideSeason, RolesOverlap,
+                           ChangeBeforeRoleStart, NotInTeam,
+                           SameRole,                   // "The player already has this role."
+                           RoleStartsLater(NaiveDate), // the start of the later role
+                           ChangedMeanwhile }          // "Undo" after another change
+    /// A role without its id: what "Undo" sends back and puts back.
+    pub struct RoleDates { pub role: Role, pub from: NaiveDate, pub until: Option<NaiveDate> }
+    pub struct RoleChange { pub ended: RoleId, pub ended_until: NaiveDate,
+                            pub role: Role, pub from: NaiveDate, pub until: Option<NaiveDate> }
+    /// `roles`: all roles of the player; picks the role of `season` that covers `date`.
+    pub fn change_role(season: Season, roles: &[PlayerRole], role: Role, date: NaiveDate)
+        -> Result<RoleChange, PlayerError>;
+    pub struct Removal<'a> { pub ended: Option<(RoleId, NaiveDate)>, pub removed: Vec<&'a PlayerRole> }
+    pub fn remove_from_team(season: Season, roles: &[PlayerRole], from: NaiveDate)
+        -> Result<Removal<'_>, PlayerError>;
+    pub fn undo_removal(season: Season, before: &[RoleDates], from: NaiveDate,
+                        stored: &[PlayerRole]) -> Result<Vec<RoleDates>, PlayerError>;
+    /// 1 September of the season.
+    pub fn proposed_start(season: Season) -> NaiveDate;
+    ```
+
+    - `change_role`, in this order: `date` outside the season → `OutsideSeason`; no role of the season covers `date` → `RoleStartsLater(start)` when a role of the season starts after `date`, else `NotInTeam`; the covering role has kind `role` → `SameRole`; `date` is its start → `ChangeBeforeRoleStart`; the new role (from `date` until the old planned end) overlaps another role → `RolesOverlap`. The old "date after the end" (`UntilBeforeFrom`) cannot happen and goes.
+    - `remove_from_team`: `from` outside the season → `OutsideSeason`; `ended` is the role of the season with `role.from < from ≤ role.last_day()`, its new end `from − 1 day`; `removed` are the roles of the season with `role.from ≥ from`, in order of start; both empty → `NotInTeam`. So a role that already ends on the day before is refused, and a removal from 1 July removes all roles of the season.
+    - `undo_removal`: applies `remove_from_team` to `before` (as roles of the season) and compares the result with `stored`'s roles of the season (kinds and dates, sorted by start); a difference → `ChangedMeanwhile`; then each role of `before` gets `check_role` against the others; gives `before`.
+    - `team`: `last_season` is empty when a player who stayed until the end of last season (also a hidden one) has a role in the season; `candidates` as now (last season's team first). `Member` gets `last_day_today: bool`: the role today ends today, no role of the season starts later, and today is not the season's last day.
+    - R17: the comments on `Group`, `Placement` and `place` speak of the team page.
+    - `training::first_training_date` and the old `proposed_start` go (with their tests).
+  - Server:
+    - `error.rs`: `AppError::Refused { status: StatusCode, code: &'static str, details: serde_json::Value }`, answered as `{ "error": code, …details }`; the OpenAPI schema `Refusal { error, date?, roles? }`.
+    - `From<PlayerError>`: `SameRole` → 400 `same_role`; `RoleStartsLater(d)` → 400 `role_starts_later` with `"date": "YYYY-MM-DD"`; `ChangedMeanwhile` → 409 `changed_meanwhile`; the others as now.
+    - `api/team.rs`: `role_change` calls the new `change_role` with all roles of the player, under the lock as now; `covering` goes (`team_leave` keeps a local search until step 6).
+    - `api/players.rs`: `proposed_from` becomes `proposed_start(season)` (no read of the weekly trainings). `TeamPageView::proposed_from` documents 1 September; `MemberView` gets `last_day_today`.
+  - `client.ts`: `ApiError` gets `code` and `body`; the messages "The player already has this role." (`same_role`), "This player's role starts on Mon 2 Nov. To change it, use "Correct" in the history." (`role_starts_later`, the date with `formatDay`), "This player was changed in the meantime. Use "Correct" in the history." (`changed_meanwhile`).
+  - `just api-types`.
+- **Tests**:
+  - Core (season 2026-2027, fixed dates):
+    - `remove_from_team`: one role from Tue 1 Sep, from Thu 15 Oct → ended Wed 14 Oct, nothing removed; with a planned role from Sun 1 Nov → that role removed too; one role from Tue 1 Sep, from Sat 15 Aug → nothing ended, the role removed; a role that starts on the date → removed; a role until Wed 14 Oct, from Thu 15 Oct, no later role → `NotInTeam`; from Wed 1 Jul 2026 → all roles of the season removed, a role of 2025-2026 untouched; from Thu 1 Jul 2027 → `OutsideSeason`.
+    - `change_role`: only trains from Tue 1 Sep to plays games on Sun 1 Nov → ended Sat 31 Oct, new from Sun 1 Nov with the old planned end; the same kind → `SameRole`; a role from Mon 2 Nov, change on Mon 12 Oct → `RoleStartsLater(Mon 2 Nov)`; no role in the season → `NotInTeam`; left on Wed 14 Oct and back from Mon 2 Nov, change on Tue 20 Oct → `RoleStartsLater(Mon 2 Nov)`; on the role's start → `ChangeBeforeRoleStart`; a date in 2027-2028 → `OutsideSeason`; a role of 2025-2026 is never picked.
+    - `undo_removal`: stored as the removal left it → `before`; "Add to the team" from Mon 2 Nov after the removal → `ChangedMeanwhile`; `before` stored again (a second "Undo") → `ChangedMeanwhile`; `before` with two overlapping roles → `RolesOverlap`.
+    - `team`: last season's team Avery and Blake and a newcomer with a role → `last_season` still both; Avery with a role → `last_season` empty, Blake still the first candidate; a hidden player of last season's team with a role → `last_season` empty; `last_day_today`: a role until Thu 15 Oct on Thu 15 Oct → true; the same with a role from Fri 16 Oct → false; an open role on Wed 30 Jun 2027 → false; a role until Wed 30 Jun 2027 on that day → false.
+    - `proposed_start(2026-2027)` → Tue 1 Sep 2026.
+  - Server (`tests/team.rs`, clock 12 Oct 2026): `change_role_errors_have_their_codes` with `same_role`, `role_starts_later` (`"date": "2026-11-02"`) and `not_in_team`; `the_proposed_start_is_the_first_of_september` (also without weekly trainings); `last_seasons_team_stays_until_one_of_them_has_a_role`; `change_role_saves_both_or_neither`: a trigger made in the test database refuses an insert into `player_roles`; "Change role" answers 500 and the old role keeps its end. The weekly-trainings test of the proposed start goes.
+- **Checks**: `just check`; `just api-types` (types checked against the code before the commit).
+
+### Step 6: "Remove from the team" from a date
+- **Goal**: "Not in the team from", with "Tomorrow", the confirmation that names the removed roles, and "Last day today".
+- **Changes**:
+  - Storage `players.rs`: `delete_role(tx, player, role) -> Result<bool, StoreError>`.
+  - `POST /api/players/{id}/team-leave`: body `LeaveTeam { from, removes: Vec<i64> }` (the first day without the team; the ids of the confirmed roles); answer `LeftTeam { team: TeamPageView, undo: UndoRemoval { from, roles: Vec<RoleDatesView { role, from, until }> } }` (`roles`: the player's roles of the season before the removal). In one transaction: lock the player (404 when missing), `roles_of`, `remove_from_team`; a removed role whose id is not in `removes` → 409 `confirm_removal` with `"roles": [RoleView]` (all removed roles), nothing written; else update the ended role, delete the removed roles, commit. Ids in `removes` that are no longer removed are ignored. Log "player left the team" (id only). The local search of step 5 goes.
+  - `client.ts`: `leaveTeam(id, from, removes)` → `LeftTeam`.
+  - `/team`: "Remove from the team" has the field "Not in the team from" (today) with a button "Tomorrow" (`dayAfter(today)`). The save sends `removes: []`; on `confirm_removal` the page asks `This also removes "Plays games · from Sun 1 Nov".` (all roles named, joined with "and") and on OK saves again with their ids; on cancel nothing happens. "Last day today" next to the badge when `last_day_today`. `currentRole` and `later` go.
+- **Tests**:
+  - Server (`tests/team.rs`): `remove_from_today_puts_the_player_under_left_at_once` (stored until Sun 11 Oct, under `left`); `remove_with_a_later_role_asks_first` (R13: 409 with the role from Sun 1 Nov and nothing changed; with its id: ended Sun 11 Oct, the later role gone, under `left`); `remove_after_add_all_leaves_nothing_in_the_season` (clock 15 Aug, roles from Tue 1 Sep, removal from today with the id: no roles in the season, in no group, a candidate again); `the_last_day_today_is_shown` (removal from Tue 13 Oct: in `members` with `last_day_today`); `remove_from_the_team_needs_a_role_on_that_date` (adapted: `not_in_team`); `remove_from_the_team_waits_for_the_players_lock` (the other connection ends the role on Thu 15 Oct and holds the lock; the removal from Sun 1 Nov waits 300 ms, then answers `not_in_team`; fails without the lock); `remove_saves_all_or_nothing` (a trigger refuses the delete; 500, the ended role keeps its end). `remove_from_the_team_and_add_again` adapted to the new body.
+  - Browser: "Remove from the team" proposes today; "Tomorrow" sets Tue 13 Oct; after the save the row shows "Last day today"; a removal from today puts the player under "Left the team" at once; a player with a planned "Change role": the dialog names "Plays games · from Sun 1 Nov", after OK the player is under "Left the team"; no sideways scroll at 320 pixels, `expectAccessible`.
+
+### Step 7: "Undo"
+- **Goal**: a removal is undone with one tap while the team page is open.
+- **Changes**:
+  - `POST /api/players/{id}/team-undo` (operation `undoRemoval`): body `UndoRemoval { from, roles }`; answer `TeamPageView`. In one transaction: lock the player (404), `roles_of`, `undo_removal`; then delete the player's roles of the season and insert `before` (new ids; nothing refers to a role id); commit. Log "removal undone". Errors: 409 `changed_meanwhile`, 400 `roles_overlap`, `outside_season`.
+  - `client.ts`: `undoRemoval(id, undo)`.
+  - `/team`: a map in the page from player id to the `undo` of the last removal. "Undo" on the player's row (in the team or under "Left the team"); a player in no group gets a line below the team: "Blake · not in the team this season · Undo". An entry goes after its "Undo" (saved or refused) and after another action on that player; all go when the coordinator leaves the page (page state only).
+- **Tests**:
+  - Server: `undo_puts_the_roles_back` (a removal with a later role, then "Undo" with the `undo` of the answer: the same kinds and dates, in `members`); `undo_after_another_change_is_refused` (removal, "Add to the team" from Mon 2 Nov, "Undo" → 409, roles as they are); `a_second_undo_is_refused`; `undo_waits_for_the_players_lock` (the other connection adds a role and holds the lock; "Undo" waits, then 409); `undo_saves_all_or_nothing` (a trigger refuses the insert; 500, the roles as the removal left them); `team-undo` in the 401 and 403 test; the log test sees "removal undone" and no name.
+  - Browser: "Undo" on a row after a removal brings both roles back (the player with the planned "Change role"); "Undo" without a row: "Add all" (replaced answers), removal of all roles, the line "· not in the team this season · Undo"; "Change role" to the same kind shows "The player already has this role."; no sideways scroll at 320 pixels, `expectAccessible`.
+
+### Step 8: "Add all" with a date and the "Today" buttons
+- **Goal**: "In the team from" of "Add player" and "Add all" is 1 September with "Today"; "Add all" asks the date.
+- **Changes**:
+  - `POST /api/players/carry`: body `CarryRequest { players, from }`. The ids are sorted before the locks are taken (two "Add all" at once cannot block each other). For each player in `last_season`: `check_role(season, from, None, roles)`, insert. One refusal answers its code and undoes the whole save (one transaction).
+  - `client.ts`: `carryPlayers(ids, from)`.
+  - `/team`: "Add all" opens "In the team from" (`proposed_from`, 1 September) with "Today" and a save button; "Add player" gets "Today" next to "In the team from".
+- **Tests**:
+  - Server: `add_all_uses_the_given_date` (from Mon 12 Oct: the roles start Mon 12 Oct; a date in 2025-2026 → 400 `outside_season`, no player added); `add_all_waits_for_the_players_lock` (the other connection gives the player a role in the season and holds the lock; "Add all" waits 300 ms, then skips that player: one role stored; fails without the lock); `add_all_brings_last_seasons_team_back` and the tests from summer with a date.
+  - Browser: "Add player" proposes Tue 1 Sep and "Today" sets Mon 12 Oct; "Add all" (replaced answers) sends the date of the field.
+
+### Step 9: Settings: a change of day moves a proposed window (R15)
+- **Goal**: "Change" of a weekly training to another day keeps no window of the old day by accident.
+- **Changes**: `/settings` keeps the day before the change. When the day changes and the form has a window, the page asks the proposal of the old day; when the window equals it, the window is "proposed" and the page asks and fills the new day's proposal. A typed window stays.
+- **Tests**: Browser: add Wednesday with the proposed window (Wed 2 Sep – Wed 26 May 2027), "Change" only the day to Tuesday, save: listed as "Tuesday … · Tue 1 Sept – Tue 25 May"; a typed window (Wed 9 Sep – Wed 26 May 2027) stays when the day changes.
+
 ## Decisions
 | Decision | Reason | Decision record? |
 |----------|--------|------------------|
@@ -164,29 +262,39 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 | One club for the whole tool; players have no stored link to a club | One coordinator, the only user (coordinator, 2026-10-16: "as long as I'm the only user") | in 0019 |
 | Roles and weekly trainings are stored by season, not linked to the team choice; they can be entered before the team is chosen | One team per season, so the season finds the team; attendance does not wait for a choice | in 0019 |
 | Weekly trainings with a window only suggest training days | A mistake is corrected for the whole window (accept review A1) | in 0019 |
-| "Change role" and "Remove from the team" act on the role that covers the given date; the new role keeps the planned end of the old one | The screen cannot change an old role by mistake; a planned end stays | no |
+| "Change role" acts on the role that covers the given date; the new role keeps the planned end of the old one | The screen cannot change an old role by mistake; a planned end stays | no |
 | No overlap of weekly trainings on one day is checked in the core under an advisory lock | An `EXCLUDE` constraint needs `btree_gist` on the cluster; the same as for roles | in 0019 |
 | Migration `0005` is rewritten; "an applied file is never edited" (decision 0004) means applied on the cluster | The first form was never merged or released (coordinator, 2026-10-16) | one line in 0019 |
 | `PUT /api/players/{id}` with the whole player (name and hidden), not `PATCH` | Like the first form's rename; the epic left the detail to the story | no |
 | The schema name `AbsenceReason` | `Reason` is taken in the OpenAPI description | no |
 | Deleting a player is always allowed in story A | Absences exist only from story B, which adds `player_has_absences` | no |
+| "Remove from the team" means: from a date, no roles in the season; the role on the day before ends, later roles are removed | The coordinator's rule (2026-10-16, second reviews A6, A7, R13) | in 0019 |
+| "Undo" sends the roles from before back; the core applies the removal to them again and compares with the stored roles under the player's lock | No stored undo state or version column; one rule in the core; a change from another screen is always seen (Phase 1, option A1, coordinator 2026-10-17) | in 0019 |
+| The confirmation of a removal comes from a 409 of the server with the roles it would remove | The rule stays in the core (R14), and the question names what is really removed, also from an old page (option B1, coordinator 2026-10-17) | no |
+| `AppError::Refused` with details (`date`, `roles`) next to `BadRequest` | Two messages of the spec need a date or a list of roles | no |
+| "Undo" puts the roles back with new ids | Nothing refers to a role id; absences (story B) refer to the player and the training | no |
+| The proposed "In the team from" of "Add player" and "Add all" is 1 September; the first training date is not used | Changed spec (sixth spec review, S27) | no |
 
 ## Not in scope
 - Trainings, absences, the start page card, the list of training days, "Change" of a training, the proposal of last season's weekly trainings in a new season (story B); totals (story C).
 - Weekly trainings or roles of a season other than the current one (shown in the history, not changed).
 - Reordering reasons; a backup of the database (backlog).
+- "Delete" for a role in the history (coordinator, 2026-10-16); stored undo data; "Undo" after leaving the team page.
+- A test of two "Add all" saves that could block each other (the sorted locks are checked by reading the code).
 
 ## Test plan
 - **Existing tests that must still pass**: all of `just check`; the browser tests of the start page (the link line must not move what they check).
 - **First-form tests**: what stays, changes or goes is named in each step; each step's progress note lists the tests it removed and why.
 - **New tests**: per step, above.
-- **Checks**: `just check` after each step; `sqlx migrate run` and `just prepare` after step 1; `just api-types` after steps 1, 3 and 4.
+- **Checks**: `just check` after each step; `sqlx migrate run` and `just prepare` after step 1 and after each changed query (step 6: `delete_role`); `just api-types` after steps 1, 3, 4, 5, 6, 7 and 8.
+- **Mutation checks** (steps 5–8): each new lock test fails without its lock; each "both or neither" test fails when the writes are not in one transaction.
 
 ## Compatibility and performance
 - The migration adds tables only; the running app works on it (decision 0004). Local databases that ran the first `0005` are made again before step 1.
 - The start page gets one line of links; nothing else changes for the games.
 - The coordinator stores names of players (children) on the cluster: no names in logs (test), no backup yet (accepted, backlog).
 - Load: about 15 players, a few roles each season, one or two weekly trainings (about 40 training days).
+- From step 6, "Remove from the team" deletes stored roles (those that start on the date or later). "Undo" while the page is open puts them back; later only "Correct" and "Add to the team". No absences exist yet (story B), so nothing else is lost.
 
 ## Progress
 - [x] First form: steps 1–5, fixes 1–5, build review twice, accept review (2026-10-15/16; replaced by this design)
@@ -194,6 +302,11 @@ story is built and reviewed (commits 905a767, ff065be, 7895c6f):
 - [x] Step 2: core rules for players (2026-10-16; `just check` passes, 39 browser tests)
 - [x] Step 3: the team page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 4: the players page and the player page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 40 browser tests)
+- [ ] Step 5: core rules and "Change role"
+- [ ] Step 6: "Remove from the team" from a date
+- [ ] Step 7: "Undo"
+- [ ] Step 8: "Add all" with a date and the "Today" buttons
+- [ ] Step 9: settings, a change of day moves a proposed window (R15)
 - [ ] Review build
 - [ ] Review accept
 
@@ -204,8 +317,12 @@ written into it: the team page heading with the team name, and "Team not chosen 
 The design reads the spec more strictly within its words:
 - A weekly training's window is inside one season, and every save is for the current season.
 - A window without its day of the week in it is allowed; it suggests no training days.
-- "Change role" and "Remove from the team" act on the role that covers the given date; the new role keeps the planned end of the old role.
+- "Change role" acts on the role that covers the given date; the new role keeps the planned end of the old role. (Steps 3–4 also had "Remove from the team" act on one role; steps 5–9 follow the changed spec.)
 - "Add player" from the list offers players in "Players of last season" and "Other players" (not hidden); a player under "Left the team" is added again with "Add to the team".
+- (Steps 5–9, coordinator 2026-10-17) Every role that "Remove from the team" deletes needs the confirmation, also a role that starts on the date itself; the spec names "a role that starts after the date". Only a removal that only ends a role is saved at once.
+- (Steps 5–9, coordinator 2026-10-17) A player whose roles of the season were all removed has no row; its "Undo" is on a line below the team: "Blake · not in the team this season · Undo".
+- (Steps 5–9) A removal whose date is the day after the role's last day ends nothing and removes nothing, so it is refused as "not in the team on that date".
+- (Steps 5–9) "Players of last season" goes also when a hidden player of last season's team has a role in the season.
 
 Implement:
 - 2026-10-16, step 1:
@@ -564,6 +681,7 @@ it ("ends the role on that date"; "Left the team" is "none today or later"), but
 taps "Remove from the team" and sees nothing change will think it was not saved, and may tap again.
 A product choice for `/discover`: for example the row shows "Last day today" (or "until Thu 15
 Oct"), or a role that ends today counts as left on the team page, or the proposal is yesterday.
+- 2026-10-17: designed (story 1 changed, approved 2026-10-16): "Not in the team from" (the first day without the team) with "Tomorrow", and "Last day today"; steps 5 and 6.
 
 **A7 – a role added by mistake cannot be taken away; "Add all" followed by "remove those who did
 not come back" keeps them in the team on the first training date (concerning deviation). Run and
@@ -584,6 +702,7 @@ absence. The spec covers the reverse mistake ("A mistake is undone in the histor
 date empty)") but not this one, against Steve's warning "every mistake must be correctable in the
 app". Needs a rule, for example: "Remove from the team" on or before the start of a role removes
 the role, or "Delete" in the history for a role of the current season.
+- 2026-10-17: designed: a removal deletes the roles from its date on, with a confirmation, and "Undo" while the page is open; steps 5, 6 and 7.
 
 **A8 – "Change role" for a player whose role starts later proposes a date that fails (neutral
 drift). Run and trace.** After "Add all" in summer each role starts on the first training date.
@@ -591,18 +710,21 @@ drift). Run and trace.** After "Add all" in summer each role starts on the first
 "This player is not in the team on that date." The coordinator must type a date in the role or use
 "Correct" (the right tool here); the message names neither. Small; a proposal of the later of
 today and the role's start (as "Remove from the team" does) would fit.
+- 2026-10-17: designed: "Change role" on a date before a later role answers `role_starts_later` with that date ("… use "Correct" in the history."); step 5.
 
 **A9 – a hidden player under "Left the team" is offered "Add to the team" (neutral drift).
 Trace.** The core puts every player with an earlier role of the season under "Left the team",
 hidden or not, and the page shows "Add to the team" for each. Story 1: a hidden player "is not
 offered when a player is added to the team". Defensible (the coordinator taps that player on
 purpose), but the spec's words say otherwise; `/discover` or Close can settle which.
+- 2026-10-17: settled in the spec (hidden only keeps lists short; the player keeps "Add to the team"); built so; no change.
 
 **A10 – "Players of last season" with "Add all" stays for the whole season (neutral drift).
 Trace.** The group holds last season's players with no role in this season, so after the
 coordinator adds players one by one, the players who did not come back stay listed above the team
 with "Add all" until each is added. The spec shows it "in a new season". Harmless alone; with A7 a
 stray tap on "Add all" in January cannot be undone.
+- 2026-10-17: designed: the group shows while no player of last season's team has a role in the season, and "Add all" asks the date; steps 5 and 8.
 
 **Faithful adaptations** (trace): the line "Team · Players · Settings" on the start page, also
 before a team is chosen, while "Attendance" does not exist (first form A4); "Add player" on the
@@ -659,6 +781,7 @@ ends the role on that date". The tests of "Remove from the team" use players wit
 they cannot see it. What happens to the later role (removed, or the save refused with a message)
 is a product choice; it belongs with the rule A7 asks for (the same function, the same "a role
 that should not exist").
+- 2026-10-17: designed: the removal deletes the later roles after a confirmation that names them; steps 5 and 6.
 
 **R14 – the rules of "Change role" and "Remove from the team" are in the server and the screen
 (decision 0001, "New rules go in `crates/core` first"; low, the root of R13). Search and trace.**
@@ -671,6 +794,7 @@ about other roles) are written in the server; the core's `PlayerError::NotInTeam
 the first form's R4 and R12 again. Suggest: a core function for "Remove from the team" (and one
 that picks the role for "Change role") with unit tests, including a player with a later role; the
 proposals in `TeamPageView` or `MemberView`, from the core.
+- 2026-10-17: designed: `change_role`, `remove_from_team` and `undo_removal` in the core; `last_day_today` from the core; `currentRole` goes from the page; steps 5 and 6.
 
 **R15 – "Change" of a weekly training to another day keeps the window of the old day, so the first
 training day is lost without a sign (bug, medium). Trace.** In "Change" the form holds the stored
@@ -683,6 +807,7 @@ line shows "Tuesday … · Wed 2 Sept – Wed 26 May", which is easy to miss on 
 test of "Change" types both dates by hand, so it cannot see it. Suggest: when the day changes, move
 a window that was the old day's proposal to the new day's proposal (or move each end to the new day
 in the same week), with a browser test that changes only the day.
+- 2026-10-17: designed: step 9.
 
 **R16 – two locks are not guarded by a test; one test checks a state the rules exclude (test,
 low). Run.** With `players::lock` removed from `team_leave` and from `carry` (in the copy), every
@@ -694,6 +819,7 @@ then answers 200 and overwrites the other connection's end, 15 Oct, with 31 Oct)
 `change_role`, before any write, on overlapping roles written past the checks (a state stored
 roles never have, as the deviation says); the two writes in one transaction are right by trace,
 not by a test.
+- 2026-10-17: designed: lock tests for "Remove from the team", "Undo" and "Add all"; "both or neither" tests with a trigger in the test database; steps 5–8.
 
 **R17 – smaller points (low).**
 - "Change role" to the same kind is accepted (run): Avery only trains from 1 Sep, "Change role" to
@@ -706,6 +832,7 @@ not by a test.
 - Comments made false by step 4: `Group` ("Where the players page lists a player"), `Placement`
   and `place` in `crates/core/src/players.rs` speak of the players page, which no longer has groups;
   they now serve the team page.
+- 2026-10-17: designed: the same role is refused (`same_role`), the later start answers `role_starts_later`, the comments are fixed; step 5.
 
 **Checked and found right.** Every new route is on the protected router and in the 401 and 403
 test (test ran); logs carry ids only, and the log test covers "Change role" and `PUT` with a new
