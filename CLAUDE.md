@@ -25,8 +25,8 @@ Database tests use `#[sqlx::test]` and need `DATABASE_URL` pointing at a running
 
 See `docs/architecture.md` and `docs/decisions/`. In short:
 
-- `crates/core` (`team_core`): product rules only (access, season, club search, game, team choice, schedule, comparison of readings and the open changes, guard, nightly reading). No network, database or web crates (decision 0001).
-- `crates/server` (`team`): settings (`config.rs`), clock and current season (`clock.rs`), database and migrations (`db.rs`), router (`app.rs`, built by `app(state)` so tests call it directly), API (`api/`), login and sessions (`auth/`), the strict reader of the game list source (`source/`, decision 0013), the open changes (`changes.rs`, decision 0016), the timer of the nightly reading (`nightly.rs`, decision 0017), the choice for each season (`followed_teams.rs`, decision 0012), the front-end files and security policy (`web.rs`), and the binary (`main.rs`: `serve` with the timer, `migrate`, `openapi`).
+- `crates/core` (`team_core`): product rules only (access, season, club search, game, team choice, schedule, comparison of readings and the open changes, guard, nightly reading, players and their roles, weekly trainings, reasons). No network, database or web crates (decision 0001).
+- `crates/server` (`team`): settings (`config.rs`), clock and current season (`clock.rs`), database and migrations (`db.rs`), router (`app.rs`, built by `app(state)` so tests call it directly), API (`api/`), login and sessions (`auth/`), the strict reader of the game list source (`source/`, decision 0013), the open changes (`changes.rs`, decision 0016), the timer of the nightly reading (`nightly.rs`, decision 0017), the choice for each season (`followed_teams.rs`, decision 0012), players and roles (`players.rs`, with the row lock of a player), reasons (`reasons.rs`) and weekly trainings (`weekly_trainings.rs`, decision 0018), the front-end files and security policy (`web.rs`), and the binary (`main.rs`: `serve` with the timer, `migrate`, `openapi`).
 - `migrations/`: forward-only SQL files, compiled in (decision 0004).
 - Everything under `/api` needs a session by default; only the two health routes are outside (decision 0007).
 - Images: `Dockerfile` (cargo-chef) targets `runtime` and `migration`. CI stages Check, Build, Publish, Release (decision 0010): Build pushes `build-<commit>`; Publish, after Check and Build passed, names it `sha-<commit>` and `latest`; a `v*` tag names the `sha-<commit>` image again. Release steps and the cluster contract are in `README.md`.
@@ -35,4 +35,4 @@ See `docs/architecture.md` and `docs/decisions/`. In short:
 
 - No `unwrap`/`expect` outside tests (clippy denies them).
 - Errors: `thiserror` enums in library code, `anyhow` only in `main.rs`.
-- Logs never contain secrets, cookies, codes or tokens.
+- Logs never contain player names, secrets, cookies, codes or tokens.
