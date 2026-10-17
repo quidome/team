@@ -1,5 +1,6 @@
 //! The JSON API under `/api`, and its OpenAPI description.
 
+pub mod attendance;
 pub mod changes;
 pub mod clubs;
 pub(crate) mod format;
@@ -45,6 +46,7 @@ use utoipa::OpenApi;
         team::role_change,
         team::team_leave,
         team::team_undo,
+        attendance::get,
         trainings::list,
         trainings::next,
         trainings::get,
