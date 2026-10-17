@@ -881,3 +881,187 @@ document for players and settings, and decision 0019 with the reading of decisio
 not see: R13 keeps a removed player in the team (and from story B at its trainings), R15 drops the
 first training day after the spec's own correction of a wrong day. R14 belongs with the fix of R13
 (and with the rule A7 asks for); R16 and R17 are small and can go with them.
+
+### Build review, 2026-10-17 (steps 5–9)
+By a fresh agent (`/review build`). The arguments held only the mode and the change folder.
+Read: the diff `main...HEAD` with a focus on steps 5–9 (`bf116f0..325edf8`: 367d3d1 to 325edf8;
+nothing uncommitted apart from the untracked `.direnv/` and `.envrc`), this folder, the epic's
+`functional.md` (story 1, story 2, the changes of 2026-10-16) and `technical.md`,
+`docs/architecture.md`, the decision records, `CLAUDE.md`, `docs/language.md`. Ran in the
+repository against the local PostgreSQL: `just check`. All of it passed (`lint-ci`,
+`api-types-check` with no diff, `check-rust` with 149 core tests and every server test file, `check-web`)
+except one browser test of `choose.e2e.ts` ("the coordinator changes the team later"), a file
+this branch does not touch. It timed out while another review ran at the same time. Run again,
+`npx playwright test` passed all 42 tests, and `cargo sqlx prepare --workspace --check` passed.
+No probes or mutations were run: the claims below are checked by trace where so marked. Nothing
+in the repository was changed apart from this section.
+
+**The earlier findings R13–R17: checked.**
+- R13, R14: trace and test runs. `remove_from_team`, `change_role` and `undo_removal` are in the
+  core with unit tests. `api/team.rs` only locks, loads, calls the core and writes; `covering` and the
+  page's `currentRole` are gone (search `covering\|currentRole` in `crates/` and `web/src`: none).
+  The one product rule left in the server is "a removal that removes a role needs a confirmation"
+  (`team_leave`, the 409 `confirm_removal`), as the design chose (option B1).
+- R15: trace and browser test. See R19 for the twin case it leaves.
+- R16: trace. Each new lock test holds the player's row lock on another connection and expects
+  the request to wait 300 ms. Without the lock the request does not wait (the other connection's
+  insert is not yet visible and the rows it deletes or ends are not locked), so each test can fail.
+  The "all or nothing" tests refuse the second write with a trigger after the first write
+  succeeded, so a commit between them leaves a changed state and the test fails. The claim of
+  step 8 that only reading the code covers the transaction of "Add all" is true and stated.
+- R17: `same_role` and `role_starts_later` with their sentences (search in `client.ts`, test
+  `change_role_errors_have_their_codes` ran). The comments on `Group`, `Placement` and `place` speak of
+  the team page, apart from one remaining line (R20).
+
+**R18 – "Left · last day Wed 14 Oct" under "Left the team" is not built (gap against the spec,
+low–medium). Search.** Story 1, criterion "Remove from the team": "the player is under 'Left the
+team' at once with 'Left · last day Wed 14 Oct'". The requirements summary of this design leaves
+it out, and **Deviations** does not name it. The row under "Left the team" shows only the badge of
+the last role ("Only trains") (search `last day` in `web/src/routes/team/+page.svelte`: only "Last day
+today"). The date shows only after a tap, in the roles line. A6 was about the coordinator seeing at once that the
+removal worked; the move to the group does that, but the spec's line also tells "left" from a
+kind of role on a phone. Build it, or write it down as a deviation for `/review accept`.
+
+**R19 – twin of R15: "Change" of the day keeps a window when only one of its dates is the old
+day's proposal (bug, low). Trace.** `dayChanged` in `/settings` moves the window only when both
+`from` and `until` equal the old day's proposal. A Wednesday saved with the proposed first date
+(Wed 2 Sep) and a typed last date (Wed 19 May), changed to Tuesday, keeps Wed 2 Sep – Wed 19 May.
+Its first training day is then Tue 8 Sep, and Tue 1 Sep is lost without a sign: the same loss
+as R15, now for a window with a typed end. R15's suggestion also named "move each end to the new
+day in the same week". Suggest: move each end on its own (an end that is the old day's proposed
+end moves to the new day's proposal), or move both ends to the new weekday within their week.
+Add a browser test with a typed last date.
+
+**R20 – smaller points (low).**
+- When the second save of a confirmed removal is refused again with `confirm_removal` (the
+  roles changed between the two taps, for example on another screen), the page shows "Something
+  went wrong. Please try again." (`messageFor` has no sentence for `confirm_removal`). Trace. A
+  rare race; a new confirmation, or "This player was changed in the meantime.", would fit.
+- The confirmation always reads "This also removes …", also when the removal only removes. This
+  is the spec's own example, after "Add all" in August: nothing ends, and the role from Tue 1 Sep is
+  the only change. Trace. The wording is for `/review accept` to judge.
+- Stale comments: `Group::Team` in `crates/core/src/players.rs` ("for example from the first
+  training date, after 'Add all' in summer") and the test comment at line 843 still name the first
+  training date, which no longer sets the start of "Add all". Search `first training` in `crates/`.
+- "Undo" trusts the roles the page sends back. The core checks only that the removal applied to
+  them gives the stored roles. So any role from the removal's date on, and any planned end from
+  that date on, passes, limited by `check_role` (the core test `undo_checks_the_roles_it_puts_back`
+  shows it). Trace. This is the design's choice (no stored undo state); it is right for one
+  coordinator who sends back the server's own answer, and is named here only so Close knows it.
+
+**R21 – a change document made false (low). Search.** The epic's `technical.md` (API, line 64)
+does not list `POST /api/players/{id}/team-undo`, still says `PATCH /api/players/{id}` (this story
+decided `PUT`), and lists the error codes as "400" without `same_role`, `role_starts_later`
+(with `date`) and the 409 codes `confirm_removal` (with `roles`) and `changed_meanwhile`. Fix there,
+or at Close in the living documents. At Close, as before: `docs/architecture.md`, the module list
+in `CLAUDE.md`, a product document for players and settings, and decision 0019 (now also with
+"Undo" without stored state, and the removal that deletes roles).
+
+**Checked and found right.** `team-undo` is on the protected router and in the 401 and 403 test
+(test ran). The log test covers "player left the team" and "removal undone" with no name (test
+ran). No `unwrap`/`expect` outside tests (clippy ran). `delete_role` is limited to the player's own
+rows. The ids of "Add all" are sorted and deduplicated before their locks are taken. `undo_removal`
+and `remove_from_team` follow the design's order of checks (core tests ran). The claims in
+**Progress** (149 core tests, 42 browser tests, the checks) are true on HEAD, apart from the one
+flaky first run above. `.sqlx/`, `web/openapi.json` and `schema.d.ts` match the code.
+
+**Verdict:** no blocking bug from the build side. Steps 5–9 put the rules of the changed story 1
+in the core, and their locks and transactions are guarded by tests that can fail. Before Close,
+build R18 or write it down as a deviation, and fix R19 (the same silent loss as R15, for a typed
+end). R20 and R21 are small.
+
+### Accept review, 2026-10-17 (steps 5–9)
+By a fresh agent (`/review accept`). The arguments held only the mode and the change folder.
+Read: the epic's `functional.md` (story 1 as approved again on 2026-10-16, story 2 for the weekly
+trainings, story 4, the Interface, the warnings and the changes after the reviews) and `idea.md`,
+this folder's `change.md`, the objective, requirements and steps here, the diff `main...HEAD` (up to
+325edf8) and the code of `/team`, `/players`, `/players/[id]`, `/settings` and the core
+`players.rs`. The view below was formed before reading **Deviations** and the earlier findings.
+Ran: `npm run build` and the server (`DEV_AUTH_BYPASS`, own port, `DEV_NOW` Thu 15 Oct 2026 and
+then Sun 15 Aug 2027) against a scratch database made for this review and dropped after it, driven
+with `curl` on the API. One browser snapshot was tried and gave nothing; its stray
+`.playwright-mcp/` folder was removed. The test suites were not run (the build review ran
+`just check`). Nothing else in the repository was changed.
+
+**Checked and found as meant (run unless said).** Clock Thu 15 Oct 2026, Avery and Blake from Tue 1
+Sep, Casey planned from Sun 1 Nov:
+- "Change role" Blake to plays games from Sun 1 Nov: Only trains Tue 1 Sep – Sat 31 Oct, then Plays
+  games from Sun 1 Nov, still in the team. To the same role: `same_role`. On the role's start:
+  `change_before_role_start`. Casey, today: `role_starts_later` with the date 2026-11-01 (Sun 1 Nov), shown as
+  "This player's role starts on … use "Correct" in the history." (trace, `client.ts`).
+- "Remove from the team" Blake from today: first a 409 that names "Plays games · from Sun 1 Nov";
+  with it confirmed, Only trains Tue 1 Sep – Wed 14 Oct, under "Left the team" at once. "Undo":
+  both roles back exactly; a second "Undo": `changed_meanwhile`.
+- Avery from tomorrow: in the team with `last_day_today`; again from tomorrow: refused.
+- Casey (only a planned role) from today: after the confirmation nothing left in the season, in no
+  group, back in the choices of "Add player". The page keeps "Undo" for such a player on its own
+  line (trace).
+- "Hidden" Blake: still in the team, still in the list with "hidden", out of the choices.
+- Same name (spaces and case differ): saved with the warning; no first name: refused.
+- Clock Sun 15 Aug 2027: the proposed "In the team from" is Wed 1 Sep 2027; "Players of last season"
+  lists Dana, not the hidden Blake; a newcomer added first does not make it go; "Add all" with Blake
+  and Dana gives only Dana a role from 1 Sep; "Remove from the team" Dana from today asks first,
+  then leaves nothing of Dana in the season, and "Players of last season" shows again. "Correct" of
+  a role of 2026-2027: `outside_season`; the history marks it not correctable.
+- Weekly trainings: the proposal for Tuesday in 2027-2028 is Tue 7 Sep – Tue 30 May (1 Sep 2027
+  is a Wednesday); an overlapping Tuesday, an end before the start, a window outside the season
+  and a last date before the first are refused with their codes. Reasons: the six presets in
+  order; " school " is refused as a name in use.
+- The "Today" button next to "In the team from" of "Add player" and "Add all", "Tomorrow" next to
+  "Not in the team from", today in "Change role" and "Add to the team", and the error sentences of
+  story 1 word for word (trace, `team/+page.svelte`, `client.ts`).
+
+**A11 – "Left · last day Wed 14 Oct" is not on the row under "Left the team" (neutral drift).
+Search and trace.** The same gap as R18, found on its own: the row shows the name and an outlined
+badge of the last role ("Only trains"); the last day shows only after a tap, in the roles line
+(search `last day\|Left ·` in `web/src`: only "Last day today"). The intent of the criterion (A6:
+see at once that the removal worked) is met by the move to the group, so this is not a concerning
+deviation. But under "Left the team" a role badge reads as a role the player still has, and the
+spec gives the line with an example. **Deviations** does not name it. Before Close: build the line
+(for example in place of the badge), or write it as a deviation with the coordinator's agreement.
+
+**A12 – the confirmation says "This also removes …" when nothing else changes (neutral drift).
+Run and trace.** For Casey (only a planned role) and for Dana after "Add all" in August (the spec's
+own example), the removal only removes; nothing ends, yet the dialog reads "This also removes
+"Only trains · from …"." The "also" suggests a second change the coordinator cannot see. The spec's
+sentence was written for a removal that also ends a role; the case it names in the behaviour
+("Add all" in August) is exactly the one where "also" is wrong. Suggest "This removes …" when the
+removal ends no role. Small; the words can be settled at Close.
+
+**A13 – a change of "Valid" or "Hidden" of a reason also saves a rename typed but not saved
+(neutral drift). Trace.** `updateReason` in `/settings` sends `names[reason.id]`, the text in the
+name field. A coordinator who types in the name, changes their mind without clearing it, and taps
+"Valid" saves the new name too. Story 4 is otherwise as meant. Small.
+
+**A14 – small text points (neutral drift). Trace.** The help text of "Hidden" on the player page
+("Not offered in "Add player" and "Add all".") leaves out the main effect the spec names first: off
+the list on "Players" unless "Show hidden players" is on. And R19 (the settings window with only a
+typed end does not move with the day) is, from the user's side, the same silent loss of the first
+training day as R15; agreed with the build review that it is fixed before Close.
+
+**Deviations, judged after the view above was formed.**
+- The confirmation also for a role that starts on the date itself: **faithful adaptation**. Such a
+  role is deleted all the same; asking first is what the coordinator wants for a deletion.
+- The "Undo" line for a player with no row ("· not in the team this season · Undo"):
+  **faithful adaptation**; without it the spec's "Undo" has no place for that case (run: Casey).
+- A removal from the day after the last day is refused as "not in the team on that date":
+  **faithful adaptation** (run: Avery on its last day, "Tomorrow" again).
+- "Players of last season" goes also when a hidden player of last season's team has a role:
+  **faithful adaptation**; the spec's rule is "a player of last season's team with a role", and
+  hidden does not change the team.
+- The earlier ones (one season per window, a window without its day, "Change role" on the covering
+  role, a player under "Left the team" added with "Add to the team", dates as "Tue 1 Sept" as on the
+  schedule, the start page line "Team · Players · Settings" while "Attendance" does not exist):
+  **faithful adaptations**, as the second accept review found; nothing in steps 5–9 changed them.
+
+**The second accept review's findings A6–A10: answered.** A6 by "Not in the team from" and "Last
+day today" (run); A7 by the removal that deletes later roles with a confirmation and "Undo" (run);
+A8 by `role_starts_later` (run); A9 settled in the spec and built so (run: hidden Blake stays in
+the team); A10 by the rule "while no player of last season's team has a role" and "Add all" with a
+date (run).
+
+**Verdict: accepted with notes.** What was built is what story 1 now means: the coordinator can
+set up the team in October with no typed date, record a change of role, a leave from today or
+tomorrow, undo a removal tapped by mistake, and start a new season with "Add all" and remove those
+who did not come back without a trace. A11 (or a written deviation) and R19 should be settled
+before Close; A12–A14 are small and can go with them or at Close.
