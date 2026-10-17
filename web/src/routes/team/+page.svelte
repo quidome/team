@@ -41,6 +41,10 @@
 	let role = $state<RoleKind>('plays_games');
 	let from = $state('');
 
+	/** "Add all" is open, with its "In the team from". */
+	let addingAll = $state(false);
+	let allFrom = $state('');
+
 	/** The open player and the form that is open for it. */
 	let open = $state<number | null>(null);
 	let action = $state<'change' | 'leave' | 'return' | null>(null);
@@ -98,6 +102,23 @@
 		from = team?.proposed_from ?? '';
 		error = null;
 		warning = null;
+	}
+
+	function startAddingAll() {
+		addingAll = true;
+		allFrom = team?.proposed_from ?? '';
+		error = null;
+	}
+
+	function saveAll(event: SubmitEvent) {
+		event.preventDefault();
+		const ids = team?.last_season.map((member) => member.id) ?? [];
+		return run(async () => {
+			const page = await carryPlayers(ids, allFrom);
+			ids.forEach(forget);
+			addingAll = false;
+			return page;
+		});
 	}
 
 	function save(event: SubmitEvent) {
@@ -243,6 +264,24 @@
 			{/each}
 		</div>
 	</fieldset>
+{/snippet}
+
+{#snippet teamFrom(value: string, set: (date: string) => void, page: TeamPage)}
+	<label class="block space-y-1">
+		<span class="text-sm">In the team from</span>
+		<span class="flex gap-2">
+			<input
+				class={field}
+				type="date"
+				{value}
+				oninput={(event) => set(event.currentTarget.value)}
+				min={page.season_first_day}
+				max={page.season_last_day}
+				required
+			/>
+			<Button type="button" variant="outline" onclick={() => set(page.today)}>Today</Button>
+		</span>
+	</label>
 {/snippet}
 
 {#snippet actionForm(member: Member, page: TeamPage)}
@@ -399,17 +438,7 @@
 					</label>
 				{/if}
 				{@render roleChoice('role', role, (kind) => (role = kind))}
-				<label class="block space-y-1">
-					<span class="text-sm">In the team from</span>
-					<input
-						class={field}
-						type="date"
-						bind:value={from}
-						min={page.season_first_day}
-						max={page.season_last_day}
-						required
-					/>
-				</label>
+				{@render teamFrom(from, (date) => (from = date), page)}
 				{#if error}
 					<p class="text-sm" role="alert">{error}</p>
 				{/if}
@@ -430,14 +459,24 @@
 			>
 				<div class="flex items-center justify-between gap-3">
 					<h2 id="last-season-heading" class="font-medium">Players of last season</h2>
-					<Button
-						size="sm"
-						disabled={busy}
-						onclick={() => run(() => carryPlayers(page.last_season.map((member) => member.id)))}
-					>
-						Add all
-					</Button>
+					{#if !addingAll}
+						<Button size="sm" disabled={busy} onclick={startAddingAll}>Add all</Button>
+					{/if}
 				</div>
+				{#if addingAll}
+					<form class="space-y-3" onsubmit={saveAll} data-testid="add-all">
+						{@render teamFrom(allFrom, (date) => (allFrom = date), page)}
+						{#if error}
+							<p class="text-sm" role="alert">{error}</p>
+						{/if}
+						<div class="flex gap-2">
+							<Button type="submit" disabled={busy}>Add all</Button>
+							<Button type="button" variant="ghost" onclick={() => (addingAll = false)}>
+								Cancel
+							</Button>
+						</div>
+					</form>
+				{/if}
 				<ul class="space-y-1">
 					{#each page.last_season as member (member.id)}
 						<li class="text-sm">
@@ -449,7 +488,7 @@
 			</section>
 		{/if}
 
-		{#if error && !adding && open === null}
+		{#if error && !adding && !addingAll && open === null}
 			<p class="text-sm" role="alert">{error}</p>
 		{/if}
 

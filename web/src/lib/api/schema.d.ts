@@ -436,6 +436,11 @@ export interface components {
 			valid: boolean;
 		};
 		CarryRequest: {
+			/**
+			 * Format: date
+			 * @description "In the team from": the first day of their roles in this season.
+			 */
+			from: string;
 			/** @description Players of last season to bring into this season ("Add all" sends all of them). */
 			players: number[];
 		};
@@ -1244,7 +1249,7 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description The team; the listed players of last season have the same role in this season */
+			/** @description The team; the listed players of last season have the same role in this season, from `from` */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -1252,6 +1257,13 @@ export interface operations {
 				content: {
 					'application/json': components['schemas']['TeamPageView'];
 				};
+			};
+			/** @description `outside_season`; no player is added */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
 			};
 			/** @description Not logged in */
 			401: {

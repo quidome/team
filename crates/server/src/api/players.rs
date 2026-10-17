@@ -10,7 +10,7 @@ use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    proposed_start, role_on, team,
+    role_on, team,
 };
 use utoipa::ToSchema;
 
@@ -144,6 +144,9 @@ pub struct RoleChange {
 pub struct CarryRequest {
     /// Players of last season to bring into this season ("Add all" sends all of them).
     pub players: Vec<i64>,
+    /// "In the team from": the first day of their roles in this season.
+    #[schema(value_type = String, format = Date)]
+    pub from: NaiveDate,
 }
 
 /// A saved player, with the warning that another player has the same name.
@@ -488,7 +491,8 @@ async fn save_role(
     operation_id = "carryPlayers",
     request_body = CarryRequest,
     responses(
-        (status = 200, description = "The team; the listed players of last season have the same role in this season", body = TeamPageView),
+        (status = 200, description = "The team; the listed players of last season have the same role in this season, from `from`", body = TeamPageView),
+        (status = 400, description = "`outside_season`; no player is added"),
         (status = 401, description = "Not logged in"),
     )
 )]
@@ -498,9 +502,13 @@ pub async fn carry(
 ) -> Result<Json<TeamPageView>, AppError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let from = proposed_start(season);
+    let from = body.from;
+    // Locks in order of id, so two "Add all" at the same time cannot block each other (a deadlock).
+    let mut ids = body.players.clone();
+    ids.sort_unstable();
+    ids.dedup();
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
-    for id in body.players.iter().copied().map(PlayerId) {
+    for id in ids.into_iter().map(PlayerId) {
         // Under the player's lock: two taps at the same time give one role. A player that already
         // has a role in this season, or did not stay until the end of last season, is skipped.
         if !players::lock(&mut tx, id).await? {

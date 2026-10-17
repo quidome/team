@@ -305,7 +305,7 @@ R13–R17). What steps 5–9 change:
 - [x] Step 5: core rules and "Change role" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 149 core tests, 40 browser tests)
 - [x] Step 6: "Remove from the team" from a date (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 41 browser tests)
 - [x] Step 7: "Undo" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
-- [ ] Step 8: "Add all" with a date and the "Today" buttons
+- [x] Step 8: "Add all" with a date and the "Today" buttons (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [ ] Step 9: settings, a change of day moves a proposed window (R15)
 - [ ] Review build
 - [ ] Review accept
@@ -371,6 +371,11 @@ Implement:
   - The page keeps "Undo" for each removed player with its name (for the line of a player with no row). An entry goes after its "Undo" (saved or refused), after "Change role", "Add to the team" or "Add player" for that player, and is replaced by a new removal.
   - The browser test of "Undo" without a row uses a real player whose role starts on Mon 2 Nov (removed from today), not replaced answers of "Add all": the same case, with the real server. The same test checks "Change role" to the same role.
   - Mutation checks: without the lock in `team_undo`, `undo_waits_for_the_players_lock` fails; with a commit between the deletes and the inserts, `undo_saves_all_or_nothing` fails.
+- 2026-10-17, step 8:
+  - `carry` also removes ids sent twice before it locks them.
+  - "One refusal undoes the whole save": the only refusal "Add all" can meet is a date outside the season, which fails on the first player; the transaction covers the other cases by reading the code, not by a test.
+  - The page has one snippet for "In the team from" with "Today", used by "Add player" and "Add all". The browser test of "Today" in "Add player" is in the test of Wren (step 7); the "Add all" test (replaced answers) checks the proposal, "Today" and the date sent.
+  - Mutation check: without the lock in `carry`, `add_all_waits_for_the_players_lock` fails.
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

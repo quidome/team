@@ -479,7 +479,7 @@ async fn add_all_brings_last_seasons_team_back(pool: PgPool) {
         .ok(
             "POST",
             "/api/players/carry",
-            Some(json!({ "players": [avery, blake, casey, dana] })),
+            Some(json!({ "players": [avery, blake, casey, dana], "from": "2026-09-01" })),
         )
         .await;
     assert_eq!(names(&page["members"]), ["Avery", "Blake"]);
@@ -493,7 +493,7 @@ async fn add_all_brings_last_seasons_team_back(pool: PgPool) {
         .ok(
             "POST",
             "/api/players/carry",
-            Some(json!({ "players": [avery, blake] })),
+            Some(json!({ "players": [avery, blake], "from": "2026-09-01" })),
         )
         .await;
     assert_eq!(page["members"][0]["roles"].as_array().unwrap().len(), 1);
@@ -513,7 +513,7 @@ async fn after_add_all_in_summer_the_players_stay_in_the_team_and_can_leave(pool
         .ok(
             "POST",
             "/api/players/carry",
-            Some(json!({ "players": [avery] })),
+            Some(json!({ "players": [avery], "from": "2026-09-01" })),
         )
         .await;
 
@@ -548,12 +548,12 @@ async fn last_seasons_players_join_during_the_season(pool: PgPool) {
         .await;
 
     on(&mut coordinator, 2026, 10, 12).await;
-    // "Add all" for Avery: from 1 September (step 8 gives "Add all" a date).
+    // "Add all" for Avery, from 1 September (the proposal).
     let page = coordinator
         .ok(
             "POST",
             "/api/players/carry",
-            Some(json!({ "players": [avery] })),
+            Some(json!({ "players": [avery], "from": "2026-09-01" })),
         )
         .await;
     assert_eq!(names(&page["members"]), ["Avery"]);
@@ -717,7 +717,7 @@ async fn remove_after_add_all_leaves_nothing_in_the_season(pool: PgPool) {
         .ok(
             "POST",
             "/api/players/carry",
-            Some(json!({ "players": [avery] })),
+            Some(json!({ "players": [avery], "from": "2026-09-01" })),
         )
         .await;
     let role = players::roles_of(&pool, PlayerId(avery)).await.unwrap()[1]
@@ -971,4 +971,81 @@ async fn undo_saves_all_or_nothing(pool: PgPool) {
         .await;
     assert_eq!(status, 500);
     assert_eq!(stored_roles(&pool, id).await, before);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn add_all_uses_the_given_date(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    on(&mut coordinator, 2026, 3, 1).await;
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2025-09-02")
+        .await;
+    let blake = coordinator
+        .add_player("Blake", "only_trains", "2025-09-02")
+        .await;
+    on(&mut coordinator, 2026, 10, 12).await;
+
+    // A date outside the season: refused, and no player is added.
+    let answer = coordinator
+        .send(
+            "POST",
+            "/api/players/carry",
+            Some(json!({ "players": [avery, blake], "from": "2026-06-30" })),
+        )
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "outside_season" })));
+    assert_eq!(stored_roles(&pool, avery).await.len(), 1);
+    assert_eq!(stored_roles(&pool, blake).await.len(), 1);
+
+    let page = coordinator
+        .ok(
+            "POST",
+            "/api/players/carry",
+            Some(json!({ "players": [blake, avery], "from": "2026-10-12" })),
+        )
+        .await;
+    assert_eq!(names(&page["members"]), ["Avery", "Blake"]);
+    assert_eq!(page["members"][0]["roles"][0]["from"], "2026-10-12");
+    assert_eq!(page["members"][1]["roles"][0]["from"], "2026-10-12");
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn add_all_waits_for_the_players_lock(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    on(&mut coordinator, 2026, 3, 1).await;
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2025-09-02")
+        .await;
+    on(&mut coordinator, 2026, 10, 12).await;
+
+    // Another save holds Avery's lock and gives Avery a role in the season, but has not committed.
+    let mut first = pool.begin().await.unwrap();
+    assert!(players::lock(&mut first, PlayerId(avery)).await.unwrap());
+    players::insert_role(
+        &mut *first,
+        PlayerId(avery),
+        Season::from_start_year(2026),
+        Role::PlaysGames,
+        date(2026, 9, 1),
+        None,
+    )
+    .await
+    .unwrap();
+
+    // "Add all" waits, then sees the role and skips Avery: one role in the season.
+    let second = coordinator.send(
+        "POST",
+        "/api/players/carry",
+        Some(json!({ "players": [avery], "from": "2026-10-12" })),
+    );
+    tokio::pin!(second);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut second).await;
+    assert!(waited.is_err(), "\"Add all\" did not wait for the lock");
+    first.commit().await.unwrap();
+    let (status, _) = second.await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        stored_roles(&pool, avery).await,
+        [(date(2025, 9, 2), None), (date(2026, 9, 1), None)]
+    );
 }

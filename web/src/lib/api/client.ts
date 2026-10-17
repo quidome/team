@@ -229,8 +229,8 @@ export async function correctRole(
 }
 
 /** Brings these players of last season into this season, with the same role ("Add all"). */
-export async function carryPlayers(players: number[]): Promise<TeamPage> {
-	return dataOf(await api.POST('/api/players/carry', { body: { players } }));
+export async function carryPlayers(players: number[], from: string): Promise<TeamPage> {
+	return dataOf(await api.POST('/api/players/carry', { body: { players, from } }));
 }
 
 export type TeamPage = components['schemas']['TeamPageView'];
