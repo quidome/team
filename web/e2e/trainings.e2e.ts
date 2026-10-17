@@ -441,4 +441,98 @@ test.describe('the overview', () => {
 		// The answer 400 shows in the console as a failed request.
 		expect(errors.filter((line) => !line.includes('400'))).toEqual([]);
 	});
+	// The data of the tests above: on Mon 12 Oct only Tue 6 Oct counts (Yara "Ill"); the Tuesdays of
+	// September and the Thursdays from Thu 3 Sep (the last weekly training added) were never opened:
+	// 11 days. Zane has a role from Tue 1 Sep and no absences.
+	test('the totals change while past trainings are entered', async ({ page }) => {
+		const errors = watchConsole(page);
+		const zane = page.getByTestId('player-totals').filter({ hasText: 'Zane' });
+		await page.goto('/attendance');
+		await expect(page.getByTestId('not-opened')).toHaveText('11 training days not opened');
+		await expect(zane).toContainText('of 1 training');
+
+		// The link opens the oldest day that is not opened: Tue 1 Sep. Zane was at school.
+		await page.getByRole('link', { name: '11 training days not opened' }).click();
+		await expect(page).toHaveURL(/\/training\/2026-09-01$/);
+		await page.getByRole('button', { name: 'Open training' }).click();
+		const atTraining = page.getByTestId('training-player').filter({ hasText: 'Zane' });
+		await atTraining.getByRole('button', { name: /Zane/ }).click();
+		await atTraining.getByRole('button', { name: 'School' }).click();
+		await expect(atTraining.getByTestId('saving')).toHaveCount(0);
+		await page.getByRole('link', { name: 'Back' }).click();
+		await expect(page.getByTestId('not-opened')).toHaveText('10 training days not opened');
+		await expect(zane).toContainText('of 2 trainings');
+		await expect(zane.getByTestId('totals-counts')).toHaveText(
+			'1 there · 1 absent, valid · 0 absent, not valid'
+		);
+
+		// Three more Tuesdays from the list, everyone there.
+		for (const [date, left] of [
+			['2026-09-08', '9 training days not opened'],
+			['2026-09-15', '8 training days not opened'],
+			['2026-09-22', '7 training days not opened']
+		]) {
+			await page.locator(`[data-date="${date}"]`).getByRole('button').first().click();
+			await expect(page).toHaveURL(new RegExp(`/training/${date}$`));
+			await page.getByRole('link', { name: 'Back' }).click();
+			await expect(page.getByTestId('not-opened')).toHaveText(left);
+		}
+		await expect(zane).toContainText('of 5 trainings');
+		await expect(zane.getByTestId('totals-counts')).toHaveText(
+			'4 there · 1 absent, valid · 0 absent, not valid'
+		);
+		expect(errors).toEqual([]);
+	});
+
+	test('a tap on a player shows the trainings it missed', async ({ page }) => {
+		const errors = watchConsole(page);
+		await page.goto('/attendance');
+		const zane = page.getByTestId('player-totals').filter({ hasText: 'Zane' });
+		const button = zane.getByRole('button');
+		await expect(button).toHaveAttribute('aria-expanded', 'false');
+		await button.click();
+		await expect(button).toHaveAttribute('aria-expanded', 'true');
+		await expect(zane.getByTestId('missed')).toHaveText('Tue 1 Sept · School');
+		await expectAccessible(page);
+		await expectNoHorizontalScroll(page, 320);
+		await button.click();
+		await expect(zane.getByTestId('missed')).toHaveCount(0);
+		expect(errors).toEqual([]);
+	});
+
+	test('a cancelled training does not count, and counts again after "Undo cancel"', async ({
+		page
+	}) => {
+		const errors = watchConsole(page);
+		const zane = page.getByTestId('player-totals').filter({ hasText: 'Zane' });
+		await page.goto('/training/2026-09-01');
+		await page.getByRole('button', { name: 'Cancel training' }).click();
+		await expect(page.getByTestId('training-top')).toHaveText('Cancelled');
+		await page.getByRole('link', { name: 'Back' }).click();
+		await expect(zane).toContainText('of 4 trainings');
+		await expect(zane.getByTestId('totals-counts')).toHaveText(
+			'4 there · 0 absent, valid · 0 absent, not valid'
+		);
+
+		// "Show cancelled" off hides the row, not the totals.
+		await page.getByRole('switch', { name: 'Show cancelled' }).uncheck();
+		await expect(page.locator('[data-date="2026-09-01"]')).toHaveCount(0);
+		await expect(zane).toContainText('of 4 trainings');
+		await page.getByRole('switch', { name: 'Show cancelled' }).check();
+
+		await page.goto('/training/2026-09-01');
+		await page.getByRole('button', { name: 'Undo cancel' }).click();
+		await expect(page.getByTestId('training-top')).toHaveText('1 absent');
+		await page.getByRole('link', { name: 'Back' }).click();
+		await expect(zane).toContainText('of 5 trainings');
+		expect(errors).toEqual([]);
+	});
+
+	test('a season with no trainings yet', async ({ page }) => {
+		const errors = watchConsole(page);
+		await page.goto('/attendance?season=2025-2026');
+		await expect(page.getByTestId('no-trainings-yet')).toHaveText('No trainings yet this season.');
+		await expect(page.getByTestId('not-opened')).toHaveCount(0);
+		expect(errors).toEqual([]);
+	});
 });

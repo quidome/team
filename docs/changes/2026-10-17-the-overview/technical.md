@@ -210,8 +210,8 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 - [x] Step 1: the counting rule in the core (2026-10-17: `Player::sort_key`, `season_overview`, 15 core tests)
 - [x] Step 2: the route `GET /api/attendance` (2026-10-17: `query_season`, `trainings::seasons`, `api/attendance.rs`; 5 tests in `tests/attendance.rs`, the route in the 401 test and the log test)
 - [x] Step 3: the choice of season (2026-10-17: `loadTrainings` and `loadAttendance` with a season, `?season=` on `/attendance` with the choice and "This season cannot be read.", "Add training" only in the current season, "Back" and "Delete training" return to the training's season; 2 browser tests, and the URL after "Delete training" in the existing test)
-- [ ] Step 4: the totals on the page
-- [ ] All checks pass
+- [x] Step 4: the totals on the page (2026-10-17: the line of days not opened with its link, "No trainings yet this season.", the totals and "Left the team" with the missed trainings under a player; 4 browser tests)
+- [x] All checks pass (`just check`, 2026-10-17: 64 browser tests)
 
 ## Deviations
 - 2026-10-17, during /design, the coordinator's choice: the epic's Interface says "the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings". Story C keeps the start page line "Attendance · Team · Players · Settings" (built in story B) and adds no links to "Attendance". Reason: the start page will become one page with the last games, the last training and the coming events (`docs/ideas.md`, 2026-10-15, extended 2026-10-17); moving the links now would move them twice.
@@ -220,6 +220,8 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 - 2026-10-17, step 2: server test 2 makes its earlier season by moving the clock to Thu 15 Jul 2027 (the September data is then in 2026-2027, an earlier season), not by roles written in 2025-2026 through storage; it tests the same answer with less hand-written data. Server test 3 uses Mon 30 Jun 2025 and Tue 1 Jul 2025, so a wrong rule would lose the season 2024-2025.
 - 2026-10-17, step 3: no SQL helper in `web/e2e/database.ts`. CI runs the browser tests outside the Nix shell, where `psql` may be missing. The browser tests do not need data in an earlier season: a season in the address is in the choice even without data, and the training page of any date (Tue 26 May 2026) has its season. The server tests cover an earlier season with data. Step 4's "No trainings yet this season." uses 2025-2026 in the same way.
 - 2026-10-17, step 3: the links with a season use `resolve('/attendance?season=…')` (SvelteKit accepts a query in `resolve`), so the lint rule `svelte/no-navigation-without-resolve` holds; the training page types its helper as `ResolvedPathname`.
+- 2026-10-17, step 4: the page has two headings of its own, "Totals" and "Trainings" (above "Add training" and the list); "Coming" and "Past" became sub-headings of "Trainings". The spec names no headings; they keep the long page readable on a phone and for a screen reader.
+- 2026-10-17, step 4: the browser tests run on the data of the tests before them, so the numbers differ from the plan: 11 days not opened (the Tuesdays of September and the Thursdays from Thu 3 Sep, added by the last test of story B), and "of 5 trainings" after four Tuesdays, because Tue 6 Oct already counted. The check at 320 pixels with an open missed list is in the test of the missed list. The text "1 training day not opened" has no browser test (`notOpenedText`).
 
 The design reads the spec more strictly within its words:
 - "Each player who could be at one or more trainings of the season": a player with a role on the date of at least one training that counts (up to today, not cancelled). A newcomer from next week has no row yet. Hidden players have rows.
