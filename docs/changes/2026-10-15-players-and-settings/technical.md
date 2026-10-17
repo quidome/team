@@ -1,6 +1,6 @@
 # Technical spec: Players and settings
 
-**Status**: approved (designed again 2026-10-16, steps 1–4 built; steps 5–9 designed and approved 2026-10-17 after the second build and accept review)
+**Status**: in progress (designed again 2026-10-16, steps 1–4 built; steps 5–9 designed and approved 2026-10-17 after the second build and accept review)
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
 **Date**: 2026-10-15, designed again 2026-10-16, steps 5–9 on 2026-10-17
@@ -302,7 +302,7 @@ R13–R17). What steps 5–9 change:
 - [x] Step 2: core rules for players (2026-10-16; `just check` passes, 39 browser tests)
 - [x] Step 3: the team page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 4: the players page and the player page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 40 browser tests)
-- [ ] Step 5: core rules and "Change role"
+- [x] Step 5: core rules and "Change role" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 149 core tests, 40 browser tests)
 - [ ] Step 6: "Remove from the team" from a date
 - [ ] Step 7: "Undo"
 - [ ] Step 8: "Add all" with a date and the "Today" buttons
@@ -353,6 +353,13 @@ Implement:
   - The history shows the season after a role of an earlier season ("· 2025-2026"); in "Correct", an empty "Until" means the role continues. The players page shows the warning of the same name on the page itself.
   - Removed first-form tests: in `tests/players.rs` the tests of the groups (`a_player_without_a_role_is_under_others`, `left_the_team_and_undo`, `back_in_the_team_is_a_new_role`; the team page tests of step 3 cover them); in the browser the tests of the first-form player page ("Left the team" and "Undo", its proposal, the "Add to the team" of a player of last season) and "Add all" on `/players` (now on `/team`). The weekly trainings test of the proposed start reads `GET /api/team`.
   - The browser test of "Correct" uses the player of the team page test (the tests run in order on one database).
+- 2026-10-17, step 5:
+  - The schema `Refusal` is in `api/team.rs` with `error` and `date`; step 6 adds `roles`.
+  - Until step 8, "Add all" gives its roles from `proposed_start(season)` (1 September).
+  - `role_change` finds the ended role again by the id that `change_role` gives; when it is not found (it cannot be), it answers `not_in_team`.
+  - Changed tests: the core test of "Add all" with 14 players no longer has a player with a role in the new season (with the new rule the group is then empty; the new core tests cover it); the server test `last_seasons_players_join_during_the_season` expects 1 September and an empty "Players of last season" after "Add all" for one player; in `change_role_errors_have_their_codes` the date before the role (15 Aug) now answers `role_starts_later`, and `not_in_team` uses a player with no role.
+  - Removed tests: the core test of the old `proposed_start` (three inputs), the core test of `first_training_date`, and `the_proposed_start_of_a_role_follows_the_weekly_trainings` in `tests/weekly_trainings.rs` (replaced by `the_proposed_start_is_the_first_of_september`).
+  - Mutation check: with the end of the current role written outside the transaction, `change_role_saves_both_or_neither` fails.
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

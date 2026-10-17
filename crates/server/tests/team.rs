@@ -58,6 +58,25 @@ fn change(role: &str, from: &str) -> Option<Value> {
     Some(json!({ "role": role, "from": from }))
 }
 
+/// Makes every `operation` ("INSERT", "UPDATE" or "DELETE") on `player_roles` fail from now on,
+/// in this test's own database: a save that writes more than once must then store nothing.
+async fn refuse_role_writes(pool: &PgPool, operation: &str) {
+    sqlx::query(
+        "CREATE FUNCTION refuse_role_write() RETURNS trigger LANGUAGE plpgsql AS \
+         $$ BEGIN RAISE EXCEPTION 'refused by the test'; END $$",
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(&format!(
+        "CREATE TRIGGER refuse_role_write BEFORE {operation} ON player_roles \
+         FOR EACH ROW EXECUTE FUNCTION refuse_role_write()"
+    ))
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_player_added_with_a_role_is_in_the_team(pool: PgPool) {
     let coordinator = Coordinator::start(pool).await;
@@ -69,7 +88,7 @@ async fn a_player_added_with_a_role_is_in_the_team(pool: PgPool) {
     assert_eq!(page["today"], "2026-10-12");
     assert_eq!(page["season_first_day"], "2026-07-01");
     assert_eq!(page["season_last_day"], "2027-06-30");
-    assert_eq!(page["proposed_from"], "2026-10-12");
+    assert_eq!(page["proposed_from"], "2026-09-01");
     assert_eq!(names(&page["members"]), ["Avery"]);
     assert_eq!(page["members"][0]["role"], "plays_games");
     assert_eq!(page["members"][0]["roles"][0]["from"], "2026-09-01");
@@ -192,10 +211,57 @@ async fn change_role_errors_have_their_codes(pool: PgPool) {
         answer,
         (400, json!({ "error": "change_before_role_start" }))
     );
+    // Before the role: it starts later.
     let answer = coordinator
         .send("POST", &path, change("only_trains", "2026-08-15"))
         .await;
+    assert_eq!(
+        answer,
+        (
+            400,
+            json!({ "error": "role_starts_later", "date": "2026-09-01" })
+        )
+    );
+    // A player with no role in the season.
+    let casey = coordinator
+        .ok(
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": "Casey", "last_name": null, "role": null })),
+        )
+        .await["player"]["id"]
+        .as_i64()
+        .unwrap();
+    let answer = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{casey}/role-change"),
+            change("only_trains", "2026-10-12"),
+        )
+        .await;
     assert_eq!(answer, (400, json!({ "error": "not_in_team" })));
+    let answer = coordinator
+        .send("POST", &path, change("plays_games", "2026-10-12"))
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "same_role" })));
+    // A role that starts later: the answer names its start.
+    let later = coordinator
+        .add_player("Blake", "only_trains", "2026-11-02")
+        .await;
+    let answer = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{later}/role-change"),
+            change("plays_games", "2026-10-12"),
+        )
+        .await;
+    assert_eq!(
+        answer,
+        (
+            400,
+            json!({ "error": "role_starts_later", "date": "2026-11-02" })
+        )
+    );
     let (status, _) = coordinator
         .send(
             "POST",
@@ -204,6 +270,25 @@ async fn change_role_errors_have_their_codes(pool: PgPool) {
         )
         .await;
     assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn change_role_saves_both_or_neither(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let id = coordinator
+        .add_player("Avery", "plays_games", "2026-09-01")
+        .await;
+    // The end of the current role is written, then the insert of the new role fails.
+    refuse_role_writes(&pool, "INSERT").await;
+    let (status, _) = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{id}/role-change"),
+            change("only_trains", "2026-10-01"),
+        )
+        .await;
+    assert_eq!(status, 500);
+    assert_eq!(stored_roles(&pool, id).await, [(date(2026, 9, 1), None)]);
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
@@ -435,7 +520,7 @@ async fn last_seasons_players_join_during_the_season(pool: PgPool) {
         .await;
 
     on(&mut coordinator, 2026, 10, 12).await;
-    // "Add all" for Avery, without weekly trainings: from today.
+    // "Add all" for Avery: from 1 September (step 8 gives "Add all" a date).
     let page = coordinator
         .ok(
             "POST",
@@ -444,9 +529,12 @@ async fn last_seasons_players_join_during_the_season(pool: PgPool) {
         )
         .await;
     assert_eq!(names(&page["members"]), ["Avery"]);
-    assert_eq!(page["members"][0]["roles"][0]["from"], "2026-10-12");
+    assert_eq!(page["members"][0]["roles"][0]["from"], "2026-09-01");
     assert!(page["left"].as_array().unwrap().is_empty());
-    assert_eq!(names(&page["last_season"]), ["Blake"]);
+    // One of last season's team has a role: "Players of last season" goes; Blake is still the
+    // first choice of "Add player".
+    assert!(page["last_season"].as_array().unwrap().is_empty());
+    assert_eq!(names(&page["candidates"]), ["Blake"]);
 
     // "Add player" from the list for Blake, with another role; the answer is the team page.
     let page = coordinator
@@ -461,4 +549,54 @@ async fn last_seasons_players_join_during_the_season(pool: PgPool) {
     assert_eq!(page["members"][1]["roles"].as_array().unwrap().len(), 1);
     assert!(page["candidates"].as_array().unwrap().is_empty());
     assert_eq!(page, coordinator.ok("GET", "/api/team", None).await);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_proposed_start_is_the_first_of_september(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool).await;
+    // No weekly training is needed.
+    let page = coordinator.ok("GET", "/api/team", None).await;
+    assert_eq!(page["proposed_from"], "2026-09-01");
+    on(&mut coordinator, 2026, 8, 15).await;
+    let page = coordinator.ok("GET", "/api/team", None).await;
+    assert_eq!(page["proposed_from"], "2026-09-01");
+    on(&mut coordinator, 2027, 1, 5).await;
+    let page = coordinator.ok("GET", "/api/team", None).await;
+    assert_eq!(page["proposed_from"], "2026-09-01");
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn last_seasons_team_stays_until_one_of_them_has_a_role(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool).await;
+    on(&mut coordinator, 2026, 3, 1).await;
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2025-09-02")
+        .await;
+    coordinator
+        .add_player("Blake", "only_trains", "2025-09-02")
+        .await;
+
+    on(&mut coordinator, 2026, 10, 12).await;
+    // A newcomer does not make the group go.
+    let page = coordinator
+        .ok(
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": "Casey", "last_name": null,
+                         "role": { "role": "plays_games", "from": "2026-09-01" } })),
+        )
+        .await;
+    assert_eq!(page["player"]["first_name"], "Casey");
+    let page = coordinator.ok("GET", "/api/team", None).await;
+    assert_eq!(names(&page["last_season"]), ["Avery", "Blake"]);
+
+    let page = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{avery}/roles"),
+            Some(json!({ "role": "plays_games", "from": "2026-09-01", "until": null })),
+        )
+        .await;
+    assert!(page["last_season"].as_array().unwrap().is_empty());
+    assert_eq!(names(&page["candidates"]), ["Blake"]);
 }

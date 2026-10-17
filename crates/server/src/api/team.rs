@@ -6,10 +6,12 @@ use axum::Json;
 use axum::extract::{Path, State};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use team_core::{Member, PlayerId, PlayerRole, Season, change_role, check_change, role_on, team};
+use team_core::{
+    Member, PlayerId, PlayerRole, Season, change_role, check_change, proposed_start, role_on, team,
+};
 use utoipa::ToSchema;
 
-use super::players::{RoleKind, RoleView, day, proposed_from, role_view};
+use super::players::{RoleKind, RoleView, day, role_view};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
@@ -27,6 +29,9 @@ pub struct MemberView {
     pub role: RoleKind,
     /// The roles of the season shown (last season's for "last_season").
     pub roles: Vec<RoleView>,
+    /// In the team, and today is the last day: the role today ends today, no role follows, and
+    /// today is not the last day of the season. The row shows "Last day today".
+    pub last_day_today: bool,
 }
 
 /// A player that "Add player" offers.
@@ -50,19 +55,29 @@ pub struct TeamPageView {
     pub season_first_day: String,
     /// The last day of the season, for example "2027-06-30": the latest date of a role.
     pub season_last_day: String,
-    /// The proposed start of a new role: the first training date of the season, or today when
-    /// trainings have started or there is no weekly training.
+    /// The proposed "In the team from" of "Add player" and "Add all": 1 September of the season.
     pub proposed_from: String,
     /// Players with a role today or later in the season, sorted by first name.
     pub members: Vec<MemberView>,
     /// Players with a role earlier in the season and none today or later.
     pub left: Vec<MemberView>,
     /// Players who were in the team until the end of last season, have no role in this season and
-    /// are not hidden: "Add all" brings them back.
+    /// are not hidden: "Add all" brings them back. Empty as soon as one player of last season's
+    /// team has a role in this season.
     pub last_season: Vec<MemberView>,
     /// The players "Add player" offers: not hidden and not in the team this season; last season's
     /// team first.
     pub candidates: Vec<PlayerSummary>,
+}
+
+/// The body of a refused request: the code, with details for some codes.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Refusal {
+    /// For example `role_starts_later` or `changed_meanwhile`.
+    pub error: String,
+    /// For `role_starts_later`: the start of the player's later role, for example "2026-11-02".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -87,6 +102,7 @@ fn member_view(member: &Member) -> MemberView {
         last_name: member.player.last_name.clone(),
         role: member.role.into(),
         roles: member.roles.iter().map(|role| role_view(role)).collect(),
+        last_day_today: member.last_day_today,
     }
 }
 
@@ -96,7 +112,6 @@ pub async fn load(state: &AppState) -> Result<TeamPageView, StoreError> {
     let today = today_in_netherlands(state.clock.as_ref());
     let all = players::all(&state.pool).await?;
     let roles = players::roles_in(&state.pool, &[season, season.previous()]).await?;
-    let proposed_from = proposed_from(state, season, today).await?;
     let team_name = followed_teams::for_season(&state.pool, season)
         .await?
         .and_then(|choice| choice.team)
@@ -108,7 +123,7 @@ pub async fn load(state: &AppState) -> Result<TeamPageView, StoreError> {
         today: day(today),
         season_first_day: day(season.first_day()),
         season_last_day: day(season.last_day()),
-        proposed_from: day(proposed_from),
+        proposed_from: day(proposed_start(season)),
         members: page.members.iter().map(member_view).collect(),
         left: page.left.iter().map(member_view).collect(),
         last_season: page.last_season.iter().map(member_view).collect(),
@@ -138,7 +153,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<TeamPageView>, Ap
 }
 
 /// Splits the player's roles into the role of `season` that covers `date` and the others;
-/// `not_in_team` when there is none.
+/// `not_in_team` when there is none. (Step 6 moves "Remove from the team" into the core.)
 fn covering(
     mut roles: Vec<PlayerRole>,
     player: PlayerId,
@@ -165,7 +180,7 @@ fn covering(
     request_body = ChangeRole,
     responses(
         (status = 200, description = "The team; the role on `from` ends the day before, the new role starts on `from`", body = TeamPageView),
-        (status = 400, description = "`not_in_team`, `change_before_role_start`, `until_before_from`, `outside_season`, `roles_overlap`"),
+        (status = 400, description = "`not_in_team`, `role_starts_later` (with `date`), `same_role`, `change_before_role_start`, `outside_season`, `roles_overlap`", body = Refusal),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player"),
     )
@@ -182,8 +197,10 @@ pub async fn role_change(
         return Err(AppError::NotFound);
     }
     let roles = players::roles_of(&mut *tx, player).await?;
-    let (current, others) = covering(roles, player, season, body.from)?;
-    let change = change_role(season, &current, body.role.into(), body.from, &others)?;
+    let change = change_role(season, &roles, body.role.into(), body.from)?;
+    let Some(current) = roles.iter().find(|role| role.id == change.ended) else {
+        return Err(AppError::BadRequest("not_in_team"));
+    };
     // Both or neither: the end of the current role and the new role.
     players::update_role(
         &mut *tx,

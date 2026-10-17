@@ -2,6 +2,7 @@
 import createClient from 'openapi-fetch';
 import type { components, paths } from './schema.js';
 import { weekdays } from '#lib/players.js';
+import { formatDay } from '#lib/schedule.js';
 
 export const api = createClient<paths>({ baseUrl: '', credentials: 'same-origin' });
 
@@ -20,8 +21,26 @@ export type ClubView = components['schemas']['ClubView'];
 export type TeamView = components['schemas']['TeamView'];
 export type ClubTeams = components['schemas']['ClubTeams'];
 
-/** A failed API call, with a message for the coordinator. */
-export class ApiError extends Error {}
+/** A failed API call, with a message for the coordinator, and the code and body of the answer. */
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		readonly code?: string,
+		readonly body?: unknown
+	) {
+		super(message);
+	}
+}
+
+/** An `ApiError` for an error answer of the API. */
+function apiError(error: unknown, status: number): ApiError {
+	const code = (error as { error?: unknown } | undefined)?.error;
+	return new ApiError(
+		messageFor(error, status),
+		typeof code === 'string' ? code : undefined,
+		error
+	);
+}
 
 /** The message for an error answer of the API (`{ "error": "<code>" }`), or for the `error` of a
  * failed reading. */
@@ -35,6 +54,9 @@ export function messageFor(error: unknown, status: number): string {
 	if (code === 'no_choice') return 'Choose your club first.';
 	if (code === 'not_held_back')
 		return 'This reading can no longer be confirmed. Read the game list again.';
+	const date = (error as { date?: unknown } | undefined)?.date;
+	if (code === 'role_starts_later' && typeof date === 'string')
+		return `This player's role starts on ${formatDay(date)}. To change it, use "Correct" in the history.`;
 	const players: Record<string, string> = {
 		first_name_required: 'A first name is needed.',
 		until_before_from: 'The end must be after the start.',
@@ -43,6 +65,8 @@ export function messageFor(error: unknown, status: number): string {
 		change_before_role_start:
 			'The change must be after the start of the role. To change the role from its start, use "Correct" in the history.',
 		not_in_team: 'This player is not in the team on that date.',
+		same_role: 'The player already has this role.',
+		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
 		weekly_trainings_overlap: 'There is already a weekly training on that day in these dates.',
@@ -58,8 +82,7 @@ export function messageFor(error: unknown, status: number): string {
 
 /** The answer's data, or an `ApiError` with a message for the coordinator. */
 function dataOf<T>(result: { data?: T; error?: unknown; response: Response }): T {
-	if (result.data === undefined)
-		throw new ApiError(messageFor(result.error, result.response.status));
+	if (result.data === undefined) throw apiError(result.error, result.response.status);
 	return result.data;
 }
 
@@ -178,7 +201,7 @@ export async function changePlayer(
 
 export async function deletePlayer(id: number): Promise<void> {
 	const result = await api.DELETE('/api/players/{id}', { params: { path: { id } } });
-	if (!result.response.ok) throw new ApiError(messageFor(result.error, result.response.status));
+	if (!result.response.ok) throw apiError(result.error, result.response.status);
 }
 
 /** "Add player" for a player from the list, and "Add to the team". */

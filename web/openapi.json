@@ -443,7 +443,14 @@
             }
           },
           "400": {
-            "description": "`not_in_team`, `change_before_role_start`, `until_before_from`, `outside_season`, `roles_overlap`"
+            "description": "`not_in_team`, `role_starts_later` (with `date`), `same_role`, `change_before_role_start`, `outside_season`, `roles_overlap`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not logged in"
@@ -1612,7 +1619,8 @@
           "id",
           "first_name",
           "role",
-          "roles"
+          "roles",
+          "last_day_today"
         ],
         "properties": {
           "first_name": {
@@ -1621,6 +1629,10 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "last_day_today": {
+            "type": "boolean",
+            "description": "In the team, and today is the last day: the role today ends today, no role follows, and\ntoday is not the last day of the season. The row shows \"Last day today\"."
           },
           "last_name": {
             "type": [
@@ -1943,6 +1955,26 @@
           },
           "valid": {
             "type": "boolean"
+          }
+        }
+      },
+      "Refusal": {
+        "type": "object",
+        "description": "The body of a refused request: the code, with details for some codes.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For `role_starts_later`: the start of the player's later role, for example \"2026-11-02\"."
+          },
+          "error": {
+            "type": "string",
+            "description": "For example `role_starts_later` or `changed_meanwhile`."
           }
         }
       },
@@ -2331,7 +2363,7 @@
             "items": {
               "$ref": "#/components/schemas/MemberView"
             },
-            "description": "Players who were in the team until the end of last season, have no role in this season and\nare not hidden: \"Add all\" brings them back."
+            "description": "Players who were in the team until the end of last season, have no role in this season and\nare not hidden: \"Add all\" brings them back. Empty as soon as one player of last season's\nteam has a role in this season."
           },
           "left": {
             "type": "array",
@@ -2349,7 +2381,7 @@
           },
           "proposed_from": {
             "type": "string",
-            "description": "The proposed start of a new role: the first training date of the season, or today when\ntrainings have started or there is no weekly training."
+            "description": "The proposed \"In the team from\" of \"Add player\" and \"Add all\": 1 September of the season."
           },
           "season": {
             "type": "string"

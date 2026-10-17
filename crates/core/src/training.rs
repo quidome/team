@@ -104,11 +104,6 @@ pub fn training_days(weekly: &[WeeklyTraining]) -> Vec<(NaiveDate, &WeeklyTraini
     days
 }
 
-/// The first training date of the season: the first training day of its weekly trainings.
-pub fn first_training_date(weekly: &[WeeklyTraining]) -> Option<NaiveDate> {
-    training_days(weekly).first().map(|(date, _)| *date)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,15 +256,5 @@ mod tests {
         // Wednesday 2 Sep to Monday 7 Sep holds no Tuesday.
         let none = [weekly(1, Weekday::Tue, date(2026, 9, 2), date(2026, 9, 7))];
         assert!(training_days(&none).is_empty());
-    }
-
-    #[test]
-    fn the_first_training_date_is_the_first_training_day() {
-        assert_eq!(first_training_date(&[]), None);
-        let both = [
-            weekly(1, Weekday::Tue, date(2026, 9, 8), date(2027, 5, 25)),
-            weekly(2, Weekday::Thu, date(2026, 9, 3), date(2027, 5, 27)),
-        ];
-        assert_eq!(first_training_date(&both), Some(date(2026, 9, 3)));
     }
 }

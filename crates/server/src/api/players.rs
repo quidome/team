@@ -6,10 +6,11 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    first_training_date, proposed_start, role_on, team,
+    proposed_start, role_on, team,
 };
 use utoipa::ToSchema;
 
@@ -18,7 +19,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{players, weekly_trainings};
+use crate::players;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -155,6 +156,21 @@ pub struct SavedPlayer {
 impl From<PlayerError> for AppError {
     fn from(error: PlayerError) -> Self {
         Self::BadRequest(match error {
+            PlayerError::RoleStartsLater(start) => {
+                return Self::Refused {
+                    status: StatusCode::BAD_REQUEST,
+                    code: "role_starts_later",
+                    details: json!({ "date": day(start) }),
+                };
+            }
+            PlayerError::ChangedMeanwhile => {
+                return Self::Refused {
+                    status: StatusCode::CONFLICT,
+                    code: "changed_meanwhile",
+                    details: json!({}),
+                };
+            }
+            PlayerError::SameRole => "same_role",
             PlayerError::FirstNameRequired => "first_name_required",
             PlayerError::UntilBeforeFrom => "until_before_from",
             PlayerError::OutsideSeason => "outside_season",
@@ -189,17 +205,6 @@ async fn roles_around(
         .into_iter()
         .filter(|role| role.season == season || role.season == season.previous())
         .collect())
-}
-
-/// The proposed start of a new role in `season` (see `proposed_start`).
-pub(crate) async fn proposed_from(
-    state: &AppState,
-    season: Season,
-    today: NaiveDate,
-) -> Result<NaiveDate, StoreError> {
-    let weekly = weekly_trainings::for_season(&state.pool, season).await?;
-    // Trainings come with story B; until then no training of the season is opened.
-    Ok(proposed_start(first_training_date(&weekly), false, today))
 }
 
 /// The detail of one player, with the history of all seasons.
@@ -493,7 +498,7 @@ pub async fn carry(
 ) -> Result<Json<TeamPageView>, AppError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let from = proposed_from(&state, season, today).await?;
+    let from = proposed_start(season);
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     for id in body.players.iter().copied().map(PlayerId) {
         // Under the player's lock: two taps at the same time give one role. A player that already

@@ -584,6 +584,11 @@ export interface components {
 			first_name: string;
 			/** Format: int64 */
 			id: number;
+			/**
+			 * @description In the team, and today is the last day: the role today ends today, no role follows, and
+			 *     today is not the last day of the season. The row shows "Last day today".
+			 */
+			last_day_today: boolean;
 			last_name?: string | null;
 			/**
 			 * @description Today's role (or the coming one); in "left", the last role of the season; in
@@ -677,6 +682,13 @@ export interface components {
 			hidden: boolean;
 			name: string;
 			valid: boolean;
+		};
+		/** @description The body of a refused request: the code, with details for some codes. */
+		Refusal: {
+			/** @description For `role_starts_later`: the start of the player's later role, for example "2026-11-02". */
+			date?: string | null;
+			/** @description For example `role_starts_later` or `changed_meanwhile`. */
+			error: string;
 		};
 		/** @enum {string} */
 		ResultKind: 'good' | 'failed' | 'held_back';
@@ -810,17 +822,15 @@ export interface components {
 			candidates: components['schemas']['PlayerSummary'][];
 			/**
 			 * @description Players who were in the team until the end of last season, have no role in this season and
-			 *     are not hidden: "Add all" brings them back.
+			 *     are not hidden: "Add all" brings them back. Empty as soon as one player of last season's
+			 *     team has a role in this season.
 			 */
 			last_season: components['schemas']['MemberView'][];
 			/** @description Players with a role earlier in the season and none today or later. */
 			left: components['schemas']['MemberView'][];
 			/** @description Players with a role today or later in the season, sorted by first name. */
 			members: components['schemas']['MemberView'][];
-			/**
-			 * @description The proposed start of a new role: the first training date of the season, or today when
-			 *     trainings have started or there is no weekly training.
-			 */
+			/** @description The proposed "In the team from" of "Add player" and "Add all": 1 September of the season. */
 			proposed_from: string;
 			season: string;
 			/** @description The first day of the season, for example "2026-07-01": the earliest date of a role. */
@@ -1349,12 +1359,14 @@ export interface operations {
 					'application/json': components['schemas']['TeamPageView'];
 				};
 			};
-			/** @description `not_in_team`, `change_before_role_start`, `until_before_from`, `outside_season`, `roles_overlap` */
+			/** @description `not_in_team`, `role_starts_later` (with `date`), `same_role`, `change_before_role_start`, `outside_season`, `roles_overlap` */
 			400: {
 				headers: {
 					[name: string]: unknown;
 				};
-				content?: never;
+				content: {
+					'application/json': components['schemas']['Refusal'];
+				};
 			};
 			/** @description Not logged in */
 			401: {

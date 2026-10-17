@@ -15,6 +15,14 @@ pub enum AppError {
     /// A request the client can fix; the reason is a short fixed code, for example `unknown_club`.
     #[error("bad request: {0}")]
     BadRequest(&'static str),
+    /// A refusal with details the screen shows, for example a date; the body is the code with
+    /// the fields of `details` (an object).
+    #[error("refused: {code}")]
+    Refused {
+        status: StatusCode,
+        code: &'static str,
+        details: serde_json::Value,
+    },
     #[error("not found")]
     NotFound,
     /// The game list cannot be reached, or answered with an error.
@@ -46,9 +54,24 @@ impl From<StoreError> for AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        if let Self::Refused {
+            status,
+            code,
+            details,
+        } = self
+        {
+            let mut body = json!({ "error": code });
+            if let (Some(body), serde_json::Value::Object(details)) =
+                (body.as_object_mut(), details)
+            {
+                body.extend(details);
+            }
+            return (status, Json(body)).into_response();
+        }
         let (status, code) = match &self {
             Self::Unauthenticated => (StatusCode::UNAUTHORIZED, "unauthenticated"),
             Self::BadRequest(reason) => (StatusCode::BAD_REQUEST, *reason),
+            Self::Refused { status, code, .. } => (*status, *code),
             Self::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             // The reader logs these with the club and season (`source/mod.rs`).
             Self::SourceUnavailable(_) => (StatusCode::BAD_GATEWAY, "source_unavailable"),
