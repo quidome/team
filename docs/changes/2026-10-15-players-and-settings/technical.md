@@ -306,7 +306,7 @@ R13–R17). What steps 5–9 change:
 - [x] Step 6: "Remove from the team" from a date (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 41 browser tests)
 - [x] Step 7: "Undo" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 8: "Add all" with a date and the "Today" buttons (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
-- [ ] Step 9: settings, a change of day moves a proposed window (R15)
+- [x] Step 9: settings, a change of day moves a proposed window (R15) (2026-10-17; `just check` passes; 42 browser tests)
 - [ ] Review build
 - [ ] Review accept
 
@@ -376,6 +376,9 @@ Implement:
   - "One refusal undoes the whole save": the only refusal "Add all" can meet is a date outside the season, which fails on the first player; the transaction covers the other cases by reading the code, not by a test.
   - The page has one snippet for "In the team from" with "Today", used by "Add player" and "Add all". The browser test of "Today" in "Add player" is in the test of Wren (step 7); the "Add all" test (replaced answers) checks the proposal, "Today" and the date sent.
   - Mutation check: without the lock in `carry`, `add_all_waits_for_the_players_lock` fails.
+- 2026-10-17, step 9:
+  - The browser test of the settings changes Tuesday to Thursday (not Wednesday to Tuesday as planned; the same case on the existing weekly training): only the day changes, and the window becomes Thu 3 Sept – Thu 27 May. A typed first date (Thu 10 Sep) stays when the day changes.
+  - Mutation check: with the old change of day (`propose()` only), the settings test fails (the window stays Tue 1 Sep).
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

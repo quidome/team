@@ -46,6 +46,8 @@
 	});
 	/** The window is the proposal, not typed: a change of the day proposes again. */
 	let windowProposed = $state(false);
+	/** The day of the week the window in the form belongs to (the day before a change of day). */
+	let windowDay = $state(2);
 	let savingWeekly = $state(false);
 	let weeklyError = $state<string | null>(null);
 
@@ -65,12 +67,29 @@
 		}
 	}
 
+	/** A new day: a window that is the old day's proposal (for example a stored weekly training
+	 * with the proposed window) moves to the new day's proposal; a typed window stays. */
+	async function dayChanged() {
+		const old = windowDay;
+		windowDay = form.weekday;
+		if (form.from && form.until && !windowProposed) {
+			try {
+				const proposal = await proposeWindow(old);
+				if (proposal.from === form.from && proposal.until === form.until) windowProposed = true;
+			} catch {
+				// The window stays as it is.
+			}
+		}
+		await propose();
+	}
+
 	function startAdding() {
 		const used = new Set(weekly.map((training) => training.weekday));
 		const weekday = weekdays.find((candidate) => !used.has(candidate.value))?.value ?? 1;
 		form = { weekday, start: '', end: '', from: '', until: '' };
 		editingId = null;
 		windowProposed = false;
+		windowDay = weekday;
 		weeklyError = null;
 		editing = true;
 		void propose();
@@ -81,6 +100,7 @@
 		form = { weekday, start, end, from, until };
 		editingId = training.id;
 		windowProposed = false;
+		windowDay = weekday;
 		weeklyError = null;
 		editing = true;
 	}
@@ -240,7 +260,7 @@
 				>
 					<label class="block space-y-1">
 						<span class="text-sm">Day</span>
-						<select class={field} bind:value={form.weekday} onchange={() => void propose()}>
+						<select class={field} bind:value={form.weekday} onchange={() => void dayChanged()}>
 							{#each weekdays as weekday (weekday.value)}
 								<option value={weekday.value}>{weekday.label}</option>
 							{/each}

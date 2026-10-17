@@ -74,14 +74,22 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	const tuesday = page.getByTestId('weekly-training');
 	await expect(tuesday).toHaveText(/Tuesday 19:45–21:00\s*· Tue 1 Sept – Tue 25 May/);
 
-	// "Change": it was a Thursday.
+	// "Change": it was a Thursday. Only the day changes; the proposed window moves with it.
 	await tuesday.getByRole('button', { name: 'Change' }).click();
 	await form.getByLabel('Day').selectOption('4');
-	await form.getByLabel('First training').fill('2026-09-03');
-	await form.getByLabel('Last training').fill('2027-05-27');
+	await expect(form.getByLabel('First training')).toHaveValue('2026-09-03');
+	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-27');
 	await form.getByRole('button', { name: 'Save weekly training' }).click();
 	const thursday = page.getByTestId('weekly-training');
 	await expect(thursday).toHaveText(/Thursday 19:45–21:00\s*· Thu 3 Sept – Thu 27 May/);
+
+	// A typed window stays when the day changes.
+	await thursday.getByRole('button', { name: 'Change' }).click();
+	await form.getByLabel('First training').fill('2026-09-10');
+	await form.getByLabel('Day').selectOption('2');
+	await expect(form.getByLabel('First training')).toHaveValue('2026-09-10');
+	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-27');
+	await form.getByRole('button', { name: 'Cancel' }).click();
 
 	// A second Thursday in the same dates is refused.
 	await page.getByRole('button', { name: 'Add weekly training' }).click();
