@@ -166,9 +166,11 @@
 			answer = await leaveTeam(member.id, from, []);
 		} catch (failure) {
 			if (!(failure instanceof ApiError) || failure.code !== 'confirm_removal') throw failure;
-			const roles = (failure.body as { roles?: RoleView[] }).roles ?? [];
+			const body = failure.body as { roles?: RoleView[]; ends?: boolean };
+			const roles = body.roles ?? [];
 			const named = roles.map((r) => `"${roleText(r)}"`).join(' and ');
-			if (!confirm(`This also removes ${named}.`)) return undefined;
+			const removes = body.ends ? 'This also removes' : 'This removes';
+			if (!confirm(`${removes} ${named}.`)) return undefined;
 			answer = await leaveTeam(
 				member.id,
 				from,
@@ -230,6 +232,12 @@
 			? `${formatDay(r.from)} – ${formatDay(r.until)}`
 			: `from ${formatDay(r.from)}`;
 		return `${roleLabels[r.role]} · ${dates}`;
+	}
+
+	/** "Left · last day Wed 14 Oct": the end of the player's last role of the season. */
+	function leftLine(member: Member): string {
+		const until = member.roles.at(-1)?.until;
+		return until ? `Left · last day ${formatDay(until)}` : 'Left';
 	}
 
 	function rolesLine(member: Member): string {
@@ -343,10 +351,16 @@
 		>
 			<span class="min-w-0 truncate font-medium">{fullName(member)}</span>
 			<span class="flex shrink-0 items-center gap-2">
-				{#if member.last_day_today}
-					<span class="text-xs text-muted-foreground" data-testid="last-day">Last day today</span>
+				{#if left}
+					<span class="text-sm text-muted-foreground tabular-nums" data-testid="left-day">
+						{leftLine(member)}
+					</span>
+				{:else}
+					{#if member.last_day_today}
+						<span class="text-xs text-muted-foreground" data-testid="last-day">Last day today</span>
+					{/if}
+					<Badge variant="secondary">{roleLabels[member.role]}</Badge>
 				{/if}
-				<Badge variant={left ? 'outline' : 'secondary'}>{roleLabels[member.role]}</Badge>
 			</span>
 		</button>
 		{#if undos[member.id]}

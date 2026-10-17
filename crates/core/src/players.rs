@@ -403,8 +403,8 @@ fn last_day_today(roles: &[&PlayerRole], season: Season, today: NaiveDate) -> bo
 /// Where the team page shows a player in a season.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group {
-    /// A role today, or one that starts later in the season (for example from the first training
-    /// date, after "Add all" in summer).
+    /// A role today, or one that starts later in the season (for example from 1 September, after
+    /// "Add all" in summer).
     Team,
     /// Roles earlier in the season, none today or later.
     Left,
@@ -840,7 +840,7 @@ mod tests {
 
     #[test]
     fn a_player_with_a_role_today_or_later_in_the_season_is_in_the_team() {
-        // After "Add all" on 15 August, from the first training date.
+        // After "Add all" on 15 August, from 1 September.
         let roles = [
             last_season_role(date(2025, 9, 2), None),
             PlayerRole {

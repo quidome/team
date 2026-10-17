@@ -67,20 +67,24 @@
 		}
 	}
 
-	/** A new day: a window that is the old day's proposal (for example a stored weekly training
-	 * with the proposed window) moves to the new day's proposal; a typed window stays. */
+	/** A new day: each date of the window that is the old day's proposal (for example a stored
+	 * weekly training with the proposed first date) moves to the new day's proposal; a typed date
+	 * stays. */
 	async function dayChanged() {
 		const old = windowDay;
 		windowDay = form.weekday;
-		if (form.from && form.until && !windowProposed) {
-			try {
-				const proposal = await proposeWindow(old);
-				if (proposal.from === form.from && proposal.until === form.until) windowProposed = true;
-			} catch {
-				// The window stays as it is.
-			}
+		if (windowProposed || !form.from || !form.until) {
+			await propose();
+			return;
 		}
-		await propose();
+		// Each date on its own: a date that is the old day's proposal moves to the new day's.
+		try {
+			const [before, after] = await Promise.all([proposeWindow(old), proposeWindow(form.weekday)]);
+			if (form.from === before.from) form.from = after.from;
+			if (form.until === before.until) form.until = after.until;
+		} catch {
+			// The window stays as it is.
+		}
 	}
 
 	function startAdding() {
@@ -149,16 +153,28 @@
 	let reasonsError = $state<string | null>(null);
 	let savingReason = $state(false);
 
-	function show(list: AbsenceReason[]) {
+	/** Shows the saved reasons. A name typed but not saved stays in its field, unless it is the
+	 * reason `renamed` that was just saved. */
+	function show(list: AbsenceReason[], renamed?: number) {
+		const stored = new Map(reasons.map((reason) => [reason.id, reason.name]));
+		names = Object.fromEntries(
+			list.map((reason) => {
+				const typed = names[reason.id];
+				const unsaved =
+					reason.id !== renamed && typed !== undefined && typed !== stored.get(reason.id);
+				return [reason.id, unsaved ? typed : reason.name];
+			})
+		);
 		reasons = list;
-		names = Object.fromEntries(list.map((reason) => [reason.id, reason.name]));
 	}
 
+	/** Saves a change of a reason; only "Save" sends the typed name, so "Valid" and "Hidden" never
+	 * save a rename by accident. */
 	async function updateReason(reason: AbsenceReason, change: Partial<AbsenceReason>) {
 		savingReason = true;
 		reasonsError = null;
 		try {
-			show(await changeReason({ ...reason, name: names[reason.id] ?? reason.name, ...change }));
+			show(await changeReason({ ...reason, ...change }), change.name ? reason.id : undefined);
 		} catch (failure) {
 			reasonsError = message(failure);
 		} finally {
@@ -339,7 +355,7 @@
 									type="button"
 									variant="outline"
 									disabled={savingReason}
-									onclick={() => updateReason(reason, {})}
+									onclick={() => updateReason(reason, { name: names[reason.id] ?? reason.name })}
 								>
 									Save
 								</Button>

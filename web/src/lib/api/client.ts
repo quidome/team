@@ -66,6 +66,7 @@ export function messageFor(error: unknown, status: number): string {
 			'The change must be after the start of the role. To change the role from its start, use "Correct" in the history.',
 		not_in_team: 'This player is not in the team on that date.',
 		same_role: 'The player already has this role.',
+		confirm_removal: 'This player was changed in the meantime. Please try again.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',

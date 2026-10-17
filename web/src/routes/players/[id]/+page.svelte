@@ -163,7 +163,8 @@
 				<span>
 					Hidden
 					<span class="block text-muted-foreground">
-						Not offered in "Add player" and "Add all". The history stays.
+						Not in the list of players (unless "Show hidden players" is on), and not offered in "Add
+						player" and "Add all". The history and the team stay.
 					</span>
 				</span>
 			</label>
