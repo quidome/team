@@ -2,7 +2,9 @@
 	Attendance (attendance at training, stories B and C): every training day and training of the
 	chosen season (the current one by default, `?season=` in the address), "Coming" above "Past". A
 	tap on a row opens the training (and so makes it exist). "Cancel training" on a day that is not
-	opened, "Show cancelled", and "Add training" (only in the current season).
+	opened, "Show cancelled", and "Add training" (only in the current season). Above the list: the
+	training days not opened, and the totals of each player, then "Left the team"; a tap on a player
+	shows the trainings it missed.
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -15,11 +17,13 @@
 		loadTraining,
 		loadTrainings,
 		openTraining,
+		type PlayerTotals,
 		type TrainingRow
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
-	import { statusText } from '#lib/trainings.js';
+	import { fullName } from '#lib/players.js';
+	import { countsText, notOpenedText, ofTrainings, statusText } from '#lib/trainings.js';
 	import { onMount } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -45,6 +49,14 @@
 		} catch {
 			// No storage: only this visit.
 		}
+	}
+
+	// The players whose missed trainings are shown.
+	let expanded = $state<number[]>([]);
+	function toggle(player: number) {
+		expanded = expanded.includes(player)
+			? expanded.filter((id) => id !== player)
+			: [...expanded, player];
 	}
 
 	let adding = $state(false);
@@ -191,6 +203,43 @@
 	</ul>
 {/snippet}
 
+{#snippet totals(players: PlayerTotals[], testid: string)}
+	<ul class="space-y-2" data-testid={testid}>
+		{#each players as player (player.id)}
+			{@const shownMissed = expanded.includes(player.id)}
+			<li class="rounded-xl border bg-card shadow-xs" data-testid="player-totals">
+				<button
+					type="button"
+					class="flex min-h-12 w-full flex-col gap-0.5 px-4 py-2 text-left"
+					aria-expanded={shownMissed}
+					onclick={() => toggle(player.id)}
+				>
+					<span class="flex w-full items-baseline justify-between gap-3">
+						<span class="min-w-0 font-medium">{fullName(player)}</span>
+						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
+							{ofTrainings(player.trainings)}
+						</span>
+					</span>
+					<span class="text-sm tabular-nums" data-testid="totals-counts">{countsText(player)}</span>
+				</button>
+				{#if shownMissed}
+					<div class="border-t px-4 py-2 text-sm" data-testid="missed">
+						{#if player.missed.length === 0}
+							<p class="text-muted-foreground">No missed trainings.</p>
+						{:else}
+							<ul class="space-y-1">
+								{#each player.missed as missed (missed.date)}
+									<li class="tabular-nums">{formatDay(missed.date)} · {missed.reason}</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{/if}
+			</li>
+		{/each}
+	</ul>
+{/snippet}
+
 {#if data.invalidSeason}
 	<section class="space-y-4 py-16 text-center">
 		<p data-testid="invalid-season">This season cannot be read.</p>
@@ -225,6 +274,34 @@
 				</select>
 			</label>
 		{/if}
+
+		{#if overview.not_opened > 0 && overview.first_not_opened}
+			<p class="text-sm" data-testid="not-opened">
+				<a
+					href={resolve('/training/[date]', { date: overview.first_not_opened })}
+					class="font-medium underline underline-offset-4"
+				>
+					{notOpenedText(overview.not_opened)}
+				</a>
+			</p>
+		{/if}
+
+		<section aria-labelledby="totals-heading" class="space-y-2">
+			<h2 id="totals-heading" class="text-lg font-semibold tracking-tight">Totals</h2>
+			{#if overview.trainings === 0}
+				<p class="text-sm text-muted-foreground" data-testid="no-trainings-yet">
+					No trainings yet this season.
+				</p>
+			{:else}
+				{@render totals(overview.team, 'team-totals')}
+				{#if overview.left.length > 0}
+					<h3 class="pt-2 font-semibold">Left the team</h3>
+					{@render totals(overview.left, 'left-totals')}
+				{/if}
+			{/if}
+		</section>
+
+		<h2 class="text-lg font-semibold tracking-tight">Trainings</h2>
 
 		{#if adding}
 			<form
@@ -292,14 +369,14 @@
 
 		{#if page.coming.length > 0}
 			<section aria-labelledby="coming-heading" class="space-y-2">
-				<h2 id="coming-heading" class="text-lg font-semibold tracking-tight">Coming</h2>
+				<h3 id="coming-heading" class="font-semibold">Coming</h3>
 				{@render rows(page.coming, 'coming')}
 			</section>
 		{/if}
 
 		{#if page.past.length > 0}
 			<section aria-labelledby="past-heading" class="space-y-2">
-				<h2 id="past-heading" class="text-lg font-semibold tracking-tight">Past</h2>
+				<h3 id="past-heading" class="font-semibold">Past</h3>
 				{@render rows(page.past, 'past')}
 			</section>
 		{/if}
