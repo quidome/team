@@ -1,6 +1,6 @@
 # Technical spec: The overview
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-10-17-the-overview
 **Date**: 2026-10-17
@@ -207,7 +207,7 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 - Risk: the totals may differ from the coordinator's sheet (for example a day the sheet marks and the tool has as not opened). The line "N training days not opened" helps to explain a difference; the check by hand finds the rest.
 
 ## Progress
-- [ ] Step 1: the counting rule in the core
+- [x] Step 1: the counting rule in the core (2026-10-17: `Player::sort_key`, `season_overview`, 15 core tests)
 - [ ] Step 2: the route `GET /api/attendance`
 - [ ] Step 3: the choice of season
 - [ ] Step 4: the totals on the page
@@ -215,6 +215,8 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 
 ## Deviations
 - 2026-10-17, during /design, the coordinator's choice: the epic's Interface says "the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings". Story C keeps the start page line "Attendance · Team · Players · Settings" (built in story B) and adds no links to "Attendance". Reason: the start page will become one page with the last games, the last training and the coming events (`docs/ideas.md`, 2026-10-15, extended 2026-10-17); moving the links now would move them twice.
+
+- 2026-10-17, step 1: `season_overview` takes 8 inputs, one more than clippy allows by default; it has `#[allow(clippy::too_many_arguments)]` instead of a struct that only groups them (the engineer's choice). Core test 12 uses trainings on 1, 15 and a cancelled 29 Sep (3 not opened), and then all six past Tuesdays (0), so it also covers "a cancelled training day is not not opened".
 
 The design reads the spec more strictly within its words:
 - "Each player who could be at one or more trainings of the season": a player with a role on the date of at least one training that counts (up to today, not cancelled). A newcomer from next week has no row yet. Hidden players have rows.

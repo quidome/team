@@ -73,6 +73,17 @@ pub fn clean_name(
     Ok((first.to_owned(), last.map(str::to_owned)))
 }
 
+impl Player {
+    /// The order of players in lists: first name, then last name (both without case), then id.
+    pub fn sort_key(&self) -> (String, Option<String>, PlayerId) {
+        (
+            self.first_name.to_lowercase(),
+            self.last_name.as_deref().map(str::to_lowercase),
+            self.id,
+        )
+    }
+}
+
 impl PlayerRole {
     /// The last day of the role: `until`, or the last day of its season while it continues. A role
     /// never runs into the next season.
@@ -342,13 +353,7 @@ pub fn team<'a>(
     today: NaiveDate,
 ) -> TeamPage<'a> {
     let mut sorted: Vec<&Player> = players.iter().collect();
-    sorted.sort_by_key(|player| {
-        (
-            player.first_name.to_lowercase(),
-            player.last_name.as_deref().map(str::to_lowercase),
-            player.id,
-        )
-    });
+    sorted.sort_by_cached_key(|player| player.sort_key());
     let mut team = TeamPage {
         members: Vec::new(),
         left: Vec::new(),
