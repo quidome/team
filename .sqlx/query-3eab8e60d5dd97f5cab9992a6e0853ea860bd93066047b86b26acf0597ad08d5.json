@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO trainings (date, start_time, end_time, created_at) VALUES ($1, $2, $3, $4)\n         ON CONFLICT (date) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Time",
+        "Time",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3eab8e60d5dd97f5cab9992a6e0853ea860bd93066047b86b26acf0597ad08d5"
+}

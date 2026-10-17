@@ -5,6 +5,8 @@
 
 mod common;
 
+use std::time::Duration;
+
 use chrono::NaiveDate;
 use common::api::Coordinator;
 use common::game_list::utc;
@@ -245,4 +247,454 @@ async fn a_date_or_season_that_cannot_be_read_is_refused(pool: PgPool) {
         .send("GET", "/api/trainings?season=2026", None)
         .await;
     assert_eq!(answer, (400, json!({ "error": "invalid_season" })));
+}
+
+async fn stored_trainings(pool: &PgPool) -> Vec<NaiveDate> {
+    sqlx::query_scalar("SELECT date FROM trainings ORDER BY date")
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+async fn stored_absences(pool: &PgPool) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM absences")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+fn times(on: &str, start: &str, end: &str) -> Option<Value> {
+    Some(json!({ "date": on, "start": start, "end": end }))
+}
+
+/// A Tuesday weekly training, two players from Tue 1 Sep, and the ids of the reasons School and Ill.
+async fn team_with_tuesdays(coordinator: &Coordinator) -> (i64, i64, i64, i64) {
+    add_tuesdays(coordinator).await;
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2026-09-01")
+        .await;
+    let blake = coordinator
+        .add_player("Blake", "only_trains", "2026-09-01")
+        .await;
+    (
+        avery,
+        blake,
+        reason_id(coordinator, "School").await,
+        reason_id(coordinator, "Ill").await,
+    )
+}
+
+fn absent(reason: i64) -> Option<Value> {
+    Some(json!({ "reason": reason }))
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn open_twice_gives_one_training(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    let path = "/api/trainings/2026-10-06/open";
+    // Another screen opens the day at the same moment: its insert is not committed yet.
+    let mut other = pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO trainings (date, start_time, end_time, created_at)
+         VALUES ('2026-10-06', '19:45', '21:00', now())",
+    )
+    .execute(&mut *other)
+    .await
+    .unwrap();
+    let open = coordinator.send("PUT", path, None);
+    tokio::pin!(open);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut open).await;
+    assert!(
+        waited.is_err(),
+        "the open did not wait for the other insert"
+    );
+    other.commit().await.unwrap();
+    let (status, page) = open.await;
+    assert_eq!(status, 200);
+    assert_eq!(page["training"]["start"], "19:45");
+    assert_eq!(page["players"].as_array().unwrap().len(), 2);
+    assert_eq!(stored_trainings(&pool).await, [date(2026, 10, 6)]);
+
+    // An absence noted, then the day opened again from another screen: the absence stays.
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let page = coordinator.ok("PUT", path, None).await;
+    assert_eq!(page["absent"], 1);
+    assert_eq!(stored_trainings(&pool).await, [date(2026, 10, 6)]);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn open_needs_a_training_day(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    add_tuesdays(&coordinator).await;
+    let answer = coordinator
+        .send("PUT", "/api/trainings/2026-10-07/open", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_a_training_day" })));
+    assert!(stored_trainings(&pool).await.is_empty());
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn add_and_change_a_training(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    let page = coordinator
+        .ok(
+            "POST",
+            "/api/trainings",
+            times("2026-10-22", "19:00", "20:30"),
+        )
+        .await;
+    assert_eq!(
+        page["training"],
+        json!({ "start": "19:00", "end": "20:30", "cancelled": false })
+    );
+    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    assert_eq!(row(&list, "2026-10-22")["extra"], true);
+
+    // "Change" to Tue 20 Oct: the absence stays.
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-22/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let page = coordinator
+        .ok(
+            "PUT",
+            "/api/trainings/2026-10-22",
+            times("2026-10-20", "19:45", "21:00"),
+        )
+        .await;
+    assert_eq!(page["date"], "2026-10-20");
+    assert_eq!(page["absent"], 1);
+    assert_eq!(stored_trainings(&pool).await, [date(2026, 10, 20)]);
+
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-27/open", None)
+        .await;
+    let cases = [
+        (times("2026-10-27", "19:45", "21:00"), "training_exists"),
+        (times("2027-07-01", "19:45", "21:00"), "outside_season"),
+        (times("2026-10-20", "21:00", "19:45"), "end_before_start"),
+        (times("2026-10-20", "7 pm", "21:00"), "invalid_time"),
+    ];
+    for (body, code) in cases {
+        let answer = coordinator
+            .send("PUT", "/api/trainings/2026-10-20", body)
+            .await;
+        assert_eq!(answer, (400, json!({ "error": code })), "{code}");
+    }
+    let answer = coordinator
+        .send(
+            "POST",
+            "/api/trainings",
+            times("2026-10-27", "19:45", "21:00"),
+        )
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "training_exists" })));
+    let (status, _) = coordinator
+        .send(
+            "PUT",
+            "/api/trainings/2026-10-21",
+            times("2026-10-23", "19:45", "21:00"),
+        )
+        .await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn two_adds_of_one_date_give_one_training(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    // Another screen adds Thu 22 Oct at the same moment: its insert is not committed yet, so the
+    // check in the core does not see it, and the unique date in the database decides.
+    let mut other = pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO trainings (date, start_time, end_time, created_at)
+         VALUES ('2026-10-22', '19:00', '20:30', now())",
+    )
+    .execute(&mut *other)
+    .await
+    .unwrap();
+    let add = coordinator.send(
+        "POST",
+        "/api/trainings",
+        times("2026-10-22", "19:00", "20:30"),
+    );
+    tokio::pin!(add);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut add).await;
+    assert!(waited.is_err(), "the add did not wait for the other insert");
+    other.commit().await.unwrap();
+    assert_eq!(add.await, (400, json!({ "error": "training_exists" })));
+    assert_eq!(stored_trainings(&pool).await, [date(2026, 10, 22)]);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn cancel_and_undo_keep_the_absences(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, blake, school, ill) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    for (player, reason) in [(avery, school), (blake, ill)] {
+        coordinator
+            .ok(
+                "PUT",
+                &format!("/api/trainings/2026-10-06/absences/{player}"),
+                absent(reason),
+            )
+            .await;
+    }
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/cancel", None)
+        .await;
+    assert_eq!(page["training"]["cancelled"], true);
+    assert_eq!(stored_absences(&pool).await, 2);
+    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    assert_eq!(row(&list, "2026-10-06")["status"], "cancelled");
+
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/uncancel", None)
+        .await;
+    assert_eq!(page["training"]["cancelled"], false);
+    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    assert_eq!(row(&list, "2026-10-06")["status"], "absent");
+    assert_eq!(row(&list, "2026-10-06")["absent"], 2);
+
+    let (status, _) = coordinator
+        .send("POST", "/api/trainings/2026-10-13/uncancel", None)
+        .await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn cancel_a_day_that_is_not_opened(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    add_tuesdays(&coordinator).await;
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-20/cancel", None)
+        .await;
+    assert_eq!(
+        page["training"],
+        json!({ "start": "19:45", "end": "21:00", "cancelled": true })
+    );
+    let first: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT cancelled_at FROM trainings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    // Cancelled again later: the first moment stays.
+    coordinator
+        .harness
+        .clock
+        .advance(chrono::Duration::hours(1));
+    coordinator
+        .ok("POST", "/api/trainings/2026-10-20/cancel", None)
+        .await;
+    let again: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT cancelled_at FROM trainings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(again, first);
+    let answer = coordinator
+        .send("POST", "/api/trainings/2026-10-21/cancel", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_a_training_day" })));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn delete_a_training_deletes_its_absences(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let (status, _) = coordinator
+        .send("DELETE", "/api/trainings/2026-10-06", None)
+        .await;
+    assert_eq!(status, 204);
+    assert!(stored_trainings(&pool).await.is_empty());
+    assert_eq!(stored_absences(&pool).await, 0);
+    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    assert_eq!(row(&list, "2026-10-06")["status"], "not_opened");
+    let (status, _) = coordinator
+        .send("DELETE", "/api/trainings/2026-10-06", None)
+        .await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn mark_absent_and_there_again(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, ill) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    let path = format!("/api/trainings/2026-10-06/absences/{avery}");
+    let marked = coordinator.ok("PUT", &path, absent(school)).await;
+    assert_eq!(
+        marked,
+        json!({ "player": avery, "reason": school, "absent": 1 })
+    );
+    // Another reason: still one absence.
+    let marked = coordinator.ok("PUT", &path, absent(ill)).await;
+    assert_eq!(marked["reason"], ill);
+    assert_eq!(stored_absences(&pool).await, 1);
+    let marked = coordinator.ok("DELETE", &path, None).await;
+    assert_eq!(
+        marked,
+        json!({ "player": avery, "reason": null, "absent": 0 })
+    );
+    // Safe to send twice.
+    let (status, _) = coordinator.send("DELETE", &path, None).await;
+    assert_eq!(status, 200);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn mark_errors_have_their_codes(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    // Dana joins after the training.
+    let dana = coordinator
+        .add_player("Dana", "plays_games", "2026-10-07")
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    let answer = coordinator
+        .send(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{dana}"),
+            absent(school),
+        )
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_in_team" })));
+
+    // A hidden reason is not offered for new marks.
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/reasons/{school}"),
+            Some(json!({ "name": "School", "valid": true, "hidden": true })),
+        )
+        .await;
+    let answer = coordinator
+        .send(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "reason_hidden" })));
+
+    for path in [
+        "/api/trainings/2026-10-06/absences/999999".to_owned(),
+        format!("/api/trainings/2026-10-13/absences/{avery}"),
+    ] {
+        let (status, _) = coordinator.send("PUT", &path, absent(school)).await;
+        assert_eq!(status, 404, "{path}");
+    }
+    let (status, _) = coordinator
+        .send(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(999_999),
+        )
+        .await;
+    assert_eq!(status, 404);
+    let (status, _) = coordinator
+        .send(
+            "DELETE",
+            &format!("/api/trainings/2026-10-13/absences/{avery}"),
+            None,
+        )
+        .await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_training_of_last_season_stays_open(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2027-05-25/open", None)
+        .await;
+
+    // In the next season, the last training of May is found in July.
+    at(&mut coordinator, 2027, 7, 15, 10, 0).await;
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2027-05-25/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let page = coordinator
+        .ok(
+            "PUT",
+            "/api/trainings/2027-05-25",
+            times("2027-05-25", "19:30", "21:00"),
+        )
+        .await;
+    assert_eq!(page["training"]["start"], "19:30");
+    assert_eq!(page["absent"], 1);
+    coordinator
+        .ok("POST", "/api/trainings/2027-05-25/cancel", None)
+        .await;
+    // A training day of last season can still be opened.
+    coordinator
+        .ok("PUT", "/api/trainings/2027-05-18/open", None)
+        .await;
+    assert_eq!(
+        stored_trainings(&pool).await,
+        [date(2027, 5, 18), date(2027, 5, 25)]
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_weekly_training_change_never_touches_a_training(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    // The weekly training was a Wednesday at 19:00 all along.
+    let weekly = coordinator.ok("GET", "/api/weekly-trainings", None).await;
+    let id = weekly["weekly_trainings"][0]["id"].as_i64().unwrap();
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/weekly-trainings/{id}"),
+            Some(json!({ "weekday": 3, "start": "19:00", "end": "20:30",
+                         "from": "2026-09-02", "until": "2027-05-26" })),
+        )
+        .await;
+    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let tuesday = row(&list, "2026-10-06");
+    assert_eq!(tuesday["start"], "19:45");
+    assert_eq!(tuesday["status"], "absent");
+    assert_eq!(tuesday["extra"], true);
+    assert_eq!(row(&list, "2026-10-07")["status"], "not_opened");
 }

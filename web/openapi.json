@@ -1063,6 +1063,40 @@
             "description": "Not logged in"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "addTraining",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The new training",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`training_exists`, `outside_season`, `end_before_start`, `invalid_time`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
       }
     },
     "/api/trainings/next": {
@@ -1128,6 +1162,307 @@
           },
           "401": {
             "description": "Not logged in"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "changeTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training now",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The training on its new date, with its attendance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`training_exists`, `outside_season`, `end_before_start`, `invalid_time`, `invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No training on the date"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "deleteTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The training and its absences are deleted"
+          },
+          "400": {
+            "description": "`invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No training on the date"
+          }
+        }
+      }
+    },
+    "/api/trainings/{date}/absences/{player}": {
+      "put": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "markAbsent",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "player",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkAbsent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The player is absent with the reason; the last mark wins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Marked"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not_in_team`, `reason_hidden`, `invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No training on the date, no such player or reason"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "markThere",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "player",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The player is there; safe to send twice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Marked"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No training on the date"
+          }
+        }
+      }
+    },
+    "/api/trainings/{date}/cancel": {
+      "post": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "cancelTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of a training or a training day",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled training; a training day gets a cancelled training",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`, `not_a_training_day`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/trainings/{date}/open": {
+      "put": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "openTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of a training day",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training of the date, made with the times of its weekly training when it did not exist; safe to send twice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`, `not_a_training_day`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/trainings/{date}/uncancel": {
+      "post": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "uncancelTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training, no longer cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No training on the date"
           }
         }
       }
@@ -1857,6 +2192,45 @@
           },
           "undo": {
             "$ref": "#/components/schemas/UndoRemoval"
+          }
+        }
+      },
+      "MarkAbsent": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Marked": {
+        "type": "object",
+        "description": "The answer of a mark: kept small, so a tap is quick.",
+        "required": [
+          "player",
+          "absent"
+        ],
+        "properties": {
+          "absent": {
+            "type": "integer",
+            "description": "The training's new number of absences.",
+            "minimum": 0
+          },
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`null` when the player is there."
           }
         }
       },
@@ -2799,6 +3173,28 @@
                 "description": "`null` while no training exists on the date."
               }
             ]
+          }
+        }
+      },
+      "TrainingInput": {
+        "type": "object",
+        "description": "\"Add training\" and \"Change\": the date and the times of a training.",
+        "required": [
+          "date",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "description": "For example \"19:45\"."
           }
         }
       },

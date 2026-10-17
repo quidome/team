@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE trainings SET cancelled_at = NULL WHERE date = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c4509b3ba7587a39c18d5c785b007ed84e3eca892a158ce9c637863ce720d0f"
+}

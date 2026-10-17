@@ -230,7 +230,7 @@ On `main` (b558232 and later), story A is built and on the cluster:
 
 ## Progress
 - [x] Step 1: the data and the rules, read only (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 159 core tests, 42 browser tests)
-- [ ] Step 2: the writes of a training
+- [x] Step 2: the writes of a training (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [ ] Step 3: the page "Attendance" and the card
 - [ ] Step 4: marking and the training page
 - [ ] Step 5: the parts of stories 1 and 4
@@ -254,5 +254,10 @@ Implement:
   - `TrainingList` also gives `season_first_day` and `season_last_day`, for the limits of the date field of "Add training" (step 3), as `TeamPageView` does.
   - The server tests of step 1 write trainings and absences with plain SQL, because the write routes come in step 2.
   - Added beyond the step's list: the server test `a_date_or_season_that_cannot_be_read_is_refused` (`invalid_date`, `invalid_season`).
+- 2026-10-17, step 2:
+  - The two tests of a date saved at the same time do not use `tokio::join!`: two requests on one task do not really run at the same time, so the test passed also without `ON CONFLICT`. Each test holds an insert of the date in an open transaction on another connection; the request must wait 300 ms, and after the commit "open" answers the one training, "Add training" `training_exists`. Mutation checks: without `ON CONFLICT` in open, `open_twice_gives_one_training` fails (500); without the mapping of the unique violation, `two_adds_of_one_date_give_one_training` fails.
+  - "Add training" and "Change" take the times as "19:45" text (as the weekly trainings), so a time that cannot be read answers `invalid_time`.
+  - "Open" of a date that already has a training (also an extra training) answers that training and writes nothing.
+  - Logs: "training opened", "training added", "training changed", "training cancelled", "training cancel undone", "training deleted", "absence marked", "absence removed", with the date and the player id only.
 
 ## Review findings

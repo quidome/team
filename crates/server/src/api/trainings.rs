@@ -3,10 +3,12 @@
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use team_core::{
-    DayStatus, Season, SeasonRow, Training, absent_count, players_at, proposed_times, season_list,
+    AttendanceError, DayStatus, PlayerId, ReasonId, Season, SeasonRow, Training, absent_count,
+    check_mark, check_training, day_times, players_at, proposed_times, season_list,
 };
 use utoipa::ToSchema;
 
@@ -14,6 +16,7 @@ use super::players::RoleKind;
 use super::reasons::{AbsenceReason, view as reason_view};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
+use crate::db::StoreError;
 use crate::error::AppError;
 use crate::{players, reasons, trainings, weekly_trainings};
 
@@ -93,6 +96,53 @@ pub struct TrainingDay {
     pub players: Vec<AtTrainingView>,
     /// All reasons in their order, also the hidden ones (they still show on old absences).
     pub reasons: Vec<AbsenceReason>,
+}
+
+/// "Add training" and "Change": the date and the times of a training.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct TrainingInput {
+    #[schema(value_type = String, format = Date)]
+    pub date: NaiveDate,
+    /// For example "19:45".
+    pub start: String,
+    pub end: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MarkAbsent {
+    pub reason: i64,
+}
+
+/// The answer of a mark: kept small, so a tap is quick.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Marked {
+    pub player: i64,
+    /// `null` when the player is there.
+    pub reason: Option<i64>,
+    /// The training's new number of absences.
+    pub absent: usize,
+}
+
+impl From<AttendanceError> for AppError {
+    fn from(error: AttendanceError) -> Self {
+        Self::BadRequest(match error {
+            AttendanceError::NotInTeam => "not_in_team",
+            AttendanceError::ReasonHidden => "reason_hidden",
+        })
+    }
+}
+
+/// A date that has a training, refused by the unique index (a save at the same time).
+fn taken(error: StoreError) -> AppError {
+    if error.is_unique_violation() {
+        AppError::BadRequest("training_exists")
+    } else {
+        error.into()
+    }
+}
+
+fn time(text: &str) -> Result<NaiveTime, AppError> {
+    NaiveTime::parse_from_str(text, "%H:%M").map_err(|_| AppError::BadRequest("invalid_time"))
 }
 
 pub(crate) fn day(date: NaiveDate) -> String {
@@ -260,4 +310,262 @@ pub async fn get(
     Path(date): Path<String>,
 ) -> Result<Json<TrainingDay>, AppError> {
     Ok(Json(day_of(&state, path_date(&date)?).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/trainings/{date}/open",
+    operation_id = "openTraining",
+    params(("date" = String, Path, description = "The date of a training day")),
+    responses(
+        (status = 200, description = "The training of the date, made with the times of its weekly training when it did not exist; safe to send twice", body = TrainingDay),
+        (status = 400, description = "`invalid_date`, `not_a_training_day`"),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn open(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    if trainings::on(&state.pool, date).await?.is_none() {
+        let weekly = weekly_trainings::for_season(&state.pool, Season::of(date)).await?;
+        let (start, end) = day_times(&weekly, date)?;
+        trainings::open(&state.pool, date, start, end, state.clock.now()).await?;
+        tracing::info!(%date, "training opened");
+    }
+    Ok(Json(day_of(&state, date).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/trainings",
+    operation_id = "addTraining",
+    request_body = TrainingInput,
+    responses(
+        (status = 200, description = "The new training", body = TrainingDay),
+        (status = 400, description = "`training_exists`, `outside_season`, `end_before_start`, `invalid_time`"),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn add(
+    State(state): State<AppState>,
+    Json(body): Json<TrainingInput>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let season = current_season(state.clock.as_ref());
+    let (start, end) = (time(&body.start)?, time(&body.end)?);
+    let stored = trainings::for_season(&state.pool, season).await?;
+    check_training(season, body.date, start, end, &stored, None)?;
+    trainings::insert(&state.pool, body.date, start, end, state.clock.now())
+        .await
+        .map_err(taken)?;
+    tracing::info!(date = %body.date, "training added");
+    Ok(Json(day_of(&state, body.date).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/trainings/{date}",
+    operation_id = "changeTraining",
+    params(("date" = String, Path, description = "The date of the training now")),
+    request_body = TrainingInput,
+    responses(
+        (status = 200, description = "The training on its new date, with its attendance", body = TrainingDay),
+        (status = 400, description = "`training_exists`, `outside_season`, `end_before_start`, `invalid_time`, `invalid_date`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No training on the date"),
+    )
+)]
+pub async fn change(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+    Json(body): Json<TrainingInput>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    let training = trainings::on(&state.pool, date)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let season = Season::of(date);
+    let (start, end) = (time(&body.start)?, time(&body.end)?);
+    let stored = trainings::for_season(&state.pool, season).await?;
+    check_training(season, body.date, start, end, &stored, Some(training.id))?;
+    if !trainings::update(&state.pool, training.id, body.date, start, end)
+        .await
+        .map_err(taken)?
+    {
+        return Err(AppError::NotFound);
+    }
+    tracing::info!(from = %date, to = %body.date, "training changed");
+    Ok(Json(day_of(&state, body.date).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/trainings/{date}/cancel",
+    operation_id = "cancelTraining",
+    params(("date" = String, Path, description = "The date of a training or a training day")),
+    responses(
+        (status = 200, description = "The cancelled training; a training day gets a cancelled training", body = TrainingDay),
+        (status = 400, description = "`invalid_date`, `not_a_training_day`"),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn cancel(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    let (start, end) = match trainings::on(&state.pool, date).await? {
+        Some(training) => (training.start, training.end),
+        None => {
+            let weekly = weekly_trainings::for_season(&state.pool, Season::of(date)).await?;
+            day_times(&weekly, date)?
+        }
+    };
+    trainings::cancel(&state.pool, date, start, end, state.clock.now()).await?;
+    tracing::info!(%date, "training cancelled");
+    Ok(Json(day_of(&state, date).await?))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/trainings/{date}/uncancel",
+    operation_id = "uncancelTraining",
+    params(("date" = String, Path, description = "The date of the training")),
+    responses(
+        (status = 200, description = "The training, no longer cancelled", body = TrainingDay),
+        (status = 400, description = "`invalid_date`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No training on the date"),
+    )
+)]
+pub async fn uncancel(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    if !trainings::uncancel(&state.pool, date).await? {
+        return Err(AppError::NotFound);
+    }
+    tracing::info!(%date, "training cancel undone");
+    Ok(Json(day_of(&state, date).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/trainings/{date}",
+    operation_id = "deleteTraining",
+    params(("date" = String, Path, description = "The date of the training")),
+    responses(
+        (status = 204, description = "The training and its absences are deleted"),
+        (status = 400, description = "`invalid_date`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No training on the date"),
+    )
+)]
+pub async fn delete(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<StatusCode, AppError> {
+    let date = path_date(&date)?;
+    if !trainings::delete(&state.pool, date).await? {
+        return Err(AppError::NotFound);
+    }
+    tracing::info!(%date, "training deleted");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// The training on `date`, else 404.
+async fn training_on(state: &AppState, date: &str) -> Result<Training, AppError> {
+    trainings::on(&state.pool, path_date(date)?)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// The answer of a mark: the player's reason now and the training's number of absences.
+async fn marked(
+    state: &AppState,
+    training: &Training,
+    player: PlayerId,
+    reason: Option<ReasonId>,
+) -> Result<Marked, AppError> {
+    let absences = trainings::absences_at(&state.pool, &[training.id]).await?;
+    let roles = players::roles_in(&state.pool, &[Season::of(training.date)]).await?;
+    Ok(Marked {
+        player: player.0,
+        reason: reason.map(|reason| reason.0),
+        absent: absent_count(training, &absences, &roles),
+    })
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/trainings/{date}/absences/{player}",
+    operation_id = "markAbsent",
+    params(
+        ("date" = String, Path, description = "The date of the training"),
+        ("player" = i64, Path, description = "The player"),
+    ),
+    request_body = MarkAbsent,
+    responses(
+        (status = 200, description = "The player is absent with the reason; the last mark wins", body = Marked),
+        (status = 400, description = "`not_in_team`, `reason_hidden`, `invalid_date`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No training on the date, no such player or reason"),
+    )
+)]
+pub async fn mark(
+    State(state): State<AppState>,
+    Path((date, player)): Path<(String, i64)>,
+    Json(body): Json<MarkAbsent>,
+) -> Result<Json<Marked>, AppError> {
+    let training = training_on(&state, &date).await?;
+    let player = PlayerId(player);
+    if players::by_id(&state.pool, player).await?.is_none() {
+        return Err(AppError::NotFound);
+    }
+    let reason = reasons::all(&state.pool)
+        .await?
+        .into_iter()
+        .find(|reason| reason.id == body.reason)
+        .ok_or(AppError::NotFound)?;
+    let roles = players::roles_of(&state.pool, player).await?;
+    let current = trainings::absences_at(&state.pool, &[training.id])
+        .await?
+        .into_iter()
+        .find(|absence| absence.player == player)
+        .map(|absence| absence.reason);
+    let reason_id = ReasonId(reason.id);
+    check_mark(player, &roles, &training, reason_id, reason.hidden, current)?;
+    trainings::mark(&state.pool, training.id, player, reason_id).await?;
+    tracing::info!(date = %training.date, player = player.0, "absence marked");
+    Ok(Json(
+        marked(&state, &training, player, Some(reason_id)).await?,
+    ))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/trainings/{date}/absences/{player}",
+    operation_id = "markThere",
+    params(
+        ("date" = String, Path, description = "The date of the training"),
+        ("player" = i64, Path, description = "The player"),
+    ),
+    responses(
+        (status = 200, description = "The player is there; safe to send twice", body = Marked),
+        (status = 400, description = "`invalid_date`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No training on the date"),
+    )
+)]
+pub async fn there(
+    State(state): State<AppState>,
+    Path((date, player)): Path<(String, i64)>,
+) -> Result<Json<Marked>, AppError> {
+    let training = training_on(&state, &date).await?;
+    let player = PlayerId(player);
+    trainings::unmark(&state.pool, training.id, player).await?;
+    tracing::info!(date = %training.date, player = player.0, "absence removed");
+    Ok(Json(marked(&state, &training, player, None).await?))
 }

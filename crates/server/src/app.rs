@@ -126,9 +126,21 @@ pub fn app(state: AppState) -> Router {
         .route("/players/{id}/team-leave", post(team::team_leave))
         .route("/players/{id}/team-undo", post(team::team_undo))
         .route("/team", get(team::get))
-        .route("/trainings", get(trainings::list))
+        .route("/trainings", get(trainings::list).post(trainings::add))
         .route("/trainings/next", get(trainings::next))
-        .route("/trainings/{date}", get(trainings::get))
+        .route(
+            "/trainings/{date}",
+            get(trainings::get)
+                .put(trainings::change)
+                .delete(trainings::delete),
+        )
+        .route("/trainings/{date}/open", put(trainings::open))
+        .route("/trainings/{date}/cancel", post(trainings::cancel))
+        .route("/trainings/{date}/uncancel", post(trainings::uncancel))
+        .route(
+            "/trainings/{date}/absences/{player}",
+            put(trainings::mark).delete(trainings::there),
+        )
         .route("/reasons", get(reasons::list).post(reasons::add))
         .route("/reasons/{id}", put(reasons::change))
         .route(

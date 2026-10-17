@@ -64,6 +64,29 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
             Some(left["undo"].clone()),
         )
         .await;
+    // A training: open, mark absent, delete.
+    coordinator
+        .ok(
+            "POST",
+            "/api/weekly-trainings",
+            Some(json!({ "weekday": 2, "start": "19:45", "end": "21:00",
+                         "from": "2026-09-01", "until": "2027-05-25" })),
+        )
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    let reason = coordinator.ok("GET", "/api/reasons", None).await[0]["id"].clone();
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{id}"),
+            Some(json!({ "reason": reason })),
+        )
+        .await;
+    coordinator
+        .send("DELETE", "/api/trainings/2026-10-06", None)
+        .await;
     coordinator.ok("GET", "/api/players", None).await;
     coordinator
         .ok("GET", &format!("/api/players/{id}"), None)
@@ -75,6 +98,9 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
     assert!(text.contains("role changed"), "{text}");
     assert!(text.contains("player left the team"), "{text}");
     assert!(text.contains("removal undone"), "{text}");
+    assert!(text.contains("training opened"), "{text}");
+    assert!(text.contains("absence marked"), "{text}");
+    assert!(text.contains("training deleted"), "{text}");
     for name in ["Zephyrin", "Quistorp"] {
         assert!(!text.contains(name), "a name in the log: {text}");
     }
