@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO absences (training_id, player_id, reason_id) VALUES ($1, $2, $3)\n         ON CONFLICT (training_id, player_id) DO UPDATE SET reason_id = excluded.reason_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0e62b0756b9434d2ed4230d414e7283ba778ab27a07d91c1acc90e02c93177a3"
+}

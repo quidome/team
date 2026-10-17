@@ -383,7 +383,7 @@ export interface paths {
 		};
 		get: operations['trainings'];
 		put?: never;
-		post?: never;
+		post: operations['addTraining'];
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -414,8 +414,72 @@ export interface paths {
 			cookie?: never;
 		};
 		get: operations['training'];
-		put?: never;
+		put: operations['changeTraining'];
 		post?: never;
+		delete: operations['deleteTraining'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/{date}/absences/{player}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['markAbsent'];
+		post?: never;
+		delete: operations['markThere'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/{date}/cancel': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['cancelTraining'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/{date}/open': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['openTraining'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/{date}/uncancel': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['uncancelTraining'];
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -666,6 +730,22 @@ export interface components {
 		LeftTeam: {
 			team: components['schemas']['TeamPageView'];
 			undo: components['schemas']['UndoRemoval'];
+		};
+		MarkAbsent: {
+			/** Format: int64 */
+			reason: number;
+		};
+		/** @description The answer of a mark: kept small, so a tap is quick. */
+		Marked: {
+			/** @description The training's new number of absences. */
+			absent: number;
+			/** Format: int64 */
+			player: number;
+			/**
+			 * Format: int64
+			 * @description `null` when the player is there.
+			 */
+			reason?: number | null;
 		};
 		Me: {
 			/** @description The name to show. */
@@ -977,6 +1057,14 @@ export interface components {
 			reasons: components['schemas']['AbsenceReason'][];
 			season: string;
 			training?: null | components['schemas']['TrainingView'];
+		};
+		/** @description "Add training" and "Change": the date and the times of a training. */
+		TrainingInput: {
+			/** Format: date */
+			date: string;
+			end: string;
+			/** @description For example "19:45". */
+			start: string;
 		};
 		/** @description The list of a season: today and later, nearest first; before today, newest first. */
 		TrainingList: {
@@ -2152,6 +2240,44 @@ export interface operations {
 			};
 		};
 	};
+	addTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['TrainingInput'];
+			};
+		};
+		responses: {
+			/** @description The new training */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `training_exists`, `outside_season`, `end_before_start`, `invalid_time` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	nextTraining: {
 		parameters: {
 			query?: never;
@@ -2209,6 +2335,310 @@ export interface operations {
 			};
 			/** @description Not logged in */
 			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	changeTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training now */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['TrainingInput'];
+			};
+		};
+		responses: {
+			/** @description The training on its new date, with its attendance */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `training_exists`, `outside_season`, `end_before_start`, `invalid_time`, `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No training on the date */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	deleteTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training and its absences are deleted */
+			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No training on the date */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	markAbsent: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+				/** @description The player */
+				player: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MarkAbsent'];
+			};
+		};
+		responses: {
+			/** @description The player is absent with the reason; the last mark wins */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Marked'];
+				};
+			};
+			/** @description `not_in_team`, `reason_hidden`, `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No training on the date, no such player or reason */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	markThere: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+				/** @description The player */
+				player: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The player is there; safe to send twice */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Marked'];
+				};
+			};
+			/** @description `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No training on the date */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	cancelTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of a training or a training day */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The cancelled training; a training day gets a cancelled training */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date`, `not_a_training_day` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	openTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of a training day */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training of the date, made with the times of its weekly training when it did not exist; safe to send twice */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date`, `not_a_training_day` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	uncancelTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training, no longer cancelled */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No training on the date */
+			404: {
 				headers: {
 					[name: string]: unknown;
 				};

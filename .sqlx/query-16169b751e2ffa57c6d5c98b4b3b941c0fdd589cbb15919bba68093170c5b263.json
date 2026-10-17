@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO trainings (date, start_time, end_time, created_at) VALUES ($1, $2, $3, $4)\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Time",
+        "Time",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "16169b751e2ffa57c6d5c98b4b3b941c0fdd589cbb15919bba68093170c5b263"
+}

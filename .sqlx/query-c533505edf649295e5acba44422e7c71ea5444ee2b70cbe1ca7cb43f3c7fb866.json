@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO trainings (date, start_time, end_time, cancelled_at, created_at)\n         VALUES ($1, $2, $3, $4, $4)\n         ON CONFLICT (date) DO UPDATE\n         SET cancelled_at = coalesce(trainings.cancelled_at, excluded.cancelled_at)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Time",
+        "Time",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c533505edf649295e5acba44422e7c71ea5444ee2b70cbe1ca7cb43f3c7fb866"
+}
