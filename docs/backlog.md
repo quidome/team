@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; designed again 2026-10-16 for weekly trainings and the pages Players and Team)
-   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): implement steps 5–9 (`/implement docs/changes/2026-10-15-players-and-settings`: the changed story 1, with R14, R15, R16 and the stale comments).
+   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): close (`/close docs/changes/2026-10-15-players-and-settings`): built and reviewed, all findings fixed.
    - Then story B, trainings and attendance (with "Change" of a training and the proposal of last season's weekly trainings), and story C, the overview.
 
 Small:

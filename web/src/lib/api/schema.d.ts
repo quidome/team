@@ -718,6 +718,8 @@ export interface components {
 		Refusal: {
 			/** @description For `role_starts_later`: the start of the player's later role, for example "2026-11-02". */
 			date?: string | null;
+			/** @description For `confirm_removal`: whether the removal also ends a role (else it only removes). */
+			ends?: boolean | null;
 			/** @description For example `role_starts_later` or `changed_meanwhile`. */
 			error: string;
 			/** @description For `confirm_removal`: the roles "Remove from the team" would remove, in order of start. */

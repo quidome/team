@@ -1,6 +1,6 @@
 # Technical spec: Players and settings
 
-**Status**: in progress (designed again 2026-10-16, steps 1–4 built; steps 5–9 designed and approved 2026-10-17 after the second build and accept review)
+**Status**: done (designed again 2026-10-16, steps 1–4 built; steps 5–9 designed, approved and built 2026-10-17, reviewed and the findings fixed)
 **Size**: story
 **Change**: docs/changes/2026-10-15-players-and-settings
 **Date**: 2026-10-15, designed again 2026-10-16, steps 5–9 on 2026-10-17
@@ -307,8 +307,9 @@ R13–R17). What steps 5–9 change:
 - [x] Step 7: "Undo" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 8: "Add all" with a date and the "Today" buttons (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 9: settings, a change of day moves a proposed window (R15) (2026-10-17; `just check` passes; 42 browser tests)
-- [ ] Review build
-- [ ] Review accept
+- [x] Review build (2026-10-17, steps 5–9: R18–R21; all fixed or answered)
+- [x] Review accept (2026-10-17, steps 5–9: accepted with notes, A11–A14; all fixed)
+- [x] Fixes after the reviews (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 
 ## Deviations
 None from `functional.md` (as approved again on 2026-10-16, with the two additions of this design
@@ -921,6 +922,7 @@ the last role ("Only trains") (search `last day` in `web/src/routes/team/+page.s
 today"). The date shows only after a tap, in the roles line. A6 was about the coordinator seeing at once that the
 removal worked; the move to the group does that, but the spec's line also tells "left" from a
 kind of role on a phone. Build it, or write it down as a deviation for `/review accept`.
+- 2026-10-17: fixed. A row under "Left the team" shows "Left · last day Sun 11 Oct" (the end of the last role of the season) in place of the role badge. Browser tests: Tess and Vic after a removal from today.
 
 **R19 – twin of R15: "Change" of the day keeps a window when only one of its dates is the old
 day's proposal (bug, low). Trace.** `dayChanged` in `/settings` moves the window only when both
@@ -931,6 +933,7 @@ as R15, now for a window with a typed end. R15's suggestion also named "move eac
 day in the same week". Suggest: move each end on its own (an end that is the old day's proposed
 end moves to the new day's proposal), or move both ends to the new weekday within their week.
 Add a browser test with a typed last date.
+- 2026-10-17: fixed. Each date of the window moves on its own: a date that is the old day's proposed date moves to the new day's proposal, a typed date stays. Browser tests: a typed last date (Thu 20 May) stays while the proposed first date moves to Tue 1 Sep; a typed first date (Thu 10 Sep) stays while the proposed last date moves to Tue 25 May.
 
 **R20 – smaller points (low).**
 - When the second save of a confirmed removal is refused again with `confirm_removal` (the
@@ -948,6 +951,7 @@ Add a browser test with a typed last date.
   that date on, passes, limited by `check_role` (the core test `undo_checks_the_roles_it_puts_back`
   shows it). Trace. This is the design's choice (no stored undo state); it is right for one
   coordinator who sends back the server's own answer, and is named here only so Close knows it.
+- 2026-10-17: first point fixed: `confirm_removal` on the confirmed save shows "This player was changed in the meantime. Please try again." (no test: the race needs two screens between two taps; traced). Second point fixed with A12. Third point fixed: the comments say 1 September. Fourth point: not changed, the design's choice (option A1); for decision 0019 at Close.
 
 **R21 – a change document made false (low). Search.** The epic's `technical.md` (API, line 64)
 does not list `POST /api/players/{id}/team-undo`, still says `PATCH /api/players/{id}` (this story
@@ -956,6 +960,7 @@ decided `PUT`), and lists the error codes as "400" without `same_role`, `role_st
 or at Close in the living documents. At Close, as before: `docs/architecture.md`, the module list
 in `CLAUDE.md`, a product document for players and settings, and decision 0019 (now also with
 "Undo" without stored state, and the removal that deletes roles).
+- 2026-10-17: fixed in the epic's `technical.md`: `GET/PUT /api/players/{id}`, `team-undo`, the codes `same_role`, `role_starts_later` (with `date`) and the 409 codes `confirm_removal` and `changed_meanwhile`. The living documents follow at Close.
 
 **Checked and found right.** `team-undo` is on the protected router and in the 401 and 403 test
 (test ran). The log test covers "player left the team" and "removal undone" with no name (test
@@ -1019,6 +1024,7 @@ see at once that the removal worked) is met by the move to the group, so this is
 deviation. But under "Left the team" a role badge reads as a role the player still has, and the
 spec gives the line with an example. **Deviations** does not name it. Before Close: build the line
 (for example in place of the badge), or write it as a deviation with the coordinator's agreement.
+- 2026-10-17: fixed with R18 (built, as the coordinator chose).
 
 **A12 – the confirmation says "This also removes …" when nothing else changes (neutral drift).
 Run and trace.** For Casey (only a planned role) and for Dana after "Add all" in August (the spec's
@@ -1027,17 +1033,20 @@ own example), the removal only removes; nothing ends, yet the dialog reads "This
 sentence was written for a removal that also ends a role; the case it names in the behaviour
 ("Add all" in August) is exactly the one where "also" is wrong. Suggest "This removes …" when the
 removal ends no role. Small; the words can be settled at Close.
+- 2026-10-17: fixed. The 409 `confirm_removal` says whether the removal also `ends` a role; the dialog reads "This removes …" when it does not, else "This also removes …". Server tests check `ends` (true with a planned role, false after "Add all"); the browser test of Wren checks "This removes "Plays games · from Mon 2 Nov".".
 
 **A13 – a change of "Valid" or "Hidden" of a reason also saves a rename typed but not saved
 (neutral drift). Trace.** `updateReason` in `/settings` sends `names[reason.id]`, the text in the
 name field. A coordinator who types in the name, changes their mind without clearing it, and taps
 "Valid" saves the new name too. Story 4 is otherwise as meant. Small.
+- 2026-10-17: fixed. Only "Save" sends the typed name; "Valid" and "Hidden" send the stored name, and a name typed but not saved stays in its field. Browser test: "Family party" typed, "Valid" ticked: after a reload the name is "Family" and "Valid" is on.
 
 **A14 – small text points (neutral drift). Trace.** The help text of "Hidden" on the player page
 ("Not offered in "Add player" and "Add all".") leaves out the main effect the spec names first: off
 the list on "Players" unless "Show hidden players" is on. And R19 (the settings window with only a
 typed end does not move with the day) is, from the user's side, the same silent loss of the first
 training day as R15; agreed with the build review that it is fixed before Close.
+- 2026-10-17: fixed. The help text of "Hidden" reads "Not in the list of players (unless "Show hidden players" is on), and not offered in "Add player" and "Add all". The history and the team stay." R19: fixed (see there).
 
 **Deviations, judged after the view above was formed.**
 - The confirmation also for a role that starts on the date itself: **faithful adaptation**. Such a

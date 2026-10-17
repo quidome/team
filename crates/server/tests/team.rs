@@ -517,7 +517,7 @@ async fn after_add_all_in_summer_the_players_stay_in_the_team_and_can_leave(pool
         )
         .await;
 
-    // After the first training date the open role of last season has ended.
+    // After 1 September the open role of last season has ended.
     on(&mut coordinator, 2026, 9, 2).await;
     let page = coordinator.ok("GET", "/api/team", None).await;
     assert_eq!(names(&page["members"]), ["Avery"]);
@@ -686,7 +686,7 @@ async fn remove_with_a_later_role_asks_first(pool: PgPool) {
         answer,
         (
             409,
-            json!({ "error": "confirm_removal",
+            json!({ "error": "confirm_removal", "ends": true,
                     "roles": [{ "id": later, "role": "plays_games",
                                 "from": "2026-11-01", "until": null }] })
         )
@@ -723,7 +723,15 @@ async fn remove_after_add_all_leaves_nothing_in_the_season(pool: PgPool) {
     let role = players::roles_of(&pool, PlayerId(avery)).await.unwrap()[1]
         .id
         .0;
-    // Avery did not come back: "Not in the team from" today.
+    // Avery did not come back: "Not in the team from" today. The removal only removes.
+    let (status, asked) = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{avery}/team-leave"),
+            leave("2026-08-15", &[]),
+        )
+        .await;
+    assert_eq!((status, &asked["ends"]), (409, &json!(false)));
     let answer = coordinator
         .ok(
             "POST",

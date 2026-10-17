@@ -86,6 +86,9 @@ pub struct Refusal {
     /// For `confirm_removal`: the roles "Remove from the team" would remove, in order of start.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roles: Option<Vec<RoleView>>,
+    /// For `confirm_removal`: whether the removal also ends a role (else it only removes).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -289,7 +292,7 @@ pub async fn team_leave(
         return Err(AppError::Refused {
             status: StatusCode::CONFLICT,
             code: "confirm_removal",
-            details: json!({ "roles": removed }),
+            details: json!({ "roles": removed, "ends": removal.ended.is_some() }),
         });
     }
     let before: Vec<RoleDatesView> = roles

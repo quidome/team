@@ -2090,6 +2090,13 @@
             ],
             "description": "For `role_starts_later`: the start of the player's later role, for example \"2026-11-02\"."
           },
+          "ends": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "For `confirm_removal`: whether the removal also ends a role (else it only removes)."
+          },
           "error": {
             "type": "string",
             "description": "For example `role_starts_later` or `changed_meanwhile`."

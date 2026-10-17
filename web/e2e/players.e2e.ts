@@ -83,12 +83,18 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	const thursday = page.getByTestId('weekly-training');
 	await expect(thursday).toHaveText(/Thursday 19:45–21:00\s*· Thu 3 Sept – Thu 27 May/);
 
-	// A typed window stays when the day changes.
+	// Each date on its own: a typed date stays, a proposed date moves with the day.
+	await thursday.getByRole('button', { name: 'Change' }).click();
+	await form.getByLabel('Last training').fill('2027-05-20');
+	await form.getByLabel('Day').selectOption('2');
+	await expect(form.getByLabel('First training')).toHaveValue('2026-09-01');
+	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-20');
+	await form.getByRole('button', { name: 'Cancel' }).click();
 	await thursday.getByRole('button', { name: 'Change' }).click();
 	await form.getByLabel('First training').fill('2026-09-10');
 	await form.getByLabel('Day').selectOption('2');
 	await expect(form.getByLabel('First training')).toHaveValue('2026-09-10');
-	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-27');
+	await expect(form.getByLabel('Last training')).toHaveValue('2027-05-25');
 	await form.getByRole('button', { name: 'Cancel' }).click();
 
 	// A second Thursday in the same dates is refused.
@@ -115,6 +121,15 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	await page.getByRole('button', { name: 'Add reason' }).click();
 	const family = page.getByTestId('reason').last();
 	await expect(family.getByLabel('Name of the reason')).toHaveValue('Family');
+
+	// "Valid" saves only "Valid": a name typed but not saved stays unsaved, in its field.
+	await family.getByLabel('Name of the reason').fill('Family party');
+	await family.getByLabel('Valid').check();
+	await expect(family.getByLabel('Valid')).toBeChecked();
+	await expect(family.getByLabel('Name of the reason')).toHaveValue('Family party');
+	await page.reload();
+	await expect(family.getByLabel('Name of the reason')).toHaveValue('Family');
+	await expect(family.getByLabel('Valid')).toBeChecked();
 
 	const holiday = page.locator('[data-reason="Holiday"]');
 	await holiday.getByLabel('Hidden').check();
@@ -190,6 +205,7 @@ test('the team page: add a player, change the role, remove from and add to the t
 	await tess.getByRole('button', { name: 'Remove from the team' }).click();
 	const left = page.getByTestId('left-player').filter({ hasText: 'Tess' });
 	await expect(left).toBeVisible();
+	await expect(left.getByTestId('left-day')).toHaveText('Left · last day Sun 11 Oct');
 	await expect(tess).toHaveCount(0);
 	await left.getByRole('button', { name: /Tess/ }).click();
 	await expect(left.getByTestId('member-roles')).toHaveText(
@@ -244,6 +260,7 @@ test('"Remove from the team" asks first when it also removes a later role', asyn
 	await vic.getByRole('button', { name: 'Remove from the team' }).click();
 	const left = page.getByTestId('left-player').filter({ hasText: 'Vic' });
 	await expect(left).toBeVisible();
+	await expect(left.getByTestId('left-day')).toHaveText('Left · last day Sun 11 Oct');
 	await left.getByRole('button', { name: /Vic/ }).click();
 	await expect(left.getByTestId('member-roles')).toHaveText(
 		'Only trains · Tue 1 Sept – Sun 11 Oct'
@@ -293,8 +310,14 @@ test('"Undo" for a player whose roles were all removed, and "Change role" to the
 
 	// From today: the role from Mon 2 Nov goes, so nothing is left in the season.
 	await wren.getByRole('button', { name: 'Remove from the team' }).click();
-	page.once('dialog', (dialog) => void dialog.accept());
+	const messages: string[] = [];
+	page.once('dialog', (dialog) => {
+		messages.push(dialog.message());
+		void dialog.accept();
+	});
 	await wren.getByRole('button', { name: 'Remove from the team' }).click();
+	// Nothing ends: only the role from Mon 2 Nov goes.
+	await expect.poll(() => messages).toEqual(['This removes "Plays games · from Mon 2 Nov".']);
 	const removed = page.getByTestId('removed').filter({ hasText: 'Wren' });
 	await expect(removed).toHaveText(/Wren · not in the team this season\s*Undo/);
 	await expect(wren).toHaveCount(0);
