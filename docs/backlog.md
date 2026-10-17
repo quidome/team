@@ -2,9 +2,8 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; designed again 2026-10-16 for weekly trainings and the pages Players and Team)
-   - Story A, [players and settings](changes/2026-10-15-players-and-settings/): close (`/close docs/changes/2026-10-15-players-and-settings`): built and reviewed, all findings fixed.
-   - Then story B, trainings and attendance (with "Change" of a training and the proposal of last season's weekly trainings), and story C, the overview.
+1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; story A, players and settings, closed 2026-10-17 on the branch `feat/players-and-settings`, not merged yet)
+   - Next: story B, trainings and attendance (with "Change" of a training and the proposal of last season's weekly trainings); then story C, the overview.
 
 Small:
 - Set up and check a backup of the team database (TrueNAS snapshots or a dump off the cluster, with a test restore). Before story A of attendance at training, all data could be read again from the game list; players and attendance cannot. The coordinator chose to do this later (2026-10-15).
