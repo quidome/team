@@ -43,7 +43,7 @@ impl From<ReasonError> for AppError {
     }
 }
 
-fn view(reason: StoredReason) -> AbsenceReason {
+pub(crate) fn view(reason: StoredReason) -> AbsenceReason {
     AbsenceReason {
         id: reason.id,
         name: reason.name,

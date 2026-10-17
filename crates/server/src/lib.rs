@@ -16,6 +16,7 @@ pub mod reading;
 pub mod readings;
 pub mod reasons;
 pub mod source;
+pub mod trainings;
 pub mod web;
 pub mod weekly_trainings;
 

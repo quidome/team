@@ -1,6 +1,9 @@
 //! Reasons for an absence: each one valid or not valid. Names are unique without case and outer
 //! spaces.
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ReasonId(pub i64);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ReasonError {
     #[error("a name is needed")]

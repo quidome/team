@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT training_id, player_id, reason_id FROM absences WHERE training_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "training_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "player_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "reason_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ec3a1818e3ba218ae694fd56552808d8c09410857d642e27bfcfd98aedf16533"
+}

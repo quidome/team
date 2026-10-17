@@ -374,6 +374,54 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/trainings': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['trainings'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/next': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['nextTraining'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/trainings/{date}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['training'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/weekly-trainings': {
 		parameters: {
 			query?: never;
@@ -434,6 +482,19 @@ export interface components {
 			id: number;
 			name: string;
 			valid: boolean;
+		};
+		/** @description A player at a training. */
+		AtTrainingView: {
+			first_name: string;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			/**
+			 * Format: int64
+			 * @description The reason of the absence; `null` when the player is there.
+			 */
+			reason?: number | null;
+			role: components['schemas']['RoleKind'];
 		};
 		CarryRequest: {
 			/**
@@ -899,6 +960,54 @@ export interface components {
 			 * @description The source's team number.
 			 */
 			number: number;
+		};
+		/** @description The times of a training. */
+		Times: {
+			end: string;
+			start: string;
+		};
+		/** @description One date: its training with the players, or nothing yet. */
+		TrainingDay: {
+			absent: number;
+			date: string;
+			/** @description The players with a role on the date, sorted by first name; empty while not opened. */
+			players: components['schemas']['AtTrainingView'][];
+			proposed_times?: null | components['schemas']['Times'];
+			/** @description All reasons in their order, also the hidden ones (they still show on old absences). */
+			reasons: components['schemas']['AbsenceReason'][];
+			season: string;
+			training?: null | components['schemas']['TrainingView'];
+		};
+		/** @description The list of a season: today and later, nearest first; before today, newest first. */
+		TrainingList: {
+			coming: components['schemas']['TrainingRow'][];
+			past: components['schemas']['TrainingRow'][];
+			season: string;
+			season_first_day: string;
+			season_last_day: string;
+			today: string;
+		};
+		/** @description One row of the list: a training, or a training day that is not opened. */
+		TrainingRow: {
+			/** @description The number of absences of players with a role on the date (0 when not opened). */
+			absent: number;
+			/** @description For example "2026-10-13". */
+			date: string;
+			end: string;
+			/** @description A training on a date that is not a training day. */
+			extra: boolean;
+			/** @description A training exists on the date (also when it is cancelled). */
+			opened: boolean;
+			/** @description For example "19:45". */
+			start: string;
+			/** @description `not_opened`, `all_there`, `absent` or `cancelled`. */
+			status: string;
+		};
+		/** @description An opened training. */
+		TrainingView: {
+			cancelled: boolean;
+			end: string;
+			start: string;
 		};
 		/**
 		 * @description What "Undo" sends back after "Remove from the team": the date of the removal and the
@@ -1996,6 +2105,107 @@ export interface operations {
 				content: {
 					'application/json': components['schemas']['TeamPageView'];
 				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	trainings: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description For example "2026-2027"; the current season when left out. */
+				season: string | null;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training days and trainings of the season, one row per date */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingList'];
+				};
+			};
+			/** @description `invalid_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	nextTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Today's training until midnight, else the next training day or training of the current season; `null` when there is none */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': null | components['schemas']['TrainingRow'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	training: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date, for example 2026-10-13 */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training of the date with its players, or nothing yet */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
 			};
 			/** @description Not logged in */
 			401: {
