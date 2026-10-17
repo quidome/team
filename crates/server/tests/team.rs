@@ -824,3 +824,151 @@ async fn remove_saves_all_or_nothing(pool: PgPool) {
     assert_eq!(status, 500);
     assert_eq!(stored_roles(&pool, id).await, before);
 }
+
+/// A player only trains from Tue 1 Sep with a planned "Change role" from Sun 1 Nov, removed from
+/// the team from today (Mon 12 Oct); gives the player and the answer of the removal.
+async fn removed_with_a_later_role(coordinator: &Coordinator, pool: &PgPool) -> (i64, Value) {
+    let id = coordinator
+        .add_player("Avery", "only_trains", "2026-09-01")
+        .await;
+    coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/role-change"),
+            change("plays_games", "2026-11-01"),
+        )
+        .await;
+    let later = players::roles_of(pool, PlayerId(id)).await.unwrap()[1].id.0;
+    let answer = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/team-leave"),
+            leave("2026-10-12", &[later]),
+        )
+        .await;
+    (id, answer)
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn undo_puts_the_roles_back(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (id, left) = removed_with_a_later_role(&coordinator, &pool).await;
+    let page = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/team-undo"),
+            Some(left["undo"].clone()),
+        )
+        .await;
+    assert_eq!(
+        stored_roles(&pool, id).await,
+        [
+            (date(2026, 9, 1), Some(date(2026, 10, 31))),
+            (date(2026, 11, 1), None)
+        ]
+    );
+    assert_eq!(names(&page["members"]), ["Avery"]);
+    assert_eq!(page["members"][0]["role"], "only_trains");
+    assert!(page["left"].as_array().unwrap().is_empty());
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn undo_after_another_change_is_refused(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (id, left) = removed_with_a_later_role(&coordinator, &pool).await;
+    // "Add to the team" from Mon 2 Nov on another screen.
+    coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{id}/roles"),
+            Some(json!({ "role": "plays_games", "from": "2026-11-02", "until": null })),
+        )
+        .await;
+    let before = stored_roles(&pool, id).await;
+    let answer = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{id}/team-undo"),
+            Some(left["undo"].clone()),
+        )
+        .await;
+    assert_eq!(answer, (409, json!({ "error": "changed_meanwhile" })));
+    assert_eq!(stored_roles(&pool, id).await, before);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_second_undo_is_refused(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (id, left) = removed_with_a_later_role(&coordinator, &pool).await;
+    let path = format!("/api/players/{id}/team-undo");
+    coordinator
+        .ok("POST", &path, Some(left["undo"].clone()))
+        .await;
+    let answer = coordinator
+        .send("POST", &path, Some(left["undo"].clone()))
+        .await;
+    assert_eq!(answer, (409, json!({ "error": "changed_meanwhile" })));
+    assert_eq!(stored_roles(&pool, id).await.len(), 2);
+    let (status, _) = coordinator
+        .send(
+            "POST",
+            "/api/players/999999/team-undo",
+            Some(left["undo"].clone()),
+        )
+        .await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn undo_waits_for_the_players_lock(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (id, left) = removed_with_a_later_role(&coordinator, &pool).await;
+
+    // Another save holds the player's lock and adds a role, but has not committed yet.
+    let mut first = pool.begin().await.unwrap();
+    assert!(players::lock(&mut first, PlayerId(id)).await.unwrap());
+    players::insert_role(
+        &mut *first,
+        PlayerId(id),
+        Season::from_start_year(2026),
+        Role::PlaysGames,
+        date(2026, 11, 2),
+        None,
+    )
+    .await
+    .unwrap();
+
+    // "Undo" waits, then sees the new role: refused.
+    let path = format!("/api/players/{id}/team-undo");
+    let second = coordinator.send("POST", &path, Some(left["undo"].clone()));
+    tokio::pin!(second);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut second).await;
+    assert!(waited.is_err(), "the undo did not wait for the lock");
+    first.commit().await.unwrap();
+    assert_eq!(second.await, (409, json!({ "error": "changed_meanwhile" })));
+    assert_eq!(
+        stored_roles(&pool, id).await,
+        [
+            (date(2026, 9, 1), Some(date(2026, 10, 11))),
+            (date(2026, 11, 2), None)
+        ]
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn undo_saves_all_or_nothing(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (id, left) = removed_with_a_later_role(&coordinator, &pool).await;
+    let before = stored_roles(&pool, id).await;
+    // The roles of the season are deleted, then the insert of the roles from before fails.
+    refuse_role_writes(&pool, "INSERT").await;
+    let (status, _) = coordinator
+        .send(
+            "POST",
+            &format!("/api/players/{id}/team-undo"),
+            Some(left["undo"].clone()),
+        )
+        .await;
+    assert_eq!(status, 500);
+    assert_eq!(stored_roles(&pool, id).await, before);
+}

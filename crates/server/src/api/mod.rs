@@ -42,6 +42,7 @@ use utoipa::OpenApi;
         team::get,
         team::role_change,
         team::team_leave,
+        team::team_undo,
         reasons::list,
         reasons::add,
         reasons::change,

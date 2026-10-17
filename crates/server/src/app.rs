@@ -124,6 +124,7 @@ pub fn app(state: AppState) -> Router {
         .route("/players/{id}/roles/{role}", put(players::correct_role))
         .route("/players/{id}/role-change", post(team::role_change))
         .route("/players/{id}/team-leave", post(team::team_leave))
+        .route("/players/{id}/team-undo", post(team::team_undo))
         .route("/team", get(team::get))
         .route("/reasons", get(reasons::list).post(reasons::add))
         .route("/reasons/{id}", put(reasons::change))

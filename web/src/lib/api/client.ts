@@ -267,6 +267,13 @@ export async function leaveTeam(id: number, from: string, removes: number[]): Pr
 	);
 }
 
+/** "Undo" of a removal: the roles from before come back, unless the player changed meanwhile. */
+export async function undoRemoval(id: number, undo: UndoRemoval): Promise<TeamPage> {
+	return dataOf(
+		await api.POST('/api/players/{id}/team-undo', { params: { path: { id } }, body: undo })
+	);
+}
+
 export type AbsenceReason = components['schemas']['AbsenceReason'];
 
 export async function loadReasons(fetch: typeof globalThis.fetch): Promise<AbsenceReason[]> {

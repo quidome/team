@@ -641,6 +641,74 @@
         }
       }
     },
+    "/api/players/{id}/team-undo": {
+      "post": {
+        "tags": [
+          "team"
+        ],
+        "operationId": "undoRemoval",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UndoRemoval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The team; the player's roles of the season are back as before the removal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`roles_overlap`, `outside_season`, `until_before_from`, `not_in_team`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such player"
+          },
+          "409": {
+            "description": "`changed_meanwhile`: the player's roles changed after the removal; nothing is saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/readings": {
       "post": {
         "tags": [
