@@ -241,10 +241,61 @@ test('"Remove from the team" asks first when it also removes a later role', asyn
 		'Only trains · Tue 1 Sept – Sun 11 Oct'
 	);
 	await expectAccessible(page);
+
+	// "Undo" puts both roles back.
+	await left.getByRole('button', { name: 'Undo' }).click();
+	await expect(left).toHaveCount(0);
+	await vic.getByRole('button', { name: /Vic/ }).click();
+	await expect(vic.getByTestId('member-roles')).toHaveText(
+		'Only trains · Tue 1 Sept – Sat 31 Oct, Plays games · from Sun 1 Nov'
+	);
+	await expect(vic.getByRole('button', { name: 'Undo' })).toHaveCount(0);
 	await expectNoHorizontalScroll(page, 320);
 	// The two answers that ask for the confirmation.
 	expect(errors).toEqual([
 		'Failed to load resource: the server responded with a status of 409 (Conflict)',
+		'Failed to load resource: the server responded with a status of 409 (Conflict)'
+	]);
+});
+
+test('"Undo" for a player whose roles were all removed, and "Change role" to the same role', async ({
+	page
+}) => {
+	const errors = watchConsole(page);
+	await page.goto('/team');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	const form = page.getByTestId('add-player');
+	await form.getByLabel('Player').selectOption({ label: 'New player' });
+	await form.getByLabel('First name').fill('Wren');
+	await form.getByLabel('In the team from').fill('2026-11-02');
+	await form.getByRole('button', { name: 'Save' }).click();
+	const wren = page.getByTestId('member').filter({ hasText: 'Wren' });
+
+	// "Change role" to the role Wren already has: refused.
+	await wren.getByRole('button', { name: /Wren/ }).click();
+	await wren.getByRole('button', { name: 'Change role' }).click();
+	await wren.getByLabel('Plays games').check();
+	await wren.getByLabel('From').fill('2026-11-09');
+	await wren.getByRole('button', { name: 'Change role' }).click();
+	await expect(wren.getByRole('alert')).toHaveText('The player already has this role.');
+	await wren.getByRole('button', { name: 'Cancel' }).click();
+
+	// From today: the role from Mon 2 Nov goes, so nothing is left in the season.
+	await wren.getByRole('button', { name: 'Remove from the team' }).click();
+	page.once('dialog', (dialog) => void dialog.accept());
+	await wren.getByRole('button', { name: 'Remove from the team' }).click();
+	const removed = page.getByTestId('removed').filter({ hasText: 'Wren' });
+	await expect(removed).toHaveText(/Wren · not in the team this season\s*Undo/);
+	await expect(wren).toHaveCount(0);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	await removed.getByRole('button', { name: 'Undo' }).click();
+	await expect(removed).toHaveCount(0);
+	await wren.getByRole('button', { name: /Wren/ }).click();
+	await expect(wren.getByTestId('member-roles')).toHaveText('Plays games · from Mon 2 Nov');
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 400 (Bad Request)',
 		'Failed to load resource: the server responded with a status of 409 (Conflict)'
 	]);
 });

@@ -2,7 +2,8 @@
 	The team of the current season (attendance at training, story A): the players in the team with
 	their role, "Change role" and "Remove from the team", "Left the team" with "Add to the team",
 	"Add player", and in a new season the players of last season with "Add all". "Remove from the team"
-	asks first when it also removes a role, and "Last day today" shows on the row.
+	asks first when it also removes a role, and "Last day today" shows on the row. After a removal,
+	"Undo" stays until the coordinator leaves the page.
 -->
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
@@ -14,10 +15,12 @@
 		carryPlayers,
 		changeRole,
 		leaveTeam,
+		undoRemoval,
 		type Member,
 		type RoleKind,
 		type RoleView,
-		type TeamPage
+		type TeamPage,
+		type UndoRemoval
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -43,6 +46,9 @@
 	let action = $state<'change' | 'leave' | 'return' | null>(null);
 	let actionRole = $state<RoleKind>('plays_games');
 	let actionDate = $state('');
+
+	/** "Undo" for each player removed while the page is open: its name and what to send back. */
+	let undos = $state<Record<number, { name: string; undo: UndoRemoval }>>({});
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
@@ -105,6 +111,7 @@
 				return null;
 			}
 			const page = await addRole(Number(choice), { role, from, until: null });
+			forget(Number(choice));
 			adding = false;
 			return page;
 		});
@@ -131,31 +138,69 @@
 	}
 
 	/** "Remove from the team"; when it also removes roles, only after a confirmation that names
-	 * them (the server says which). */
-	async function leave(id: number, from: string): Promise<TeamPage | undefined> {
+	 * them (the server says which). Keeps what "Undo" sends back. */
+	async function leave(member: Member, from: string): Promise<TeamPage | undefined> {
+		let answer;
 		try {
-			return (await leaveTeam(id, from, [])).team;
+			answer = await leaveTeam(member.id, from, []);
 		} catch (failure) {
 			if (!(failure instanceof ApiError) || failure.code !== 'confirm_removal') throw failure;
 			const roles = (failure.body as { roles?: RoleView[] }).roles ?? [];
 			const named = roles.map((r) => `"${roleText(r)}"`).join(' and ');
 			if (!confirm(`This also removes ${named}.`)) return undefined;
-			return (
-				await leaveTeam(
-					id,
-					from,
-					roles.map((r) => r.id)
-				)
-			).team;
+			answer = await leaveTeam(
+				member.id,
+				from,
+				roles.map((r) => r.id)
+			);
 		}
+		undos = { ...undos, [member.id]: { name: fullName(member), undo: answer.undo } };
+		return answer.team;
 	}
+
+	/** Another change of the player ends its "Undo". */
+	function forget(id: number) {
+		undos = Object.fromEntries(Object.entries(undos).filter(([key]) => Number(key) !== id));
+	}
+
+	function undo(id: number) {
+		const entry = undos[id];
+		if (!entry) return;
+		open = null;
+		return run(async () => {
+			try {
+				return await undoRemoval(id, entry.undo);
+			} finally {
+				forget(id);
+			}
+		});
+	}
+
+	/** The players removed while the page is open who are in no group, so have no row. */
+	let removed = $derived.by(() => {
+		const page = team;
+		if (!page) return [];
+		const shown = new Set([...page.members, ...page.left].map((m) => m.id));
+		return Object.entries(undos)
+			.map(([id, entry]) => ({ id: Number(id), name: entry.name }))
+			.filter(({ id }) => !shown.has(id));
+	});
 
 	function act(event: SubmitEvent, member: Member) {
 		event.preventDefault();
-		if (action === 'change') return run(() => changeRole(member.id, actionRole, actionDate));
-		if (action === 'leave') return run(() => leave(member.id, actionDate));
+		if (action === 'change')
+			return run(async () => {
+				const page = await changeRole(member.id, actionRole, actionDate);
+				forget(member.id);
+				return page;
+			});
+		if (action === 'leave') return run(() => leave(member, actionDate));
 		if (action === 'return')
-			return run(() => addRole(member.id, { role: actionRole, from: actionDate, until: null }));
+			return run(async () => {
+				const page = await addRole(member.id, { role: actionRole, from: actionDate, until: null });
+				forget(member.id);
+				return page;
+			});
 	}
 
 	/** "Only trains · Tue 1 Sept – Sun 11 Oct", or "Plays games · from Sun 1 Nov". */
@@ -265,6 +310,13 @@
 				<Badge variant={left ? 'outline' : 'secondary'}>{roleLabels[member.role]}</Badge>
 			</span>
 		</button>
+		{#if undos[member.id]}
+			<div class="px-4 pb-3">
+				<Button size="sm" variant="outline" disabled={busy} onclick={() => undo(member.id)}>
+					Undo
+				</Button>
+			</div>
+		{/if}
 		{#if open === member.id}
 			<div class="border-t px-4 pt-3 pb-4">
 				<p class="text-sm text-muted-foreground tabular-nums" data-testid="member-roles">
@@ -409,6 +461,25 @@
 			<ul class="space-y-2" aria-label="Players in the team">
 				{#each page.members as member (member.id)}
 					{@render row(member, page, false)}
+				{/each}
+			</ul>
+		{/if}
+
+		{#if removed.length > 0}
+			<ul class="space-y-2" aria-label="Removed just now">
+				{#each removed as player (player.id)}
+					<li
+						class="flex min-h-12 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2 text-sm shadow-xs"
+						data-testid="removed"
+					>
+						<span class="min-w-0">
+							<span class="font-medium">{player.name}</span>
+							<span class="text-muted-foreground">· not in the team this season</span>
+						</span>
+						<Button size="sm" variant="outline" disabled={busy} onclick={() => undo(player.id)}>
+							Undo
+						</Button>
+					</li>
 				{/each}
 			</ul>
 		{/if}

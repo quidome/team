@@ -8,7 +8,7 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
     Member, PlayerId, PlayerRole, RoleDates, RoleId, change_role, proposed_start, remove_from_team,
-    team,
+    team, undo_removal,
 };
 use utoipa::ToSchema;
 
@@ -116,6 +116,16 @@ pub struct RoleDatesView {
     /// `null` while the role continues.
     #[schema(value_type = Option<String>, format = Date)]
     pub until: Option<NaiveDate>,
+}
+
+impl From<&RoleDatesView> for RoleDates {
+    fn from(role: &RoleDatesView) -> Self {
+        RoleDates {
+            role: role.role.into(),
+            from: role.from,
+            until: role.until,
+        }
+    }
 }
 
 impl From<&RoleDates> for RoleDatesView {
@@ -303,6 +313,47 @@ pub async fn team_leave(
             roles: before,
         },
     }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/players/{id}/team-undo",
+    operation_id = "undoRemoval",
+    params(("id" = i64, Path, description = "The player")),
+    request_body = UndoRemoval,
+    responses(
+        (status = 200, description = "The team; the player's roles of the season are back as before the removal", body = TeamPageView),
+        (status = 400, description = "`roles_overlap`, `outside_season`, `until_before_from`, `not_in_team`", body = Refusal),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such player"),
+        (status = 409, description = "`changed_meanwhile`: the player's roles changed after the removal; nothing is saved", body = Refusal),
+    )
+)]
+pub async fn team_undo(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(body): Json<UndoRemoval>,
+) -> Result<Json<TeamPageView>, AppError> {
+    let player = PlayerId(id);
+    let season = current_season(state.clock.as_ref());
+    let before: Vec<RoleDates> = body.roles.iter().map(RoleDates::from).collect();
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    if !players::lock(&mut tx, player).await? {
+        return Err(AppError::NotFound);
+    }
+    let roles = players::roles_of(&mut *tx, player).await?;
+    let back = undo_removal(season, &before, body.from, &roles)?;
+    // All or nothing: the roles of the season as the removal left them go, the roles from before
+    // come back (with new ids; nothing refers to a role id).
+    for role in roles.iter().filter(|role| role.season == season) {
+        players::delete_role(&mut *tx, player, role.id).await?;
+    }
+    for role in &back {
+        players::insert_role(&mut *tx, player, season, role.role, role.from, role.until).await?;
+    }
+    tx.commit().await.map_err(StoreError::from)?;
+    tracing::info!(player = player.0, "removal undone");
+    Ok(Json(load(&state).await?))
 }
 
 /// Gives the stored role `id` (one of `roles`) the end `until`.

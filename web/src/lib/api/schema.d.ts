@@ -230,6 +230,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/players/{id}/team-undo': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post: operations['undoRemoval'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/readings': {
 		parameters: {
 			query?: never;
@@ -1563,6 +1579,65 @@ export interface operations {
 				content?: never;
 			};
 			/** @description `confirm_removal`: the removal removes roles that are not in `removes`; nothing is saved */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Refusal'];
+				};
+			};
+		};
+	};
+	undoRemoval: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The player */
+				id: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['UndoRemoval'];
+			};
+		};
+		responses: {
+			/** @description The team; the player's roles of the season are back as before the removal */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TeamPageView'];
+				};
+			};
+			/** @description `roles_overlap`, `outside_season`, `until_before_from`, `not_in_team` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Refusal'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such player */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description `changed_meanwhile`: the player's roles changed after the removal; nothing is saved */
 			409: {
 				headers: {
 					[name: string]: unknown;

@@ -559,6 +559,7 @@ async fn every_new_route_needs_a_login_and_changes_need_the_origin(pool: PgPool)
         ("POST", "/api/players/carry"),
         ("POST", "/api/players/1/role-change"),
         ("POST", "/api/players/1/team-leave"),
+        ("POST", "/api/players/1/team-undo"),
         ("GET", "/api/team"),
         ("GET", "/api/reasons"),
         ("POST", "/api/reasons"),
