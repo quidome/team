@@ -1,7 +1,9 @@
 //! Trainings and absences (tables `trainings`, `absences`; decision 0020).
 
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use sqlx::PgExecutor;
+use sqlx::{PgExecutor, PgPool};
 use team_core::{Absence, PlayerId, ReasonId, Season, Training, TrainingId};
 
 use crate::db::StoreError;
@@ -43,20 +45,24 @@ pub async fn for_season(
     Ok(rows.into_iter().map(Training::from).collect())
 }
 
-/// The seasons with a role, a weekly training or a training, oldest first. The season of a date
-/// is that of `Season::of`: it starts on 1 July.
-pub async fn seasons(db: impl PgExecutor<'_>) -> Result<Vec<Season>, StoreError> {
+/// The seasons with a role, a weekly training or a training, oldest first. The season of a
+/// training is `Season::of` its date.
+pub async fn seasons(db: &PgPool) -> Result<Vec<Season>, StoreError> {
     let years = sqlx::query_scalar!(
         r#"SELECT season_year AS "year!" FROM player_roles
-           UNION SELECT season_year FROM weekly_trainings
-           UNION SELECT (EXTRACT(YEAR FROM date)::int
-                         - CASE WHEN EXTRACT(MONTH FROM date) < 7 THEN 1 ELSE 0 END)
-                 FROM trainings
-           ORDER BY 1"#
+           UNION SELECT season_year FROM weekly_trainings"#
     )
     .fetch_all(db)
     .await?;
-    Ok(years.into_iter().map(Season::from_start_year).collect())
+    let dates = sqlx::query_scalar!("SELECT DISTINCT date FROM trainings")
+        .fetch_all(db)
+        .await?;
+    let seasons: BTreeSet<Season> = years
+        .into_iter()
+        .map(Season::from_start_year)
+        .chain(dates.into_iter().map(Season::of))
+        .collect();
+    Ok(seasons.into_iter().collect())
 }
 
 /// The training on `date`, if any.

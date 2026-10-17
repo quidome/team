@@ -421,7 +421,21 @@ test.describe('the overview', () => {
 		await choice.selectOption('2026-2027');
 		await expect(page).toHaveURL(/\/attendance\?season=2026-2027$/);
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2026-2027');
-		await expect(page.getByRole('button', { name: 'Add training' })).toBeVisible();
+
+		// An open "Add training" form and its error do not move to another season.
+		await page.getByRole('button', { name: 'Add training' }).click();
+		const form = page.getByTestId('add-training');
+		await form.getByLabel('Date').fill('2026-10-06');
+		await form.getByLabel('Start').fill('19:45');
+		await form.getByLabel('End').fill('21:00');
+		await form.getByRole('button', { name: 'Save' }).click();
+		await expect(form.getByRole('alert')).toHaveText('There is already a training on this date.');
+		// Back to 2025-2026 with the browser (the choice offers it only while it is chosen).
+		await page.goBack();
+		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2025-2026');
+		await expect(page.getByTestId('add-training')).toHaveCount(0);
+		await expect(page.getByRole('alert')).toHaveCount(0);
 
 		// The last training day of May 2026 belongs to 2025-2026.
 		await page.goto('/training/2026-05-26');
@@ -429,7 +443,8 @@ test.describe('the overview', () => {
 		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
 		await expectAccessible(page);
 		await expectNoHorizontalScroll(page, 320);
-		expect(errors).toEqual([]);
+		// The refused save shows in the console as a failed request.
+		expect(errors.filter((line) => !line.includes('400'))).toEqual([]);
 	});
 
 	test('a season that cannot be read', async ({ page }) => {
@@ -525,6 +540,21 @@ test.describe('the overview', () => {
 		await expect(page.getByTestId('training-top')).toHaveText('1 absent');
 		await page.getByRole('link', { name: 'Back' }).click();
 		await expect(zane).toContainText('of 5 trainings');
+		expect(errors).toEqual([]);
+	});
+
+	test('trainings at which no player had a role', async ({ page }) => {
+		const errors = watchConsole(page);
+		// Such a season needs trainings before any role; the answer is replaced.
+		await page.route('**/api/attendance*', async (route) => {
+			const overview = await (await route.fetch()).json();
+			await route.fulfill({ json: { ...overview, team: [], left: [] } });
+		});
+		await page.goto('/attendance');
+		await expect(page.getByTestId('no-player-totals')).toHaveText(
+			'No player had a role at these trainings. Add players in Team.'
+		);
+		await page.unrouteAll({ behavior: 'ignoreErrors' });
 		expect(errors).toEqual([]);
 	});
 
