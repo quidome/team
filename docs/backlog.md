@@ -3,8 +3,8 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; story A, players and settings, closed 2026-10-17 on the branch `feat/players-and-settings`, not merged yet)
-   - Story B, [trainings and attendance](changes/2026-10-17-trainings-and-attendance/): implement (`/implement docs/changes/2026-10-17-trainings-and-attendance`, 5 steps, on the branch `feat/trainings-and-attendance`).
-   - Then story C, the overview.
+   - Story B, [trainings and attendance](changes/2026-10-17-trainings-and-attendance/): close (`/close docs/changes/2026-10-17-trainings-and-attendance`): built and reviewed on the branch `feat/trainings-and-attendance`, all findings fixed or answered.
+   - Then story C, the overview. Release it before 1 July 2027: until then a training of an earlier season is reached only by its address (accept review of story B, A2).
 
 Small:
 - Set up and check a backup of the team database (TrueNAS snapshots or a dump off the cluster, with a test restore). Before story A of attendance at training, all data could be read again from the game list; players and attendance cannot. The coordinator chose to do this later (2026-10-15).

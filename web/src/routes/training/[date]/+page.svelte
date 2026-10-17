@@ -49,6 +49,10 @@
 	/** For each player, the number of its newest tap. */
 	const newest: Record<number, number> = {};
 	let waiting = $state(0);
+	/** For each player, the taps still waiting for an answer: the row shows "saving". */
+	let saving = $state<Record<number, number>>({});
+	/** Counts every tap, so an answer of a reload or an action sent before a tap is not trusted. */
+	let taps = 0;
 	let notSaved = $state(false);
 
 	let changing = $state(false);
@@ -74,7 +78,9 @@
 		shown = { ...shown, [player]: reason };
 		const tap = (newest[player] ?? 0) + 1;
 		newest[player] = tap;
+		taps += 1;
 		waiting += 1;
+		saving = { ...saving, [player]: (saving[player] ?? 0) + 1 };
 		const before = queues[player] ?? Promise.resolve();
 		const request = before.then(async () => {
 			try {
@@ -90,6 +96,7 @@
 				notSaved = true;
 			} finally {
 				waiting -= 1;
+				saving = { ...saving, [player]: (saving[player] ?? 1) - 1 };
 			}
 		});
 		queues[player] = request;
@@ -99,8 +106,11 @@
 	onMount(() => {
 		const visible = async () => {
 			if (document.visibilityState !== 'visible' || waiting > 0 || !day) return;
+			const before = taps;
 			try {
-				day = await loadTraining(fetch, day.date);
+				const fresh = await loadTraining(fetch, day.date);
+				// A tap after the reload was sent: its answer decides, not the older reload.
+				if (taps === before && waiting === 0) day = fresh;
 			} catch {
 				// The page keeps what it shows.
 			}
@@ -109,11 +119,20 @@
 		return () => document.removeEventListener('visibilitychange', visible);
 	});
 
+	/** An action that does not change the marks ("Open", "Cancel training", "Undo cancel"). When a
+	 * tap was made while it ran, the marks on the screen stay: the answer may be older. */
 	async function run(work: () => Promise<TrainingDay>) {
 		busy = true;
 		error = null;
+		const before = taps;
 		try {
-			day = await work();
+			const answer = await work();
+			const [keptShown, keptStored] = [shown, stored];
+			day = answer;
+			if (taps !== before || waiting > 0) {
+				shown = keptShown;
+				stored = keptStored;
+			}
 		} catch (failure) {
 			error = message(failure);
 		} finally {
@@ -269,13 +288,16 @@
 								onclick={() => (picking = picking === player.id ? null : player.id)}
 							>
 								<span class="min-w-0 truncate font-medium">{fullName(player)}</span>
-								<span
-									class="shrink-0 text-sm {reason === null
-										? 'text-muted-foreground'
-										: 'font-medium'}"
-									data-testid="player-mark"
-								>
-									{reason === null ? 'there' : reasonName(page, reason)}
+								<span class="flex shrink-0 items-center gap-2">
+									{#if (saving[player.id] ?? 0) > 0}
+										<span class="text-xs text-muted-foreground" data-testid="saving">saving…</span>
+									{/if}
+									<span
+										class="text-sm {reason === null ? 'text-muted-foreground' : 'font-medium'}"
+										data-testid="player-mark"
+									>
+										{reason === null ? 'there' : reasonName(page, reason)}
+									</span>
 								</span>
 							</button>
 							{#if picking === player.id}

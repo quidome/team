@@ -3,7 +3,7 @@
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use chrono::{NaiveDate, NaiveTime, Weekday};
+use chrono::{NaiveDate, Weekday};
 use serde::{Deserialize, Serialize};
 use team_core::{
     Season, TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, proposals_from,
@@ -11,6 +11,7 @@ use team_core::{
 };
 use utoipa::{IntoParams, ToSchema};
 
+use super::format::{clock_time, day, time};
 use crate::app::AppState;
 use crate::clock::current_season;
 use crate::db::StoreError;
@@ -41,8 +42,8 @@ pub struct WeeklyTrainings {
     /// The last day of the season, for example "2027-06-30": the latest date of a window.
     pub season_last_day: String,
     pub weekly_trainings: Vec<WeeklyTrainingView>,
-    /// Only while the season has no weekly trainings: last season's, one per day of the week, each
-    /// with the new proposed window. Saved with "Add".
+    /// Last season's weekly trainings that ran until its end, one per day of the week that has no
+    /// weekly training yet in this season, each with the new proposed window. Saved with "Add".
     pub proposals: Vec<WeeklyProposalView>,
 }
 
@@ -98,20 +99,8 @@ impl From<TrainingError> for AppError {
     }
 }
 
-fn day(date: NaiveDate) -> String {
-    date.format("%Y-%m-%d").to_string()
-}
-
-fn clock_time(time: NaiveTime) -> String {
-    time.format("%H:%M").to_string()
-}
-
 fn weekday(number: i16) -> Result<Weekday, AppError> {
     weekday_from_number(number).ok_or(AppError::BadRequest("invalid_weekday"))
-}
-
-fn time(text: &str) -> Result<NaiveTime, AppError> {
-    NaiveTime::parse_from_str(text, "%H:%M").map_err(|_| AppError::BadRequest("invalid_time"))
 }
 
 fn view(training: &WeeklyTraining) -> Result<WeeklyTrainingView, StoreError> {
@@ -127,23 +116,19 @@ fn view(training: &WeeklyTraining) -> Result<WeeklyTrainingView, StoreError> {
 
 async fn load(state: &AppState, season: Season) -> Result<WeeklyTrainings, AppError> {
     let stored = weekly_trainings::for_season(&state.pool, season).await?;
-    let proposals = if stored.is_empty() {
-        let last = weekly_trainings::for_season(&state.pool, season.previous()).await?;
-        proposals_from(&last, season)
-            .iter()
-            .map(|proposal| {
-                Ok(WeeklyProposalView {
-                    weekday: weekday_number(proposal.weekday)?,
-                    start: clock_time(proposal.start),
-                    end: clock_time(proposal.end),
-                    from: day(proposal.from),
-                    until: day(proposal.until),
-                })
+    let last = weekly_trainings::for_season(&state.pool, season.previous()).await?;
+    let proposals = proposals_from(&last, &stored, season)
+        .iter()
+        .map(|proposal| {
+            Ok(WeeklyProposalView {
+                weekday: weekday_number(proposal.weekday)?,
+                start: clock_time(proposal.start),
+                end: clock_time(proposal.end),
+                from: day(proposal.from),
+                until: day(proposal.until),
             })
-            .collect::<Result<_, StoreError>>()?
-    } else {
-        Vec::new()
-    };
+        })
+        .collect::<Result<_, StoreError>>()?;
     Ok(WeeklyTrainings {
         season: season.to_string(),
         season_first_day: day(season.first_day()),

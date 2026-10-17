@@ -253,8 +253,10 @@
 			{/if}
 		</section>
 
-		<Button variant="ghost" class="text-destructive" disabled={busy} onclick={remove}>
-			Delete player
-		</Button>
+		{#if !shown.has_absences}
+			<Button variant="ghost" class="text-destructive" disabled={busy} onclick={remove}>
+				Delete player
+			</Button>
+		{/if}
 	</section>
 {/if}

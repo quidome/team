@@ -800,6 +800,8 @@ export interface components {
 		/** @description One player with the history of all seasons. */
 		PlayerDetail: {
 			first_name: string;
+			/** @description The player has absences, so "Delete player" is not offered. */
+			has_absences: boolean;
 			hidden: boolean;
 			/** @description All roles of all seasons, newest first. */
 			history: components['schemas']['HistoryRole'][];
@@ -1170,8 +1172,8 @@ export interface components {
 		/** @description The weekly trainings of the current season, sorted by the start of the window. */
 		WeeklyTrainings: {
 			/**
-			 * @description Only while the season has no weekly trainings: last season's, one per day of the week, each
-			 *     with the new proposed window. Saved with "Add".
+			 * @description Last season's weekly trainings that ran until its end, one per day of the week that has no
+			 *     weekly training yet in this season, each with the new proposed window. Saved with "Add".
 			 */
 			proposals: components['schemas']['WeeklyProposalView'][];
 			season: string;
