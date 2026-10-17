@@ -209,7 +209,7 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 ## Progress
 - [x] Step 1: the counting rule in the core (2026-10-17: `Player::sort_key`, `season_overview`, 15 core tests)
 - [x] Step 2: the route `GET /api/attendance` (2026-10-17: `query_season`, `trainings::seasons`, `api/attendance.rs`; 5 tests in `tests/attendance.rs`, the route in the 401 test and the log test)
-- [ ] Step 3: the choice of season
+- [x] Step 3: the choice of season (2026-10-17: `loadTrainings` and `loadAttendance` with a season, `?season=` on `/attendance` with the choice and "This season cannot be read.", "Add training" only in the current season, "Back" and "Delete training" return to the training's season; 2 browser tests, and the URL after "Delete training" in the existing test)
 - [ ] Step 4: the totals on the page
 - [ ] All checks pass
 
@@ -218,6 +218,8 @@ On `main` (a9242c5), stories A and B are built, closed and on the cluster:
 
 - 2026-10-17, step 1: `season_overview` takes 8 inputs, one more than clippy allows by default; it has `#[allow(clippy::too_many_arguments)]` instead of a struct that only groups them (the engineer's choice). Core test 12 uses trainings on 1, 15 and a cancelled 29 Sep (3 not opened), and then all six past Tuesdays (0), so it also covers "a cancelled training day is not not opened".
 - 2026-10-17, step 2: server test 2 makes its earlier season by moving the clock to Thu 15 Jul 2027 (the September data is then in 2026-2027, an earlier season), not by roles written in 2025-2026 through storage; it tests the same answer with less hand-written data. Server test 3 uses Mon 30 Jun 2025 and Tue 1 Jul 2025, so a wrong rule would lose the season 2024-2025.
+- 2026-10-17, step 3: no SQL helper in `web/e2e/database.ts`. CI runs the browser tests outside the Nix shell, where `psql` may be missing. The browser tests do not need data in an earlier season: a season in the address is in the choice even without data, and the training page of any date (Tue 26 May 2026) has its season. The server tests cover an earlier season with data. Step 4's "No trainings yet this season." uses 2025-2026 in the same way.
+- 2026-10-17, step 3: the links with a season use `resolve('/attendance?season=…')` (SvelteKit accepts a query in `resolve`), so the lint rule `svelte/no-navigation-without-resolve` holds; the training page types its helper as `ResolvedPathname`.
 
 The design reads the spec more strictly within its words:
 - "Each player who could be at one or more trainings of the season": a player with a role on the date of at least one training that counts (up to today, not cancelled). A newcomer from next week has no row yet. Hidden players have rows.
