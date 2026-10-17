@@ -236,6 +236,9 @@ export async function carryPlayers(players: number[]): Promise<TeamPage> {
 export type TeamPage = components['schemas']['TeamPageView'];
 export type Member = components['schemas']['MemberView'];
 export type PlayerSummary = components['schemas']['PlayerSummary'];
+export type RoleView = components['schemas']['RoleView'];
+export type LeftTeam = components['schemas']['LeftTeam'];
+export type UndoRemoval = components['schemas']['UndoRemoval'];
 
 /** The team of the current season (attendance at training, story A). */
 export async function loadTeam(fetch: typeof globalThis.fetch): Promise<TeamPage> {
@@ -252,10 +255,15 @@ export async function changeRole(id: number, role: RoleKind, from: string): Prom
 	);
 }
 
-/** "Remove from the team": the role on `until` ends on that day. */
-export async function leaveTeam(id: number, until: string): Promise<TeamPage> {
+/** "Remove from the team": from `from` (the first day without the team) the player has no roles in
+ * the season. `removes` are the ids of the roles the coordinator confirmed to remove; a removal of
+ * other roles fails with the code `confirm_removal` and those roles in the body. */
+export async function leaveTeam(id: number, from: string, removes: number[]): Promise<LeftTeam> {
 	return dataOf(
-		await api.POST('/api/players/{id}/team-leave', { params: { path: { id } }, body: { until } })
+		await api.POST('/api/players/{id}/team-leave', {
+			params: { path: { id } },
+			body: { from, removes }
+		})
 	);
 }
 

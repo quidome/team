@@ -209,6 +209,22 @@ pub async fn update_role(
     Ok(result.rows_affected() == 1)
 }
 
+/// Deletes a role of `player`; `false` when the player has no such role.
+pub async fn delete_role(
+    db: impl PgExecutor<'_>,
+    player: PlayerId,
+    id: RoleId,
+) -> Result<bool, StoreError> {
+    let result = sqlx::query!(
+        "DELETE FROM player_roles WHERE id = $2 AND player_id = $1",
+        player.0,
+        id.0,
+    )
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
 fn role_text(role: Role) -> &'static str {
     match role {
         Role::PlaysGames => "plays_games",

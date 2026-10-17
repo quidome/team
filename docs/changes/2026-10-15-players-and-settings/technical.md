@@ -303,7 +303,7 @@ R13–R17). What steps 5–9 change:
 - [x] Step 3: the team page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 4: the players page and the player page (2026-10-16; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 40 browser tests)
 - [x] Step 5: core rules and "Change role" (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 149 core tests, 40 browser tests)
-- [ ] Step 6: "Remove from the team" from a date
+- [x] Step 6: "Remove from the team" from a date (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 41 browser tests)
 - [ ] Step 7: "Undo"
 - [ ] Step 8: "Add all" with a date and the "Today" buttons
 - [ ] Step 9: settings, a change of day moves a proposed window (R15)
@@ -360,6 +360,12 @@ Implement:
   - Changed tests: the core test of "Add all" with 14 players no longer has a player with a role in the new season (with the new rule the group is then empty; the new core tests cover it); the server test `last_seasons_players_join_during_the_season` expects 1 September and an empty "Players of last season" after "Add all" for one player; in `change_role_errors_have_their_codes` the date before the role (15 Aug) now answers `role_starts_later`, and `not_in_team` uses a player with no role.
   - Removed tests: the core test of the old `proposed_start` (three inputs), the core test of `first_training_date`, and `the_proposed_start_of_a_role_follows_the_weekly_trainings` in `tests/weekly_trainings.rs` (replaced by `the_proposed_start_is_the_first_of_september`).
   - Mutation check: with the end of the current role written outside the transaction, `change_role_saves_both_or_neither` fails.
+- 2026-10-17, step 6:
+  - `end_role` in `api/team.rs` writes the new end of a stored role; "Change role" and "Remove from the team" both use it.
+  - "Add to the team" now proposes today (the old proposal "the day after the end" needed `later`, which goes); the spec says today.
+  - The browser test of the team page no longer adds a weekly training (the proposal is 1 September without one). Tess is removed from tomorrow ("Last day today"), then from today (under "Left the team" at once). The new browser test of the confirmation dismisses the dialog once (the form stays) and accepts it once; it expects the two 409 answers in the console.
+  - Adapted server tests: the removal body is `{ from }` (the first day without the team, one day after the old `until`); `remove_from_the_team_needs_a_role_on_that_date` checks `outside_season`, a role that already ends on the day before, and a player with no role (a date before a role that starts later now removes that role after a confirmation).
+  - Mutation checks: without the lock in `team_leave`, `remove_from_the_team_waits_for_the_players_lock` fails; with a commit between the end and the deletes, `remove_saves_all_or_nothing` fails.
 
 ## Review findings of the first form
 Kept as history; the dated lines say what was fixed in the first form. The new form is reviewed

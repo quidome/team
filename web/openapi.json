@@ -603,23 +603,40 @@
         },
         "responses": {
           "200": {
-            "description": "The team; the role on `until` ends on that day",
+            "description": "The team, and what \"Undo\" sends back; from `from` on the player has no roles in the season",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TeamPageView"
+                  "$ref": "#/components/schemas/LeftTeam"
                 }
               }
             }
           },
           "400": {
-            "description": "`not_in_team`, `outside_season`"
+            "description": "`not_in_team`, `outside_season`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            }
           },
           "401": {
             "description": "Not logged in"
           },
           "404": {
             "description": "No such player"
+          },
+          "409": {
+            "description": "`confirm_removal`: the removal removes roles that are not in `removes`; nothing is saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            }
           }
         }
       }
@@ -1590,13 +1607,37 @@
       "LeaveTeam": {
         "type": "object",
         "required": [
-          "until"
+          "from"
         ],
         "properties": {
-          "until": {
+          "from": {
             "type": "string",
             "format": "date",
-            "description": "The last day in the team."
+            "description": "\"Not in the team from\": the first day without the team."
+          },
+          "removes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "The ids of the roles the coordinator confirmed to remove (roles that start on `from` or\nlater); empty at first."
+          }
+        }
+      },
+      "LeftTeam": {
+        "type": "object",
+        "description": "The answer of \"Remove from the team\".",
+        "required": [
+          "team",
+          "undo"
+        ],
+        "properties": {
+          "team": {
+            "$ref": "#/components/schemas/TeamPageView"
+          },
+          "undo": {
+            "$ref": "#/components/schemas/UndoRemoval"
           }
         }
       },
@@ -1975,6 +2016,16 @@
           "error": {
             "type": "string",
             "description": "For example `role_starts_later` or `changed_meanwhile`."
+          },
+          "roles": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RoleView"
+            },
+            "description": "For `confirm_removal`: the roles \"Remove from the team\" would remove, in order of start."
           }
         }
       },
@@ -1988,6 +2039,31 @@
       },
       "RoleChange": {
         "type": "object",
+        "required": [
+          "role",
+          "from"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleKind"
+          },
+          "until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "`null` while the role continues."
+          }
+        }
+      },
+      "RoleDatesView": {
+        "type": "object",
+        "description": "A role without its id, as \"Undo\" sends it back.",
         "required": [
           "role",
           "from"
@@ -2422,6 +2498,26 @@
             "type": "integer",
             "format": "int64",
             "description": "The source's team number."
+          }
+        }
+      },
+      "UndoRemoval": {
+        "type": "object",
+        "description": "What \"Undo\" sends back after \"Remove from the team\": the date of the removal and the\nplayer's roles of the season from before it.",
+        "required": [
+          "from",
+          "roles"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleDatesView"
+            }
           }
         }
       },

@@ -18,11 +18,6 @@ export function dayAfter(date: string): string {
 	return next.toISOString().slice(0, 10);
 }
 
-/** The later of two dates such as "2026-10-15". */
-export function later(first: string, second: string): string {
-	return first > second ? first : second;
-}
-
 /** The days of the week, 1 = Monday, as the API numbers them. */
 export const weekdays: { value: number; label: string }[] = [
 	{ value: 1, label: 'Monday' },

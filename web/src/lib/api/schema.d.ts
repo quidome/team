@@ -571,9 +571,19 @@ export interface components {
 		LeaveTeam: {
 			/**
 			 * Format: date
-			 * @description The last day in the team.
+			 * @description "Not in the team from": the first day without the team.
 			 */
-			until: string;
+			from: string;
+			/**
+			 * @description The ids of the roles the coordinator confirmed to remove (roles that start on `from` or
+			 *     later); empty at first.
+			 */
+			removes?: number[];
+		};
+		/** @description The answer of "Remove from the team". */
+		LeftTeam: {
+			team: components['schemas']['TeamPageView'];
+			undo: components['schemas']['UndoRemoval'];
 		};
 		Me: {
 			/** @description The name to show. */
@@ -689,10 +699,23 @@ export interface components {
 			date?: string | null;
 			/** @description For example `role_starts_later` or `changed_meanwhile`. */
 			error: string;
+			/** @description For `confirm_removal`: the roles "Remove from the team" would remove, in order of start. */
+			roles?: components['schemas']['RoleView'][] | null;
 		};
 		/** @enum {string} */
 		ResultKind: 'good' | 'failed' | 'held_back';
 		RoleChange: {
+			/** Format: date */
+			from: string;
+			role: components['schemas']['RoleKind'];
+			/**
+			 * Format: date
+			 * @description `null` while the role continues.
+			 */
+			until?: string | null;
+		};
+		/** @description A role without its id, as "Undo" sends it back. */
+		RoleDatesView: {
 			/** Format: date */
 			from: string;
 			role: components['schemas']['RoleKind'];
@@ -853,6 +876,15 @@ export interface components {
 			 * @description The source's team number.
 			 */
 			number: number;
+		};
+		/**
+		 * @description What "Undo" sends back after "Remove from the team": the date of the removal and the
+		 *     player's roles of the season from before it.
+		 */
+		UndoRemoval: {
+			/** Format: date */
+			from: string;
+			roles: components['schemas']['RoleDatesView'][];
 		};
 		/** @description A new or changed weekly training. */
 		WeeklyTrainingInput: {
@@ -1498,13 +1530,13 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description The team; the role on `until` ends on that day */
+			/** @description The team, and what "Undo" sends back; from `from` on the player has no roles in the season */
 			200: {
 				headers: {
 					[name: string]: unknown;
 				};
 				content: {
-					'application/json': components['schemas']['TeamPageView'];
+					'application/json': components['schemas']['LeftTeam'];
 				};
 			};
 			/** @description `not_in_team`, `outside_season` */
@@ -1512,7 +1544,9 @@ export interface operations {
 				headers: {
 					[name: string]: unknown;
 				};
-				content?: never;
+				content: {
+					'application/json': components['schemas']['Refusal'];
+				};
 			};
 			/** @description Not logged in */
 			401: {
@@ -1527,6 +1561,15 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content?: never;
+			};
+			/** @description `confirm_removal`: the removal removes roles that are not in `removes`; nothing is saved */
+			409: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Refusal'];
+				};
 			};
 		};
 	};
