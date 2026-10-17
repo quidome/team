@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 1. [Attendance at training](changes/2026-10-14-attendance-at-training/) – implement (epic, 3 stories; story A, players and settings, closed and merged 2026-10-17, pull request #10)
-   - Story B, trainings and attendance, closed 2026-10-17 on the branch `feat/trainings-and-attendance` (not merged yet).
+   - Story B, trainings and attendance, closed and merged 2026-10-17, pull request #11.
    - Next: story C, the overview. Release it before 1 July 2027: until then a training of an earlier season is reached only by its address (accept review of story B, A2).
 
 Small:
