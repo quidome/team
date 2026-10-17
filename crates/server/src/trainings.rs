@@ -43,6 +43,22 @@ pub async fn for_season(
     Ok(rows.into_iter().map(Training::from).collect())
 }
 
+/// The seasons with a role, a weekly training or a training, oldest first. The season of a date
+/// is that of `Season::of`: it starts on 1 July.
+pub async fn seasons(db: impl PgExecutor<'_>) -> Result<Vec<Season>, StoreError> {
+    let years = sqlx::query_scalar!(
+        r#"SELECT season_year AS "year!" FROM player_roles
+           UNION SELECT season_year FROM weekly_trainings
+           UNION SELECT (EXTRACT(YEAR FROM date)::int
+                         - CASE WHEN EXTRACT(MONTH FROM date) < 7 THEN 1 ELSE 0 END)
+                 FROM trainings
+           ORDER BY 1"#
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(years.into_iter().map(Season::from_start_year).collect())
+}
+
 /// The training on `date`, if any.
 pub async fn on(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<Option<Training>, StoreError> {
     let row = sqlx::query_as!(

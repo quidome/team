@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+	'/api/attendance': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['attendance'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/changes': {
 		parameters: {
 			query?: never;
@@ -560,6 +576,27 @@ export interface components {
 			reason?: number | null;
 			role: components['schemas']['RoleKind'];
 		};
+		/** @description The overview of a season on the page "Attendance". */
+		AttendanceOverview: {
+			current_season: string;
+			/** @description The oldest of them. */
+			first_not_opened?: string | null;
+			/** @description "Left the team": roles earlier in the season, none today or later. */
+			left: components['schemas']['PlayerTotalsView'][];
+			/** @description Training days before today without a training. */
+			not_opened: number;
+			/** @description For example "2026-2027". */
+			season: string;
+			/**
+			 * @description The seasons to choose from, newest first: those with a role, a weekly training or a
+			 *     training, the current season and the chosen season.
+			 */
+			seasons: string[];
+			/** @description A role today or later in the season (on its last day for an earlier season). */
+			team: components['schemas']['PlayerTotalsView'][];
+			/** @description The trainings of the season up to today that are not cancelled; 0: no trainings yet. */
+			trainings: number;
+		};
 		CarryRequest: {
 			/**
 			 * Format: date
@@ -770,6 +807,13 @@ export interface components {
 			/** @description The roles of the season shown (last season's for "last_season"). */
 			roles: components['schemas']['RoleView'][];
 		};
+		/** @description A training that a player missed and that counts. */
+		MissedView: {
+			/** @description For example "2026-10-06". */
+			date: string;
+			reason: string;
+			valid: boolean;
+		};
 		NewPlayer: {
 			first_name: string;
 			last_name?: string | null;
@@ -835,6 +879,20 @@ export interface components {
 			/** Format: int64 */
 			id: number;
 			last_name?: string | null;
+		};
+		/** @description The totals of one player in the season. */
+		PlayerTotalsView: {
+			absent_not_valid: number;
+			absent_valid: number;
+			first_name: string;
+			/** Format: int64 */
+			id: number;
+			last_name?: string | null;
+			/** @description Newest first. */
+			missed: components['schemas']['MissedView'][];
+			there: number;
+			/** @description "of N trainings": the trainings that count for this player. */
+			trainings: number;
 		};
 		/** @description All players of the club, sorted by first name. */
 		PlayersList: {
@@ -1197,6 +1255,43 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+	attendance: {
+		parameters: {
+			query?: {
+				/** @description For example "2026-2027"; the current season when left out. */
+				season?: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The totals of each player in the season, the training days not opened and the seasons to choose from */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AttendanceOverview'];
+				};
+			};
+			/** @description `invalid_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	changes: {
 		parameters: {
 			query?: never;

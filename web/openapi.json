@@ -6,6 +6,43 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/attendance": {
+      "get": {
+        "tags": [
+          "attendance"
+        ],
+        "operationId": "attendance",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "description": "For example \"2026-2027\"; the current season when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The totals of each player in the season, the training days not opened and the seasons to choose from",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceOverview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/changes": {
       "get": {
         "tags": [
@@ -1713,6 +1750,66 @@
           }
         }
       },
+      "AttendanceOverview": {
+        "type": "object",
+        "description": "The overview of a season on the page \"Attendance\".",
+        "required": [
+          "season",
+          "current_season",
+          "seasons",
+          "trainings",
+          "not_opened",
+          "team",
+          "left"
+        ],
+        "properties": {
+          "current_season": {
+            "type": "string"
+          },
+          "first_not_opened": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The oldest of them."
+          },
+          "left": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerTotalsView"
+            },
+            "description": "\"Left the team\": roles earlier in the season, none today or later."
+          },
+          "not_opened": {
+            "type": "integer",
+            "description": "Training days before today without a training.",
+            "minimum": 0
+          },
+          "season": {
+            "type": "string",
+            "description": "For example \"2026-2027\"."
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The seasons to choose from, newest first: those with a role, a weekly training or a\ntraining, the current season and the chosen season."
+          },
+          "team": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerTotalsView"
+            },
+            "description": "A role today or later in the season (on its last day for an earlier season)."
+          },
+          "trainings": {
+            "type": "integer",
+            "description": "The trainings of the season up to today that are not cancelled; 0: no trainings yet.",
+            "minimum": 0
+          }
+        }
+      },
       "CarryRequest": {
         "type": "object",
         "required": [
@@ -2287,6 +2384,27 @@
           }
         }
       },
+      "MissedView": {
+        "type": "object",
+        "description": "A training that a player missed and that counts.",
+        "required": [
+          "date",
+          "reason",
+          "valid"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "For example \"2026-10-06\"."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
       "NewPlayer": {
         "type": "object",
         "required": [
@@ -2510,6 +2628,58 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "PlayerTotalsView": {
+        "type": "object",
+        "description": "The totals of one player in the season.",
+        "required": [
+          "id",
+          "first_name",
+          "there",
+          "absent_valid",
+          "absent_not_valid",
+          "trainings",
+          "missed"
+        ],
+        "properties": {
+          "absent_not_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "absent_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "missed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissedView"
+            },
+            "description": "Newest first."
+          },
+          "there": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "trainings": {
+            "type": "integer",
+            "description": "\"of N trainings\": the trainings that count for this player.",
+            "minimum": 0
           }
         }
       },

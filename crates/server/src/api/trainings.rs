@@ -12,7 +12,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use super::format::{clock_time, day, path_date, time};
+use super::format::{clock_time, day, path_date, query_season, time};
 use super::players::RoleKind;
 use super::reasons::{AbsenceReason, view as reason_view};
 use crate::app::AppState;
@@ -251,12 +251,7 @@ pub async fn list(
     State(state): State<AppState>,
     Query(query): Query<SeasonQuery>,
 ) -> Result<Json<TrainingList>, AppError> {
-    let season = match query.season {
-        Some(text) => text
-            .parse::<Season>()
-            .map_err(|_| AppError::BadRequest("invalid_season"))?,
-        None => current_season(state.clock.as_ref()),
-    };
+    let season = query_season(query.season, state.clock.as_ref())?;
     Ok(Json(list_of(&state, season).await?))
 }
 
