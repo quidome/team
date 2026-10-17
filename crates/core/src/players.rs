@@ -51,6 +51,13 @@ pub enum PlayerError {
     ChangeBeforeRoleStart,
     #[error("the player is not in the team on that date")]
     NotInTeam,
+    #[error("the player already has this role")]
+    SameRole,
+    /// The player has no role on the date, but a role of the season starts later, on this date.
+    #[error("the player's role starts on {0}")]
+    RoleStartsLater(NaiveDate),
+    #[error("the player's roles were changed in the meantime")]
+    ChangedMeanwhile,
 }
 
 /// The names without outer spaces; an empty last name is no last name.
@@ -125,57 +132,177 @@ pub fn check_change(
     check_role(season, from, until, others)
 }
 
-/// The proposed start of a new role: the first training date of the season until a training of
-/// the season is opened (`training_opened`), then today; with no weekly training, today. So the
-/// coordinator who sets up in October and then enters the trainings since September is proposed
-/// the first training date.
-pub fn proposed_start(
-    first_training: Option<NaiveDate>,
-    training_opened: bool,
-    today: NaiveDate,
-) -> NaiveDate {
-    match first_training {
-        Some(first) if !training_opened => first,
-        _ => today,
+/// The proposed "In the team from" of "Add player" and "Add all": 1 September of the season. So
+/// the first setup in October, with the trainings since 1 September, needs no typed date.
+pub fn proposed_start(season: Season) -> NaiveDate {
+    NaiveDate::from_ymd_opt(season.start_year(), 9, 1).unwrap_or_else(|| season.first_day())
+}
+
+/// A role without its id: what "Undo" sends back and puts back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoleDates {
+    pub role: Role,
+    pub from: NaiveDate,
+    /// `None` while the role continues.
+    pub until: Option<NaiveDate>,
+}
+
+impl From<&PlayerRole> for RoleDates {
+    fn from(role: &PlayerRole) -> Self {
+        RoleDates {
+            role: role.role,
+            from: role.from,
+            until: role.until,
+        }
     }
 }
 
-/// "Change role" on `date`: `current` ends on `ended_until`, the day before; the new role of kind
-/// `role` runs from `from` (= `date`) until `until`, the planned end of `current`.
+/// "Change role" on `date`: the role `ended` ends on `ended_until`, the day before; the new role of
+/// kind `role` runs from `from` (= `date`) until `until`, the planned end of the ended role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RoleChange {
+    pub ended: RoleId,
     pub ended_until: NaiveDate,
     pub role: Role,
     pub from: NaiveDate,
     pub until: Option<NaiveDate>,
 }
 
-/// Checks "Change role" of `current`, a role of `season`, to `role` on `date`. `others` are the
-/// player's other roles (without `current`). The new role keeps the planned end of `current`.
+/// Checks "Change role" to `role` on `date`. `roles` are all roles of the player; the change acts
+/// on the role of `season` that covers `date`, and the new role keeps its planned end.
 pub fn change_role(
     season: Season,
-    current: &PlayerRole,
+    roles: &[PlayerRole],
     role: Role,
     date: NaiveDate,
-    others: &[PlayerRole],
 ) -> Result<RoleChange, PlayerError> {
-    if current.season != season || Season::of(date) != season {
+    if Season::of(date) != season {
         return Err(PlayerError::OutsideSeason);
     }
-    if date <= current.from {
+    let Some(current) = roles
+        .iter()
+        .find(|stored| stored.season == season && stored.covers(date))
+    else {
+        return Err(later_start(roles, season, date)
+            .map_or(PlayerError::NotInTeam, PlayerError::RoleStartsLater));
+    };
+    if current.role == role {
+        return Err(PlayerError::SameRole);
+    }
+    if date == current.from {
         return Err(PlayerError::ChangeBeforeRoleStart);
     }
-    if current.until.is_some_and(|until| date > until) {
-        return Err(PlayerError::UntilBeforeFrom);
-    }
     let ended_until = date.pred_opt().ok_or(PlayerError::OutsideSeason)?;
-    check_role(season, date, current.until, others)?;
+    let others: Vec<PlayerRole> = roles
+        .iter()
+        .filter(|other| other.id != current.id)
+        .cloned()
+        .collect();
+    check_role(season, date, current.until, &others)?;
     Ok(RoleChange {
+        ended: current.id,
         ended_until,
         role,
         from: date,
         until: current.until,
     })
+}
+
+/// The start of the first role of `season` that starts after `date`.
+fn later_start(roles: &[PlayerRole], season: Season, date: NaiveDate) -> Option<NaiveDate> {
+    roles
+        .iter()
+        .filter(|role| role.season == season && role.from > date)
+        .map(|role| role.from)
+        .min()
+}
+
+/// "Remove from the team" from a date: the role `ended` gets its new end (the day before), and the
+/// roles in `removed` are deleted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Removal<'a> {
+    pub ended: Option<(RoleId, NaiveDate)>,
+    /// In order of start.
+    pub removed: Vec<&'a PlayerRole>,
+}
+
+/// "Remove from the team" from `from`, the first day without the team: from that date the player
+/// has no roles in `season`. The role that covers the day before and `from` ends on the day before;
+/// every role of the season that starts on `from` or later is removed. `roles` are all roles of the
+/// player.
+pub fn remove_from_team(
+    season: Season,
+    roles: &[PlayerRole],
+    from: NaiveDate,
+) -> Result<Removal<'_>, PlayerError> {
+    if Season::of(from) != season {
+        return Err(PlayerError::OutsideSeason);
+    }
+    let in_season = || roles.iter().filter(|role| role.season == season);
+    let ended = in_season()
+        .find(|role| role.from < from && from <= role.last_day())
+        .map(|role| (role.id, from.pred_opt().unwrap_or(from)));
+    let mut removed: Vec<&PlayerRole> = in_season().filter(|role| role.from >= from).collect();
+    removed.sort_by_key(|role| role.from);
+    if ended.is_none() && removed.is_empty() {
+        return Err(PlayerError::NotInTeam);
+    }
+    Ok(Removal { ended, removed })
+}
+
+/// "Undo" of a removal from `from`: `before` are the player's roles of `season` before the removal,
+/// `stored` the player's roles now. When the removal of `before` gives the stored roles of the
+/// season, nothing else changed them, and `before` comes back; else `ChangedMeanwhile`.
+pub fn undo_removal(
+    season: Season,
+    before: &[RoleDates],
+    from: NaiveDate,
+    stored: &[PlayerRole],
+) -> Result<Vec<RoleDates>, PlayerError> {
+    let player = stored.first().map_or(PlayerId(0), |role| role.player);
+    let earlier: Vec<PlayerRole> = before
+        .iter()
+        .zip(0..)
+        .map(|(dates, index)| PlayerRole {
+            id: RoleId(index),
+            player,
+            season,
+            role: dates.role,
+            from: dates.from,
+            until: dates.until,
+        })
+        .collect();
+    let removal = remove_from_team(season, &earlier, from)?;
+    let mut expected: Vec<RoleDates> = earlier
+        .iter()
+        .filter(|role| !removal.removed.iter().any(|removed| removed.id == role.id))
+        .map(|role| match removal.ended {
+            Some((id, until)) if id == role.id => RoleDates {
+                until: Some(until),
+                ..RoleDates::from(role)
+            },
+            _ => RoleDates::from(role),
+        })
+        .collect();
+    let mut now: Vec<RoleDates> = stored
+        .iter()
+        .filter(|role| role.season == season)
+        .map(RoleDates::from)
+        .collect();
+    expected.sort_by_key(|role| role.from);
+    now.sort_by_key(|role| role.from);
+    if expected != now {
+        return Err(PlayerError::ChangedMeanwhile);
+    }
+    for role in &earlier {
+        let others: Vec<PlayerRole> = earlier
+            .iter()
+            .filter(|other| other.id != role.id)
+            .cloned()
+            .collect();
+        check_role(season, role.from, role.until, &others)?;
+    }
+    Ok(before.to_vec())
 }
 
 /// A player on the team page, with the role shown and the roles of the season listed (last
@@ -185,6 +312,9 @@ pub struct Member<'a> {
     pub player: &'a Player,
     pub role: Role,
     pub roles: Vec<&'a PlayerRole>,
+    /// In the team, and today is the last day: the role today ends today, no role of the season
+    /// follows, and today is not the season's last day (when every role ends).
+    pub last_day_today: bool,
 }
 
 /// The team page of a season.
@@ -194,14 +324,17 @@ pub struct TeamPage<'a> {
     pub members: Vec<Member<'a>>,
     /// A role earlier in the season, none today or later.
     pub left: Vec<Member<'a>>,
-    /// "Add all": in the team until the end of last season, no role in this season, not hidden.
+    /// "Add all": in the team until the end of last season, no role in this season, not hidden;
+    /// empty as soon as one player of last season's team has a role in this season.
     pub last_season: Vec<Member<'a>>,
     /// "Add player": not hidden, not in `members` or `left`; last season's team first.
     pub candidates: Vec<&'a Player>,
 }
 
 /// The team page of `season` on `today`: each player placed with `place`, each group sorted by
-/// first name. Hiding only leaves a player out of `last_season` and `candidates`.
+/// first name. Hiding only leaves a player out of `last_season` and `candidates`. "Players of last
+/// season" go when one of last season's team (also a hidden one) has a role in the season; a
+/// newcomer does not count.
 pub fn team<'a>(
     players: &'a [Player],
     roles: &'a [PlayerRole],
@@ -223,18 +356,28 @@ pub fn team<'a>(
         candidates: Vec::new(),
     };
     let mut others: Vec<&Player> = Vec::new();
+    let mut last_team_back = false;
     for player in sorted {
         let placement = place(roles, player.id, season, today);
-        let member = |role| Member {
+        let member = |role, last_day_today| Member {
             player,
             role,
             roles: placement.roles.clone(),
+            last_day_today,
         };
+        if matches!(placement.group, Group::Team | Group::Left)
+            && stayed_until_end(roles, player.id, season.previous()).is_some()
+        {
+            last_team_back = true;
+        }
         match (placement.group, placement.role) {
-            (Group::Team, Some(role)) => team.members.push(member(role)),
-            (Group::Left, Some(role)) => team.left.push(member(role)),
+            (Group::Team, Some(role)) => {
+                let last = last_day_today(&placement.roles, season, today);
+                team.members.push(member(role, last));
+            }
+            (Group::Left, Some(role)) => team.left.push(member(role, false)),
             (Group::LastSeason, Some(role)) if !player.hidden => {
-                team.last_season.push(member(role));
+                team.last_season.push(member(role, false));
                 team.candidates.push(player);
             }
             _ if !player.hidden => others.push(player),
@@ -242,10 +385,22 @@ pub fn team<'a>(
         }
     }
     team.candidates.extend(others);
+    if last_team_back {
+        team.last_season.clear();
+    }
     team
 }
 
-/// Where the players page lists a player in a season.
+/// Whether today is the last day in the team: see `Member::last_day_today`.
+fn last_day_today(roles: &[&PlayerRole], season: Season, today: NaiveDate) -> bool {
+    today != season.last_day()
+        && roles
+            .iter()
+            .any(|role| role.covers(today) && role.last_day() == today)
+        && !roles.iter().any(|role| role.from > today)
+}
+
+/// Where the team page shows a player in a season.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group {
     /// A role today, or one that starts later in the season (for example from the first training
@@ -260,7 +415,7 @@ pub enum Group {
     Other,
 }
 
-/// A player's place on the players page: the group, the role shown with the name, and the roles
+/// A player's place on the team page: the group, the role shown with the name, and the roles
 /// listed (of the season, or of last season for `LastSeason`), in order of start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Placement<'a> {
@@ -443,36 +598,28 @@ mod tests {
     }
 
     #[test]
-    fn the_proposed_start_is_the_first_training_date_until_a_training_is_opened() {
-        let first = Some(date(2026, 9, 1));
+    fn the_proposed_start_is_the_first_of_september() {
+        assert_eq!(proposed_start(season()), date(2026, 9, 1));
         assert_eq!(
-            proposed_start(first, false, date(2026, 8, 15)),
-            date(2026, 9, 1)
+            proposed_start(Season::from_start_year(2027)),
+            date(2027, 9, 1)
         );
-        // Setting up in October, before entering the trainings since September.
-        assert_eq!(
-            proposed_start(first, false, date(2026, 10, 12)),
-            date(2026, 9, 1)
-        );
-        assert_eq!(
-            proposed_start(first, true, date(2026, 10, 12)),
-            date(2026, 10, 12)
-        );
-        assert_eq!(
-            proposed_start(None, false, date(2026, 10, 12)),
-            date(2026, 10, 12)
-        );
+    }
+
+    fn trains(id: i64, from: NaiveDate, until: Option<NaiveDate>) -> PlayerRole {
+        PlayerRole {
+            role: Role::OnlyTrains,
+            ..role(id, from, until)
+        }
     }
 
     #[test]
     fn change_role_ends_the_role_the_day_before_and_starts_the_new_one() {
-        let current = PlayerRole {
-            role: Role::OnlyTrains,
-            ..role(1, date(2026, 9, 1), None)
-        };
+        let roles = [trains(1, date(2026, 9, 1), None)];
         assert_eq!(
-            change_role(season(), &current, Role::PlaysGames, date(2026, 11, 1), &[]),
+            change_role(season(), &roles, Role::PlaysGames, date(2026, 11, 1)),
             Ok(RoleChange {
+                ended: RoleId(1),
                 ended_until: date(2026, 10, 31),
                 role: Role::PlaysGames,
                 from: date(2026, 11, 1),
@@ -480,41 +627,214 @@ mod tests {
             })
         );
         // A planned end stays.
-        let planned = role(1, date(2026, 9, 1), Some(date(2027, 3, 31)));
+        let planned = [role(1, date(2026, 9, 1), Some(date(2027, 3, 31)))];
         assert_eq!(
-            change_role(season(), &planned, Role::OnlyTrains, date(2026, 11, 1), &[])
+            change_role(season(), &planned, Role::OnlyTrains, date(2026, 11, 1))
                 .map(|change| change.until),
             Ok(Some(date(2027, 3, 31)))
         );
     }
 
     #[test]
-    fn change_role_is_checked() {
-        let current = role(1, date(2026, 9, 1), Some(date(2027, 3, 31)));
-        let change = |date, others: &[PlayerRole]| {
-            change_role(season(), &current, Role::OnlyTrains, date, others)
-        };
+    fn change_role_acts_on_the_role_on_the_date() {
+        // Left on Wed 14 Oct, back from Mon 2 Nov: a change on Mon 9 Nov acts on the second role.
+        let roles = [
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 14))),
+            trains(2, date(2026, 11, 2), None),
+        ];
         assert_eq!(
-            change(date(2026, 9, 1), &[]),
+            change_role(season(), &roles, Role::PlaysGames, date(2026, 11, 9))
+                .map(|change| (change.ended, change.ended_until)),
+            Ok((RoleId(2), date(2026, 11, 8)))
+        );
+        // A role of last season is never picked.
+        let last = [last_season_role(date(2025, 9, 2), None)];
+        assert_eq!(
+            change_role(season(), &last, Role::OnlyTrains, date(2026, 10, 12)),
+            Err(PlayerError::NotInTeam)
+        );
+    }
+
+    #[test]
+    fn change_role_is_checked() {
+        let roles = [role(1, date(2026, 9, 1), Some(date(2027, 3, 31)))];
+        let change = |roles: &[PlayerRole], kind, date| change_role(season(), roles, kind, date);
+        assert_eq!(
+            change(&roles, Role::OnlyTrains, date(2026, 9, 1)),
             Err(PlayerError::ChangeBeforeRoleStart)
         );
         assert_eq!(
-            change(date(2027, 4, 1), &[]),
-            Err(PlayerError::UntilBeforeFrom)
+            change(&roles, Role::PlaysGames, date(2026, 11, 1)),
+            Err(PlayerError::SameRole)
         );
         assert_eq!(
-            change(date(2027, 7, 1), &[]),
+            change(&roles, Role::OnlyTrains, date(2027, 7, 1)),
             Err(PlayerError::OutsideSeason)
         );
-        let later = [role(2, date(2026, 11, 15), Some(date(2026, 11, 30)))];
         assert_eq!(
-            change(date(2026, 11, 1), &later),
+            change(&[], Role::OnlyTrains, date(2026, 10, 12)),
+            Err(PlayerError::NotInTeam)
+        );
+        // After the end of the role, with no role later.
+        assert_eq!(
+            change(&roles, Role::OnlyTrains, date(2027, 4, 1)),
+            Err(PlayerError::NotInTeam)
+        );
+        let later = [role(1, date(2026, 11, 2), None)];
+        assert_eq!(
+            change(&later, Role::OnlyTrains, date(2026, 10, 12)),
+            Err(PlayerError::RoleStartsLater(date(2026, 11, 2)))
+        );
+        let between = [
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 14))),
+            trains(2, date(2026, 11, 2), None),
+        ];
+        assert_eq!(
+            change(&between, Role::PlaysGames, date(2026, 10, 20)),
+            Err(PlayerError::RoleStartsLater(date(2026, 11, 2)))
+        );
+        // A state the checks never store: a later role inside the role that changes.
+        let overlapping = [
+            role(1, date(2026, 9, 1), None),
+            role(2, date(2026, 11, 15), Some(date(2026, 11, 30))),
+        ];
+        assert_eq!(
+            change(&overlapping, Role::OnlyTrains, date(2026, 11, 1)),
             Err(PlayerError::RolesOverlap)
         );
-        let last = last_season_role(date(2025, 9, 2), None);
+    }
+
+    /// The ended role with its new end, and the ids of the removed roles.
+    type Outcome = (Option<(RoleId, NaiveDate)>, Vec<RoleId>);
+
+    fn removal(roles: &[PlayerRole], from: NaiveDate) -> Result<Outcome, PlayerError> {
+        remove_from_team(season(), roles, from).map(|removal| {
+            (
+                removal.ended,
+                removal.removed.iter().map(|role| role.id).collect(),
+            )
+        })
+    }
+
+    #[test]
+    fn remove_from_the_team_ends_the_role_the_day_before() {
+        let roles = [trains(1, date(2026, 9, 1), None)];
         assert_eq!(
-            change_role(season(), &last, Role::OnlyTrains, date(2026, 3, 1), &[]),
+            removal(&roles, date(2026, 10, 15)),
+            Ok((Some((RoleId(1), date(2026, 10, 14))), vec![]))
+        );
+    }
+
+    #[test]
+    fn remove_from_the_team_removes_the_roles_from_the_date_on() {
+        // A planned "Change role" from Sun 1 Nov goes too.
+        let roles = [
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 31))),
+            role(2, date(2026, 11, 1), None),
+        ];
+        assert_eq!(
+            removal(&roles, date(2026, 10, 15)),
+            Ok((Some((RoleId(1), date(2026, 10, 14))), vec![RoleId(2)]))
+        );
+        // After "Add all" in August: the role from Tue 1 Sep has not started.
+        let added = [role(1, date(2026, 9, 1), None)];
+        assert_eq!(
+            removal(&added, date(2026, 8, 15)),
+            Ok((None, vec![RoleId(1)]))
+        );
+        // A role that starts on the date is removed.
+        assert_eq!(
+            removal(&added, date(2026, 9, 1)),
+            Ok((None, vec![RoleId(1)]))
+        );
+    }
+
+    #[test]
+    fn remove_from_the_team_from_the_first_day_of_the_season_removes_all_its_roles() {
+        let roles = [
+            last_season_role(date(2025, 9, 2), None),
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 31))),
+            role(2, date(2026, 11, 1), None),
+        ];
+        assert_eq!(
+            removal(&roles, date(2026, 7, 1)),
+            Ok((None, vec![RoleId(1), RoleId(2)]))
+        );
+    }
+
+    #[test]
+    fn remove_from_the_team_is_checked() {
+        // The role already ends on the day before: nothing to end or remove.
+        let ended = [role(1, date(2026, 9, 1), Some(date(2026, 10, 14)))];
+        assert_eq!(
+            removal(&ended, date(2026, 10, 15)),
+            Err(PlayerError::NotInTeam)
+        );
+        assert_eq!(
+            removal(&[], date(2026, 10, 15)),
+            Err(PlayerError::NotInTeam)
+        );
+        let roles = [role(1, date(2026, 9, 1), None)];
+        assert_eq!(
+            removal(&roles, date(2027, 7, 1)),
             Err(PlayerError::OutsideSeason)
+        );
+    }
+
+    fn dates(roles: &[PlayerRole]) -> Vec<RoleDates> {
+        roles.iter().map(RoleDates::from).collect()
+    }
+
+    #[test]
+    fn undo_puts_the_roles_back_when_nothing_else_changed() {
+        let before = [
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 31))),
+            role(2, date(2026, 11, 1), None),
+        ];
+        // As "Remove from the team" from Thu 15 Oct left them, with a role of last season.
+        let stored = [
+            last_season_role(date(2025, 9, 2), None),
+            trains(1, date(2026, 9, 1), Some(date(2026, 10, 14))),
+        ];
+        assert_eq!(
+            undo_removal(season(), &dates(&before), date(2026, 10, 15), &stored),
+            Ok(dates(&before))
+        );
+        // All roles removed: nothing of the season is stored.
+        let added = [role(1, date(2026, 9, 1), None)];
+        assert_eq!(
+            undo_removal(season(), &dates(&added), date(2026, 8, 15), &[]),
+            Ok(dates(&added))
+        );
+    }
+
+    #[test]
+    fn undo_after_another_change_is_refused() {
+        let before = [trains(1, date(2026, 9, 1), None)];
+        let removed = trains(1, date(2026, 9, 1), Some(date(2026, 10, 14)));
+        // "Add to the team" from Mon 2 Nov after the removal.
+        let added = [removed.clone(), role(2, date(2026, 11, 2), None)];
+        assert_eq!(
+            undo_removal(season(), &dates(&before), date(2026, 10, 15), &added),
+            Err(PlayerError::ChangedMeanwhile)
+        );
+        // A second "Undo": the roles from before are stored again.
+        assert_eq!(
+            undo_removal(season(), &dates(&before), date(2026, 10, 15), &before),
+            Err(PlayerError::ChangedMeanwhile)
+        );
+    }
+
+    #[test]
+    fn undo_checks_the_roles_it_puts_back() {
+        let before = [
+            role(1, date(2026, 9, 1), None),
+            role(2, date(2026, 11, 1), None),
+        ];
+        let stored = [role(1, date(2026, 9, 1), Some(date(2026, 10, 14)))];
+        assert_eq!(
+            undo_removal(season(), &dates(&before), date(2026, 10, 15), &stored),
+            Err(PlayerError::RolesOverlap)
         );
     }
 
@@ -622,24 +942,14 @@ mod tests {
         // One left in March; one stayed until the last day of the season.
         roles[2].until = Some(date(2026, 3, 10));
         roles[3].until = Some(date(2026, 6, 30));
-        // One already has a role in the new season.
-        roles.push(PlayerRole {
-            id: RoleId(100),
-            player: PlayerId(5),
-            season: season(),
-            role: Role::PlaysGames,
-            from: date(2026, 9, 1),
-            until: None,
-        });
         let team = team(&players, &roles, season(), date(2026, 8, 15));
         let carried: Vec<(PlayerId, Role)> = team
             .last_season
             .iter()
             .map(|member| (member.player.id, member.role))
             .collect();
-        assert_eq!(carried.len(), 12);
+        assert_eq!(carried.len(), 13);
         assert!(!carried.iter().any(|(player, _)| *player == PlayerId(3)));
-        assert!(!carried.iter().any(|(player, _)| *player == PlayerId(5)));
         assert!(carried.contains(&(PlayerId(4), Role::PlaysGames)));
         assert!(carried.contains(&(PlayerId(12), Role::OnlyTrains)));
     }
@@ -754,6 +1064,75 @@ mod tests {
         assert_eq!(names, ["Casey", "Dana", "avery", "Blake"]);
         assert_eq!(team.left.len(), 1);
         assert_eq!(team.left[0].player.first_name, "Eli");
+    }
+
+    #[test]
+    fn last_seasons_team_shows_until_one_of_them_has_a_role() {
+        let players = [player(1, "Avery"), player(2, "Blake"), player(3, "Casey")];
+        let last = |id, player| PlayerRole {
+            id: RoleId(id),
+            player: PlayerId(player),
+            ..last_season_role(date(2025, 9, 2), None)
+        };
+        // Casey is a newcomer: "Players of last season" stays.
+        let mut roles = vec![
+            last(50, 1),
+            last(51, 2),
+            PlayerRole {
+                player: PlayerId(3),
+                ..role(1, date(2026, 9, 1), None)
+            },
+        ];
+        let page = team(&players, &roles, season(), date(2026, 10, 12));
+        assert_eq!(page.last_season.len(), 2);
+        // Avery has a role: the group goes; Blake is still the first choice of "Add player".
+        roles.push(role(2, date(2026, 9, 1), None));
+        let page = team(&players, &roles, season(), date(2026, 10, 12));
+        assert!(page.last_season.is_empty());
+        assert_eq!(page.candidates[0].first_name, "Blake");
+    }
+
+    #[test]
+    fn a_hidden_player_of_last_seasons_team_with_a_role_makes_the_group_go() {
+        let players = [
+            Player {
+                hidden: true,
+                ..player(1, "Avery")
+            },
+            player(2, "Blake"),
+        ];
+        let roles = [
+            last_season_role(date(2025, 9, 2), None),
+            PlayerRole {
+                id: RoleId(51),
+                player: PlayerId(2),
+                ..last_season_role(date(2025, 9, 2), None)
+            },
+            role(1, date(2026, 9, 1), None),
+        ];
+        let page = team(&players, &roles, season(), date(2026, 10, 12));
+        assert!(page.last_season.is_empty());
+    }
+
+    #[test]
+    fn the_last_day_in_the_team_is_shown_on_that_day() {
+        let players = [player(1, "Avery")];
+        let last_day = |roles: &[PlayerRole], today| {
+            team(&players, roles, season(), today).members[0].last_day_today
+        };
+        let ends = [role(1, date(2026, 9, 1), Some(date(2026, 10, 15)))];
+        assert!(last_day(&ends, date(2026, 10, 15)));
+        assert!(!last_day(&ends, date(2026, 10, 14)));
+        let followed = [
+            role(1, date(2026, 9, 1), Some(date(2026, 10, 15))),
+            trains(2, date(2026, 10, 16), None),
+        ];
+        assert!(!last_day(&followed, date(2026, 10, 15)));
+        // Not on 30 June, when every role ends.
+        let open = [role(1, date(2026, 9, 1), None)];
+        assert!(!last_day(&open, date(2027, 6, 30)));
+        let to_the_end = [role(1, date(2026, 9, 1), Some(date(2027, 6, 30)))];
+        assert!(!last_day(&to_the_end, date(2027, 6, 30)));
     }
 
     #[test]

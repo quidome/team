@@ -7,7 +7,6 @@ mod common;
 use std::time::Duration;
 
 use common::api::Coordinator;
-use common::game_list::utc;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use team::weekly_trainings;
@@ -175,25 +174,4 @@ async fn a_save_waits_for_another_save(pool: PgPool) {
     other.commit().await.unwrap();
     let (status, _) = save.await;
     assert_eq!(status, 200);
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_proposed_start_of_a_role_follows_the_weekly_trainings(pool: PgPool) {
-    let mut coordinator = Coordinator::start(pool).await;
-    coordinator.harness.clock.set(utc(2026, 8, 15, 12, 0));
-    coordinator.log_in_again().await;
-    // No weekly training: today.
-    let team = coordinator.ok("GET", "/api/team", None).await;
-    assert_eq!(team["proposed_from"], "2026-08-15");
-    // With a Tuesday from 1 September: the first training date.
-    coordinator
-        .ok("POST", "/api/weekly-trainings", Some(tuesday()))
-        .await;
-    let team = coordinator.ok("GET", "/api/team", None).await;
-    assert_eq!(team["proposed_from"], "2026-09-01");
-    // Also on 12 October: no training of the season is opened yet (trainings come with story B).
-    coordinator.harness.clock.set(utc(2026, 10, 12, 12, 0));
-    coordinator.log_in_again().await;
-    let team = coordinator.ok("GET", "/api/team", None).await;
-    assert_eq!(team["proposed_from"], "2026-09-01");
 }

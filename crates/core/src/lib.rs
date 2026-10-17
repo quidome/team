@@ -24,9 +24,9 @@ pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_sourc
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
 pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date};
 pub use players::{
-    Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Role, RoleChange, RoleId,
-    TeamPage, change_role, check_change, check_role, clean_name, place, proposed_start, role_on,
-    team,
+    Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,
+    RoleDates, RoleId, TeamPage, change_role, check_change, check_role, clean_name, place,
+    proposed_start, remove_from_team, role_on, team, undo_removal,
 };
 pub use reasons::{ReasonError, clean_reason_name};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
@@ -36,6 +36,6 @@ pub use team_choice::{
     choice_state, choose_team, own_teams, same_choice, schedule_target,
 };
 pub use training::{
-    TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, first_training_date,
-    proposed_window, training_days,
+    TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, proposed_window,
+    training_days,
 };
