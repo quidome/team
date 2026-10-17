@@ -397,6 +397,9 @@
           "204": {
             "description": "Deleted, with its roles"
           },
+          "400": {
+            "description": "`player_has_absences`"
+          },
           "401": {
             "description": "Not logged in"
           },
@@ -2343,6 +2346,27 @@
           }
         }
       },
+      "NowThere": {
+        "type": "object",
+        "description": "A player who counts as \"there\" at trainings after a role started or its start moved earlier.",
+        "required": [
+          "player",
+          "trainings"
+        ],
+        "properties": {
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "trainings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dates of those trainings, for example \"2026-09-01\", in order."
+          }
+        }
+      },
       "PlayerChange": {
         "type": "object",
         "required": [
@@ -2375,7 +2399,8 @@
           "season",
           "season_first_day",
           "season_last_day",
-          "history"
+          "history",
+          "now_there"
         ],
         "properties": {
           "first_name": {
@@ -2400,6 +2425,13 @@
               "string",
               "null"
             ]
+          },
+          "now_there": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NowThere"
+            },
+            "description": "After a save of a role: the trainings at which the player now counts as there. Empty\notherwise."
           },
           "season": {
             "type": "string",
@@ -3021,7 +3053,8 @@
           "members",
           "left",
           "last_season",
-          "candidates"
+          "candidates",
+          "now_there"
         ],
         "properties": {
           "candidates": {
@@ -3051,6 +3084,13 @@
               "$ref": "#/components/schemas/MemberView"
             },
             "description": "Players with a role today or later in the season, sorted by first name."
+          },
+          "now_there": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NowThere"
+            },
+            "description": "After \"Add player\" from the list, \"Add to the team\" or \"Add all\": the players who now count\nas there at trainings, with those trainings. Empty otherwise."
           },
           "proposed_from": {
             "type": "string",
@@ -3316,6 +3356,36 @@
           }
         }
       },
+      "WeeklyProposalView": {
+        "type": "object",
+        "description": "A weekly training of last season, proposed with a window in the current season.",
+        "required": [
+          "weekday",
+          "start",
+          "end",
+          "from",
+          "until"
+        ],
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "until": {
+            "type": "string"
+          },
+          "weekday": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1 (Monday) to 7 (Sunday)."
+          }
+        }
+      },
       "WeeklyTrainingInput": {
         "type": "object",
         "description": "A new or changed weekly training.",
@@ -3394,9 +3464,17 @@
           "season",
           "season_first_day",
           "season_last_day",
-          "weekly_trainings"
+          "weekly_trainings",
+          "proposals"
         ],
         "properties": {
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeeklyProposalView"
+            },
+            "description": "Only while the season has no weekly trainings: last season's, one per day of the week, each\nwith the new proposed window. Saved with \"Add\"."
+          },
           "season": {
             "type": "string"
           },

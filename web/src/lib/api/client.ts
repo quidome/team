@@ -70,6 +70,8 @@ export function messageFor(error: unknown, status: number): string {
 		training_exists: 'There is already a training on this date.',
 		not_a_training_day: 'This date is not a training day.',
 		reason_hidden: 'This reason is hidden.',
+		player_has_absences:
+			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
@@ -300,6 +302,7 @@ export async function changeReason(
 export type WeeklyTrainings = components['schemas']['WeeklyTrainings'];
 export type WeeklyTraining = components['schemas']['WeeklyTrainingView'];
 export type WeeklyTrainingInput = components['schemas']['WeeklyTrainingInput'];
+export type WeeklyProposal = components['schemas']['WeeklyProposalView'];
 
 /** The weekly trainings of the current season (attendance at training, story A). */
 export async function loadWeeklyTrainings(

@@ -784,6 +784,13 @@ export interface components {
 			from: string;
 			role: components['schemas']['RoleKind'];
 		};
+		/** @description A player who counts as "there" at trainings after a role started or its start moved earlier. */
+		NowThere: {
+			/** Format: int64 */
+			player: number;
+			/** @description The dates of those trainings, for example "2026-09-01", in order. */
+			trainings: string[];
+		};
 		PlayerChange: {
 			first_name: string;
 			/** @description A hidden player is not offered in "Add player" of the team page and not in "Add all". */
@@ -799,6 +806,11 @@ export interface components {
 			/** Format: int64 */
 			id: number;
 			last_name?: string | null;
+			/**
+			 * @description After a save of a role: the trainings at which the player now counts as there. Empty
+			 *     otherwise.
+			 */
+			now_there: components['schemas']['NowThere'][];
 			/** @description The current season, for example "2026-2027". */
 			season: string;
 			/** @description The first day of the current season: the earliest date of a corrected role. */
@@ -1017,6 +1029,11 @@ export interface components {
 			left: components['schemas']['MemberView'][];
 			/** @description Players with a role today or later in the season, sorted by first name. */
 			members: components['schemas']['MemberView'][];
+			/**
+			 * @description After "Add player" from the list, "Add to the team" or "Add all": the players who now count
+			 *     as there at trainings, with those trainings. Empty otherwise.
+			 */
+			now_there: components['schemas']['NowThere'][];
 			/** @description The proposed "In the team from" of "Add player" and "Add all": 1 September of the season. */
 			proposed_from: string;
 			season: string;
@@ -1106,6 +1123,18 @@ export interface components {
 			from: string;
 			roles: components['schemas']['RoleDatesView'][];
 		};
+		/** @description A weekly training of last season, proposed with a window in the current season. */
+		WeeklyProposalView: {
+			end: string;
+			from: string;
+			start: string;
+			until: string;
+			/**
+			 * Format: int32
+			 * @description 1 (Monday) to 7 (Sunday).
+			 */
+			weekday: number;
+		};
 		/** @description A new or changed weekly training. */
 		WeeklyTrainingInput: {
 			end: string;
@@ -1140,6 +1169,11 @@ export interface components {
 		};
 		/** @description The weekly trainings of the current season, sorted by the start of the window. */
 		WeeklyTrainings: {
+			/**
+			 * @description Only while the season has no weekly trainings: last season's, one per day of the week, each
+			 *     with the new proposed window. Saved with "Add".
+			 */
+			proposals: components['schemas']['WeeklyProposalView'][];
 			season: string;
 			/** @description The first day of the season, for example "2026-07-01": the earliest date of a window. */
 			season_first_day: string;
@@ -1572,6 +1606,13 @@ export interface operations {
 		responses: {
 			/** @description Deleted, with its roles */
 			204: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description `player_has_absences` */
+			400: {
 				headers: {
 					[name: string]: unknown;
 				};

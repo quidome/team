@@ -7,6 +7,7 @@ mod common;
 use std::time::Duration;
 
 use common::api::Coordinator;
+use common::game_list::utc;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use team::weekly_trainings;
@@ -23,7 +24,7 @@ async fn nothing_saved_yet(pool: PgPool) {
     assert_eq!(
         list,
         json!({ "season": "2026-2027", "season_first_day": "2026-07-01",
-                "season_last_day": "2027-06-30", "weekly_trainings": [] })
+                "season_last_day": "2027-06-30", "weekly_trainings": [], "proposals": [] })
     );
 }
 
@@ -174,4 +175,36 @@ async fn a_save_waits_for_another_save(pool: PgPool) {
     other.commit().await.unwrap();
     let (status, _) = save.await;
     assert_eq!(status, 200);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn last_seasons_weekly_trainings_are_proposed(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool).await;
+    coordinator
+        .ok("POST", "/api/weekly-trainings", Some(tuesday()))
+        .await;
+    // While the season has weekly trainings, nothing is proposed.
+    let list = coordinator.ok("GET", "/api/weekly-trainings", None).await;
+    assert_eq!(list["proposals"], json!([]));
+
+    // The next season: last season's Tuesday with the new proposed window.
+    coordinator.harness.clock.set(utc(2027, 8, 15, 12, 0));
+    coordinator.log_in_again().await;
+    let list = coordinator.ok("GET", "/api/weekly-trainings", None).await;
+    assert_eq!(list["season"], "2027-2028");
+    assert_eq!(
+        list["proposals"],
+        json!([{ "weekday": 2, "start": "19:45", "end": "21:00",
+                 "from": "2027-09-07", "until": "2028-05-30" }])
+    );
+    // Saved with "Add": no longer proposed.
+    let list = coordinator
+        .ok(
+            "POST",
+            "/api/weekly-trainings",
+            Some(json!({ "weekday": 2, "start": "19:45", "end": "21:00",
+                         "from": "2027-09-07", "until": "2028-05-30" })),
+        )
+        .await;
+    assert_eq!(list["proposals"], json!([]));
 }

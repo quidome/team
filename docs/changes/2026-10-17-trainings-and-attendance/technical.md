@@ -233,7 +233,7 @@ On `main` (b558232 and later), story A is built and on the cluster:
 - [x] Step 2: the writes of a training (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 42 browser tests)
 - [x] Step 3: the page "Attendance" and the card (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 48 browser tests)
 - [x] Step 4: marking and the training page (2026-10-17; `just check` passes; 53 browser tests)
-- [ ] Step 5: the parts of stories 1 and 4
+- [x] Step 5: the parts of stories 1 and 4 (2026-10-17; `just check` passes apart from `api-types-check` before the commit, the types checked against the code; 56 browser tests)
 - [ ] Review build
 - [ ] Review accept
 
@@ -272,5 +272,11 @@ Implement:
   - "Change" to another date goes to the page of the new date (the address is replaced, so "Back" does not lead to the old date).
   - Browser tests: "Change" moves the extra training of Thu 22 Oct to Wed 21 Oct (not Tue 6 Oct to Wed 7 Oct as planned: Tue 6 Oct holds the marks of the other tests); "Delete training" deletes the training of Tue 3 Nov from step 3. With no reasons, a player who is there gets no choices, and an absent player only "There".
   - Mutation check: with the queue removed, the test of the late answer fails (the whole test file run; with `-g` alone the test lacks the player of the tests before it).
+- 2026-10-17, step 5:
+  - `now_there` is a field of `PlayerDetail` (so "Add player" carries it inside `SavedPlayer.player`, and "Correct" answers it) and of `TeamPageView` ("Add to the team", "Add player" from the list, "Add all"); it is empty on `GET`. The routes read the player's roles before the write and again inside the same transaction after it.
+  - `StoreError::is_foreign_key_violation` turns the refused delete into `player_has_absences`, as `is_unique_violation` does for names.
+  - The message uses "1 earlier training" for one training ("This player now counts as there at 1 earlier training: …"), and the dates as on the schedule. On the team page, "Add player" for a new player loads the team page and shows the message from the new player's answer.
+  - The proposals of last season are shown above the list of weekly trainings, each with "Add" (its accessible name names the day and times); after "Add" the answer has no proposals, so the part goes.
+  - Mutation check: with `ON DELETE CASCADE` for the player in migration `0006`, `a_player_with_absences_cannot_be_deleted` fails (the delete answers 204).
 
 ## Review findings

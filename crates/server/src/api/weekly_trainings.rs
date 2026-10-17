@@ -6,7 +6,8 @@ use axum::extract::{Path, Query, State};
 use chrono::{NaiveDate, NaiveTime, Weekday};
 use serde::{Deserialize, Serialize};
 use team_core::{
-    Season, TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, proposed_window,
+    Season, TrainingError, WeeklyTraining, WeeklyTrainingId, check_weekly_training, proposals_from,
+    proposed_window,
 };
 use utoipa::{IntoParams, ToSchema};
 
@@ -40,6 +41,20 @@ pub struct WeeklyTrainings {
     /// The last day of the season, for example "2027-06-30": the latest date of a window.
     pub season_last_day: String,
     pub weekly_trainings: Vec<WeeklyTrainingView>,
+    /// Only while the season has no weekly trainings: last season's, one per day of the week, each
+    /// with the new proposed window. Saved with "Add".
+    pub proposals: Vec<WeeklyProposalView>,
+}
+
+/// A weekly training of last season, proposed with a window in the current season.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct WeeklyProposalView {
+    /// 1 (Monday) to 7 (Sunday).
+    pub weekday: i16,
+    pub start: String,
+    pub end: String,
+    pub from: String,
+    pub until: String,
 }
 
 /// A new or changed weekly training.
@@ -112,11 +127,29 @@ fn view(training: &WeeklyTraining) -> Result<WeeklyTrainingView, StoreError> {
 
 async fn load(state: &AppState, season: Season) -> Result<WeeklyTrainings, AppError> {
     let stored = weekly_trainings::for_season(&state.pool, season).await?;
+    let proposals = if stored.is_empty() {
+        let last = weekly_trainings::for_season(&state.pool, season.previous()).await?;
+        proposals_from(&last, season)
+            .iter()
+            .map(|proposal| {
+                Ok(WeeklyProposalView {
+                    weekday: weekday_number(proposal.weekday)?,
+                    start: clock_time(proposal.start),
+                    end: clock_time(proposal.end),
+                    from: day(proposal.from),
+                    until: day(proposal.until),
+                })
+            })
+            .collect::<Result<_, StoreError>>()?
+    } else {
+        Vec::new()
+    };
     Ok(WeeklyTrainings {
         season: season.to_string(),
         season_first_day: day(season.first_day()),
         season_last_day: day(season.last_day()),
         weekly_trainings: stored.iter().map(view).collect::<Result<_, _>>()?,
+        proposals,
     })
 }
 

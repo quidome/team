@@ -1,5 +1,6 @@
 // Words for players, roles and training days (attendance at training, story A).
 import type { RoleKind } from '#lib/api/client.js';
+import { formatDay } from '#lib/schedule.js';
 
 export const roleLabels: Record<RoleKind, string> = {
 	plays_games: 'Plays games',
@@ -28,3 +29,11 @@ export const weekdays: { value: number; label: string }[] = [
 	{ value: 6, label: 'Saturday' },
 	{ value: 7, label: 'Sunday' }
 ];
+
+/** "This player now counts as there at 2 earlier trainings: Tue 1 Sept, Tue 8 Sept." With a name
+ * in place of "This player" when more than one player is named. */
+export function nowThereText(trainings: string[], name?: string): string {
+	const count = trainings.length;
+	const what = count === 1 ? '1 earlier training' : `${count} earlier trainings`;
+	return `${name ?? 'This player'} now counts as there at ${what}: ${trainings.map(formatDay).join(', ')}.`;
+}

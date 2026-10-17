@@ -12,7 +12,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use super::players::{RoleKind, RoleView, day, role_view};
+use super::players::{NowThere, RoleKind, RoleView, day, role_view};
 use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgConnection;
@@ -73,6 +73,9 @@ pub struct TeamPageView {
     /// The players "Add player" offers: not hidden and not in the team this season; last season's
     /// team first.
     pub candidates: Vec<PlayerSummary>,
+    /// After "Add player" from the list, "Add to the team" or "Add all": the players who now count
+    /// as there at trainings, with those trainings. Empty otherwise.
+    pub now_there: Vec<NowThere>,
 }
 
 /// The body of a refused request: the code, with details for some codes.
@@ -198,6 +201,7 @@ pub async fn load(state: &AppState) -> Result<TeamPageView, StoreError> {
                 last_name: player.last_name.clone(),
             })
             .collect(),
+        now_there: Vec::new(),
     })
 }
 

@@ -10,7 +10,7 @@ use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    role_on, team,
+    now_there, role_on, team,
 };
 use utoipa::ToSchema;
 
@@ -19,7 +19,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::players;
+use crate::{players, trainings};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -105,6 +105,17 @@ pub struct PlayerDetail {
     pub season_last_day: String,
     /// All roles of all seasons, newest first.
     pub history: Vec<HistoryRole>,
+    /// After a save of a role: the trainings at which the player now counts as there. Empty
+    /// otherwise.
+    pub now_there: Vec<NowThere>,
+}
+
+/// A player who counts as "there" at trainings after a role started or its start moved earlier.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NowThere {
+    pub player: i64,
+    /// The dates of those trainings, for example "2026-09-01", in order.
+    pub trainings: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -197,6 +208,25 @@ pub(crate) fn role_view(role: &PlayerRole) -> RoleView {
     }
 }
 
+/// The trainings of the current season at which `player` counts as there after its roles changed
+/// from `before` to `after`; `None` when there are none.
+pub(crate) async fn now_there_of(
+    state: &AppState,
+    player: PlayerId,
+    before: &[PlayerRole],
+    after: &[PlayerRole],
+) -> Result<Option<NowThere>, AppError> {
+    let season = current_season(state.clock.as_ref());
+    let stored = trainings::for_season(&state.pool, season).await?;
+    let ids: Vec<_> = stored.iter().map(|training| training.id).collect();
+    let absences = trainings::absences_at(&state.pool, &ids).await?;
+    let found = now_there(player, before, after, &stored, &absences);
+    Ok((!found.is_empty()).then(|| NowThere {
+        player: player.0,
+        trainings: found.iter().map(|training| day(training.date)).collect(),
+    }))
+}
+
 /// The roles of `player` in the current season and the season before.
 async fn roles_around(
     db: impl PgExecutor<'_>,
@@ -237,6 +267,7 @@ async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError
                 correctable: role.season == season,
             })
             .collect(),
+        now_there: Vec::new(),
     })
 }
 
@@ -318,14 +349,17 @@ pub async fn add(
     if let Some(role) = &body.role {
         players::insert_role(&mut *tx, id, season, role.role.into(), role.from, None).await?;
     }
+    let roles = players::roles_of(&mut *tx, id).await?;
     let same_name =
         players::same_name_exists(&mut *tx, &first_name, last_name.as_deref(), Some(id)).await?;
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = id.0, "player added");
-    Ok(Json(SavedPlayer {
-        player: detail(&state, id).await?,
-        same_name,
-    }))
+    let mut player = detail(&state, id).await?;
+    player.now_there = now_there_of(&state, id, &[], &roles)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(Json(SavedPlayer { player, same_name }))
 }
 
 #[utoipa::path(
@@ -371,6 +405,7 @@ pub async fn change(
     params(("id" = i64, Path, description = "The player")),
     responses(
         (status = 204, description = "Deleted, with its roles"),
+        (status = 400, description = "`player_has_absences`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player"),
     )
@@ -379,7 +414,17 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
-    if !players::delete(&state.pool, PlayerId(id)).await? {
+    // A player with absences cannot be deleted: the foreign key of the absences refuses it.
+    let deleted = players::delete(&state.pool, PlayerId(id))
+        .await
+        .map_err(|error| {
+            if error.is_foreign_key_violation() {
+                AppError::BadRequest("player_has_absences")
+            } else {
+                error.into()
+            }
+        })?;
+    if !deleted {
         return Err(AppError::NotFound);
     }
     tracing::info!(player = id, "player deleted");
@@ -404,8 +449,13 @@ pub async fn add_role(
     Path(id): Path<i64>,
     Json(body): Json<RoleChange>,
 ) -> Result<Json<TeamPageView>, AppError> {
-    save_role(&state, PlayerId(id), None, body).await?;
-    Ok(Json(team::load(&state).await?))
+    let (before, after) = save_role(&state, PlayerId(id), None, body).await?;
+    let mut page = team::load(&state).await?;
+    page.now_there = now_there_of(&state, PlayerId(id), &before, &after)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(Json(page))
 }
 
 #[utoipa::path(
@@ -429,8 +479,13 @@ pub async fn correct_role(
     Path((id, role)): Path<(i64, i64)>,
     Json(body): Json<RoleChange>,
 ) -> Result<Json<PlayerDetail>, AppError> {
-    save_role(&state, PlayerId(id), Some(RoleId(role)), body).await?;
-    Ok(Json(detail(&state, PlayerId(id)).await?))
+    let (before, after) = save_role(&state, PlayerId(id), Some(RoleId(role)), body).await?;
+    let mut player = detail(&state, PlayerId(id)).await?;
+    player.now_there = now_there_of(&state, PlayerId(id), &before, &after)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(Json(player))
 }
 
 /// Adds a role (`role` is `None`) or changes one, under the player's lock, so two saves at the same
@@ -440,15 +495,16 @@ async fn save_role(
     player: PlayerId,
     role: Option<RoleId>,
     body: RoleChange,
-) -> Result<(), AppError> {
+) -> Result<(Vec<PlayerRole>, Vec<PlayerRole>), AppError> {
     let season = current_season(state.clock.as_ref());
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     if !players::lock(&mut tx, player).await? {
         return Err(AppError::NotFound);
     }
-    let roles = players::roles_of(&mut *tx, player).await?;
-    let (changed, others): (Vec<PlayerRole>, Vec<PlayerRole>) = roles
-        .into_iter()
+    let before = players::roles_of(&mut *tx, player).await?;
+    let (changed, others): (Vec<PlayerRole>, Vec<PlayerRole>) = before
+        .iter()
+        .cloned()
         .partition(|stored| Some(stored.id) == role);
     match (role, changed.first()) {
         (None, _) => check_role(season, body.from, body.until, &others)?,
@@ -480,9 +536,10 @@ async fn save_role(
             .await?;
         }
     }
+    let after = players::roles_of(&mut *tx, player).await?;
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = player.0, "role saved");
-    Ok(())
+    Ok((before, after))
 }
 
 #[utoipa::path(
@@ -507,6 +564,7 @@ pub async fn carry(
     let mut ids = body.players.clone();
     ids.sort_unstable();
     ids.dedup();
+    let mut changed = Vec::new();
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     for id in ids.into_iter().map(PlayerId) {
         // Under the player's lock: two taps at the same time give one role. A player that already
@@ -522,9 +580,15 @@ pub async fn carry(
         if let Some(member) = page.last_season.first() {
             check_role(season, from, None, &roles)?;
             players::insert_role(&mut *tx, id, season, member.role, from, None).await?;
+            changed.push((id, roles.clone(), players::roles_of(&mut *tx, id).await?));
             tracing::info!(player = id.0, "player carried into the season");
         }
     }
     tx.commit().await.map_err(StoreError::from)?;
-    Ok(Json(team::load(&state).await?))
+    let mut page = team::load(&state).await?;
+    for (id, before, after) in &changed {
+        page.now_there
+            .extend(now_there_of(&state, *id, before, after).await?);
+    }
+    Ok(Json(page))
 }

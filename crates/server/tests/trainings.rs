@@ -698,3 +698,137 @@ async fn a_weekly_training_change_never_touches_a_training(pool: PgPool) {
     assert_eq!(tuesday["extra"], true);
     assert_eq!(row(&list, "2026-10-07")["status"], "not_opened");
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_player_with_absences_cannot_be_deleted(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, blake, school, _) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let answer = coordinator
+        .send("DELETE", &format!("/api/players/{avery}"), None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "player_has_absences" })));
+    let (status, _) = coordinator
+        .send("GET", &format!("/api/players/{avery}"), None)
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(stored_absences(&pool).await, 1);
+    // Blake has no absences: deleted.
+    let (status, _) = coordinator
+        .send("DELETE", &format!("/api/players/{blake}"), None)
+        .await;
+    assert_eq!(status, 204);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
+    let mut coordinator = Coordinator::start(pool.clone()).await;
+    add_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-09-01/open", None)
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-09-08/open", None)
+        .await;
+
+    // "Add player" from 1 Sep: there at both trainings.
+    let saved = coordinator
+        .ok(
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": "Casey", "last_name": null,
+                         "role": { "role": "plays_games", "from": "2026-09-01" } })),
+        )
+        .await;
+    let casey = saved["player"]["id"].as_i64().unwrap();
+    assert_eq!(
+        saved["player"]["now_there"],
+        json!([{ "player": casey, "trainings": ["2026-09-01", "2026-09-08"] }])
+    );
+
+    // "Correct" of a role from today to 1 Sep.
+    let avery = coordinator
+        .add_player("Avery", "plays_games", "2026-10-12")
+        .await;
+    let role = coordinator
+        .ok("GET", &format!("/api/players/{avery}"), None)
+        .await["history"][0]["id"]
+        .as_i64()
+        .unwrap();
+    let player = coordinator
+        .ok(
+            "PUT",
+            &format!("/api/players/{avery}/roles/{role}"),
+            Some(json!({ "role": "plays_games", "from": "2026-09-01", "until": null })),
+        )
+        .await;
+    assert_eq!(
+        player["now_there"],
+        json!([{ "player": avery, "trainings": ["2026-09-01", "2026-09-08"] }])
+    );
+    // A change that covers nothing new: empty.
+    let player = coordinator
+        .ok(
+            "PUT",
+            &format!("/api/players/{avery}/roles/{role}"),
+            Some(json!({ "role": "only_trains", "from": "2026-09-01", "until": null })),
+        )
+        .await;
+    assert_eq!(player["now_there"], json!([]));
+    assert_eq!(
+        coordinator.ok("GET", "/api/team", None).await["now_there"],
+        json!([])
+    );
+
+    // "Add to the team" (from the list) and "Add all" answer it on the team page.
+    let dana = coordinator
+        .ok(
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": "Dana", "last_name": null, "role": null })),
+        )
+        .await["player"]["id"]
+        .as_i64()
+        .unwrap();
+    let page = coordinator
+        .ok(
+            "POST",
+            &format!("/api/players/{dana}/roles"),
+            Some(json!({ "role": "plays_games", "from": "2026-09-05", "until": null })),
+        )
+        .await;
+    assert_eq!(
+        page["now_there"],
+        json!([{ "player": dana, "trainings": ["2026-09-08"] }])
+    );
+
+    // The next season: a training on Tue 7 Sep 2027, then "Add all" from 1 Sep.
+    at(&mut coordinator, 2027, 7, 2, 10, 0).await;
+    coordinator
+        .ok(
+            "POST",
+            "/api/trainings",
+            times("2027-09-07", "19:45", "21:00"),
+        )
+        .await;
+    let page = coordinator
+        .ok(
+            "POST",
+            "/api/players/carry",
+            Some(json!({ "players": [casey], "from": "2027-09-01" })),
+        )
+        .await;
+    assert_eq!(
+        page["now_there"],
+        json!([{ "player": casey, "trainings": ["2027-09-07"] }])
+    );
+}

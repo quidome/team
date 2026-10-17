@@ -47,6 +47,16 @@ pub enum StoreError {
 }
 
 impl StoreError {
+    /// A delete that a foreign key refused, for example a player with absences.
+    pub fn is_foreign_key_violation(&self) -> bool {
+        match self {
+            Self::Database(error) => error
+                .as_database_error()
+                .is_some_and(|error| error.is_foreign_key_violation()),
+            Self::Invalid(_) => false,
+        }
+    }
+
     /// A write that a unique index refused, for example a reason name that is taken.
     pub fn is_unique_violation(&self) -> bool {
         match self {

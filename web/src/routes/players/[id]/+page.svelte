@@ -16,7 +16,7 @@
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
-	import { fullName, roleLabels } from '#lib/players.js';
+	import { fullName, nowThereText, roleLabels } from '#lib/players.js';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -37,6 +37,7 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let warning = $state<string | null>(null);
+	let notice = $state<string | null>(null);
 
 	function message(failure: unknown): string {
 		return failure instanceof ApiError
@@ -79,6 +80,7 @@
 		if (!player || correcting === null) return;
 		busy = true;
 		error = null;
+		notice = null;
 		try {
 			player = await correctRole(player.id, correcting, {
 				role,
@@ -86,6 +88,8 @@
 				until: until || null
 			});
 			correcting = null;
+			const counted = player.now_there[0];
+			notice = counted ? nowThereText(counted.trainings) : null;
 		} catch (failure) {
 			error = message(failure);
 		} finally {
@@ -146,6 +150,9 @@
 		{/if}
 		{#if warning}
 			<p class="text-sm" role="status" data-testid="same-name">{warning}</p>
+		{/if}
+		{#if notice}
+			<p class="text-sm" role="status" data-testid="now-there">{notice}</p>
 		{/if}
 
 		<form class="space-y-4 rounded-xl border bg-card p-4 shadow-xs" onsubmit={save}>
