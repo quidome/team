@@ -15,6 +15,7 @@
 		carryPlayers,
 		changeRole,
 		leaveTeam,
+		loadTeam,
 		undoRemoval,
 		type Member,
 		type RoleKind,
@@ -24,7 +25,7 @@
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { dayAfter, fullName, roleLabels } from '#lib/players.js';
+	import { dayAfter, fullName, nowThereText, roleLabels } from '#lib/players.js';
 	import { formatDay } from '#lib/schedule.js';
 	import type { PageProps } from './$types';
 
@@ -57,6 +58,16 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let warning = $state<string | null>(null);
+	/** After a role that starts earlier than trainings that exist: who now counts as there. */
+	let notices = $state<string[]>([]);
+
+	function noticesOf(entries: { player: number; trainings: string[] }[], page: TeamPage | null) {
+		const named = entries.length > 1;
+		notices = entries.map((entry) => {
+			const member = page?.members.find((m) => m.id === entry.player);
+			return nowThereText(entry.trainings, named && member ? fullName(member) : undefined);
+		});
+	}
 
 	function message(failure: unknown): string {
 		return failure instanceof ApiError
@@ -70,10 +81,13 @@
 		busy = true;
 		error = null;
 		try {
+			notices = [];
 			const page = await work();
 			if (page === undefined) return;
-			if (page) team = page;
-			else await invalidateAll();
+			if (page) {
+				team = page;
+				noticesOf(page.now_there, page);
+			} else await invalidateAll();
 			open = null;
 			action = null;
 		} catch (failure) {
@@ -129,7 +143,8 @@
 				const saved = await addPlayer(firstName, lastName.trim() ? lastName : null, { role, from });
 				if (saved.same_name) warning = 'There is already a player with this name.';
 				adding = false;
-				return null;
+				// The team page shows who now counts as there, from the answer of the new player.
+				return { ...(await loadTeam(fetch)), now_there: saved.player.now_there };
 			}
 			const page = await addRole(Number(choice), { role, from, until: null });
 			forget(Number(choice));
@@ -424,6 +439,9 @@
 		{#if warning}
 			<p class="text-sm" role="status" data-testid="same-name">{warning}</p>
 		{/if}
+		{#each notices as notice (notice)}
+			<p class="text-sm" role="status" data-testid="now-there">{notice}</p>
+		{/each}
 
 		{#if adding}
 			<form

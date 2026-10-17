@@ -295,3 +295,67 @@ test('no player with a role, and no reasons', async ({ page }) => {
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
 	expect(errors).toEqual([]);
 });
+
+test('a player added from 1 September counts as there at the trainings since', async ({ page }) => {
+	const errors = watchConsole(page);
+	// The tests before opened Tue 6, Tue 13 and Tue 27 Oct, moved an extra training to Wed 21 Oct,
+	// and cancelled Tue 20 Oct (a cancelled training does not count).
+	await page.goto('/team');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	const form = page.getByTestId('add-player');
+	await form.getByLabel('Player').selectOption({ label: 'New player' });
+	await form.getByLabel('First name').fill('Zane');
+	await form.getByRole('button', { name: 'Save' }).click();
+	await expect(page.getByTestId('now-there')).toHaveText(
+		'This player now counts as there at 4 earlier trainings: Tue 6 Oct, Tue 13 Oct, Wed 21 Oct, Tue 27 Oct.'
+	);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	expect(errors).toEqual([]);
+});
+
+test('a player with absences cannot be deleted', async ({ page }) => {
+	const errors = watchConsole(page);
+	// Yara is absent ("Ill") on Tue 6 Oct.
+	await page.goto('/players');
+	await page.getByTestId('player').filter({ hasText: 'Yara' }).click();
+	page.once('dialog', (dialog) => void dialog.accept());
+	await page.getByRole('button', { name: 'Delete player' }).click();
+	await expect(page.getByRole('alert')).toHaveText(
+		'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.'
+	);
+	await expect(page.getByTestId('player-name')).toHaveText('Yara');
+	expect(errors).toEqual([
+		'Failed to load resource: the server responded with a status of 400 (Bad Request)'
+	]);
+});
+
+test("a new season proposes last season's weekly trainings", async ({ page }) => {
+	// The server's clock has no last season, so the answer is replaced; the API tests cover the
+	// real proposal. "Add" saves it for real.
+	const errors = watchConsole(page);
+	await page.route('**/api/weekly-trainings', async (route) => {
+		if (route.request().method() !== 'GET') return route.continue();
+		const list = await (await route.fetch()).json();
+		await route.fulfill({
+			json: {
+				...list,
+				proposals: [
+					{ weekday: 4, start: '19:00', end: '20:30', from: '2026-09-03', until: '2027-05-27' }
+				]
+			}
+		});
+	});
+	await page.goto('/settings');
+	const proposal = page.getByTestId('proposal');
+	await expect(proposal).toHaveText(/Thursday\s+19:00–20:30\s*· Thu 3 Sept – Thu 27 May/);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	await proposal.getByRole('button', { name: 'Add Thursday 19:00–20:30' }).click();
+	await expect(page.getByTestId('proposals')).toHaveCount(0);
+	await expect(
+		page.getByTestId('weekly-training').filter({ hasText: 'Thursday 19:00–20:30' })
+	).toBeVisible();
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	expect(errors).toEqual([]);
+});

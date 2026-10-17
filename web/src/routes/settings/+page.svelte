@@ -13,8 +13,10 @@
 		deleteWeeklyTraining,
 		proposeWindow,
 		type AbsenceReason,
+		type WeeklyProposal,
 		type WeeklyTraining,
-		type WeeklyTrainingInput
+		type WeeklyTrainingInput,
+		type WeeklyTrainings
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { weekdays } from '#lib/players.js';
@@ -109,11 +111,16 @@
 		editing = true;
 	}
 
-	async function runWeekly(action: () => Promise<{ weekly_trainings: WeeklyTraining[] }>) {
+	/** Last season's weekly trainings, while this season has none. */
+	let proposals = $state<WeeklyProposal[]>(untrack(() => data.weekly?.proposals ?? []));
+
+	async function runWeekly(action: () => Promise<WeeklyTrainings>) {
 		savingWeekly = true;
 		weeklyError = null;
 		try {
-			weekly = (await action()).weekly_trainings;
+			const answer = await action();
+			weekly = answer.weekly_trainings;
+			proposals = answer.proposals;
 			return true;
 		} catch (failure) {
 			weeklyError = message(failure);
@@ -230,6 +237,38 @@
 			</div>
 			{#if weeklyError}
 				<p class="text-sm" role="alert">{weeklyError}</p>
+			{/if}
+			{#if proposals.length > 0}
+				<div class="space-y-2" data-testid="proposals">
+					<h3 class="text-sm font-medium">Last season's weekly trainings</h3>
+					<ul class="space-y-2">
+						{#each proposals as proposal (proposal.weekday)}
+							<li
+								class="flex items-center justify-between gap-3 rounded-lg border p-3"
+								data-testid="proposal"
+							>
+								<p class="min-w-0 text-sm tabular-nums">
+									<span class="font-medium">
+										{dayName(proposal.weekday)}
+										{proposal.start}–{proposal.end}
+									</span>
+									<span class="text-muted-foreground">
+										· {formatDay(proposal.from)} – {formatDay(proposal.until)}
+									</span>
+								</p>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={savingWeekly}
+									onclick={() => runWeekly(() => addWeeklyTraining({ ...proposal }))}
+									aria-label="Add {dayName(proposal.weekday)} {proposal.start}–{proposal.end}"
+								>
+									Add
+								</Button>
+							</li>
+						{/each}
+					</ul>
+				</div>
 			{/if}
 			{#if weekly.length === 0}
 				<p class="text-sm text-muted-foreground">No weekly trainings yet.</p>
