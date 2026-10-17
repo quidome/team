@@ -1,8 +1,8 @@
 ---
 title: Players and settings
 type: feature
-stage: design
-closure: review build + accept   # stored data rebuilt, new transactions with locks, the user behaviour changed after the first accept review
+stage: implement
+closure: review build + accept   # stored roles deleted by a removal, new transactions with locks, the user behaviour changed after the second accept review
 created: 2026-10-15
 ---
 
@@ -23,3 +23,4 @@ keeps the list of reasons for an absence.
 | 2026-10-16 | design | the epic's functional spec was changed and approved again (pages Players and Team, weekly trainings); this story goes back to design after /vision |
 | 2026-10-16 | implement | designed again and approved: 4 steps (weekly trainings end to end, core rules for players, the team page, the players page and the player page); migration 0005 rewritten; the team page shows the chosen team; closure review build + accept |
 | 2026-10-16 | design | second build and accept review: not ready (R13–R17, A6–A10); the epic's story 1 changed and approved again for A6–A10, R13 and R17; this story goes to /design for the new rules, with R14, R15, R16 and the stale comments |
+| 2026-10-17 | implement | steps 5–9 designed and approved: core rules and "Change role", "Remove from the team" from a date with the confirmation, "Undo", "Add all" with a date and "Today", the settings fix R15; closure review build + accept |
