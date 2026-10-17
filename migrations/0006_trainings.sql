@@ -1,4 +1,4 @@
--- Trainings and absences (attendance at training, story B; decision 0019).
+-- Trainings and absences (attendance at training, story B; decision 0020).
 
 -- A training exists only when the coordinator opens a training day or adds one. At most one
 -- training per date. No link to a weekly training: a later change of a weekly training never

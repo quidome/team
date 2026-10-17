@@ -88,13 +88,13 @@ Each story has its own change folder and its own `/design`.
 | # | Story | Type | Scope | Depends on | Expected closure | Status |
 |---|---|---|---|---|---|---|
 | A | [Players and settings](../done/2026-10-15-players-and-settings/) | feature | Rewrite migration `0005`: `players` (with hidden), `player_roles`, `reasons` (6 presets), `weekly_trainings`. Core `players` (`change_role`, `remove_from_team`, `undo_removal`, `proposed_start` = 1 September, hidden in "Add all") and `training` (weekly trainings, check, proposed window, training days). API and pages `/players` and `/players/[id]` (all players, hidden, history with "Correct", delete), `/team` ("Add player", "Change role", "Remove from the team" with "Undo", "Add to the team", "Add all" with a date), `/settings` (weekly trainings: add, change, delete; reasons). Links from the start page. Built first in the old form on its branch; its design says what stays. | – | review build + accept | done |
-| B | [Trainings and attendance](../2026-10-17-trainings-and-attendance/) | feature | Migration `trainings` (date unique), `absences`. Core: the list of a season (one row per date), `next_training`, the players at a training, the proposal of last season's weekly trainings. API and pages `/training/[date]` (open, absences, "Change" of date and times, cancel and undo, delete any training, "No player has a role on this date."), "Add training", the start page card, the list of the season. Trainings of an earlier season stay open. | A | review build + accept | implement |
+| B | [Trainings and attendance](../done/2026-10-17-trainings-and-attendance/) | feature | Migration `trainings` (date unique), `absences`. Core: the list of a season (one row per date), `next_training`, the players at a training, the proposal of last season's weekly trainings. API and pages `/training/[date]` (open, absences, "Change" of date and times, cancel and undo, delete any training, "No player has a role on this date."), "Add training", the start page card, the list of the season. Trainings of an earlier season stay open. | A | review build + accept | done |
 | C | The overview | feature | Core `season_overview`. API and page `/attendance`: totals, "Left the team", "N training days not opened", "Show cancelled", earlier seasons, the missed trainings of a player. | B | review build + accept | open |
 
 ## Decisions
 | Decision | Reason | Decision record? |
 |----------|--------|------------------|
-| Attendance is stored as absences only; "there" follows from the training, the player's role and the absence | No rewrite on role changes; deleting a player without absences loses nothing; totals follow the data (spec note S7, S8) | yes, 0019 at the close of story B |
+| Attendance is stored as absences only; "there" follows from the training, the player's role and the absence | No rewrite on role changes; deleting a player without absences loses nothing; totals follow the data (spec note S7, S8) | yes, 0020 (written at the close of story B; 0019 is not used) |
 | A player is the person; a role (plays games / only trains) in a season has a start and an end; a real change of role ends one and starts the next | Players join, change role, leave and come back; the history stays right (coordinator, 2026-10-15 and 2026-10-16) | yes, 0018 (written at the close of story A) |
 | Weekly trainings with a window only suggest training days; an opened training is independent; training days are not stored | A mistake is corrected for the whole window; the past of opened trainings never changes by itself (coordinator, 2026-10-16; accept review A1) | in 0018 |
 | One training per date; any training can be deleted by hand; "extra" is worked out, not stored | Coordinator's rules (2026-10-16, spec review S13); one row per date in the list | no |
@@ -129,7 +129,7 @@ Each story has its own change folder and its own `/design`.
 
 ## Progress
 - [x] Story A: players and settings (built once in the first form and reviewed; designed again 2026-10-16; steps 5–9 on 2026-10-17; closed 2026-10-17, decision 0018)
-- [ ] Story B: trainings and attendance
+- [x] Story B: trainings and attendance (closed 2026-10-17, decision 0020)
 - [ ] Story C: the overview
 - [ ] Epic review accept
 

@@ -4,8 +4,8 @@ What it does **now**, for the coordinator. Updated at each /close that changes i
 
 ## Purpose
 The settings page tells the tool when the team trains and which reasons there are for an absence,
-so that a training is ready to mark without setting it up each time. Trainings themselves, and
-marking attendance, come with the next part of attendance at training.
+so that a training is ready to mark without setting it up each time. Opening a training and
+marking attendance are in [trainings and attendance](trainings-and-attendance.md).
 
 ## Behaviour
 ### Weekly trainings
@@ -15,13 +15,13 @@ marking attendance, come with the next part of attendance at training.
 - "Change" changes everything of a weekly training (the day, the times and the window), for its whole window: this is how a mistake is corrected. When the day changes, a date of the window that is the old day's proposal moves to the new day's proposal; a typed date stays. A real change of schedule is the end of one weekly training (its window ends) and a new one (for example Thursday from Thu 7 Jan).
 - "Delete" removes a weekly training, after a confirmation ("Delete the weekly training on Tuesday?").
 - The list shows the weekly trainings of the current season, sorted by the start of the window.
-- A new season (from 1 July) starts with no weekly trainings. (Proposing last season's weekly trainings comes with the next part of attendance at training.)
+- A new season (from 1 July) starts with no weekly trainings. The settings page proposes "Last season's weekly trainings": those that ran until the end of last season (a day given up during the season is not proposed), one per day of the week that has no weekly training yet, each with the new proposed window, for example "Tuesday 19:45–21:00 · Tue 7 Sept – Tue 30 May". "Add" saves a proposal as it is; it can be changed after.
 
 ### Reasons
 - The tool starts with these reasons, in this order: School, Ill, Injured (valid), Holiday, Work, No reason (not valid).
 - "Add reason" adds a reason with a name and "Valid"; it comes last in the list.
 - A reason can be renamed ("Save"), and changed between valid and not valid ("Valid"). A name typed but not saved is not saved by a tap on "Valid" or "Hidden".
-- "Hidden": the reason is no longer offered for new marks; it stays in the list with "hidden" and can be shown again.
+- "Hidden": the reason is no longer offered for new marks at a training; earlier absences keep it and still show it. It stays in the list with "hidden" and can be shown again.
 - Two reasons cannot have the same name; upper and lower case and outer spaces do not count.
 
 ## Errors and limits

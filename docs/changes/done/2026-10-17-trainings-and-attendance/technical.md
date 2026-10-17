@@ -11,7 +11,7 @@ trainings right (change, cancel, delete), see the season's trainings and the nex
 attendance at training leaves the sheet; story C adds the totals.
 
 ## Requirements summary
-Story B of the epic [Attendance at training](../2026-10-14-attendance-at-training/technical.md),
+Story B of the epic [Attendance at training](../../2026-10-14-attendance-at-training/technical.md),
 from the epic's `functional.md` (approved again 2026-10-16): story 2 (trainings, the list, the card,
 a new season), story 3 (marking), and the parts of stories 1 and 4 that need trainings and
 absences. Words from `docs/language.md`: training, training day, weekly training, attendance,
@@ -198,11 +198,11 @@ On `main` (b558232 and later), story A is built and on the cluster:
 ## Decisions
 | Decision | Reason | Decision record? |
 |----------|--------|------------------|
-| Attendance is stored as absences only; "there" follows from the training, the player's role and the absence | No rewrite on role changes; deleting a player without absences loses nothing; totals follow the data (epic) | yes, 0019 at Close |
-| One training per date, guarded by a unique date; "Open" is `INSERT … ON CONFLICT DO NOTHING`, safe to send twice | Two opens give one training without a lock to forget (Phase 1, choice 2) | in 0019 |
-| A training is opened by the tap on its row (list or card); a page load never writes | No training is made by a reload or a back button; "Not opened" is seen before the tap (Phase 1, choice 1) | in 0019 |
-| Absences go with their training (`CASCADE`); a player with absences cannot be deleted (`RESTRICT`) | The database guards both; no race loses an absence | in 0019 |
-| The taps of one player are sent one after the other; the screen shows the new state at once and puts the stored state back on a failure | A late answer never overwrites a newer tap; taps of different players do not wait (Phase 1, choice 3) | in 0019 |
+| Attendance is stored as absences only; "there" follows from the training, the player's role and the absence | No rewrite on role changes; deleting a player without absences loses nothing; totals follow the data (epic) | yes, 0020 at Close |
+| One training per date, guarded by a unique date; "Open" is `INSERT … ON CONFLICT DO NOTHING`, safe to send twice | Two opens give one training without a lock to forget (Phase 1, choice 2) | in 0020 |
+| A training is opened by the tap on its row (list or card); a page load never writes | No training is made by a reload or a back button; "Not opened" is seen before the tap (Phase 1, choice 1) | in 0020 |
+| Absences go with their training (`CASCADE`); a player with absences cannot be deleted (`RESTRICT`) | The database guards both; no race loses an absence | in 0020 |
+| The taps of one player are sent one after the other; the screen shows the new state at once and puts the stored state back on a failure | A late answer never overwrites a newer tap; taps of different players do not wait (Phase 1, choice 3) | in 0020 |
 | The routes of a training use its date (`/api/trainings/{date}/…`), not an id | The date is unique and is the page's address; differs from the epic's outline | no |
 | The card is the first coming row of the current season; no separate rule | One rule for the list and the card | no |
 | Last season's weekly trainings are proposed inside `GET /api/weekly-trainings` (`proposals`), saved with the existing "Add" | No new route; differs from the epic's outline | no |
@@ -334,7 +334,7 @@ and ids only.
   who follows "0019" lands on the attendance decision. For Close: either say so in decision 0019
   (as 0018 does for `0005`), or give the new record another number and fix the three new comments.
   Checked by search (`grep -rn 0019 crates web/src migrations`).
-  - 2026-10-17: not fixed here: a choice for Close (the header of the applied migration `0005` cannot change).
+  - 2026-10-17, at Close: fixed (coordinator's choice, option b): the attendance decision is 0020, and the number 0019 is not used, so the header of `0005` points to no record instead of a wrong one. `0006`, `trainings.rs` and `attendance.rs` say 0020.
 - **R4 – Small helpers built a third time.** `api/trainings.rs` defines `day`, `clock_time` and
   `time` again; `api/weekly_trainings.rs` has the same three and `api/players.rs` has `day`.
   `trainings::day` and `path_date` are `pub(crate)` but used nowhere else. Not a rule break; one

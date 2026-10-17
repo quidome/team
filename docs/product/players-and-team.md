@@ -10,16 +10,18 @@ the player's **role** in the team of a season: "Plays games" or "Only trains". B
 training. The roles of a player, one after the other, are the player's history.
 
 Two pages: **Players** (every player the coordinator ever entered) and **Team** (the team of the
-current season). The start page links to both, and to the settings ("Team · Players · Settings").
+current season). The start page links to both, to [attendance](trainings-and-attendance.md) and to
+the settings ("Attendance · Team · Players · Settings").
 
 ## Behaviour
 ### Players
 - The page lists all players, sorted by first name, each with "Plays games" or "Only trains" when the player has a role today, else "Not in the team". A player whose role starts later shows "Not in the team" here, and is in the team on the team page.
 - "Add player" adds a player with a first name (required) and a last name (optional). Names are saved without outer spaces; an empty last name is no last name.
 - **Hidden** only keeps lists short; it is not a status. A hidden player is left out of the list on "Players" (unless "Show hidden players" is on; it then shows "· hidden"), the choices of "Add player" on the team page, and "Players of last season" (so "Add all" does not add it). Nothing else changes: a hidden player in the team stays in the team, the history stays, and a hidden player under "Left the team" still has "Add to the team".
-- A tap on a player opens the player: the name with "Save", the switch "Hidden", the history, and "Delete player".
+- A tap on a player opens the player: the name with "Save", the switch "Hidden", the history, and "Delete player" for a player with no absences.
 - The history lists the roles of all seasons, newest first, for example "Plays games · from Sun 1 Nov" and "Only trains · Tue 1 Sept – Sat 31 Oct"; a role of an earlier season shows its season ("· 2025-2026"). A role of the current season has "Correct": the kind, "From" and "Until" (empty while the role continues), filled in with the stored values, with the same checks as a new role. For example a player added from 1 September who joined on 3 November, or added as "Plays games" by mistake. Roles of an earlier season cannot be corrected.
-- "Delete player" asks first ("Delete Avery? This cannot be undone.") and deletes the player with all roles of all seasons. (From the attendance change on, a player with absences cannot be deleted, only removed from the team or hidden.)
+- "Delete player" asks first ("Delete Avery? This cannot be undone.") and deletes the player with all roles of all seasons, for example a player added by mistake. A player with absences cannot be deleted, only removed from the team or hidden: the button is not offered.
+- When a role starts, or its start moves earlier ("Add player" from 1 September, "Add to the team", "Correct", "Add all"), while trainings on or after that date exist, the page says "This player now counts as there at 4 earlier trainings: Tue 6 Oct, Tue 13 Oct, Wed 21 Oct, Tue 27 Oct." ("there" is the default at a training), so the coordinator can mark absences. Cancelled trainings, and trainings where the player has an absence, are not listed. After "Add all", each line names its player.
 
 ### Team
 - The heading shows the team chosen from the game list for the season and the season, for example "U14-1 · 2026-2027"; before a team is chosen, "Team not chosen yet" with a link to choose it ([choose club and team](choose-club-and-team.md)). Players can be added before the team is chosen.
@@ -37,6 +39,7 @@ current season). The start page links to both, and to the settings ("Team · Pla
 
 ## Errors and limits
 - "A first name is needed." – no first name.
+- "This player has absences and cannot be deleted. Remove the player from the team, or hide the player." – a delete of a player with absences (the page does not offer it).
 - "The end must be after the start." – the end of a role before its start ("Correct").
 - "This date is outside the season." – a date of a role outside the current season; a role of an earlier season cannot be changed.
 - "This player already has a role on that date." – two roles of one player that overlap.
