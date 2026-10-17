@@ -121,7 +121,7 @@ and times, and a later change of the weekly training does not touch it.
 - [ ] "Add training" makes a training on any date of the season that has no training yet (an extra training), with the times of a weekly training on that day of the week, or times the coordinator types.
 - [ ] "Change" on a training changes its date and its times; the attendance stays (coordinator, 2026-10-16). For example trainings opened while a weekly training said Wednesday or 19:00 by mistake.
 - [ ] The coordinator can delete any training by hand ("Delete training", after a confirmation: "Delete the training of Thu 22 Oct? Its attendance is removed."), for example one opened or added on a wrong date (coordinator, 2026-10-16). Nothing else ever deletes a training. When the date is a training day, it shows as "Not opened" again. A holiday is cancelled, not deleted: a deleted training day counts as not opened.
-- [ ] Trainings and attendance of an earlier season can still be opened, entered, changed and cancelled (coordinator, 2026-10-16), for example the last training of May found in July. Its weekly trainings and roles are fixed.
+- [ ] Trainings and attendance of an earlier season can still be opened, entered, changed and cancelled (coordinator, 2026-10-16), for example the last training of May found in July. Its weekly trainings and roles are fixed. "Add training" is only for the current season, so an extra training of an earlier season cannot be added (2026-10-17, story C).
 - [ ] Weekly trainings, training days and "today" are in Dutch local time, the same as the games.
 - [ ] A new season (from 1 July, as for the games) has no weekly trainings. The settings page proposes the weekly trainings of last season with new proposed windows (story B of the epic builds this).
 
@@ -224,11 +224,11 @@ the player missed, with the date and the reason.
 Screens (phone first, also usable on a computer):
 - **Start page** (`/`): below the team header, a compact card "Training · Tue 20 Oct · 19:45" with "Not opened yet", "All there", "N absent" or "Cancelled". A tap opens the training (and so makes it exist, story 2). It shows only when the season has a coming training day or training, and takes one line so the next games stay high on the first screen.
 - **Training** (for one date): the date and time at the top, "N absent", "All there" or "Cancelled"; the players as large rows (name, and the reason when absent). A tap on a row opens the list of reasons with "There" on top. At the bottom: "Change" (date and times), "Cancel training" or "Undo cancel", and "Delete training".
-- **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date). A tap on a player shows the trainings that player missed.
+- **Attendance**: the season (with a choice of earlier seasons), the totals for each player, the group "Left the team", and the list of training days and trainings of the season, "Coming" above "Past" ("Not opened", "All there", "N absent", "Cancelled"), with "Cancel training" on a day that is not opened and the switch "Show cancelled", and above the totals the number of training days not opened. "Add training" (with a date; only in the current season). A tap on a player shows the trainings that player missed.
 - **Players**: all players, sorted by first name, with the role today or "Not in the team", "Add player" and the switch "Show hidden players". A tap opens the player: first name, last name, "Hidden", the history (the roles, newest first, "Correct" for a role of the current season), and "Delete player" when the player has no absences.
 - **Team** (current season): the heading with the team's name and the season, or "Team not chosen yet"; the players in the team with "Plays games" or "Only trains", then "Left the team"; "Add player" (from the list or new, with a role and a date); while no player of last season's team has a role in the season, those players with "Add all" (with "In the team from"). A tap on a player gives "Change role" ("From") and "Remove from the team" ("Not in the team from", with "Tomorrow"), or "Add to the team" under "Left the team"; after a removal, "Undo" on the row. "In the team from" of "Add player" and "Add all" is filled with 1 September, with "Today"; the other dates with today, and "Not in the team from" with "Tomorrow" next to it.
 - **Weekly trainings and reasons** (settings): the weekly trainings of the season (day, start and end time, window), "Add weekly training", "Change" and "Delete" for each, and the list of reasons with valid / not valid, "Add reason", rename, hide.
-- Navigation: the start page links to "Attendance"; "Attendance" links to "Team", "Players" and the settings.
+- Navigation: the start page links to "Attendance", "Team", "Players" and the settings (coordinator, 2026-10-17, story C; until the start page becomes one page of past and coming events, `docs/ideas.md`). "Attendance" has no links to the other pages.
 
 Example of the training screen:
 
@@ -588,3 +588,9 @@ Decided with the coordinator; the stories above are changed to match.
 - **S31:** fixed. The Context uses the word list's meaning of player; Steve's warning is marked
   settled; the last name is optional in "Add player" on the team page; "Tomorrow" is always next
   to the date field of "Remove from the team".
+
+## Change during story C (2026-10-17)
+At the design and close of story C, with the coordinator, after the spec review of its deviations
+(all serve; notes D1 and D8):
+- Navigation (D1): the start page keeps "Attendance · Team · Players · Settings"; "Attendance" gets no links. The coordinator's choice until the start page becomes one page of past and coming events (`docs/ideas.md`). Changed: Interface, "Navigation".
+- "Add training" only in the current season (D8, a limit from story B, accept review A5): an extra training of an earlier season cannot be added. Changed: story 2 (trainings of an earlier season), Interface "Attendance". An idea line keeps the case.
