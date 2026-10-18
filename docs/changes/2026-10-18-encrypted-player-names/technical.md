@@ -1,6 +1,6 @@
 # Technical spec: Player names stored encrypted
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: [2026-10-18-encrypted-player-names](./)
 **Date**: 2026-10-18
@@ -284,7 +284,7 @@ plain columns that `0008` removed; try again after the update. After release 2:
 - [x] Release 1, 2026-10-18: PR #13 (steps 1–3) and PR #14 (review fixes R1, R2) merged; live at 11:29 UTC. On the database `team`: migration 0007, the migration log "player names encrypted" count 14, 14 players with encrypted names, 0 plain names, 14 roles, 71 games, 1 training and 2 absences (the same as before); the coordinator saw the names right on "Players", "Team" and "Attendance"; the next pod start encrypted 0. Backup before: `team-20261018T102433Z.dump.age`. A problem outside this change was found on the way: since 08:09 UTC the Vault value `DATABASE_URL` named the empty database `team_v2`, so the app had shown an empty tool and the first two starts of release 1 ran on `team_v2`; the coordinator set it back to `team` in Vault, and a hard refresh and a full sync in Argo CD applied it. Not tagged yet.
 - [x] Step 4 – the plain-text columns removed, 2026-10-18 (branch `feat/drop-plain-player-names`; merge only after a nightly dump with encrypted names was checked): migrations `0008_drop_plain_player_names.sql` and `0009_vacuum_players.sql` (`-- no-transaction`, `VACUUM FULL players`); `encrypt_plain_names` and `encrypt_after_migrations` removed; `team migrate` calls `check_key` after the migrations; `NameRow.first_name_enc` is `Vec<u8>` (NOT NULL), so the "not encrypted yet" case is gone; `update_name` no longer writes the plain columns. Tests: `the_plain_name_columns_are_gone` (16), `the_removal_refuses_a_player_that_is_not_encrypted` (17); `names_are_not_stored_as_plain_text` now reads the whole row as text; tests 14, 15 and the R1 rename test removed with the code they test. `.sqlx/` prepared. `just check` passes.
 - [x] Release 2, 2026-10-18: backup before with only encrypted names `team-20261018T114532Z.dump.age`; PR #15 merged (`e0c49ea`), live at 11:58 UTC, tagged v0.3.2 (`sha256:ecf6d7bb…`). On the database `team`: migrations 0008 and 0009 successful; `players` has `id`, `hidden`, `created_at`, `first_name_enc` (NOT NULL), `last_name_enc`; 14 players, 14 roles, 71 games, 1 training, 2 absences; no errors; the coordinator saw the names right. Release step 6 (27 known names of 4 letters or more, from the old laptop dump, matched by `grep` in the pod; only file names printed): the players table file has none; the `sessions` table has the coordinator's own name (the Pocket ID name shares a name with a player; out of scope by the coordinator's choice); two WAL segments (`pg_wal/…0002`, `…0003`) still hold the old plain inserts and updates until new writes fill them (segments are recycled by renaming, not wiped; not in the dumps, only on the database disk) — for the known debt at Close. Release step 7: the laptop dumps `team-before-v2.dump` and `team-2026-10-18T0929.dump` deleted.
-- [ ] All checks pass
+- [x] All checks pass (CI in full on `e0c49ea`: Check with e2e and check-sqlx, Build with the smoke test)
 
 ## Deviations
 - 2026-10-18, step 1: `CipherError` has a fifth case, `Encrypt` ("cannot encrypt"), because the crate's `encrypt` returns a `Result` (only for an input far larger than a name); the spec listed four cases.
@@ -293,6 +293,7 @@ plain columns that `0008` removed; try again after the update. After release 2:
 - 2026-10-18, step 2: `StoreError` has a second new case, `Seal(CipherError)` ("a name cannot be encrypted"), for a write: the player has no id yet, so `Name { player, … }` does not fit.
 - 2026-10-18, step 2: test 14 starts the database at `0006` with `Migrator::new` on a temporary folder with copies of the first 6 migration files, not with a cut list of `MIGRATOR`'s migrations: the fields of `Migrator` are hidden and "semver-exempt" in sqlx 0.8. Test 13 is in its own file (`tests/player_name_logs.rs`), because a test that reads the log needs its own process (`LogBuffer`).
 - 2026-10-18, step 3 (coordinator): `team serve` stops only when the key cannot read a stored name. When the database cannot be reached, it logs "cannot check the player name key now: the database is not reachable" and starts, as before; readiness reports the database. Reason: `serve` is built to start without the database (`db::lazy_pool`), and stopping would make the pod restart in a loop while the database is down. `team migrate` (the init container) always checks the key with a working database.
+- 2026-10-18, step 4: `team migrate` applies the migrations first and then checks the key (`check_key`). Harmless: no migration writes a name (review R10).
 - 2026-10-18, step 4: test 15 (`migrate_with_a_wrong_key_stops_and_changes_nothing`) and the rename test of R1 are removed with `encrypt_after_migrations`, as test 14 is: they test the one-time encryption, which release 2 removes. A wrong key in `migrate` is still covered by `check_key` (test 12), which `migrate` now calls directly. Release step for release 2: a rename on the old pod fails during the update (the release 1 code still writes the plain columns).
 - 2026-10-18, step 3: the data step of `team migrate` is a store function, `players::encrypt_after_migrations`, so test 15 tests the order (check, then encrypt) that `main.rs` uses.
 
@@ -459,3 +460,81 @@ Runs by the reviewer: `cargo test -p team --test player_names --test player_name
   who can wait. Worth one line in the release steps. How checked: trace of `main`'s `players::all`
   (`query!` on a column that was `NOT NULL` when it was compiled); not run.
   - 2026-10-18: Fixed in the release steps: step 4 says that during the update (about a minute) the old pod cannot list players.
+
+### Build review, 2026-10-18 (step 4, release 2)
+Input: the mode `build` and this change folder; nothing else was given. Everything is merged, so
+"the diff against `main`" is empty; reviewed instead: commit `e0c49ea` (step 4) on top of the
+release 1 code (`117197b`, `d2b586a`, reviewed above as R1–R6), the state of `main` at `cd5fd21`,
+this change folder, `docs/architecture.md`, the valid decision records (0004 in detail),
+`CLAUDE.md`, `AGENTS.md`, and for the restore path the recovery steps in `gitops-lab`
+(`docs/product/team-database.md`). Summary: no blocker. Step 4 does what the spec says, in the
+right place (schema in `migrations/`, the key check in the store, `migrate` in `main.rs`). R7 is
+an operational gap worth one line before Close; the rest is for Close.
+
+- **R7 – a dump made before release 1 can no longer be restored and started with the current
+  image.** The dumps are kept by count (the newest 7), so the dumps from before 11:29 UTC on
+  2026-10-18 (schema `0006`, plain names, among them `team-20261018T102433Z.dump.age`) stay for
+  about a week. After a restore of one of them (recovery step 3a), the init container of v0.3.2
+  applies `0007`, then `0008` fails on `SET NOT NULL` (the rows have no `first_name_enc`), and the
+  pod stays in Init. The one-time encryption that would fix it was removed in step 4. The way out
+  exists: run the migration image of release 1 (v0.3.1, `sha-d2b586a…`) once with the
+  same `PLAYER_NAME_KEY`, then the current one. No document says so: the comment of `0008` ("SET
+  NOT NULL fails, `team migrate` stops and nothing is lost") stops at the failure, and neither
+  `README.md` nor the recovery steps in `gitops-lab` name the case. A sibling, smaller: `0008`
+  only refuses a row *without* `first_name_enc`; a row with an encrypted name *and* a newer plain
+  one (a rename by the old pod during release 1, the R1 case) passes `0008`, which drops the newer
+  name without a sign. On the cluster this cannot happen (release step 4 counted 0 plain names,
+  and the backup before release 2 was made after that), so only a restored dump from the release 1
+  window could carry it. How checked: trace of `0007`/`0008` and `main.rs` `migrate`; test 17
+  (`the_removal_refuses_a_player_that_is_not_encrypted`, run, passes) is exactly the first case;
+  the retention read in `gitops-lab/docs/product/team-database.md`. Suggestion: one line in the
+  recovery steps (or decision record 0021) for dumps older than release 1 until they age out.
+  - 2026-10-18: Fixed in the documents: `README.md` has "Restoring a backup from before v0.3.1" (run the v0.3.1 migration image once with the same settings, then the normal start; the command with the labels the NetworkPolicy needs; not tested on the cluster). The R1 twin is covered there too (the v0.3.1 image keeps the newer plain name). The recovery steps in `gitops-lab` link to it (gitops-lab PR #194). No code change: the plain backups age out within about a week.
+- **R8 – migration `0009` runs outside a transaction, which decision 0004 does not foresee.**
+  Decision 0004 says `team migrate` applies each migration "in a transaction"; `0009` is
+  `-- no-transaction` (VACUUM cannot run in one). The design chose this (step 4), and it is safe:
+  `VACUUM FULL` is atomic on its own and can run twice, so a stop between the VACUUM and sqlx's
+  record of the migration only repeats it at the next start. The no-transaction path works: every
+  `#[sqlx::test]` database applies `0009` (the whole suite passes, and a VACUUM inside a
+  transaction would fail). For Close: name the exception and its reason in decision record 0021
+  and in "Database migrations" of `docs/architecture.md`/`README.md`, so the next migration
+  author does not copy it for a statement that needs a transaction. How checked: reading 0004,
+  `0009`, and the test run.
+  - 2026-10-18: For Close: decision record 0021 names `0009` as the one migration outside a transaction (`VACUUM FULL` cannot run in one; it can run twice), and `docs/architecture.md` says so where it describes the migrations.
+- **R9 – sibling of R2: `migrate` calls every error of `check_key` a key problem.** `main.rs`
+  `migrate` wraps any `check_key` error, also `StoreError::Database`, in "the player name key
+  cannot read the stored names". `serve` was fixed for this in R2; `migrate` was not (in release 1
+  its context was "encrypting the player names"). Low: the cause follows in the error chain, and
+  `migrate` has just used the database. How checked: reading `main.rs`; not run.
+  - 2026-10-18: Not fixed: anyhow prints the cause under the context ("Caused by: ..."), so a database error shows as a database error in the log; the context only says which step failed.
+- **R10 – the claims about checks.** Run by the reviewer on `cd5fd21`: `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` (all pass,
+  among them `the_plain_name_columns_are_gone` (16), `the_removal_refuses_a_player_that_is_not_encrypted`
+  (17), `names_are_not_stored_as_plain_text`, `check_key_reads_a_stored_name_with_the_right_key_only`),
+  all with `SQLX_OFFLINE=true` (see below). CI on `e0c49ea` (`main`, run 39125016821): Check
+  (`lint-ci api-types-check check-rust check-web e2e check-sqlx`), Build (with the smoke test) and
+  Publish passed. Can a new test not fail? Test 17 fails if `0008` loses `SET NOT NULL` or runs
+  without a transaction (the plain row would be gone); test 16 fails if a plain column or a
+  nullable `first_name_enc` remains (traced). The removal of tests 14, 15 and the R1 test is right
+  (the code they test is gone). One order changed without a note: `migrate` now applies `0008` and
+  `0009` *before* it checks the key, where release 1 checked first; harmless, because no
+  migration writes a name. Not checked: release steps 6 and 7 (on the cluster and the laptop).
+  Local environment (not in the diff): the local `.env` names the database `team` (at migration
+  0007, no players), while `README.md`, `.env.example` and CI say the local one is `team_v2` (here
+  at migration 1); with this `.env`, `cargo clippy`/`just check-rust` fail with three `query_as!`
+  type errors in `players.rs` until `just migrate` runs. The builder's "`just check` passes" was
+  therefore not reproduced as written, only through CI and offline mode.
+  - 2026-10-18: No code change. The local `.env` of the coordinator names `team`, while `.env.example`, `README.md` and CI name `team_v2`; the coordinator keeps `team` locally (2026-10-18); the documents keep `team_v2` as the default of `.env.example`. "All checks pass" is ticked: CI passed in full on `e0c49ea` (Check with e2e and check-sqlx, Build with the smoke test). The order in `migrate` (migrations, then `check_key`) is noted under Deviations.
+- **R11 – documents the diff made false (for Close, in addition to R6).** `docs/architecture.md`:
+  the `migrations/` row stops at `0006` (now `0007`–`0009`); "Tables: `players` (first name, last
+  name, `hidden`)" (now encrypted columns only); nothing on `cipher.rs`, the key check in `serve`
+  and `migrate`. `CLAUDE.md` "Architecture": no `cipher.rs`. The comment of `0007` says `team
+  migrate` encrypts the plain names, which is no longer true, but an applied file is not edited
+  (0004); the architecture text should carry the truth. `docs/backlog.md` item 1 still says "Next:
+  `/implement …`". In this file, "All checks pass" is not ticked although CI passed, and
+  `change.md` has no log line for release 2. The "Known debt" of **Compatibility and performance**
+  should gain what release step 6 found: two WAL segments with the old plain inserts and updates,
+  and the coordinator's name in `sessions`. How checked: search of `docs/architecture.md`,
+  `CLAUDE.md`, `README.md`, `docs/backlog.md`, `crates/`, `migrations/` for `encrypt`, `plain`,
+  `cipher`, `0006`, `team migrate`.
+  - 2026-10-18: For Close, with R6: `docs/architecture.md`, `CLAUDE.md`, the known debt (the WAL segments and the coordinator's name in `sessions`), `docs/backlog.md`. `technical.md` and `change.md` are updated now.

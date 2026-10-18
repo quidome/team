@@ -84,6 +84,31 @@ Never apply it by hand. The image keeps this contract:
 | Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET`, `PLAYER_NAME_KEY` (32 random bytes in base64, the key of the encrypted player names; a copy is kept outside the platform, because without it the names in the database and in every backup are lost) |
 | Other settings | `ORIGIN`, `SESSION_TTL_SECONDS`, `DEV_AUTH_BYPASS` and `DEV_NOW` (a start moment for the clock, for example `2026-10-12T10:00:00Z`; both ignored by release builds), optional `TEAM_ACCESS_ROLE` (default `team_coordinator`), `GAME_LIST_URL` (default `https://db.basketball.nl`; the cluster uses the default), `HOST`, `PORT`, `WEB_DIR` |
 
+### Restoring a backup from before v0.3.1
+
+From v0.3.2 the player names are only stored encrypted, and `team migrate` no longer encrypts
+plain names: migration `0008` refuses a database that still has them, `team migrate` stops, and the
+pod waits in Init. Backups made before v0.3.1 went live (2026-10-18 11:29 UTC, for example
+`team-20261018T102433Z.dump.age`) have plain names; the nightly job keeps the newest 7 backups, so
+they are gone after about a week.
+
+To restore such a backup: follow the recovery steps in `gitops-lab` (the app scaled to 0), then,
+before the app starts again, run the migration image of v0.3.1 once with the same settings. It
+applies `0007` and encrypts the names with `PLAYER_NAME_KEY`; the next normal start applies `0008`
+and `0009`. The labels let the pod through the database's NetworkPolicy. Not tested on the cluster.
+
+```sh
+kubectl run team-migrate-v031 -n productivity --rm -i --restart=Never \
+  --labels=app.kubernetes.io/name=team,app.kubernetes.io/instance=team \
+  --image=ghcr.io/quidome/team:v0.3.1-migration \
+  --overrides='{"spec":{"securityContext":{"runAsUser":1000,"runAsGroup":1000,"runAsNonRoot":true},
+    "containers":[{"name":"team-migrate-v031","image":"ghcr.io/quidome/team:v0.3.1-migration",
+    "envFrom":[{"secretRef":{"name":"team"}}]}]}}'
+```
+
+A backup made during the update to v0.3.1 itself (about a minute) can hold a player with both an
+encrypted name and a newer plain name (a rename by the old pod); this path keeps the newer one.
+
 ### Switching from the old app (done)
 
 The new app uses its own, empty database (decision 0006). On the cluster this was done on
