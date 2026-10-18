@@ -26,7 +26,9 @@ just check      # every check (as CI): workflow and script lint, API types, Rust
                 # front-end check/lint/build, browser tests, sqlx query data
 ```
 
-The database tests (`#[sqlx::test]`) create their own databases on the server in `DATABASE_URL`.
+The local database is `team_v2` (`.env.example`, and CI); the cluster database is `team` (see the
+cluster contract below). The database tests (`#[sqlx::test]`) create their own databases on the
+server in `DATABASE_URL`.
 After changing an SQL query, run `just prepare` and commit `.sqlx/`.
 
 ## Database migrations
@@ -78,6 +80,7 @@ Never apply it by hand. The image keeps this contract:
 | Ports and probes | 3000; `GET /api/health/liveness`, `GET /api/health/readiness` |
 | Commands | `runtime`: `team serve`; `migration` (init container): `team migrate` (needs `DATABASE_URL` and `PLAYER_NAME_KEY`) |
 | Security | user and group 1000, read-only root file system |
+| Database | `team` on the server `team-postgresql` (namespace `productivity`): `DATABASE_URL` in Vault ends in `/team`. The nightly backup dumps this database. `team_v2` is only the local name; never copy the local value to Vault (from 08:09 to 11:29 UTC on 2026-10-18 the app used an empty `team_v2` that way) |
 | Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET`, `PLAYER_NAME_KEY` (32 random bytes in base64, the key of the encrypted player names; a copy is kept outside the platform, because without it the names in the database and in every backup are lost) |
 | Other settings | `ORIGIN`, `SESSION_TTL_SECONDS`, `DEV_AUTH_BYPASS` and `DEV_NOW` (a start moment for the clock, for example `2026-10-12T10:00:00Z`; both ignored by release builds), optional `TEAM_ACCESS_ROLE` (default `team_coordinator`), `GAME_LIST_URL` (default `https://db.basketball.nl`; the cluster uses the default), `HOST`, `PORT`, `WEB_DIR` |
 
