@@ -226,8 +226,12 @@ Before the merge of release 1 (operator):
 
 Release 1: merge, green `main`, restart the pod, check, tag (as `README.md`, "Making a release").
 After release 1:
-4. Check on the cluster: `SELECT count(*) FROM players WHERE first_name IS NOT NULL` gives 0;
-   "Players", "Team" and "Attendance" show the same names in the same order as before.
+4. Check on the cluster: `SELECT count(*) FROM players WHERE first_name IS NOT NULL OR
+   last_name IS NOT NULL` gives 0; "Players", "Team" and "Attendance" show the same names in the
+   same order as before. When the count is not 0 (the old pod added or renamed a player during
+   the update), restart the pod once more: `team migrate` encrypts those rows (review R1). During
+   the update (about a minute) the old pod cannot list players, because the plain columns are
+   empty (review A7).
 5. Wait for the first nightly dump with encrypted names.
 
 Release 2 (step 4): merge, green `main`, restart the pod, check, tag. After release 2:
@@ -290,3 +294,165 @@ Release 2 (step 4): merge, green `main`, restart the pod, check, tag. After rele
 - 2026-10-18, step 3: the data step of `team migrate` is a store function, `players::encrypt_after_migrations`, so test 15 tests the order (check, then encrypt) that `main.rs` uses.
 
 ## Review findings
+
+### Build review, 2026-10-18 (steps 1–3, release 1)
+Input: the diff of `feat/encrypted-player-names` against `main` (commit 8eb37f2, nothing
+uncommitted in the code), this change folder, `docs/architecture.md`, the valid decision records,
+`CLAUDE.md`, `AGENTS.md`. No other input was given. Summary: no blocker; the structure follows the
+project's rules (decision 0001: `same_name` and the sort in the core, the cipher and the key in the
+server; decision 0004: add first, remove in release 2, the data step in `team migrate`, not in
+`serve`). R1 is worth fixing before the merge of release 1; the rest is notes and work for Close.
+
+- **R1 – a rename by the old pod during the update leaves a plain name, and the rename is lost
+  (twin of the "plain row" case).** The team deployment is `RollingUpdate` with `maxSurge: 1`,
+  `maxUnavailable: 0` (`gitops-lab/applications/productivity/team/helm-chart/templates/deployment.yaml`),
+  so the v0.3.0 pod keeps serving after the new init container applied `0007` and encrypted the
+  names. The spec handles one case of that window: a player *added* by the old pod (a row without
+  `first_name_enc`). It does not handle the twin: a *rename* by the old pod (`PUT /api/players/{id}`
+  from a page that was already open) runs `UPDATE players SET first_name = $2, last_name = $3`, which
+  the 0007 CHECK allows, on a row that already has `first_name_enc`. Then: (a) `encrypt_plain_names`
+  selects only `WHERE first_name_enc IS NULL`, so this row is never encrypted again and the plain
+  name stays in the table until release 2 drops the column (expected result 1 broken, silently);
+  (b) the new pod reads the old encrypted name, so the coordinator's rename is lost without a
+  message. The old pod answers 200 (its `detail` reads the plain name it just wrote). How checked:
+  trace of the old `change` (main) and the new `encrypt_plain_names`, and the deployment strategy
+  read in `gitops-lab`; not reproduced by a run. The window is short and one coordinator does the
+  release, so the chance is small, but the fix is cheap: select
+  `WHERE first_name_enc IS NULL OR first_name IS NOT NULL OR last_name IS NOT NULL` (a plain value
+  is always newer than the encrypted one, because new code writes both plain columns as NULL) and a
+  test for that row. Release step 4 (`count(*) WHERE first_name IS NOT NULL` = 0) would show the
+  leftover, but the release steps do not say what to do then (restart the pod once more, so
+  `team migrate` runs again). The accepted case (an added plain row) has the same gap: until the next
+  pod start, Players, Team, Attendance, the training page and add/change all answer 500 (`all`
+  gives `StoreError::Invalid`); release step 4 should say "if not 0: restart the pod again".
+  - 2026-10-18: Fixed (branch `fix/encrypted-names-review`): `encrypt_plain_names` takes every row with a plain first name (`WHERE first_name IS NOT NULL`), so a rename or an add by the old pod is encrypted over the old value at the next `team migrate`; new test `a_rename_by_an_older_version_is_encrypted_over_the_old_name` (fails with the old query, checked). Release step 4 now checks both plain columns and says to restart the pod once more when the count is not 0.
+- **R2 – `serve` calls every database error "not reachable".** `main.rs` `serve` treats any
+  `StoreError::Database` from `check_key` as "cannot check the player name key now: the database
+  is not reachable". A reachable database without migration `0007` (for example `just serve` before
+  `just migrate`) gives an SQL error (column `first_name_enc` does not exist) and the same warning.
+  The behaviour is right (it starts, readiness reports the missing migration); only the log text
+  misleads. Low. How checked: trace of `check_key` and the `match` in `serve`; not run.
+  - 2026-10-18: Fixed: the warning says "cannot check the player name key now: the database cannot be read".
+- **R3 – limits of the stored form, for decision record 0021.** The stored value is
+  `1 + 12 + len(name) + 16` bytes (asserted in `the_same_name_is_sealed_differently_each_time`), so
+  a copy of the database shows the length in bytes of each first and last name. The AAD is the
+  column name only, so a value can be moved to another player's row (same column) and still
+  decrypts. Both are outside the accepted threat (a copy without the key, read-only), and no change
+  is needed, but the record should name them as known limits next to "not against cluster access".
+  How checked: reading `cipher.rs`.
+  - 2026-10-18: Not fixed in code (outside the accepted threat, a copy without the key); Close writes both limits in decision record 0021.
+- **R4 – "the same order" holds (checked).** The old list was `ORDER BY lower(first_name), …` in
+  the database; the new one is `Player::sort_key` (`to_lowercase`, code point order). They match
+  only if the database sorts by code point. Both the local and the cluster PostgreSQL are the
+  official `postgres:16-alpine` image (`compose.yaml`; `gitops-lab/.../postgresql-chart/values.yaml`),
+  whose musl `en_US.utf8` collation sorts by code point: a run on the local database of
+  `ORDER BY lower(n)` gave `anna marie, annabel, Eva, fleur, Zoe, Zoë, Émile`, which is also the
+  `to_lowercase` order. Not checked on the cluster database itself. The order would differ on a
+  glibc PostgreSQL (accents, spaces); worth one line in the record. Test 11 uses only ASCII names.
+  - 2026-10-18: No change needed.
+- **R5 – the claims about checks.** Run by the reviewer on 8eb37f2: `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (all pass,
+  including the 5 tests of `tests/player_names.rs`, `tests/player_name_logs.rs`, the 7 cipher
+  tests, the 2 new settings tests and the core `same_name` test), and
+  `cargo sqlx prepare --workspace --check` (passes). Not run: `lint-ci`, `api-types-check`,
+  `check-web`, `e2e`, `smoke`, and the hand checks of step 3 (`serve`/`migrate` with another key;
+  covered by tests 12 and 15). The flaky browser test noted under step 2 was not looked into. Can
+  a new test not fail? Checked by trace for tests 10, 11, 12, 13, 14, 15: each fails if its
+  behaviour breaks (test 11 inserts in reverse of the expected order; test 13 flips byte 13, the
+  first byte after version and nonce; test 15 keeps a plain row and checks it stays plain). No
+  test that cannot fail was found.
+  - 2026-10-18: No change needed. The full `just check` (with `lint-ci`, `api-types-check`, `check-web`, `e2e`) ran on the fix branch; the flaky browser test: see A6.
+- **R6 – documents the diff made false (for Close).** `docs/architecture.md`: the `crates/server`
+  row has no `cipher.rs`, and says nothing of the key check in `serve` or the encryption in
+  `migrate`; the `migrations/` row stops at `0006`; "Tables: `players` (first name, last name,
+  `hidden`)" no longer says how the names are stored. `CLAUDE.md` "Architecture": the server list
+  has no `cipher.rs` (the encryption of the player names) and `team migrate` now also needs
+  `PLAYER_NAME_KEY`. Decision record **0021** must exist with that number, because migration
+  `0007` names it (deviation of step 2). `README.md`, `.env.example`, the smoke test and the
+  Playwright settings are updated in the diff. How checked: search of `docs/architecture.md`,
+  `CLAUDE.md`, `README.md`, `Justfile` for `players`, `DATABASE_URL`, `same name`, `sorted`,
+  `migrate`.
+  - 2026-10-18: For Close: `docs/architecture.md`, `CLAUDE.md`, and decision record number 0021.
+
+### Accept review, 2026-10-18 (steps 1–3, release 1)
+Input: the mode `accept` and this change folder; nothing else was given. Read: `change.md`, the
+objective and expected results 1–5 in this file, the diff of `feat/encrypted-player-names` against
+`main` (commit 8eb37f2), the run of the tests; the **Deviations** and the build review only after
+the view below was formed. Scope: release 1 only. Step 4 is not built, so expected result 4 ("no
+plain-text columns are left") and the "no old row versions" half of result 1 cannot be judged yet;
+they need a look after step 4.
+
+**Verdict: accepted with notes.** What the coordinator meant – a copy of the database without the
+key shows no names, and the coordinator sees no change – is what release 1 builds. One gap (A1,
+the same as build finding R1) can silently break result 1 during the update; it is a small fix in
+the build, not a problem of the spec, and should be closed before the merge of release 1.
+
+Runs by the reviewer: `cargo test -p team --test player_names --test player_name_logs --test players
+--test players_storage` (23 pass), `cargo test -p team --lib` (29 pass, among them the 7 cipher and
+2 settings tests), the core `same_name` test (pass), and the browser tests `players.e2e.ts` and
+`trainings.e2e.ts` twice (run 1: 60 pass, 1 fail, 2 not run – see A6; run 2: 63 pass).
+
+- **A1 – result 1: a rename by the old pod during the update stays plain, and is lost (concerning
+  deviation).** The same as R1; confirmed by trace: `main`'s `update_name` writes
+  `first_name`/`last_name`, the 0007 CHECK allows it on a row that has `first_name_enc`, and
+  `encrypt_plain_names` selects only `WHERE first_name_enc IS NULL`. The result breaks both promises
+  at once: a plain name stays in the table without any sign (result 1), and the new pod shows the
+  old name, so the coordinator's change is gone (result 3). Small chance, cheap fix (R1's wider
+  `WHERE`, and a test). Until it is fixed, release step 4 should at least check
+  `first_name IS NOT NULL OR last_name IS NOT NULL` and say what to do when the count is not 0
+  (restart the pod once more). How checked: trace of both versions of the code; not run.
+  - 2026-10-18: Fixed with R1.
+- **A2 – result 3, "the same order": faithful adaptation.** The order moved from SQL
+  (`ORDER BY lower(...)`, the database's collation) to `Player::sort_key` (`to_lowercase`, code
+  point order). On the local PostgreSQL (`postgres:16-alpine`, musl, `en_US.utf8`) I ran
+  `ORDER BY lower(n)` on `Émile, Fleur, Zoë, de Vries, Dekker, Anne-Fleur, Anne Bakker, Annek`:
+  code point order (`… Fleur | Zoë | Émile`), the same as the new code; with `COLLATE "en-x-icu"`
+  the order is different (`Émile` before `Fleur`). So the order is the same only where the
+  database sorts by code point; R4 reads the cluster's chart as the same image. The cluster
+  database itself: not checked (a read on the cluster was not allowed in this review). The Team
+  page already used `sort_key`, so the lists now agree with each other in any case.
+  - 2026-10-18: No change needed.
+- **A3 – result 3, "the same warning": faithful adaptation, with one small drift.** `same_name` in
+  the core matches the old SQL for every name written through the API (`clean_name` trims, and turns
+  an empty last name into none). It does not match for a name written outside the API: the old SQL
+  treated a last name `''` as no last name (`coalesce(last_name, '')`), the new code does not, and
+  `encrypt_plain_names` encrypts the stored values as they are, without `clean_name`. The cluster's
+  players were entered after 2026-10-17; if any came in by hand-written SQL (an import), a last
+  name `''` or spaces around a name would be kept, and a same-name warning for that player could be
+  missed. Neutral drift; a check on the cluster before release 1
+  (`count(*) WHERE last_name = '' OR first_name <> btrim(first_name)`) settles it. How checked:
+  trace, and a search for every `INSERT INTO players` (only the API and tests); cluster data not
+  checked.
+  - 2026-10-18: Not fixed: on the cluster, 0 of the 14 players have an empty last name or spaces around a name (counted, no names shown, 2026-10-18), and both versions clean a name before they save it (`clean_name`), so no such row exists or can come from the app.
+- **A4 – result 5, the key: faithful adaptation.** Without `PLAYER_NAME_KEY` neither `serve`
+  (`Config`) nor `migrate` starts; a key that is not 32 bytes of base64 is refused without its
+  value in the message (tests 6–8 run). A wrong key stops `migrate` before it writes anything
+  (test 15) and stops `serve` when the database can be read (test 12 for `check_key`; the `serve`
+  path by trace). A name that cannot be read gives 500 and only the player id in the log (test 13
+  run). The deviation of step 3 (`serve` starts when the database cannot be reached) keeps the
+  intent, because the init container always checks the key against a working database first. One
+  case the spec already accepts: with no player stored yet, any key is taken, and the first name
+  written fixes the key; with the cluster's existing players this cannot happen at release 1.
+  - 2026-10-18: No change needed.
+- **A5 – result 2 and the data: faithful adaptation.** AES-256-GCM in the server, a new nonce from
+  `OsRng` for each value, version byte `1`, the column name as AAD (`cipher.rs`, tests 1–5 run).
+  New and changed names are written only to the encrypted columns, with the plain columns set to
+  NULL (test 10 run: no "Anna" or "Vries" bytes in the raw row). The existing players are
+  encrypted once with their ids, hidden state, roles and absences kept (test 14 run). No index on
+  a name exists (search of `migrations/` for `INDEX`). The old row versions with plain names stay in
+  the table file until step 4's `VACUUM FULL`; a `pg_dump` does not copy them.
+  - 2026-10-18: No change needed.
+- **A6 – a browser test failed once in my runs (neutral, not explained).** "a cancelled training
+  does not count, and counts again after \"Undo cancel\"" failed in 1 of 2 runs on
+  `expect(errors).toEqual([])`, the same test the builder saw fail (Progress, step 2). The test
+  calls `page.goto` while the overview may still be loading, so an aborted fetch is a likely cause,
+  unrelated to names; not proven. Whether it also fails on `main`: not checked.
+  - 2026-10-18: Not fixed: the cause is still not found (3 failures in the builder's runs, 1 in the reviewer's, many passing runs). Added to `docs/backlog.md` (Small) to check whether it also fails on the commit before this change.
+- **A7 – during the update the old pod cannot list players (neutral drift).** After `0007` the
+  plain columns are NULL for every player, and the v0.3.0 pod still serving reads them as
+  `NOT NULL` text, so its Players, Team and Attendance pages fail until the new pod takes over.
+  This is the "no change for the coordinator" promise broken for the minute of the update only,
+  and it follows from decision 0004's add-then-remove path; the release is done by the coordinator,
+  who can wait. Worth one line in the release steps. How checked: trace of `main`'s `players::all`
+  (`query!` on a column that was `NOT NULL` when it was compiled); not run.
+  - 2026-10-18: Fixed in the release steps: step 4 says that during the update (about a minute) the old pod cannot list players.

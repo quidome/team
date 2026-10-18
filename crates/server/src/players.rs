@@ -82,12 +82,13 @@ pub async fn update_name(
     Ok(result.rows_affected() == 1)
 }
 
-/// Encrypts the names of the players that still have plain names (from before the encryption,
-/// or written by an older version during an update) and empties the plain columns. Runs in
-/// `team migrate`; returns how many players it encrypted.
+/// Encrypts the names of the players that still have a plain first name, and empties the plain
+/// columns: players from before the encryption, and players that an older version added or renamed
+/// during an update (it writes both plain columns, so a plain name is always the newer one, also
+/// over an encrypted name). Runs in `team migrate`; returns how many players it encrypted.
 pub async fn encrypt_plain_names(tx: &mut PgConnection, key: &NameKey) -> Result<u64, StoreError> {
     let rows = sqlx::query!(
-        "SELECT id, first_name, last_name FROM players WHERE first_name_enc IS NULL
+        "SELECT id, first_name, last_name FROM players WHERE first_name IS NOT NULL
          ORDER BY id FOR UPDATE"
     )
     .fetch_all(&mut *tx)

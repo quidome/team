@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, first_name, last_name FROM players WHERE first_name_enc IS NULL\n         ORDER BY id FOR UPDATE",
+  "query": "SELECT id, first_name, last_name FROM players WHERE first_name IS NOT NULL\n         ORDER BY id FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       true
     ]
   },
-  "hash": "b9b48edc8d1ed41e755778e0e877df3073539b652a9d88cb16e6c23ecec7694e"
+  "hash": "b7a6c48c0410f126305ab6e1474d1302b79a61574420afe8ac7843c5603e3385"
 }
