@@ -10,7 +10,7 @@ Let the coordinator keep the club's players, the team of the current season with
 role, the weekly trainings, and the reasons for an absence, so that story B can mark attendance.
 
 ## Requirements summary
-Story A of the epic [Attendance at training](../../2026-10-14-attendance-at-training/technical.md),
+Story A of the epic [Attendance at training](../2026-10-14-attendance-at-training/technical.md),
 from functional stories 1, 2 (the weekly trainings) and 4, as approved again on 2026-10-16 (story 1 changed after the second reviews of this story, approved after the sixth spec review). Words
 from `docs/language.md` (player, role, hidden, weekly training, training day).
 

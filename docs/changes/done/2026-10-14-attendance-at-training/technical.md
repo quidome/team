@@ -1,6 +1,6 @@
 # Technical spec: Attendance at training
 
-**Status**: approved (designed again 2026-10-16 after the change of the functional spec)
+**Status**: done (designed again 2026-10-16 after the change of the functional spec)
 **Size**: epic
 **Change**: docs/changes/2026-10-14-attendance-at-training
 **Date**: 2026-10-15, changed 2026-10-16
@@ -87,9 +87,9 @@ Each story has its own change folder and its own `/design`.
 
 | # | Story | Type | Scope | Depends on | Expected closure | Status |
 |---|---|---|---|---|---|---|
-| A | [Players and settings](../done/2026-10-15-players-and-settings/) | feature | Rewrite migration `0005`: `players` (with hidden), `player_roles`, `reasons` (6 presets), `weekly_trainings`. Core `players` (`change_role`, `remove_from_team`, `undo_removal`, `proposed_start` = 1 September, hidden in "Add all") and `training` (weekly trainings, check, proposed window, training days). API and pages `/players` and `/players/[id]` (all players, hidden, history with "Correct", delete), `/team` ("Add player", "Change role", "Remove from the team" with "Undo", "Add to the team", "Add all" with a date), `/settings` (weekly trainings: add, change, delete; reasons). Links from the start page. Built first in the old form on its branch; its design says what stays. | – | review build + accept | done |
-| B | [Trainings and attendance](../done/2026-10-17-trainings-and-attendance/) | feature | Migration `trainings` (date unique), `absences`. Core: the list of a season (one row per date), `next_training`, the players at a training, the proposal of last season's weekly trainings. API and pages `/training/[date]` (open, absences, "Change" of date and times, cancel and undo, delete any training, "No player has a role on this date."), "Add training", the start page card, the list of the season. Trainings of an earlier season stay open. | A | review build + accept | done |
-| C | [The overview](../done/2026-10-17-the-overview/) | feature | Core `season_overview`. API and page `/attendance`: totals, "Left the team", "N training days not opened", "Show cancelled", earlier seasons, the missed trainings of a player. | B | review build + accept | done |
+| A | [Players and settings](../2026-10-15-players-and-settings/) | feature | Rewrite migration `0005`: `players` (with hidden), `player_roles`, `reasons` (6 presets), `weekly_trainings`. Core `players` (`change_role`, `remove_from_team`, `undo_removal`, `proposed_start` = 1 September, hidden in "Add all") and `training` (weekly trainings, check, proposed window, training days). API and pages `/players` and `/players/[id]` (all players, hidden, history with "Correct", delete), `/team` ("Add player", "Change role", "Remove from the team" with "Undo", "Add to the team", "Add all" with a date), `/settings` (weekly trainings: add, change, delete; reasons). Links from the start page. Built first in the old form on its branch; its design says what stays. | – | review build + accept | done |
+| B | [Trainings and attendance](../2026-10-17-trainings-and-attendance/) | feature | Migration `trainings` (date unique), `absences`. Core: the list of a season (one row per date), `next_training`, the players at a training, the proposal of last season's weekly trainings. API and pages `/training/[date]` (open, absences, "Change" of date and times, cancel and undo, delete any training, "No player has a role on this date."), "Add training", the start page card, the list of the season. Trainings of an earlier season stay open. | A | review build + accept | done |
+| C | [The overview](../2026-10-17-the-overview/) | feature | Core `season_overview`. API and page `/attendance`: totals, "Left the team", "N training days not opened", "Show cancelled", earlier seasons, the missed trainings of a player. | B | review build + accept | done |
 
 ## Decisions
 | Decision | Reason | Decision record? |
@@ -131,7 +131,7 @@ Each story has its own change folder and its own `/design`.
 - [x] Story A: players and settings (built once in the first form and reviewed; designed again 2026-10-16; steps 5–9 on 2026-10-17; closed 2026-10-17, decision 0018)
 - [x] Story B: trainings and attendance (closed 2026-10-17, decision 0020)
 - [x] Story C: the overview (closed 2026-10-17; no decision record, decision 0020 holds the counting rule)
-- [ ] Epic review accept
+- [x] Epic review accept (2026-10-18: accepted with notes, A1–A4)
 
 ## Deviations
 - 2026-10-15, during /design, agreed by the coordinator: the functional spec was changed after approval, without a third spec review: a player has no dates; a role in the team of a season has a start and an end.
@@ -145,3 +145,68 @@ The design reads the spec more strictly within its words:
 - A weekly training's window is inside one season; the season of a weekly training is the season of its window.
 
 ## Review findings
+
+### Epic review accept (2026-10-18)
+Fresh agent (`/review accept`), on branch `feat/the-overview` at `7651be1` (stories A and B
+merged, story C on the branch). The arguments held only the mode and the change folder. Read:
+`functional.md`, `idea.md`, `change.md`, this file up to **Deviations** (read after forming the
+view), `docs/language.md`. Not read: `docs/changes/done/`.
+
+How it was checked: the front end and server built from the branch and run against a throwaway
+database (`team_accept_review`, dropped afterwards) with the debug clock on Tue 20 Oct 2026 19:40
+Dutch time, the login bypass, 390 and 320 pixels wide. The coordinator's October set-up was walked
+through in the browser (weekly training, "Add player", open Tue 1 Sep from the link "7 training
+days not opened", one tap for "Ill"), the rest seeded through the API: 5 players (one from Sun
+4 Oct, one removed from Wed 7 Oct), trainings since 1 Sep, a training day cancelled unopened, an
+opened training cancelled with an absence, an extra training Thu 15 Oct, an absence in advance on
+Tue 27 Oct. A second server with the clock on 10 Jul 2027 checked the new season. Rows with
+"(run)" were seen on the running program.
+
+| Criterion | Result |
+|---|---|
+| Story 5 totals (run) | Every count matched a hand count: 7 trainings for the players since 1 Sep, 4 for the player from 4 Oct; today counts, Tue 27 Oct with an advance absence does not; both cancelled trainings left out. After "Undo cancel" the kept absence counts again; "Injured" made not valid moves the count from valid to not valid; the role "Correct"ed back to open makes an absence after the old end count; a player after "Change role" is counted once; a hidden player keeps its row. |
+| "Left the team" (run) | The removed player shows under "Left the team" with the trainings of its role only; its absence after the last day is kept and not counted. |
+| Missed trainings (run) | A tap on a player lists date and reason, newest first, without the absence at a cancelled training. |
+| "N training days not opened" (run) | "7 training days not opened" with the link to Tue 1 Sep; today's training day is not counted; it is gone when every past day is opened or cancelled. |
+| Earlier seasons (run) | The choice "Season" shows once a second season has data; 2025-2026 shows its totals, "3 training days not opened", its list without "Add training", rows that still open. |
+| New season (run, clock 10 Jul 2027) | No roles; "Players of last season" holds last season's team without the hidden player, each with its last role; settings propose the Tuesday with the window Tue 7 Sep – Tue 30 May; no training card. |
+| Stories 2 and 3 (run) | Card "Training · Tue 20 Oct · 19:45" with "1 absent"; the list "Coming" above "Past", one row per date, "· extra" on Thu 15 Oct, "Cancel" on rows not opened; the player from 4 Oct not shown on 1 Sep; reasons open on a tap and save at once; "Delete training" makes a training day "Not opened" again; "Change" to a date with a training gives `training_exists`, outside the season `outside_season`; overlapping weekly trainings give `weekly_trainings_overlap`. A failed tap was not reproduced by hand (the page keeps its own `fetch`); `web/e2e/trainings.e2e.ts` covers it with `page.route` (500 and a request that never answers). |
+| Story 1 (run) | "Add player" filled with 1 Sep and "Today"; "Remove from the team" filled with today and "Tomorrow"; a removal that also removes the planned "Only trains · from Sun 1 Nov" asks first and names it; then "Last day today" and "Undo"; "Undo" puts both roles back; "Change role" to the same role gives `same_role`; moving a start earlier answers with the trainings where the player now counts as there. |
+| Phone (run) | No sideways scroll at 320 pixels on Team, Attendance (with a player opened) and Training; rows large enough for a thumb at 390 pixels. |
+
+A1 – **faithful adaptation.** The link "N training days not opened" leads to the training page
+with "Open training" and the line "Opening it makes it count, with every player there.", so it
+takes one tap more than a row of the list or the card, which open at once. It follows Bruce's
+warning that the coordinator must see a day is "Not opened" before it is opened, and the link is
+not a tap on a training in the spec's sense.
+
+A2 – **faithful adaptation.** In an earlier season, players whose role ran to 30 June are in the
+totals, not under "Left the team" (the spec's rule "none today or later" would put everyone
+there once the season is over). The choice of season shows only when there is more than one
+season to choose.
+
+A3 – **neutral drift.** Dates read "Tue 1 Sept", "Tue 29 Sept" where the spec writes "Tue 1 Sep".
+The pages use the same date format as the schedule (`formatDay`, `en-GB`), which is what
+**Consistency** asks; only the spec's examples differ.
+
+A4 – **note, not a deviation.** Built as the spec says ("Coming" above "Past", the whole season),
+but at 390 pixels on 20 Oct the past trainings start below 32 rows of "Coming", near the end of
+a page about 3,200 pixels long. Entering the trainings since 1 September goes through the link "N
+training days not opened" and needs no scroll; correcting last week's training means scrolling
+past the rest of the season each time (less so as the season goes on). The coordinator may want to see this on the phone; if it matters, it is a
+line for `docs/ideas.md` (it fits the idea of the start page with past and coming events), not a
+correction of this epic.
+
+Nothing found that is a concerning deviation. Each acceptance criterion of stories 1 to 5 that was
+run behaves as meant; the open points of `idea.md` (last name optional, times, set-up of the
+schedule, what counts, joins and leaves, reasons changed later, where it lives, correcting the
+past, a new season) are each settled in the spec and built that way.
+
+**Verdict: accepted with notes** (A4 for the coordinator to look at on the phone).
+
+Answers of the builder:
+- A1 – 2026-10-18: nothing to fix (faithful; the extra tap keeps "Not opened" visible before a day is opened).
+- A2 – 2026-10-18: nothing to fix (the design of story C: an earlier season is grouped on 30 June; the choice shows with more than one season).
+- A3 – 2026-10-18: nothing to fix ("Sept" is the date format of the schedule, as the spec's consistency rule asks).
+- A4 – 2026-10-18: not changed in this epic (built as specified); the coordinator's choice: a line in `docs/ideas.md`, next to the start page idea, to look at on the phone after the release.
+

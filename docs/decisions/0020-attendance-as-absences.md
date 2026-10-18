@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-17
-**Change**: [2026-10-17-trainings-and-attendance](../changes/done/2026-10-17-trainings-and-attendance/) (story B of [attendance at training](../changes/2026-10-14-attendance-at-training/))
+**Change**: [2026-10-17-trainings-and-attendance](../changes/done/2026-10-17-trainings-and-attendance/) (story B of [attendance at training](../changes/done/2026-10-14-attendance-at-training/))
 
 The number 0019 is not used. The header of migration `0005` names decision 0018 (players, roles
 and weekly trainings) as "0019", the number planned before that record was written; an applied

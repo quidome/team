@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-17
-**Change**: [2026-10-15-players-and-settings](../changes/done/2026-10-15-players-and-settings/) (story A of [attendance at training](../changes/2026-10-14-attendance-at-training/))
+**Change**: [2026-10-15-players-and-settings](../changes/done/2026-10-15-players-and-settings/) (story A of [attendance at training](../changes/done/2026-10-14-attendance-at-training/))
 
 ## Context
 Attendance at training brings the first data that exists only in the tool: players, who is in the

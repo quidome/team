@@ -8,7 +8,7 @@ created: 2026-10-17
 
 # Trainings and attendance
 
-Story B of the epic [Attendance at training](../../2026-10-14-attendance-at-training/). The
+Story B of the epic [Attendance at training](../2026-10-14-attendance-at-training/). The
 coordinator opens a training (or adds one), marks who is absent and why in one tap each, changes,
 cancels or deletes a training, and enters the trainings since 1 September. The start page shows
 the next training. The functional spec is the epic's (`functional.md`, stories 2 and 3, and the

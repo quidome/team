@@ -1,6 +1,6 @@
 # Functional spec: Attendance at training
 
-**Status**: approved (changed after the second accept and build review of story A, approved again 2026-10-16 after the sixth spec review)
+**Status**: done (approved; changed after the second accept and build review of story A, approved again 2026-10-16 after the sixth spec review)
 **Change**: docs/changes/2026-10-14-attendance-at-training
 **Date**: 2026-10-15, changed 2026-10-16
 
