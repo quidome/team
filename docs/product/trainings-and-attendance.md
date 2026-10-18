@@ -62,7 +62,7 @@ or an earlier season.
 - "No player has a role on this date." – a training with no player in a role.
 - "No reasons. Add one in Reasons." – all reasons hidden: only "There" is offered.
 - A tap that reaches the server after its 10 seconds is saved, but shown as not saved until the page loads again.
-- "Add training" is only for the current season. One training per date. Logs carry dates and player ids, never names. The data exists only in the tool, and there is no backup yet.
+- "Add training" is only for the current season. One training per date. Logs carry dates and player ids, never names. The data exists only in the tool. A nightly encrypted copy of the database is kept on the home storage (TrueNAS), not yet outside the house.
 
 ## Interface
 - Screens: `/attendance` (with `?season=` for another season), `/training/[date]`; the card and the link on the start page (`/`). The start page keeps the line "Attendance · Team · Players · Settings"; "Attendance" has no links to the other pages.

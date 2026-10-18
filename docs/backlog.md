@@ -2,8 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. Backup of the whole team database – owned by `gitops-lab` (the team deployment, `applications/productivity/team`), as a technical change there: a nightly dump, encrypted before it leaves the cluster (the key also kept outside the platform), to a TrueNAS share off the cluster, with retention, written restore steps and one tested restore. Start: `/design technical: …` in a session in `gitops-lab`. Since v0.3.0 the players and attendance exist only in this database (coordinator, 2026-10-18; the choice of 2026-10-15 to wait is over).
-2. Store the player names encrypted in the database (AES-256-GCM in the app, the key from Vault and also kept outside the platform), so a copy of the database or a backup does not show who the players are; sorting and the same-name warning move from SQL to the core; existing players are encrypted once. After the backup. Start: `/design technical: …` in this repository (coordinator, 2026-10-18).
+1. Store the player names encrypted in the database (AES-256-GCM in the app, the key from Vault and also kept outside the platform), so a copy of the database or a backup does not show who the players are; sorting and the same-name warning move from SQL to the core; existing players are encrypted once. The nightly backup runs (since 2026-10-18). Start: `/design technical: …` in this repository (coordinator, 2026-10-18).
 
 Small:
 - A new game that the coordinator has not seen, confirmed as gone and then back in the game list, shows as "came back" instead of "new", so it is not in the summary line of new games (epic review accept A2; `update_open_changes` and `change_between` in `crates/core/src/comparison.rs`).

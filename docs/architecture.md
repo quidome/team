@@ -149,7 +149,7 @@ pull requests read them. GitHub does not use Nix; locally the Nix shell gives th
 - GitHub actions from other parties are fixed to a major version, not to an exact commit. Fix together with automatic dependency updates (idea in `docs/ideas.md`).
 - The cluster follows the moving name `latest`; pinning to a fixed version is planned in the `gitops-lab` README before production use.
 - The cached image build after a code-only push to `main` is not yet measured on GitHub (run 5 of the pipeline change; locally 27 s). Measure at the next code change.
-- No backup covers the players, roles, weekly trainings and reasons, the first data that exists only in the tool (the coordinator's choice, 2026-10-15; backlog).
+- The team database has a nightly dump at 01:30, encrypted with age in the cluster (the private key only outside the platform), on a TrueNAS share with retention, with recovery steps and one tested restore. It is built and owned by `gitops-lab` (the team deployment). It is on TrueNAS only, the same system as the database volume, so it is not yet a full backup; the off-site copy is on the `gitops-lab` backlog.
 - The overlap of roles and of weekly trainings is checked in the core under a lock, not by the database (no `btree_gist` on the cluster; decision 0018). A write that skips the lock or the core is not stopped.
 - "Undo" trusts the roles the page sends back; the core checks only that the removal of them gives the stored roles, and `check_role` (decision 0018).
 - That one refusal undoes the whole "Add all" is checked by reading the code (one transaction); the only refusal a test can reach fails on the first player.

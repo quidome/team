@@ -52,7 +52,7 @@ the settings ("Attendance · Team · Players · Settings").
 - "This no longer exists. Load the page again." – a player deleted on another screen.
 - Players and roles only of the current season can be changed; one team per season; one coordinator. Two screens: the last save wins, and every check uses the stored roles.
 - Player names never go to the log (ids only).
-- The data exists only in the tool, and there is no backup yet.
+- The data exists only in the tool. A nightly encrypted copy of the database is kept on the home storage (TrueNAS), not yet outside the house.
 
 ## Interface
 - Screens: `/players`, `/players/[id]`, `/team`; the links on the start page (`/`).
