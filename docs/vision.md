@@ -114,3 +114,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-18 | Where we are: attendance at training is released (v0.3.0) and runs on the cluster |
 | 2026-10-18 | Where we are: a nightly encrypted copy of the team database exists (built in `gitops-lab`); encrypted player names come next |
 | 2026-10-18 | Where we are: the player names are stored encrypted (v0.3.1, v0.3.2) |
+| 2026-10-18 | Word list: "duty place" added (one place at a game that a player of the team must fill), from `/vision duties` |

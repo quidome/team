@@ -22,6 +22,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | duty | A task a player must do for a game: drive, jury or referee. | Not "task" for these. |
 | drive | The duty to drive players to an away game. | |
 | jury / referee | The duty to fill a jury or referee place at another club game. | |
+| duty place | One place at a game that a player of the team must fill: one driver at an away game of the team, or one jury or referee place at a home game of another club team, as the club gives them to the team. A game can have several. | "2 jury places", "3 drivers". Not "slot", not "spot". |
 | duty total | How many duties a player has done. Shows that the work is shared fairly. | |
 | message | Text the tool produces for the coordinator to copy into the chat. | The tool never "sends". |
 | referee committee | The club group that wants to know which players do which jury and referee duties. | |
