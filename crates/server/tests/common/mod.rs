@@ -37,6 +37,8 @@ pub const ORIGIN: &str = "https://team.example.test";
 pub const CLIENT_ID: &str = "team-coordinator";
 pub const CLIENT_SECRET: &str = "client-secret-for-tests";
 pub const SESSION_SECRET: &str = "0123456789abcdef0123456789abcdef";
+/// 32 bytes of 7 in base64.
+pub const PLAYER_NAME_KEY: &str = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=";
 pub const SIGNING_KEY: &str = include_str!("../data/test-signing-key.pem");
 pub const OTHER_KEY: &str = include_str!("../data/test-other-key.pem");
 /// The inline start script of the test front end; its hash must be in the security policy.
@@ -69,6 +71,7 @@ pub fn config_with(issuer: &str, overrides: &[(&str, &str)]) -> Config {
             "OIDC_CLIENT_ID" => CLIENT_ID,
             "OIDC_CLIENT_SECRET" => CLIENT_SECRET,
             "SESSION_SECRET" => SESSION_SECRET,
+            "PLAYER_NAME_KEY" => PLAYER_NAME_KEY,
             "ORIGIN" => ORIGIN,
             _ => return None,
         };

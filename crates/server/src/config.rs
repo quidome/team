@@ -8,6 +8,8 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use url::Url;
 
+use crate::cipher::NameKey;
+
 const MIN_SESSION_SECRET_LEN: usize = 32;
 const DEFAULT_GAME_LIST_URL: &str = "https://db.basketball.nl";
 
@@ -27,6 +29,8 @@ pub struct Config {
     pub oidc_client_id: String,
     pub oidc_client_secret: String,
     pub session_secret: String,
+    /// The key of the encrypted player names.
+    pub player_name_key: NameKey,
     pub origin: Url,
     pub session_ttl: Duration,
     pub access_role: String,
@@ -83,6 +87,8 @@ impl Config {
             });
         }
 
+        let player_name_key = player_name_key(&required("PLAYER_NAME_KEY")?)?;
+
         let session_ttl_seconds = match optional("SESSION_TTL_SECONDS") {
             None => 28_800,
             Some(value) => parse_positive("SESSION_TTL_SECONDS", &value)?,
@@ -129,6 +135,7 @@ impl Config {
             oidc_client_id: required("OIDC_CLIENT_ID")?,
             oidc_client_secret: required("OIDC_CLIENT_SECRET")?,
             session_secret,
+            player_name_key,
             origin: parse_url("ORIGIN", &required("ORIGIN")?)?,
             session_ttl: Duration::from_secs(session_ttl_seconds),
             access_role: optional("TEAM_ACCESS_ROLE")
@@ -146,6 +153,14 @@ impl Config {
             dev_now,
         })
     }
+}
+
+/// Reads `PLAYER_NAME_KEY`; the error never contains the value.
+pub fn player_name_key(value: &str) -> Result<NameKey, ConfigError> {
+    NameKey::from_base64(value).map_err(|error| ConfigError::Invalid {
+        name: "PLAYER_NAME_KEY",
+        reason: error.to_string(),
+    })
 }
 
 fn parse_url(name: &'static str, value: &str) -> Result<Url, ConfigError> {
@@ -181,6 +196,9 @@ mod tests {
 
     use super::*;
 
+    /// 32 bytes of 7 in base64.
+    const PLAYER_NAME_KEY: &str = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=";
+
     fn settings(overrides: &[(&str, Option<&str>)]) -> Result<Config, ConfigError> {
         let mut values: HashMap<String, String> = [
             (
@@ -191,6 +209,7 @@ mod tests {
             ("OIDC_CLIENT_ID", "team-coordinator"),
             ("OIDC_CLIENT_SECRET", "client-secret"),
             ("SESSION_SECRET", "0123456789abcdef0123456789abcdef"),
+            ("PLAYER_NAME_KEY", PLAYER_NAME_KEY),
             ("ORIGIN", "https://team.example.test"),
         ]
         .into_iter()
@@ -294,6 +313,38 @@ mod tests {
         assert!(!output.contains("client-secret"));
         assert!(!output.contains("0123456789abcdef"));
         assert!(!output.contains("postgresql://"));
+        assert!(!output.contains(PLAYER_NAME_KEY));
+        assert!(!output.contains("BwcH"));
         Ok(())
+    }
+
+    #[test]
+    fn names_a_missing_player_name_key() {
+        let error = settings(&[("PLAYER_NAME_KEY", None)]).err();
+        assert_eq!(error, Some(ConfigError::Missing("PLAYER_NAME_KEY")));
+        assert!(
+            error.is_some_and(|error| {
+                error.to_string() == "setting PLAYER_NAME_KEY is required"
+            })
+        );
+    }
+
+    #[test]
+    fn refuses_a_player_name_key_that_is_not_32_bytes_of_base64() {
+        // 31 bytes, then text that is not base64.
+        for value in [
+            "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw==",
+            "secret-not-base64!",
+        ] {
+            let error = settings(&[("PLAYER_NAME_KEY", Some(value))]).err();
+            assert!(matches!(
+                &error,
+                Some(ConfigError::Invalid {
+                    name: "PLAYER_NAME_KEY",
+                    ..
+                })
+            ));
+            assert!(error.is_some_and(|error| !error.to_string().contains(value)));
+        }
     }
 }

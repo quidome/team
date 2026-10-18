@@ -12,6 +12,8 @@ runtime=${1:?usage: smoke-test.sh RUNTIME_IMAGE MIGRATION_IMAGE}
 migration=${2:?usage: smoke-test.sh RUNTIME_IMAGE MIGRATION_IMAGE}
 admin_url=postgresql://team:team@localhost:5432/postgres
 database_url=postgresql://team:team@localhost:5432/team_smoke
+# 32 bytes of 7 in base64; only for the smoke test.
+player_name_key=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
 containers=()
 
 cleanup() {
@@ -43,6 +45,7 @@ start() {
         -e OIDC_CLIENT_ID=team-coordinator \
         -e OIDC_CLIENT_SECRET=smoke-test \
         -e SESSION_SECRET=smoke-test-secret-of-at-least-32-chars \
+        -e PLAYER_NAME_KEY="$player_name_key" \
         -e ORIGIN="http://localhost:$port" \
         -e PORT="$port" \
         "${env_args[@]}" \
@@ -69,7 +72,7 @@ psql "$admin_url" -qc 'DROP DATABASE IF EXISTS team_smoke' -c 'CREATE DATABASE t
 
 for run in 1 2; do
     docker run --rm --network host --read-only --user 1000:1000 \
-        -e DATABASE_URL="$database_url" "$migration" >/dev/null \
+        -e DATABASE_URL="$database_url" -e PLAYER_NAME_KEY="$player_name_key" "$migration" >/dev/null \
         || fail "migration run $run failed"
     echo "ok   migration run $run"
 done

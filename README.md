@@ -76,9 +76,9 @@ Never apply it by hand. The image keeps this contract:
 | Item | Value |
 |---|---|
 | Ports and probes | 3000; `GET /api/health/liveness`, `GET /api/health/readiness` |
-| Commands | `runtime`: `team serve`; `migration` (init container): `team migrate` |
+| Commands | `runtime`: `team serve`; `migration` (init container): `team migrate` (needs `DATABASE_URL` and `PLAYER_NAME_KEY`) |
 | Security | user and group 1000, read-only root file system |
-| Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET` |
+| Settings from Vault | `DATABASE_URL`, `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_SECRET`, `PLAYER_NAME_KEY` (32 random bytes in base64, the key of the encrypted player names; a copy is kept outside the platform, because without it the names in the database and in every backup are lost) |
 | Other settings | `ORIGIN`, `SESSION_TTL_SECONDS`, `DEV_AUTH_BYPASS` and `DEV_NOW` (a start moment for the clock, for example `2026-10-12T10:00:00Z`; both ignored by release builds), optional `TEAM_ACCESS_ROLE` (default `team_coordinator`), `GAME_LIST_URL` (default `https://db.basketball.nl`; the cluster uses the default), `HOST`, `PORT`, `WEB_DIR` |
 
 ### Switching from the old app (done)

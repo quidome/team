@@ -6,6 +6,9 @@ use std::time::Duration;
 use sqlx::migrate::Migrator;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgConnection, PgPool};
+use team_core::PlayerId;
+
+use crate::cipher::CipherError;
 
 /// The SQL files in `migrations/`, compiled into the binary.
 pub static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
@@ -44,6 +47,14 @@ pub enum StoreError {
     Database(#[from] sqlx::Error),
     #[error("stored data is not valid: {0}")]
     Invalid(String),
+    /// Names only the player's id, never the name.
+    #[error("the name of player {} cannot be read: {error}", player.0)]
+    Name {
+        player: PlayerId,
+        error: CipherError,
+    },
+    #[error("a name cannot be encrypted: {0}")]
+    Seal(CipherError),
 }
 
 impl StoreError {
@@ -53,7 +64,7 @@ impl StoreError {
             Self::Database(error) => error
                 .as_database_error()
                 .is_some_and(|error| error.is_foreign_key_violation()),
-            Self::Invalid(_) => false,
+            Self::Invalid(_) | Self::Name { .. } | Self::Seal(_) => false,
         }
     }
 
@@ -63,7 +74,7 @@ impl StoreError {
             Self::Database(error) => error
                 .as_database_error()
                 .is_some_and(|error| error.is_unique_violation()),
-            Self::Invalid(_) => false,
+            Self::Invalid(_) | Self::Name { .. } | Self::Seal(_) => false,
         }
     }
 }

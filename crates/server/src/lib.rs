@@ -4,6 +4,7 @@ pub mod api;
 pub mod app;
 pub mod auth;
 pub mod changes;
+pub mod cipher;
 pub mod clock;
 pub mod config;
 pub mod db;

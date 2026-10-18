@@ -4,9 +4,15 @@
 
 use chrono::{NaiveDate, NaiveTime, TimeZone, Utc, Weekday};
 use sqlx::PgPool;
+use team::cipher::NameKey;
 use team::weekly_trainings::{self, WeeklyTrainingData};
 use team::{players, reasons};
 use team_core::{Role, Season, WeeklyTrainingId};
+
+/// 32 bytes of 7 in base64, as in `common`.
+fn key() -> NameKey {
+    NameKey::from_base64("BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=").unwrap()
+}
 
 fn date(year: i32, month: u32, day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(year, month, day).unwrap()
@@ -66,7 +72,9 @@ async fn a_new_reason_comes_last_and_a_taken_name_is_refused(pool: PgPool) {
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_player_with_two_roles_is_read_back_with_both(pool: PgPool) {
     let now = Utc.with_ymd_and_hms(2026, 10, 12, 8, 0, 0).unwrap();
-    let id = players::insert(&pool, "Avery", None, now).await.unwrap();
+    let id = players::insert(&pool, &key(), "Avery", None, now)
+        .await
+        .unwrap();
     players::insert_role(
         &pool,
         id,
@@ -106,7 +114,9 @@ async fn a_player_with_two_roles_is_read_back_with_both(pool: PgPool) {
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn deleting_a_player_deletes_its_roles(pool: PgPool) {
     let now = Utc.with_ymd_and_hms(2026, 10, 12, 8, 0, 0).unwrap();
-    let id = players::insert(&pool, "Avery", None, now).await.unwrap();
+    let id = players::insert(&pool, &key(), "Avery", None, now)
+        .await
+        .unwrap();
     players::insert_role(
         &pool,
         id,
@@ -118,7 +128,7 @@ async fn deleting_a_player_deletes_its_roles(pool: PgPool) {
     .await
     .unwrap();
     assert!(players::delete(&pool, id).await.unwrap());
-    assert!(players::by_id(&pool, id).await.unwrap().is_none());
+    assert!(players::by_id(&pool, &key(), id).await.unwrap().is_none());
     assert!(players::roles_of(&pool, id).await.unwrap().is_empty());
     assert!(!players::delete(&pool, id).await.unwrap());
 }
@@ -187,11 +197,25 @@ async fn a_weekly_training_is_read_back_changed_and_deleted(pool: PgPool) {
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_player_is_not_hidden_until_it_is_set(pool: PgPool) {
     let now = Utc.with_ymd_and_hms(2026, 10, 12, 12, 0, 0).unwrap();
-    let id = players::insert(&pool, "Avery", None, now).await.unwrap();
-    assert!(!players::by_id(&pool, id).await.unwrap().unwrap().hidden);
+    let id = players::insert(&pool, &key(), "Avery", None, now)
+        .await
+        .unwrap();
+    assert!(
+        !players::by_id(&pool, &key(), id)
+            .await
+            .unwrap()
+            .unwrap()
+            .hidden
+    );
     assert!(players::set_hidden(&pool, id, true).await.unwrap());
-    assert!(players::by_id(&pool, id).await.unwrap().unwrap().hidden);
-    assert!(players::all(&pool).await.unwrap()[0].hidden);
+    assert!(
+        players::by_id(&pool, &key(), id)
+            .await
+            .unwrap()
+            .unwrap()
+            .hidden
+    );
+    assert!(players::all(&pool, &key()).await.unwrap()[0].hidden);
     assert!(
         !players::set_hidden(&pool, team_core::PlayerId(id.0 + 1), true)
             .await

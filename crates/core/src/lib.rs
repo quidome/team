@@ -31,7 +31,7 @@ pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, 
 pub use players::{
     Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,
     RoleDates, RoleId, TeamPage, change_role, check_change, check_role, clean_name, place,
-    proposed_start, remove_from_team, role_on, team, undo_removal,
+    proposed_start, remove_from_team, role_on, same_name, team, undo_removal,
 };
 pub use reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
