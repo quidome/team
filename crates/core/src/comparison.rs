@@ -203,7 +203,12 @@ pub fn update_open_changes(
         match open_by_id.get(&source_id) {
             Some(open) => {
                 let change = change_between(open.last_seen.as_ref(), now, club, team, today);
-                if change.is_none() {
+                // A game that leaves the game list before its change was seen keeps the open
+                // change, with nothing to show while it is gone: if it comes back, it is compared
+                // with what the coordinator last saw, so a game never seen is "new", not "came
+                // back". A past game lets it go.
+                let kept_while_gone = !now.in_list && now.game.date >= today;
+                if change.is_none() && !kept_while_gone {
                     updates.push(ChangeUpdate::Remove { source_id });
                 } else if before != Some(now) {
                     updates.push(ChangeUpdate::Touch { source_id });
@@ -889,10 +894,77 @@ mod tests {
     }
 
     #[test]
-    fn a_new_game_that_is_gone_before_it_is_seen_has_no_change() {
+    fn a_new_game_that_is_gone_before_it_is_seen_keeps_its_change_with_nothing_to_show() {
         let open = [open(1, None)];
         assert_eq!(
             updates(&open, &stored(&[at(10)]), &[]),
+            [ChangeUpdate::Touch { source_id: 1 }]
+        );
+        let gone = StoredGame {
+            game: at(10),
+            in_list: false,
+        };
+        assert_eq!(
+            list_changes(open.to_vec(), &[gone.clone()], CLUB, TEAM, TODAY),
+            []
+        );
+        // While it stays gone, nothing happens.
+        assert_eq!(updates(&open, &[gone], &[]), []);
+    }
+
+    #[test]
+    fn a_new_game_that_is_gone_and_back_before_it_is_seen_is_still_new() {
+        let open = [open(1, None)];
+        let gone = StoredGame {
+            game: at(10),
+            in_list: false,
+        };
+        assert_eq!(
+            updates(&open, &[gone], &[at(10)]),
+            [ChangeUpdate::Touch { source_id: 1 }]
+        );
+        let listed = list_changes(open.to_vec(), &stored(&[at(10)]), CLUB, TEAM, TODAY);
+        let kinds: Vec<_> = listed.iter().map(|listed| listed.change.clone()).collect();
+        assert_eq!(kinds, [Change::New]);
+    }
+
+    #[test]
+    fn a_game_never_seen_in_the_schedule_that_is_gone_and_back_comes_into_the_schedule() {
+        // Last seen outside the schedule: a game of two other clubs' teams that became a home
+        // game of another club team, not seen yet, then gone and back.
+        let outside = game(1, OPPONENT, OPPONENT);
+        let inside = game(1, CLUB_TEAM, OPPONENT);
+        let open = [open(1, Some(outside))];
+        let gone = StoredGame {
+            game: inside.clone(),
+            in_list: false,
+        };
+        assert_eq!(
+            updates(&open, &[gone], &[inside.clone()]),
+            [ChangeUpdate::Touch { source_id: 1 }]
+        );
+        let listed = list_changes(open.to_vec(), &stored(&[inside]), CLUB, TEAM, TODAY);
+        assert!(
+            matches!(
+                listed.as_slice(),
+                [ListedChange {
+                    change: Change::IntoSchedule(_),
+                    ..
+                }]
+            ),
+            "{listed:?}"
+        );
+    }
+
+    #[test]
+    fn a_gone_new_game_whose_date_passed_lets_its_change_go() {
+        let open = [open(1, None)];
+        let gone_yesterday = StoredGame {
+            game: on(at(10), day(12)),
+            in_list: false,
+        };
+        assert_eq!(
+            updates(&open, &[gone_yesterday], &[]),
             [ChangeUpdate::Remove { source_id: 1 }]
         );
     }

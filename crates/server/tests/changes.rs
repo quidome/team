@@ -310,6 +310,33 @@ async fn a_new_duty_game_is_new(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_new_game_gone_and_back_before_it_is_seen_is_still_new(pool: PgPool) {
+    let reader = read_once(pool).await;
+    let with_new_game = || {
+        games_with(|games| {
+            let mut new_game = game_mut(games, DUTY_GAME).clone();
+            new_game["id"] = json!(NEW_GAME);
+            new_game["nr"] = json!("NEW-1");
+            games.push(new_game);
+        })
+    };
+    let change = only_change(&reader, with_new_game()).await;
+    assert_eq!(change["kind"], "new");
+
+    // Gone before the coordinator looked: nothing to show.
+    reader.answer(real_games());
+    reader.read_good().await;
+    assert_eq!(changes(&reader).await, Vec::<Value>::new());
+
+    // Back: still new, because the coordinator never saw it (epic review accept A2).
+    let change = only_change(&reader, with_new_game()).await;
+    assert_eq!(
+        (&change["id"], &change["kind"], &change["before"]),
+        (&json!(NEW_GAME), &json!("new"), &Value::Null)
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_start_time_that_becomes_known_is_start_time_known(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.answer(at(TIME_GAME, "00:00"));
