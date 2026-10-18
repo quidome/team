@@ -1,7 +1,7 @@
 ---
 title: Player names stored encrypted
 type: technical
-stage: close
+stage: done
 closure: review build + accept   # security, and the one-time encryption of the only copy of the names cannot be undone; the accept review checks that the coordinator sees no change and no plain name stays
 created: 2026-10-18
 ---
@@ -23,3 +23,4 @@ backup (built in `gitops-lab`) came first.
 | 2026-10-18 | implement | Release 1 live at 11:29 UTC: the 14 players in the database `team` encrypted, nothing lost, names right in the app. On the way: since 08:09 UTC Vault `DATABASE_URL` named the empty database `team_v2` (cause not found yet), so the app showed an empty tool; set back to `team` by the coordinator. Next: tag, then step 4 (release 2) after a nightly dump with encrypted names. |
 | 2026-10-18 | implement | Step 4 built; backup with only encrypted names; release 2 merged (PR #15), live at 11:58 UTC, tagged v0.3.2; release steps 6 (no name in the players table file; WAL and `sessions` noted) and 7 (laptop dumps deleted) done. /close stopped: step 4 had no review. Build review of step 4 (R7-R11, no blocker): R7 (a backup from before v0.3.1 needs the v0.3.1 migration image once) documented in `README.md`; the others answered. |
 | 2026-10-18 | close | Step 4 (release 2) gets the build review only: the coordinator chose not to run the accept review for step 4 (the accept review of release 1 covered the intent; the cluster check of release 2 showed the names right). R7 also in `gitops-lab` (PR #194). technical.md done. Next: `/close docs/changes/2026-10-18-encrypted-player-names`. |
+| 2026-10-18 | done | Closed: decision 0021 (player names encrypted in the app), `docs/architecture.md` (modules, migrations 0007-0009, the players section, two patterns, the limits as known debt), `CLAUDE.md`, product document players-and-team, vision "where we are", one idea (a command to change the key); folder moved to `docs/changes/done/`. |

@@ -38,6 +38,7 @@ It is not:
   - each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
 - Attendance at training runs on the cluster (v0.3.0, released 18 October 2026): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season.
 - A nightly encrypted copy of the team database is kept on the home storage (since 18 October 2026, built in `gitops-lab`); a copy outside the house comes later.
+- The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -112,3 +113,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-18 | Where we are: attendance at training is built and reviewed as a whole (all 3 stories); a release comes next |
 | 2026-10-18 | Where we are: attendance at training is released (v0.3.0) and runs on the cluster |
 | 2026-10-18 | Where we are: a nightly encrypted copy of the team database exists (built in `gitops-lab`); encrypted player names come next |
+| 2026-10-18 | Where we are: the player names are stored encrypted (v0.3.1, v0.3.2) |

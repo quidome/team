@@ -51,7 +51,7 @@ the settings ("Attendance · Team · Players · Settings").
 - "This player was changed in the meantime. Please try again." – a confirmed removal whose roles changed on another screen before the second tap.
 - "This no longer exists. Load the page again." – a player deleted on another screen.
 - Players and roles only of the current season can be changed; one team per season; one coordinator. Two screens: the last save wins, and every check uses the stored roles.
-- Player names never go to the log (ids only).
+- Player names never go to the log (ids only). They are stored encrypted, with a key that is kept in Vault and in the coordinator's password manager: a copy of the database or a backup does not show who the players are. Without the key the names cannot be read.
 - The data exists only in the tool. A nightly encrypted copy of the database is kept on the home storage (TrueNAS), not yet outside the house.
 
 ## Interface
