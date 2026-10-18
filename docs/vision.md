@@ -36,7 +36,7 @@ It is not:
   - the tool reads the club's games on a tap and by itself every night at 03:00, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms; after 3 nights without a good reading the start page says the games may be out of date;
   - the start page shows the team's games and the club's home games (possible duty games), with a quick filter and past games on request; in a new season last season's schedule shows until the team is chosen;
   - each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
-- Attendance at training is built and reviewed (not released yet): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season. Next: a release.
+- Attendance at training runs on the cluster (v0.3.0, released 18 October 2026): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season.
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -109,3 +109,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-17 | Where we are: trainings and marking attendance are built (story B of attendance at training); the totals come next |
 | 2026-10-17 | Where we are: the totals for each player are built (story C); attendance at training is complete, its review and a release come next |
 | 2026-10-18 | Where we are: attendance at training is built and reviewed as a whole (all 3 stories); a release comes next |
+| 2026-10-18 | Where we are: attendance at training is released (v0.3.0) and runs on the cluster |

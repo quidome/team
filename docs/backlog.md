@@ -2,8 +2,6 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. Release attendance at training (epic closed 2026-10-18): merge the pull request of `feat/the-overview` (story C) and tag a version, before 1 July 2027. Until then a training of an earlier season is reached on the cluster only by its address.
-
 Small:
 - Set up and check a backup of the team database (TrueNAS snapshots or a dump off the cluster, with a test restore). Before story A of attendance at training, all data could be read again from the game list; players and attendance cannot. The coordinator chose to do this later (2026-10-15).
 - A new game that the coordinator has not seen, confirmed as gone and then back in the game list, shows as "came back" instead of "new", so it is not in the summary line of new games (epic review accept A2; `update_open_changes` and `change_between` in `crates/core/src/comparison.rs`).
