@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE players SET first_name_enc = $2, last_name_enc = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "381249cc7f885eb5d2698d84820791e2a47e5ba0bbe883f90c4db9e160c694b0"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, first_name_enc, last_name_enc, hidden FROM players\n         WHERE first_name_enc IS NOT NULL ORDER BY id LIMIT 1",
+  "query": "SELECT id, first_name_enc, last_name_enc, hidden FROM players ORDER BY id LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -29,10 +29,10 @@
     },
     "nullable": [
       false,
-      true,
+      false,
       true,
       false
     ]
   },
-  "hash": "52febe5c01488fd7eced09de6097aa87f3395ac36196ee467c5cffd11bc4a218"
+  "hash": "187901e4a6f9498cdfdb59ff765217cbb0d95d0c138383cc3d9d1bde0645229d"
 }

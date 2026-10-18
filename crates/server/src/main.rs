@@ -138,12 +138,9 @@ async fn migrate() -> anyhow::Result<()> {
         .await
         .context("connecting to the database")?;
     db::migrate(&pool).await.context("applying migrations")?;
-    let count = players::encrypt_after_migrations(&pool, &player_name_key)
+    players::check_key(&pool, &player_name_key)
         .await
-        .context("encrypting the player names")?;
-    if count > 0 {
-        tracing::info!(count, "player names encrypted");
-    }
+        .context("the player name key cannot read the stored names")?;
     pool.close().await;
     tracing::info!("migrations are up to date");
     Ok(())
