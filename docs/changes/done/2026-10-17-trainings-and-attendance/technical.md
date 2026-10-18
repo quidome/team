@@ -11,7 +11,7 @@ trainings right (change, cancel, delete), see the season's trainings and the nex
 attendance at training leaves the sheet; story C adds the totals.
 
 ## Requirements summary
-Story B of the epic [Attendance at training](../../2026-10-14-attendance-at-training/technical.md),
+Story B of the epic [Attendance at training](../2026-10-14-attendance-at-training/technical.md),
 from the epic's `functional.md` (approved again 2026-10-16): story 2 (trainings, the list, the card,
 a new season), story 3 (marking), and the parts of stories 1 and 4 that need trainings and
 absences. Words from `docs/language.md`: training, training day, weekly training, attendance,

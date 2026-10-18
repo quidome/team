@@ -8,7 +8,7 @@ created: 2026-10-15
 
 # Players and settings
 
-Story A of the epic [Attendance at training](../../2026-10-14-attendance-at-training/). The
+Story A of the epic [Attendance at training](../2026-10-14-attendance-at-training/). The
 coordinator types in the players with their roles (plays games or only trains, from and until),
 sets the training days of the season with their times and the first and last training date, and
 keeps the list of reasons for an absence.

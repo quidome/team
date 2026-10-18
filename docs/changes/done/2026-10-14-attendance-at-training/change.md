@@ -1,7 +1,7 @@
 ---
 title: Attendance at training
 type: feature
-stage: implement
+stage: done
 closure: review accept   # epic: each story has its own closure; a fresh agent checks the whole result after story C
 created: 2026-10-14
 ---
@@ -31,3 +31,4 @@ the team. This is the first change with players in the tool.
 | 2026-10-17 | implement | story B closed: trainings (open, add, change, cancel, delete), the list on "Attendance", the card, marking with one tap per absence; decision 0020 (0019 is not used); product document trainings-and-attendance; story C next, before 1 July 2027 |
 | 2026-10-17 | implement | story C designed and approved in its own folder (`2026-10-17-the-overview`): the start page keeps its links (coordinator); notes for /close: the Interface line about links from "Attendance", and "Add training" only in the current season |
 | 2026-10-17 | implement | story C closed: the totals, "Left the team", the training days not opened, the missed trainings and the choice of season on "Attendance"; product document trainings-and-attendance; functional.md changed (Navigation, "Add training" only in the current season); the epic review accept is next |
+| 2026-10-18 | done | epic review accept: accepted with notes (A1–A4; A4 an idea line); closed: the living documents were updated at the close of each story; vision "where we are" (built and reviewed, a release next); links of decisions 0018 and 0020 and of the stories to `done/`; folder moved to `docs/changes/done/`; the release stays as a line in the backlog |

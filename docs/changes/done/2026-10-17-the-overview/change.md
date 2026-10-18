@@ -8,7 +8,7 @@ created: 2026-10-17
 
 # The overview
 
-Story C of the epic [Attendance at training](../../2026-10-14-attendance-at-training/). The page
+Story C of the epic [Attendance at training](../2026-10-14-attendance-at-training/). The page
 "Attendance" gets the season totals for each player ("there", "absent, valid", "absent, not
 valid", "of N trainings"), the group "Left the team", the number of past training days not
 opened, the missed trainings of a player, and the choice of an earlier season. The functional spec
