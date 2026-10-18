@@ -23,6 +23,8 @@ function server(port: number, bypass: boolean) {
 			OIDC_CLIENT_ID: 'team-coordinator',
 			OIDC_CLIENT_SECRET: 'e2e',
 			SESSION_SECRET: 'e2e-session-secret-of-at-least-32-chars',
+			// 32 bytes of 7 in base64; only for the browser tests.
+			PLAYER_NAME_KEY: 'BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=',
 			ORIGIN: `http://localhost:${port}`,
 			HOST: '127.0.0.1',
 			PORT: String(port),

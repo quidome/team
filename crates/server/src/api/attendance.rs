@@ -103,7 +103,7 @@ pub async fn get(
     let season = query_season(query.season, state.clock.as_ref())?;
     let current = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let players = players::all(&state.pool).await?;
+    let players = players::all(&state.pool, &state.config.player_name_key).await?;
     let roles = players::roles_in(&state.pool, &[season]).await?;
     let weekly = weekly_trainings::for_season(&state.pool, season).await?;
     let stored = trainings::for_season(&state.pool, season).await?;

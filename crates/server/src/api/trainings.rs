@@ -214,7 +214,7 @@ async fn fill(
     training: &Training,
     view: &mut TrainingDay,
 ) -> Result<(), AppError> {
-    let all = players::all(&state.pool).await?;
+    let all = players::all(&state.pool, &state.config.player_name_key).await?;
     let roles = players::roles_in(&state.pool, &[season]).await?;
     let absences = trainings::absences_at(&state.pool, &[training.id]).await?;
     view.training = Some(TrainingView {
@@ -501,7 +501,10 @@ pub async fn mark(
 ) -> Result<Json<Marked>, AppError> {
     let training = training_on(&state, &date).await?;
     let player = PlayerId(player);
-    if players::by_id(&state.pool, player).await?.is_none() {
+    if players::by_id(&state.pool, &state.config.player_name_key, player)
+        .await?
+        .is_none()
+    {
         return Err(AppError::NotFound);
     }
     let reason = reasons::all(&state.pool)

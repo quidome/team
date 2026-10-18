@@ -10,7 +10,7 @@ use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    now_there, role_on, team,
+    now_there, role_on, same_name, team,
 };
 use utoipa::ToSchema;
 
@@ -241,7 +241,7 @@ async fn roles_around(
 
 /// The detail of one player, with the history of all seasons.
 async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError> {
-    let player = players::by_id(&state.pool, id)
+    let player = players::by_id(&state.pool, &state.config.player_name_key, id)
         .await?
         .ok_or(AppError::NotFound)?;
     let season = current_season(state.clock.as_ref());
@@ -283,7 +283,7 @@ async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError
 pub async fn list(State(state): State<AppState>) -> Result<Json<PlayersList>, AppError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let all = players::all(&state.pool).await?;
+    let all = players::all(&state.pool, &state.config.player_name_key).await?;
     let roles = players::roles_in(&state.pool, &[season]).await?;
     Ok(Json(PlayersList {
         season: season.to_string(),
@@ -339,8 +339,10 @@ pub async fn add(
         check_role(season, role.from, None, &[])?;
     }
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    let key = &state.config.player_name_key;
     let id = players::insert(
         &mut *tx,
+        key,
         &first_name,
         last_name.as_deref(),
         state.clock.now(),
@@ -350,8 +352,8 @@ pub async fn add(
         players::insert_role(&mut *tx, id, season, role.role.into(), role.from, None).await?;
     }
     let roles = players::roles_of(&mut *tx, id).await?;
-    let same_name =
-        players::same_name_exists(&mut *tx, &first_name, last_name.as_deref(), Some(id)).await?;
+    let all = players::all(&mut *tx, key).await?;
+    let same_name = same_name(&all, &first_name, last_name.as_deref(), Some(id));
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = id.0, "player added");
     let mut player = detail(&state, id).await?;
@@ -384,12 +386,13 @@ pub async fn change(
     let (first_name, last_name) = clean_name(&body.first_name, body.last_name.as_deref())?;
     // The name and "Hidden" together, or neither.
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
-    if !players::update_name(&mut *tx, id, &first_name, last_name.as_deref()).await? {
+    let key = &state.config.player_name_key;
+    if !players::update_name(&mut *tx, key, id, &first_name, last_name.as_deref()).await? {
         return Err(AppError::NotFound);
     }
     players::set_hidden(&mut *tx, id, body.hidden).await?;
-    let same_name =
-        players::same_name_exists(&mut *tx, &first_name, last_name.as_deref(), Some(id)).await?;
+    let all = players::all(&mut *tx, key).await?;
+    let same_name = same_name(&all, &first_name, last_name.as_deref(), Some(id));
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(player = id.0, "player changed");
     Ok(Json(SavedPlayer {
@@ -572,7 +575,8 @@ pub async fn carry(
         if !players::lock(&mut tx, id).await? {
             continue;
         }
-        let Some(player) = players::by_id(&mut *tx, id).await? else {
+        let Some(player) = players::by_id(&mut *tx, &state.config.player_name_key, id).await?
+        else {
             continue;
         };
         let roles = roles_around(&mut *tx, id, season).await?;

@@ -176,7 +176,7 @@ fn member_view(member: &Member) -> MemberView {
 pub async fn load(state: &AppState) -> Result<TeamPageView, StoreError> {
     let season = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
-    let all = players::all(&state.pool).await?;
+    let all = players::all(&state.pool, &state.config.player_name_key).await?;
     let roles = players::roles_in(&state.pool, &[season, season.previous()]).await?;
     let team_name = followed_teams::for_season(&state.pool, season)
         .await?

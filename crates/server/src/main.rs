@@ -13,10 +13,11 @@ use team::auth::oidc::Oidc;
 #[cfg(debug_assertions)]
 use team::clock::ShiftedClock;
 use team::clock::{Clock, SystemClock};
-use team::config::Config;
+use team::config::{self, Config};
+use team::db::StoreError;
 use team::source::Source;
 use team::web::Web;
-use team::{AppState, api, app, db, nightly};
+use team::{AppState, api, app, db, nightly, players};
 
 #[derive(Parser)]
 #[command(name = "team", about = "Team coordinator tool")]
@@ -29,7 +30,7 @@ struct Cli {
 enum Command {
     /// Run the web server.
     Serve,
-    /// Apply database migrations that are not applied yet. Needs only DATABASE_URL.
+    /// Apply database migrations that are not applied yet. Needs DATABASE_URL and PLAYER_NAME_KEY.
     Migrate,
     /// Print the OpenAPI description of the API. Needs no settings.
     Openapi,
@@ -95,6 +96,19 @@ async fn serve() -> anyhow::Result<()> {
         source: source.clone(),
     };
 
+    // A wrong key stops the server before it shows a page. A database that cannot be reached does
+    // not: the server starts, and readiness reports the database (`team migrate` in the init
+    // container has checked the key already).
+    match players::check_key(&state.pool, &state.config.player_name_key).await {
+        Ok(()) => {}
+        Err(StoreError::Database(error)) => {
+            tracing::warn!(%error, "cannot check the player name key now: the database is not reachable");
+        }
+        Err(error) => {
+            return Err(error).context("the player name key cannot read the stored names");
+        }
+    }
+
     let listener = TcpListener::bind(address)
         .await
         .with_context(|| format!("listening on {address}"))?;
@@ -116,10 +130,20 @@ async fn serve() -> anyhow::Result<()> {
 
 async fn migrate() -> anyhow::Result<()> {
     let database_url = std::env::var("DATABASE_URL").context("setting DATABASE_URL is required")?;
+    let player_name_key = config::player_name_key(
+        &std::env::var("PLAYER_NAME_KEY").context("setting PLAYER_NAME_KEY is required")?,
+    )
+    .context("reading settings")?;
     let pool = sqlx::PgPool::connect(&database_url)
         .await
         .context("connecting to the database")?;
     db::migrate(&pool).await.context("applying migrations")?;
+    let count = players::encrypt_after_migrations(&pool, &player_name_key)
+        .await
+        .context("encrypting the player names")?;
+    if count > 0 {
+        tracing::info!(count, "player names encrypted");
+    }
     pool.close().await;
     tracing::info!("migrations are up to date");
     Ok(())

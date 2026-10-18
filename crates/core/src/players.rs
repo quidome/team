@@ -84,6 +84,23 @@ impl Player {
     }
 }
 
+/// Whether a player other than `except` has the same first and last name, without case (no last
+/// name equals no last name). The names come cleaned (`clean_name`).
+pub fn same_name(
+    players: &[Player],
+    first: &str,
+    last: Option<&str>,
+    except: Option<PlayerId>,
+) -> bool {
+    let first = first.to_lowercase();
+    let last = last.map(str::to_lowercase);
+    players.iter().any(|player| {
+        Some(player.id) != except
+            && player.first_name.to_lowercase() == first
+            && player.last_name.as_deref().map(str::to_lowercase) == last
+    })
+}
+
 impl PlayerRole {
     /// The last day of the role: `until`, or the last day of its season while it continues. A role
     /// never runs into the next season.
@@ -924,6 +941,23 @@ mod tests {
             last_name: None,
             hidden: false,
         }
+    }
+
+    #[test]
+    fn the_same_name_is_found_without_case() {
+        let anna = player(1, "anna");
+        let anna_de_vries = Player {
+            last_name: Some("de Vries".to_owned()),
+            ..player(2, "Anna")
+        };
+        let players = [anna, anna_de_vries];
+        assert!(same_name(&players, "Anna", None, None));
+        assert!(same_name(&players, "ANNA", Some("De Vries"), None));
+        assert!(!same_name(&players, "Anna", Some("Bakker"), None));
+        assert!(!same_name(&players, "Bram", None, None));
+        // The player itself does not count.
+        assert!(!same_name(&players, "Anna", None, Some(PlayerId(1))));
+        assert!(!same_name(&[], "Anna", None, None));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # Technical spec: Player names stored encrypted
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: [2026-10-18-encrypted-player-names](./)
 **Date**: 2026-10-18
@@ -272,14 +272,21 @@ Release 2 (step 4): merge, green `main`, restart the pod, check, tag. After rele
   change.
 
 ## Progress
-- [ ] Step 1 – the encryption and the key setting
-- [ ] Step 2 – encrypted names in the store
-- [ ] Step 3 – the key check at start
+- [x] Step 1 – the encryption and the key setting, 2026-10-18: `cipher.rs` (`NameKey`, `NameField`, `seal`, `open`, `KeyError`, `CipherError`) with 7 unit tests (tests 1–6 and the key's debug output); `Config::player_name_key` and `config::player_name_key` with 2 new settings tests and the debug test extended (tests 7, 8); `team migrate` reads the key; test key in `tests/common/mod.rs`, `web/playwright.config.ts`, `scripts/smoke-test.sh`; `.env.example` and the cluster contract in `README.md`. `just check` passes.
+- [x] Step 2 – encrypted names in the store, 2026-10-18: migration `0007_encrypted_player_names.sql`; `players.rs` reads and writes only the encrypted columns, sorts with `Player::sort_key`, `encrypt_plain_names`; `same_name_exists` removed for the core rule `team_core::same_name`; `StoreError::Name` and `StoreError::Seal`; every caller passes `config.player_name_key`; `team migrate` encrypts after the SQL migrations and logs only the count. Tests: core `the_same_name_is_found_without_case` (9); `tests/player_names.rs` with `names_are_not_stored_as_plain_text` (10), `encrypted_players_are_listed_in_order_and_the_same_name_is_found` (11) and `encrypt_plain_names_encrypts_each_player_once` (14); `tests/player_name_logs.rs` (13). `.sqlx/` prepared; the local database encrypted by `just migrate`. `just check` passes. Note: the browser test "a cancelled training does not count, and counts again after \"Undo cancel\"" failed 3 times with "TypeError: Failed to fetch" in the first runs (two of them during or right after a full `just check`), then passed 11 runs in a row; the cause was not found (the debug output of the console watcher caught nothing).
+- [x] Step 3 – the key check at start, 2026-10-18: `players::check_key` (the player with the lowest id that has an encrypted name) and `players::encrypt_after_migrations` (`check_key`, then `encrypt_plain_names` in one transaction), which `team migrate` calls; `team serve` calls `check_key` before it listens. Tests: `check_key_reads_a_stored_name_with_the_right_key_only` (12) and `migrate_with_a_wrong_key_stops_and_changes_nothing` (15) in `tests/player_names.rs`. By hand on the local database: `serve` with the database down starts (liveness 200, readiness 503, the warning in the log); `serve` and `migrate` with another key stop with "the name of player 1 cannot be read: not authentic (wrong key or changed data)" and no name in the output. `just check` passes.
 - [ ] Release 1
 - [ ] Step 4 – the plain-text columns removed
 - [ ] Release 2
 - [ ] All checks pass
 
 ## Deviations
+- 2026-10-18, step 1: `CipherError` has a fifth case, `Encrypt` ("cannot encrypt"), because the crate's `encrypt` returns a `Result` (only for an input far larger than a name); the spec listed four cases.
+- 2026-10-18, step 1: `NameKey::from_base64` ignores spaces and line ends around the value (a key pasted with a line end is not refused); the bytes must still be exactly 32.
+- 2026-10-18, step 2: the comment in migration `0007` names the decision record as **0021** (the next free number; 0019 is not used), not `NNNN`: the file is applied on the cluster at release 1, before Close writes the record, and an applied file is never edited (decision 0004). Close must give the record number 0021.
+- 2026-10-18, step 2: `StoreError` has a second new case, `Seal(CipherError)` ("a name cannot be encrypted"), for a write: the player has no id yet, so `Name { player, … }` does not fit.
+- 2026-10-18, step 2: test 14 starts the database at `0006` with `Migrator::new` on a temporary folder with copies of the first 6 migration files, not with a cut list of `MIGRATOR`'s migrations: the fields of `Migrator` are hidden and "semver-exempt" in sqlx 0.8. Test 13 is in its own file (`tests/player_name_logs.rs`), because a test that reads the log needs its own process (`LogBuffer`).
+- 2026-10-18, step 3 (coordinator): `team serve` stops only when the key cannot read a stored name. When the database cannot be reached, it logs "cannot check the player name key now: the database is not reachable" and starts, as before; readiness reports the database. Reason: `serve` is built to start without the database (`db::lazy_pool`), and stopping would make the pod restart in a loop while the database is down. `team migrate` (the init container) always checks the key with a working database.
+- 2026-10-18, step 3: the data step of `team migrate` is a store function, `players::encrypt_after_migrations`, so test 15 tests the order (check, then encrypt) that `main.rs` uses.
 
 ## Review findings
