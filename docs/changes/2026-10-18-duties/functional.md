@@ -74,6 +74,7 @@ to enter what already happened this season.
 - A coming game (today or later) that leaves the game list keeps its duty places while it is gone; on "Duties" and on its page it shows "no longer in the game list". Its duties do not count while it is gone. If it comes back, they count again.
 - A game whose date has passed was played: its duties stay done, also when it leaves the game list later (for example when the source cleans up). Its page says "no longer in the game list".
 - A game that stops being a home game of another club team (for example the home and away teams swap, or it becomes a game of the team) keeps its places, with "This game no longer needs duties of the team." on its page and on "Duties", and its places do not count. Setting the places to 0 removes them.
+- Another team chosen in the middle of a season (rare): the duties of the old team stay stored, and the same rule applies: coming ones show "This game no longer needs duties of the team." and do not count; past ones count. Choosing the old team again brings them back (coordinator, 2026-10-18, in Design).
 - A game of an earlier season can be opened (from the schedule of last season) but its duty places cannot be changed: "Duties of an earlier season cannot be changed."
 - "Duties" with no games with duty places: "No duty places yet. Open a game in the schedule to add them."
 

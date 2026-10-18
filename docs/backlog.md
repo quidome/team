@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage design: duty places, who does them and the totals, the message for the next game, the message for the referee committee; functional spec approved. Next: `/design docs/changes/2026-10-18-duties`.
+1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement: four stories, technical spec approved. Story A [Duty places](changes/2026-10-18-duty-places/) is next: `/design docs/changes/2026-10-18-duty-places`. Then B (release 1 with A), C, D, and the epic review accept.
 
 Small:
 - From 08:09 to 11:29 UTC on 2026-10-18 the Vault value `DATABASE_URL` of the team app named the database `team_v2` (empty, made by the app at 08:09) instead of `team`, so the app showed an empty tool. Set back by the coordinator. The empty database `team_v2` was deleted on 2026-10-18. `README.md` (the cluster contract) and `.env.example` now name both databases. To do: find the cause in the Vault version history (the value was right on 2026-10-17). A check that the app's database is not empty, after each release, would have found this at 09:16.
