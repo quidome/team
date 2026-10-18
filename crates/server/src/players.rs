@@ -3,7 +3,7 @@
 //! log.
 
 use chrono::{DateTime, NaiveDate, Utc};
-use sqlx::{PgConnection, PgExecutor, PgPool};
+use sqlx::{PgConnection, PgExecutor};
 use team_core::{Player, PlayerId, PlayerRole, Role, RoleId, Season};
 
 use crate::cipher::{NameField, NameKey, open, seal};
@@ -70,9 +70,7 @@ pub async fn update_name(
 ) -> Result<bool, StoreError> {
     let (first, last) = seal_names(key, first_name, last_name)?;
     let result = sqlx::query!(
-        "UPDATE players
-         SET first_name_enc = $2, last_name_enc = $3, first_name = NULL, last_name = NULL
-         WHERE id = $1",
+        "UPDATE players SET first_name_enc = $2, last_name_enc = $3 WHERE id = $1",
         id.0,
         first,
         last,
@@ -82,48 +80,12 @@ pub async fn update_name(
     Ok(result.rows_affected() == 1)
 }
 
-/// Encrypts the names of the players that still have a plain first name, and empties the plain
-/// columns: players from before the encryption, and players that an older version added or renamed
-/// during an update (it writes both plain columns, so a plain name is always the newer one, also
-/// over an encrypted name). Runs in `team migrate`; returns how many players it encrypted.
-pub async fn encrypt_plain_names(tx: &mut PgConnection, key: &NameKey) -> Result<u64, StoreError> {
-    let rows = sqlx::query!(
-        "SELECT id, first_name, last_name FROM players WHERE first_name IS NOT NULL
-         ORDER BY id FOR UPDATE"
-    )
-    .fetch_all(&mut *tx)
-    .await?;
-    let mut count = 0;
-    for row in rows {
-        let Some(first_name) = row.first_name else {
-            return Err(StoreError::Invalid(format!(
-                "player {} has no name",
-                row.id
-            )));
-        };
-        let (first, last) = seal_names(key, &first_name, row.last_name.as_deref())?;
-        sqlx::query!(
-            "UPDATE players
-             SET first_name_enc = $2, last_name_enc = $3, first_name = NULL, last_name = NULL
-             WHERE id = $1",
-            row.id,
-            first,
-            last,
-        )
-        .execute(&mut *tx)
-        .await?;
-        count += 1;
-    }
-    Ok(count)
-}
-
 /// Whether `key` reads the stored names: decrypts the name of the player with the lowest id, if
-/// there is one with an encrypted name. A wrong key gives `StoreError::Name`.
+/// there is one. A wrong key gives `StoreError::Name`.
 pub async fn check_key(db: impl PgExecutor<'_>, key: &NameKey) -> Result<(), StoreError> {
     let row = sqlx::query_as!(
         NameRow,
-        "SELECT id, first_name_enc, last_name_enc, hidden FROM players
-         WHERE first_name_enc IS NOT NULL ORDER BY id LIMIT 1"
+        "SELECT id, first_name_enc, last_name_enc, hidden FROM players ORDER BY id LIMIT 1"
     )
     .fetch_optional(db)
     .await?;
@@ -131,17 +93,6 @@ pub async fn check_key(db: impl PgExecutor<'_>, key: &NameKey) -> Result<(), Sto
         Some(row) => row.into_player(key).map(|_| ()),
         None => Ok(()),
     }
-}
-
-/// The step of `team migrate` after the SQL migrations: checks the key against the stored names
-/// first (so names are never encrypted with two keys), then encrypts the plain names in one
-/// transaction. Returns how many players it encrypted.
-pub async fn encrypt_after_migrations(pool: &PgPool, key: &NameKey) -> Result<u64, StoreError> {
-    check_key(pool, key).await?;
-    let mut tx = pool.begin().await?;
-    let count = encrypt_plain_names(&mut tx, key).await?;
-    tx.commit().await?;
-    Ok(count)
 }
 
 fn seal_names(
@@ -159,7 +110,7 @@ fn seal_names(
 
 struct NameRow {
     id: i64,
-    first_name_enc: Option<Vec<u8>>,
+    first_name_enc: Vec<u8>,
     last_name_enc: Option<Vec<u8>>,
     hidden: bool,
 }
@@ -168,17 +119,9 @@ impl NameRow {
     fn into_player(self, key: &NameKey) -> Result<Player, StoreError> {
         let player = PlayerId(self.id);
         let failed = |error| StoreError::Name { player, error };
-        // A plain row, written by an older version during an update, until the next
-        // `team migrate` encrypts it.
-        let Some(first) = self.first_name_enc else {
-            return Err(StoreError::Invalid(format!(
-                "the name of player {} is not encrypted yet",
-                self.id
-            )));
-        };
         Ok(Player {
             id: player,
-            first_name: open(key, NameField::First, &first).map_err(failed)?,
+            first_name: open(key, NameField::First, &self.first_name_enc).map_err(failed)?,
             last_name: self
                 .last_name_enc
                 .map(|last| open(key, NameField::Last, &last))
