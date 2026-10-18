@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. Store the player names encrypted in the database (AES-256-GCM in the app, the key from Vault and also kept outside the platform), so a copy of the database or a backup does not show who the players are; sorting and the same-name warning move from SQL to the core; existing players are encrypted once. The nightly backup runs (since 2026-10-18). Start: `/design technical: …` in this repository (coordinator, 2026-10-18).
+1. [Player names stored encrypted](changes/2026-10-18-encrypted-player-names/) – technical, stage implement: 4 steps in two releases; before release 1 the operator puts the key in the password manager and Vault, changes `gitops-lab` and makes a fresh backup. Next: `/implement docs/changes/2026-10-18-encrypted-player-names`.
 
 Small:
 - A new game that the coordinator has not seen, confirmed as gone and then back in the game list, shows as "came back" instead of "new", so it is not in the summary line of new games (epic review accept A2; `update_open_changes` and `change_between` in `crates/core/src/comparison.rs`).
