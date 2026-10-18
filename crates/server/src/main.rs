@@ -102,7 +102,7 @@ async fn serve() -> anyhow::Result<()> {
     match players::check_key(&state.pool, &state.config.player_name_key).await {
         Ok(()) => {}
         Err(StoreError::Database(error)) => {
-            tracing::warn!(%error, "cannot check the player name key now: the database is not reachable");
+            tracing::warn!(%error, "cannot check the player name key now: the database cannot be read");
         }
         Err(error) => {
             return Err(error).context("the player name key cannot read the stored names");

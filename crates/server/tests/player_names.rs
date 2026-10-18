@@ -302,3 +302,34 @@ async fn migrate_with_a_wrong_key_stops_and_changes_nothing(pool: PgPool) {
         .collect();
     assert_eq!(names, ["Anna", "Bram"]);
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_rename_by_an_older_version_is_encrypted_over_the_old_name(pool: PgPool) {
+    let id = players::insert(&pool, &key(), "Anna", Some("de Vries"), Utc::now())
+        .await
+        .unwrap();
+    // The old version (v0.3.0) renames during the update: it writes both plain columns and leaves
+    // the encrypted ones.
+    sqlx::query("UPDATE players SET first_name = 'Anne', last_name = NULL WHERE id = $1")
+        .bind(id.0)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        players::encrypt_after_migrations(&pool, &key())
+            .await
+            .unwrap(),
+        1
+    );
+    let player = players::by_id(&pool, &key(), id).await.unwrap().unwrap();
+    assert_eq!(player.first_name, "Anne");
+    assert_eq!(player.last_name, None);
+    let plain: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM players WHERE first_name IS NOT NULL OR last_name IS NOT NULL",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(plain, 0);
+}
