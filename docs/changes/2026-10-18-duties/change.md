@@ -1,7 +1,7 @@
 ---
 title: Duties
 type: feature
-stage: discover
+stage: design
 closure: checks      # set by /design
 created: 2026-10-18
 ---
@@ -19,3 +19,4 @@ committee. An epic of four stories (see `idea.md`).
 |------|-------|------|
 | 2026-10-18 | idea | created from `/vision duties` (priority 3 and 4 of the vision; journeys 3, 4 and 5) |
 | 2026-10-18 | discover | idea ready for discovery: an epic of four stories (A places, B who does it and the totals, C the message for the next game, D the message for the referee committee); answers of the coordinator in `idea.md`; the word "duty place" added |
+| 2026-10-18 | design | functional.md approved: four stories (A duty places, B who does each duty place and the totals, C the message for the next game, D the message for the referee committee); spec review: all four "serves – note", notes S1–S9 answered (S1, S2, S4, S7 by the coordinator) |
