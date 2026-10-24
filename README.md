@@ -31,6 +31,13 @@ cluster contract below). The database tests (`#[sqlx::test]`) create their own d
 server in `DATABASE_URL`.
 After changing an SQL query, run `just prepare` and commit `.sqlx/`.
 
+## Benchmarks of development machines
+
+`scripts/bench.sh` times a clean build, small rebuilds, the core tests and the front-end check, to
+compare development machines. Run it in the Nix shell, on the same commit on each machine, after
+`just web-install`; no database is necessary. It writes `benchmarks/<host>-<date>.txt`: commit
+that file.
+
 ## Database migrations
 
 Migrations are plain SQL files in [`migrations/`](./migrations/), compiled into the binary

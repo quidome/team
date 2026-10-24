@@ -1,0 +1,14 @@
+host:        neo
+cpu:         Apple A18 Pro, 6 cores, 8 GB memory
+system:      Darwin arm64
+commit:      014b6a2
+rustc:       rustc 1.86.0 (05f9846f8 2025-03-31) (built from a source tarball)
+node:        v22.20.0
+runs:        3 (median)
+
+step                                      seconds
+clean build (workspace, all targets)      101.3
+rebuild after a change in crates/core     16.4
+rebuild after a change in crates/server   16.7
+core tests after a change (build and run) 0.9
+front end (just check-web)                13.5
