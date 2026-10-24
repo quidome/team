@@ -21,6 +21,11 @@
           # automation (Playwright tests and the Playwright MCP server) is
           # Linux-only here; on Darwin, install a browser separately if needed.
           browserPackages = pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.chromium ];
+          # mold links Rust much faster than the default GNU linker (a small rebuild
+          # took 15-20 s instead of 34 s, benchmarks/nimbus-mold-*). It writes Linux
+          # programs only. The shell hook turns it on, so CI and the images, which
+          # do not use this shell, keep the default linker.
+          linuxPackages = pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.mold ];
         in
         {
           default = pkgs.mkShell {
@@ -42,7 +47,7 @@
               shellcheck
               git
               jq
-            ] ++ browserPackages;
+            ] ++ browserPackages ++ linuxPackages;
 
             RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
 
@@ -55,6 +60,8 @@
               printf 'Node: %s\n\n' "$(node --version)" >&2
               ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
                 export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="${pkgs.chromium}/bin/chromium"
+                export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+                export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold"
               ''}
             '';
           };
