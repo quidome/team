@@ -157,6 +157,8 @@ test('mark a player absent with a reason, and there again', async ({ page }) => 
 	await yara.getByRole('button', { name: 'Ill' }).click();
 	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
 	await expect(page.getByTestId('training-top')).toHaveText('1 absent');
+	// The row shows the tap at once; it is stored when "saving…" is gone.
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 
@@ -169,6 +171,7 @@ test('mark a player absent with a reason, and there again', async ({ page }) => 
 	await yara.getByRole('button', { name: 'There' }).click();
 	await expect(yara.getByTestId('player-mark')).toHaveText('there');
 	await expect(page.getByTestId('training-top')).toHaveText('All there');
+	await expect(yara.getByTestId('saving')).toHaveCount(0);
 	await page.reload();
 	await expect(yara.getByTestId('player-mark')).toHaveText('there');
 	expect(errors).toEqual([]);

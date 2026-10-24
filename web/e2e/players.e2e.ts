@@ -1,9 +1,15 @@
 // Players and settings (attendance at training, story A). The server's clock is 12 October 2026
 // (DEV_NOW), so the season is 2026-2027. The tests share one database and run in this order.
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { expectAccessible, expectNoHorizontalScroll, watchConsole } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
+
+/** Waits for the answer of a change in a row of the team page: the answer closes the row. The open
+ * form already shows the new role, so its text does not show that the change is saved. */
+async function expectClosed(row: Locator) {
+	await expect(row.getByRole('button', { expanded: true })).toHaveCount(0);
+}
 
 test('the start page links to attendance, the team, players and settings', async ({ page }) => {
 	await page.goto('/');
@@ -128,6 +134,8 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	await family.getByLabel('Valid').check();
 	await expect(family.getByLabel('Valid')).toBeChecked();
 	await expect(family.getByLabel('Name of the reason')).toHaveValue('Family party');
+	// Saved: the boxes are off while a change is saved. A reload before that loses the change.
+	await expect(family.getByLabel('Valid')).toBeEnabled();
 	await page.reload();
 	await expect(family.getByLabel('Name of the reason')).toHaveValue('Family');
 	await expect(family.getByLabel('Valid')).toBeChecked();
@@ -135,6 +143,7 @@ test('set the weekly trainings and the reasons', async ({ page }) => {
 	const holiday = page.locator('[data-reason="Holiday"]');
 	await holiday.getByLabel('Hidden').check();
 	await expect(holiday.getByLabel('Hidden')).toBeChecked();
+	await expect(holiday.getByLabel('Hidden')).toBeEnabled();
 
 	await page.reload();
 	await expect(page.getByText('No weekly trainings yet.')).toBeVisible();
@@ -180,6 +189,7 @@ test('the team page: add a player, change the role, remove from and add to the t
 	await expect(sky.first().getByLabel('Plays games')).toBeChecked();
 	await expect(sky.first().getByLabel('From')).toHaveValue('2026-10-12');
 	await sky.first().getByRole('button', { name: 'Change role' }).click();
+	await expectClosed(sky.first());
 	await expect(sky.first()).toContainText('Plays games');
 	await sky.first().getByRole('button', { name: /Sky/ }).click();
 	await expect(sky.first().getByTestId('member-roles')).toHaveText(
@@ -241,6 +251,7 @@ test('"Remove from the team" asks first when it also removes a later role', asyn
 	await vic.getByRole('button', { name: 'Change role' }).click();
 	await vic.getByLabel('From').fill('2026-11-01');
 	await vic.getByRole('button', { name: 'Change role' }).click();
+	await expectClosed(vic);
 	await vic.getByRole('button', { name: /Vic/ }).click();
 	await expect(vic.getByTestId('member-roles')).toHaveText(
 		'Only trains · Tue 1 Sept – Sat 31 Oct, Plays games · from Sun 1 Nov'
@@ -403,6 +414,8 @@ test('a hidden player is listed only with "Show hidden players"', async ({ page 
 	await page.getByLabel('Hidden').check();
 	await page.getByRole('button', { name: 'Save' }).click();
 	await expect(page.getByLabel('Hidden')).toBeChecked();
+	// Saved: "Save" is off while the change is saved.
+	await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
 
 	await page.goto('/players');
 	const uma = page.getByTestId('player').filter({ hasText: 'Uma' });
