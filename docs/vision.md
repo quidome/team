@@ -39,7 +39,7 @@ It is not:
 - Attendance at training runs on the cluster (v0.3.0, released 18 October 2026): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season.
 - A nightly encrypted copy of the team database is kept on the home storage (since 18 October 2026, built in `gitops-lab`); a copy outside the house comes later.
 - The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
-- The start page and the page "Season" are built (epic start page and season, 25 October 2026, not released yet): the start page shows the open items (problems with the game list, changes not seen, training days not opened, trainings not checked), the last training and the events of this week and next week; "Season" shows all games and trainings of a season per week, with labels that combine; the coordinator confirms with "Checked" that the attendance of a training is complete. A release comes next, then duties again from Discover.
+- The start page and the page "Season" run on the cluster (v0.4.0, released 25 October 2026): the start page shows the open items (problems with the game list, changes not seen, training days not opened, trainings not checked), the last training and the events of this week and next week; "Season" shows all games and trainings of a season per week, with labels that combine; the coordinator confirms with "Checked" that the attendance of a training is complete. Duties come next, again from Discover.
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -123,3 +123,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-25 | Where we are: checked trainings are built (story C); the start page with the open items comes next |
 | 2026-10-25 | Where we are: the start page with the open items is built (story B); all three stories of start page and season are built, the review of the whole and a release come next |
 | 2026-10-25 | Start page and season closed after its review of the whole (decision 0022); a release comes next, then duties again from Discover |
+| 2026-10-25 | Where we are: start page and season is released (v0.4.0) and runs on the cluster; migration 0010 checked the 8 trainings before that day |
