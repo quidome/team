@@ -2,8 +2,8 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. Landing page and season overview – idea, next: `/vision` (the line of 2026-10-15 in `ideas.md`, extended on 2026-10-25): the start page as a landing page with the open items, and a season overview of all games and trainings with labels and date separators; "Done" for attendance. Needs words for "a training, a game or a duty" and for "Done".
-2. [Duties](changes/2026-10-18-duties/) – feature, epic, back to discover after item 1: the screens change (landing page, overview, open items). Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
+1. [Start page and season](changes/2026-10-25-start-page-and-season/) – feature, stage discover: the start page as a landing page (the last game and training, the next events, the open items) and the page "Season" with labels and date separators; a past training is an open item until checked. Next: `/discover docs/changes/2026-10-25-start-page-and-season`.
+2. [Duties](changes/2026-10-18-duties/) – feature, epic, back to discover after item 1: the screens change (start page, "Season", open items). Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
 
 Small:
 - From 08:09 to 11:29 UTC on 2026-10-18 the Vault value `DATABASE_URL` of the team app named the database `team_v2` (empty, made by the app at 08:09) instead of `team`, so the app showed an empty tool. Set back by the coordinator. The empty database `team_v2` was deleted on 2026-10-18. `README.md` (the cluster contract) and `.env.example` now name both databases. To do: find the cause in the Vault version history (the value was right on 2026-10-17). A check that the app's database is not empty, after each release, would have found this at 09:16.

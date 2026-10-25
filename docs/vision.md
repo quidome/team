@@ -50,7 +50,7 @@ see it.
 
 ## Where we are going
 First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then duties and the messages built on them. Each step must be good
+Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items. Then duties and the messages built on them. Each step must be good
 enough to replace that part of the sheet.
 
 ## Longer horizon
@@ -62,6 +62,7 @@ Not for now:
 These stay ideas until real use shows the need.
 
 ## User journeys
+0. **Open the tool.** A few times a week, the coordinator opens the tool on the phone and sees the next events and the open items: what still needs the coordinator. One tap completes the record of the last training. The whole season is one tap further, for any game or training.
 1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because our players do jury duty at those games when we play at home. When a game moves, the tool shows the change.
 2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows.
 3. **Set the duties of a game.** The coordinator sets how many duties a game needs. An away game needs drivers. A home game means jury or referee places at other club games.
@@ -72,9 +73,10 @@ These stay ideas until real use shows the need.
 ## Priorities
 1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
 2. **Attendance at training, then at games** – done every week, and the most direct reason to leave the sheet. For the coach it shows the effort each player gives to the team.
-3. **Duties and the message for the next game** – the weekly message is the second thing done every week.
-4. **The message for the referee committee** – built on the same duties.
-5. **The overview for the parents, with duty totals** – makes the fairness visible.
+3. **The start page with the open items, and the page "Season"** – the weekly look at what comes and what is open; the place where later parts show their open items.
+4. **Duties and the message for the next game** – the weekly message is the second thing done every week.
+5. **The message for the referee committee** – built on the same duties.
+6. **The overview for the parents, with duty totals** – makes the fairness visible.
 
 ## Principles
 - **The coordinator carries the text to the chat.** The tool only produces text to copy. It never posts.
@@ -115,3 +117,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-18 | Where we are: a nightly encrypted copy of the team database exists (built in `gitops-lab`); encrypted player names come next |
 | 2026-10-18 | Where we are: the player names are stored encrypted (v0.3.1, v0.3.2) |
 | 2026-10-18 | Word list: "duty place" added (one place at a game that a player of the team must fill), from `/vision duties` |
+| 2026-10-25 | The start page and the page "Season" come before duties (new priority 3, journey 0 "Open the tool"), from the design of duty places; words event, checked, open item, Season |
