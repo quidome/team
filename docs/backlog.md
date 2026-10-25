@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage design (2026-10-25): functional spec approved again: the duty places of each home game of the club (referee 1 and 2, table 1 and 2) are given to club teams, copied from the schedule of the referee committee. Next: `/design docs/changes/2026-10-18-duties` (the epic), then `/design` and of story A [Duty places](changes/2026-10-18-duty-places/) (stage design; its 7 steps are built on disk, not committed, and reviewed: R2, R3, R7, R8, A6 stay to fix). Then B (release 1 with A), C, D, and the epic review accept.
+1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement (2026-10-25): functional and technical spec approved again: the duties belong to the game; the 4 places of each home game of the club (referee 1 and 2, table 1 and 2) are given to club teams, copied from the schedule of the referee committee. Next: `/design docs/changes/2026-10-18-duty-places` of story A [Duty places](changes/2026-10-18-duty-places/) (stage design; its first build of 7 steps is on disk and on the local branch `duty-places-v1`, reviewed: R2, R3, R7, R8, A6 stay to fix). Then B (release 1 with A), C, D, and the epic review accept.
 
 Small:
 - Look at the start page of v0.4.0 on the phone: its speed, and the open items after a nightly reading (epic review A8 of start page and season; released 2026-10-25, migration 0010 checked the 8 trainings before that day).

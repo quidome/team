@@ -1,7 +1,7 @@
 ---
 title: Duties
 type: feature
-stage: design
+stage: implement
 closure: review accept   # epic: each story has its own closure (review build + accept); a fresh agent checks the whole result after story D
 created: 2026-10-18
 ---
@@ -26,3 +26,4 @@ committee. An epic of four stories (see `idea.md`).
 | 2026-10-25 | implement | technical.md approved again for the new screens: the same tables and core rules, a row with 0 places means "handled", the places travel on the answers of "Season" and the start page, two new open items, the page of a game, a page "Duties" with the totals, "Messages" on the start page; four stories, each with closure review build + accept; epic closure review accept |
 | 2026-10-25 | discover | back to discover (from the reviews of story A): the referee committee gives the duty places of each home game of the club (referee 1 and 2, table 1 and 2) to club teams; the coordinator copies that schedule with pull-down lists and marks each game as ok (`/vision`, `idea.md` 2026-10-25). "Jury" becomes "table". Drivers stay. |
 | 2026-10-25 | design | functional.md approved again: the 4 places of each home game of the club (referee 1 and 2, table 1 and 2) given to club teams with pull-down lists, saved at once; "Schedule entered" (check 1) and open places of the team (check 2); "places of the team" includes drivers; "jury" is "table"; spec review: A–C "serves – note", D "serves", notes S18–S23 answered by the coordinator; technical.md must be changed |
+| 2026-10-25 | implement | technical.md approved again: the duties belong to the game (4 places of each home game of the club given to club teams, in `duty_teams`; "Schedule entered" a time on `game_duties`; drivers for the team); club teams from the stored games of the season; a row with 0 and 0 no longer means "handled"; the same four stories, each with closure review build + accept; epic closure review accept. The first build of story A is kept on the local branch `duty-places-v1` |
