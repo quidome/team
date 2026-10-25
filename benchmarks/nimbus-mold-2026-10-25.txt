@@ -1,0 +1,16 @@
+host:        nimbus
+cpu:         11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz, 8 cores, 15 GB memory
+system:      Linux x86_64
+commit:      c0a462a
+rustc:       rustc 1.86.0 (05f9846f8 2025-03-31) (built from a source tarball)
+node:        v22.20.0
+linker:      mold 2.39.1 (dev shell, CARGO_TARGET_<linux>_RUSTFLAGS)
+power:       battery (balanced profile)
+runs:        3 (median)
+
+step                                      seconds
+clean build (workspace, all targets)      182.1
+rebuild after a change in crates/core     16.2
+rebuild after a change in crates/server   15.3
+core tests after a change (build and run) 0.9
+front end (just check-web)                29.2

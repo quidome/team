@@ -13,3 +13,9 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
+
+[profile.dev]
+# Only line numbers, no variable information: small rebuilds took 10 s instead of 16 s
+# (benchmarks/nimbus-mold-line-tables-2026-10-25.txt). For a debugger, build once with
+# CARGO_PROFILE_DEV_DEBUG=true.
+debug = "line-tables-only"
