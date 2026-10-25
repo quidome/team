@@ -52,7 +52,7 @@ From `functional.md` (approved 2026-10-25; spec review notes 1–7 answered):
 | # | Story | Type | Scope | Depends on | Closure | Release | Status |
 |---|-------|------|-------|------------|---------|---------|--------|
 | A | [The page "Season"](../done/2026-10-25-season-page/) | feature | Core `season_events` (order within a date first, risk 3) and `not_opened` out of `season_overview`. `followed_teams::seasons`. `GET /api/season`. Page `/season` with `Labels`, `SeasonEvents`, the season choice, the "Game list" card, "Add training", "Cancel", "Show cancelled". "Attendance" without its list; "Back" on a training to "Season"; `GET /api/trainings?season=` removed; the link "Season" first on the start page (the start page keeps its schedule and cards until B); `?from=start` on the card of the next training (moved here from B, 2026-10-25). | – | review build + accept | 1 | done (2026-10-25) |
-| C | [Checked trainings](../2026-10-25-checked-trainings/) | feature | Migration `0010_trainings_checked` first (risk 2). `Training.checked`, `check_checking`, `not_checked`. `PUT` / `DELETE /api/trainings/{date}/checked`. "Checked" / "Undo check" on the training page; "Checked" on the row on "Season". | A | review build | 1 with A, or 2 | implement |
+| C | [Checked trainings](../done/2026-10-25-checked-trainings/) | feature | Migration `0010_trainings_checked` first (risk 2). `Training.checked`, `check_checking`, `not_checked`. `PUT` / `DELETE /api/trainings/{date}/checked`. "Checked" / "Undo check" on the training page; "Checked" on the row on "Season". | A | review build | 1 with A, or 2 | done (2026-10-25) |
 | B | The start page as a landing page | feature | Core `start_page`. `readings::state`. `GET /api/start`. The start page rewritten (open items, "Last", "Next", links, the choose step of a new season); the schedule, cards, line of changes and view "Last season" removed; `GET /api/schedule` and `GET /api/trainings/next` removed; `?from=start` on the training links of the new start page (the parameter itself comes in A). Measure the answer time of `/api/start` (risk 4). | A, C | review build + accept | 2 or 3 | not started |
 
 Within each story: the core with unit tests, then the route with its tests, then the page with its
@@ -97,7 +97,7 @@ spec and `functional.md`.
 
 ## Progress
 - [x] Story A – the page "Season" (done 2026-10-25; folder in `changes/done/`)
-- [ ] Story C – checked trainings
+- [x] Story C – checked trainings (done 2026-10-25; folder in `changes/done/`)
 - [ ] Story B – the start page as a landing page
 - [ ] Epic review accept
 

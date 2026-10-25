@@ -7,7 +7,9 @@ The coordinator, who is also the coach, keeps who was at training and why a play
 seconds on a phone in the hall. A **training** exists, and counts, only when the coordinator opens a
 training day (suggested by a weekly training, see [weekly trainings and reasons](weekly-trainings-and-reasons.md))
 or adds a training. Every player with a role on its date ([players and team](players-and-team.md))
-is "there" at first; the coordinator only marks who is absent, with a reason. The page
+is "there" at first; the coordinator only marks who is absent, with a reason, and then confirms
+with "Checked" that the attendance is complete, so a training nobody looked at can stay in view (the
+open items of the start page come later). The page
 "Attendance" shows, for each player, how often the player was there and why not, for the current
 or an earlier season. The list of training days and trainings is on [Season](season.md).
 
@@ -41,6 +43,15 @@ or an earlier season. The list of training days and trainings is on [Season](sea
 - A date that is not opened (reached by its address) shows "Not opened" with "Open training".
 - A training is independent once opened: a change or delete of a weekly training never changes it. A training on a date that is no longer a training day stays, as "extra".
 
+### Checked
+- A training of today or earlier that is not cancelled has the button "Checked": a tap saves at once, and the page then shows "Checked" with a check mark (a state, not a button) and "Undo check", which also saves at once. A training after today, or a cancelled one, has no "Checked" (an absence noted in advance does not make it complete; a cancelled training has no attendance).
+- A save that fails shows "Not saved. Try again." and the stored state; a training deleted on another screen meanwhile shows "This training no longer exists. Load the page again."
+- A check stays when the coordinator marks a player, changes the times or the date (also to a date after today: it then shows "Checked" with "Undo check"), cancels the training or undoes the cancel. "Delete training" removes it; opened again, the training is not checked.
+- Two screens: a check and a mark at the same moment are both kept; "Checked" and "Undo check": the last one wins.
+- A training of an earlier season can be checked and unchecked as well.
+- On "Season" a checked training shows "· Checked" after its status.
+- When checked trainings came (release of story C of start page and season), every training before that day was checked once.
+
 ### Earlier seasons
 - Trainings and attendance of an earlier season can still be opened, marked, changed and cancelled, for example the last training of May found in July: choose the season on "Season" and tap the row. "Back", and the jump after "Delete training", on a training return to "Season" of that training's season.
 - "Add training" is only for the current season, and "Change" cannot move a training to another season. So a forgotten extra training (not on a training day) of an earlier season cannot be entered.
@@ -53,6 +64,7 @@ or an earlier season. The list of training days and trainings is on [Season](sea
 - "This date is not a training day." – "Open" of a date without a weekly training (only from an address).
 - "This player is not in the team on that date." – a mark for a player with no role on the date (the page never offers it).
 - "This reason is hidden." – a mark with a hidden reason (the page never offers it).
+- "A training after today cannot be checked yet." and "A cancelled training cannot be checked." – a check the page never offers.
 - "This date cannot be read." – an address with a date that is not a date.
 - "This season cannot be read." – an address with a season that is not a season (`?season=abc`), with a button "Current season".
 - "No player has a role on this date." – a training with no player in a role.
@@ -62,4 +74,4 @@ or an earlier season. The list of training days and trainings is on [Season](sea
 
 ## Interface
 - Screens: `/attendance` (with `?season=` for another season), `/training/[date]` (with `?from=start` or `?from=attendance` for "Back"), the list on `/season`; the card and the link on the start page (`/`). The start page has the line "Season · Attendance · Team · Players · Settings"; "Attendance" has no links to the other pages.
-- Server addresses (all need a login): `GET /api/attendance?season=` (the totals, "Left the team", the training days not opened and the seasons to choose from), `GET /api/season?season=` (the list, with the games; see [Season](season.md)), `GET /api/trainings/next` (the card), `GET /api/trainings/{date}` (one training with its players), `PUT /api/trainings/{date}/open`, `POST /api/trainings` ("Add training"), `PUT /api/trainings/{date}` ("Change"), `POST /api/trainings/{date}/cancel`, `POST /api/trainings/{date}/uncancel`, `DELETE /api/trainings/{date}`, `PUT` and `DELETE /api/trainings/{date}/absences/{player}` (mark absent, mark there).
+- Server addresses (all need a login): `GET /api/attendance?season=` (the totals, "Left the team", the training days not opened and the seasons to choose from), `GET /api/season?season=` (the list, with the games; see [Season](season.md)), `GET /api/trainings/next` (the card), `GET /api/trainings/{date}` (one training with its players), `PUT /api/trainings/{date}/open`, `POST /api/trainings` ("Add training"), `PUT /api/trainings/{date}` ("Change"), `POST /api/trainings/{date}/cancel`, `POST /api/trainings/{date}/uncancel`, `DELETE /api/trainings/{date}`, `PUT` and `DELETE /api/trainings/{date}/absences/{player}` (mark absent, mark there), `PUT` and `DELETE /api/trainings/{date}/checked` ("Checked", "Undo check").

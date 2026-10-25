@@ -39,7 +39,7 @@ It is not:
 - Attendance at training runs on the cluster (v0.3.0, released 18 October 2026): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season.
 - A nightly encrypted copy of the team database is kept on the home storage (since 18 October 2026, built in `gitops-lab`); a copy outside the house comes later.
 - The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
-- The page "Season" is built (story A of start page and season, 25 October 2026, not released yet): all games and trainings of a season per week, with labels that combine; the list of trainings moved there from "Attendance". Checked trainings and the start page with the open items come next.
+- The page "Season" and checked trainings are built (stories A and C of start page and season, 25 October 2026, not released yet): all games and trainings of a season per week, with labels that combine, and the list of trainings moved there from "Attendance"; the coordinator confirms with "Checked" that the attendance of a training is complete. The start page with the open items comes next.
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -120,3 +120,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-18 | Word list: "duty place" added (one place at a game that a player of the team must fill), from `/vision duties` |
 | 2026-10-25 | The start page and the page "Season" come before duties (new priority 3, journey 0 "Open the tool"), from the design of duty places; words event, checked, open item, Season |
 | 2026-10-25 | Where we are: the page "Season" is built (story A of start page and season); checked trainings come next |
+| 2026-10-25 | Where we are: checked trainings are built (story C); the start page with the open items comes next |
