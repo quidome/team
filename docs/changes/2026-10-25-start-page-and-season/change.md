@@ -1,7 +1,7 @@
 ---
 title: Start page and season
 type: feature
-stage: discover
+stage: design
 closure: checks      # set by /design
 created: 2026-10-25
 ---
@@ -18,3 +18,4 @@ open item until the coordinator checks it. The base on which duties show their o
 |------|-------|------|
 | 2026-10-25 | idea | created from `/vision` (the line of 2026-10-15 in `ideas.md`, extended on 2026-10-25 in the design of duty places); new priority 3 and journey 0 of the vision; words event, checked, open item, Season |
 | 2026-10-25 | discover | idea ready for discovery |
+| 2026-10-25 | design | functional.md approved: three stories (A the page "Season", B the start page as a landing page with "Open items", "Last" and "Next", C checked trainings); spec review: all three "serves – note", notes 1–7 answered (1, 2, 4 by the coordinator) |

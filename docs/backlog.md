@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Start page and season](changes/2026-10-25-start-page-and-season/) – feature, stage discover: the start page as a landing page (the last game and training, the next events, the open items) and the page "Season" with labels and date separators; a past training is an open item until checked. Next: `/discover docs/changes/2026-10-25-start-page-and-season`.
+1. [Start page and season](changes/2026-10-25-start-page-and-season/) – feature, stage design: functional spec approved (A the page "Season", B the start page with "Open items", "Last" and "Next", C checked trainings). Next: `/design docs/changes/2026-10-25-start-page-and-season`.
 2. [Duties](changes/2026-10-18-duties/) – feature, epic, back to discover after item 1: the screens change (start page, "Season", open items). Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
 
 Small:
