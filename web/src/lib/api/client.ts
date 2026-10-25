@@ -351,18 +351,19 @@ export async function deleteWeeklyTraining(id: number): Promise<WeeklyTrainings>
 	return dataOf(await api.DELETE('/api/weekly-trainings/{id}', { params: { path: { id } } }));
 }
 
-export type TrainingList = components['schemas']['TrainingList'];
 export type TrainingRow = components['schemas']['TrainingRow'];
 export type TrainingDay = components['schemas']['TrainingDay'];
 export type AtTraining = components['schemas']['AtTrainingView'];
 
-/** The training days and trainings of a season (the current one when left out), one row per
- * date. */
-export async function loadTrainings(
+export type SeasonAnswer = components['schemas']['SeasonAnswer'];
+export type EventView = components['schemas']['EventView'];
+
+/** All events of a season (the current one when left out) for the page "Season". */
+export async function loadSeason(
 	fetch: typeof globalThis.fetch,
 	season?: string
-): Promise<TrainingList> {
-	return dataOf(await api.GET('/api/trainings', { fetch, params: { query: { season } } }));
+): Promise<SeasonAnswer> {
+	return dataOf(await api.GET('/api/season', { fetch, params: { query: { season } } }));
 }
 
 export type AttendanceOverview = components['schemas']['AttendanceOverview'];

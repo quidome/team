@@ -9,6 +9,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page as current } from '$app/state';
 	import type { ResolvedPathname } from '$app/types';
 	import {
 		ApiError,
@@ -163,7 +164,15 @@
 			});
 			changing = false;
 			if (moved.date === page.date) day = moved;
-			else await goto(resolve('/training/[date]', { date: moved.date }), { replaceState: true });
+			else {
+				// The new date keeps where the training was opened from.
+				const query = from ? `?from=${encodeURIComponent(from)}` : '';
+				/* eslint-disable svelte/no-navigation-without-resolve -- the path is resolved; only the query `from` is added (resolve() takes no query on a route with a parameter) */
+				await goto(`${resolve('/training/[date]', { date: moved.date })}${query}`, {
+					replaceState: true
+				});
+				/* eslint-enable svelte/no-navigation-without-resolve */
+			}
 		} catch (failure) {
 			error = message(failure);
 		} finally {
@@ -180,17 +189,26 @@
 		error = null;
 		try {
 			await deleteTraining(page.date);
-			await goto(attendanceOf(page.season));
+			await goto(seasonOf(page.season));
 		} catch (failure) {
 			error = message(failure);
 			busy = false;
 		}
 	}
 
-	/** The page "Attendance" of the training's season, so "Back" returns to the season it came
-	 * from. */
-	function attendanceOf(season: string): ResolvedPathname {
-		return resolve(`/attendance?season=${encodeURIComponent(season)}`);
+	/** Where the training was opened from: `?from=start` or `?from=attendance`, else "Season". */
+	const from = $derived(current.url.searchParams.get('from'));
+
+	/** The page "Season" of the training's season, so "Back" returns to the season it came from. */
+	function seasonOf(season: string): ResolvedPathname {
+		return resolve(`/season?season=${encodeURIComponent(season)}`);
+	}
+
+	/** "Back": the page the training was opened from. */
+	function backOf(season: string): ResolvedPathname {
+		if (from === 'start') return resolve('/');
+		if (from === 'attendance') return resolve(`/attendance?season=${encodeURIComponent(season)}`);
+		return seasonOf(season);
 	}
 
 	function reasonName(page: TrainingDay, id: number): string {
@@ -236,7 +254,7 @@
 					{topLine(page, shown)}
 				</p>
 			</div>
-			<Button href={attendanceOf(page.season)} variant="ghost">Back</Button>
+			<Button href={backOf(page.season)} variant="ghost">Back</Button>
 		</div>
 
 		{#if notSaved}

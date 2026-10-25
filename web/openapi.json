@@ -982,6 +982,43 @@
         }
       }
     },
+    "/api/season": {
+      "get": {
+        "tags": [
+          "season"
+        ],
+        "operationId": "season",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "description": "For example \"2026-2027\"; the current season when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All events of the season, coming and past",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/selection": {
       "get": {
         "tags": [
@@ -1066,41 +1103,6 @@
       }
     },
     "/api/trainings": {
-      "get": {
-        "tags": [
-          "trainings"
-        ],
-        "operationId": "trainings",
-        "parameters": [
-          {
-            "name": "season",
-            "in": "query",
-            "description": "For example \"2026-2027\"; the current season when left out.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The training days and trainings of the season, one row per date",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TrainingList"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`invalid_season`"
-          },
-          "401": {
-            "description": "Not logged in"
-          }
-        }
-      },
       "post": {
         "tags": [
           "trainings"
@@ -2096,6 +2098,63 @@
           "source_format"
         ]
       },
+      "EventView": {
+        "type": "object",
+        "description": "One event: a game or a training (or a training day not opened). Exactly one of `game` and\n`training` is set.",
+        "required": [
+          "date",
+          "week",
+          "week_first_day",
+          "week_last_day"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Dutch local date, for example \"2026-10-31\"."
+          },
+          "game": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ScheduleGame"
+              }
+            ]
+          },
+          "training": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TrainingRow"
+              }
+            ]
+          },
+          "week": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The ISO week number.",
+            "minimum": 0
+          },
+          "week_first_day": {
+            "type": "string",
+            "description": "The Monday and the Sunday of the week."
+          },
+          "week_last_day": {
+            "type": "string"
+          }
+        }
+      },
+      "GamesState": {
+        "type": "string",
+        "enum": [
+          "shown",
+          "team_needed",
+          "none"
+        ]
+      },
       "HistoryRole": {
         "type": "object",
         "description": "A role in a player's history.",
@@ -3085,6 +3144,85 @@
           }
         }
       },
+      "SeasonAnswer": {
+        "type": "object",
+        "required": [
+          "season",
+          "current_season",
+          "today",
+          "season_first_day",
+          "season_last_day",
+          "seasons",
+          "games",
+          "coming",
+          "past"
+        ],
+        "properties": {
+          "club": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ClubView",
+                "description": "The club and team of the season's choice; `null` without a choice (or without a team)."
+              }
+            ]
+          },
+          "coming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "description": "Today and later, nearest first."
+          },
+          "current_season": {
+            "type": "string"
+          },
+          "games": {
+            "$ref": "#/components/schemas/GamesState"
+          },
+          "past": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "description": "Before today, newest first."
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the events, for example \"2026-2027\"."
+          },
+          "season_first_day": {
+            "type": "string",
+            "description": "The first and last day of the season, for \"Add training\"."
+          },
+          "season_last_day": {
+            "type": "string"
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The seasons with trainings, roles, weekly trainings or a choice, and the current and the\nchosen season; newest first."
+          },
+          "team": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TeamView"
+              }
+            ]
+          },
+          "today": {
+            "type": "string",
+            "description": "Dutch date: events of today and later are coming."
+          }
+        }
+      },
       "SeenAnswer": {
         "type": "object",
         "required": [
@@ -3407,44 +3545,6 @@
           "start": {
             "type": "string",
             "description": "For example \"19:45\"."
-          }
-        }
-      },
-      "TrainingList": {
-        "type": "object",
-        "description": "The list of a season: today and later, nearest first; before today, newest first.",
-        "required": [
-          "season",
-          "today",
-          "season_first_day",
-          "season_last_day",
-          "coming",
-          "past"
-        ],
-        "properties": {
-          "coming": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TrainingRow"
-            }
-          },
-          "past": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TrainingRow"
-            }
-          },
-          "season": {
-            "type": "string"
-          },
-          "season_first_day": {
-            "type": "string"
-          },
-          "season_last_day": {
-            "type": "string"
-          },
-          "today": {
-            "type": "string"
           }
         }
       },

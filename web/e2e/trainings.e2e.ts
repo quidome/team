@@ -29,22 +29,22 @@ test('a Tuesday weekly training gives the card on the start page', async ({ page
 	expect(errors).toEqual([]);
 });
 
+const pastLabel = (page: import('@playwright/test').Page) =>
+	page.getByTestId('labels').getByRole('button', { name: 'Past', exact: true });
+
 test('the list of the season, and a tap on a row opens the training', async ({ page }) => {
 	const errors = watchConsole(page);
-	await page.goto('/attendance');
-	await expect(page.getByRole('heading', { name: 'Attendance · 2026-2027' })).toBeVisible();
-	const coming = page.getByTestId('coming').getByTestId('training-row');
-	const past = page.getByTestId('past').getByTestId('training-row');
+	await page.goto('/season');
+	await pastLabel(page).click();
+	const coming = page.getByTestId('part-coming').getByTestId('training-row');
+	const past = page.getByTestId('part-past').getByTestId('training-row');
 	await expect(coming.first()).toHaveAttribute('data-date', '2026-10-13');
 	await expect(past.first()).toHaveAttribute('data-date', '2026-10-06');
 	await expect(past.first().getByTestId('training-status')).toHaveText('Not opened');
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 
-	await past
-		.first()
-		.getByRole('button', { name: /^Tue 6 Oct/ })
-		.click();
+	await past.first().getByRole('button').first().click();
 	await expect(page).toHaveURL(/\/training\/2026-10-06$/);
 	await expect(page.getByTestId('training-heading')).toHaveText('Tue 6 Oct · 19:45–21:00');
 	await expect(page.getByTestId('training-top')).toHaveText('All there');
@@ -52,7 +52,10 @@ test('the list of the season, and a tap on a row opens the training', async ({ p
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 
+	// "Back" goes to "Season" of the training's season, with "Past" still on.
 	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/season\?season=2026-2027$/);
+	await expect(pastLabel(page)).toHaveAttribute('aria-pressed', 'true');
 	await expect(page.locator('[data-date="2026-10-06"]').getByTestId('training-status')).toHaveText(
 		'All there'
 	);
@@ -61,8 +64,8 @@ test('the list of the season, and a tap on a row opens the training', async ({ p
 
 test('"Cancel training" on a day that is not opened, and "Show cancelled"', async ({ page }) => {
 	const errors = watchConsole(page);
-	await page.goto('/attendance');
-	const tuesday = page.locator('[data-date="2026-10-20"]');
+	await page.goto('/season');
+	const tuesday = page.locator('[data-testid="training-row"][data-date="2026-10-20"]');
 	await tuesday.getByRole('button', { name: 'Cancel training of Tue 20 Oct' }).click();
 	await expect(tuesday.getByTestId('training-status')).toHaveText('Cancelled');
 	await page.getByLabel('Show cancelled').uncheck();
@@ -77,7 +80,7 @@ test('"Cancel training" on a day that is not opened, and "Show cancelled"', asyn
 
 test('"Add training" with typed times, and with the proposed times', async ({ page }) => {
 	const errors = watchConsole(page);
-	await page.goto('/attendance');
+	await page.goto('/season');
 	await page.getByRole('button', { name: 'Add training' }).click();
 	const form = page.getByTestId('add-training');
 	await expect(form.getByLabel('Date')).toHaveAttribute('min', '2026-07-01');
@@ -88,8 +91,10 @@ test('"Add training" with typed times, and with the proposed times', async ({ pa
 	await expect(page).toHaveURL(/\/training\/2026-10-22$/);
 	await expect(page.getByTestId('training-heading')).toHaveText('Thu 22 Oct · 19:00–20:30');
 
-	await page.goto('/attendance');
-	await expect(page.locator('[data-date="2026-10-22"]')).toContainText('extra');
+	await page.goto('/season');
+	await expect(page.locator('[data-testid="training-row"][data-date="2026-10-22"]')).toContainText(
+		'extra'
+	);
 	await page.getByRole('button', { name: 'Add training' }).click();
 	await form.getByLabel('Date').fill('2026-11-03');
 	await form.getByLabel('Date').dispatchEvent('change');
@@ -99,7 +104,7 @@ test('"Add training" with typed times, and with the proposed times', async ({ pa
 	await expect(page.getByTestId('training-heading')).toHaveText('Tue 3 Nov · 19:45–21:00');
 
 	// The same date again is refused.
-	await page.goto('/attendance');
+	await page.goto('/season');
 	await page.getByRole('button', { name: 'Add training' }).click();
 	await form.getByLabel('Date').fill('2026-10-22');
 	await form.getByLabel('Start').fill('19:00');
@@ -115,10 +120,12 @@ test('a training reached by its address is opened only with "Open training"', as
 	const errors = watchConsole(page);
 	await page.goto('/training/2026-10-27');
 	await expect(page.getByTestId('training-top')).toHaveText('Not opened');
-	await page.goto('/attendance');
-	await expect(page.locator('[data-date="2026-10-27"]').getByTestId('training-status')).toHaveText(
-		'Not opened'
-	);
+	await page.goto('/season');
+	await expect(
+		page
+			.locator('[data-testid="training-row"][data-date="2026-10-27"]')
+			.getByTestId('training-status')
+	).toHaveText('Not opened');
 
 	await page.goto('/training/2026-10-27');
 	await page.getByRole('button', { name: 'Open training' }).click();
@@ -130,8 +137,11 @@ test('a tap on the card opens the next training', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/');
 	await page.getByTestId('training-card').click();
-	await expect(page).toHaveURL(/\/training\/2026-10-13$/);
+	await expect(page).toHaveURL(/\/training\/2026-10-13\?from=start$/);
 	await expect(page.getByTestId('training-top')).toHaveText('All there');
+	// "Back" returns to the start page it came from.
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/$/);
 	await page.goto('/');
 	await expect(page.getByTestId('training-card')).toHaveText(/All there/);
 	expect(errors).toEqual([]);
@@ -315,7 +325,7 @@ test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async (
 		void dialog.accept();
 	});
 	await page.getByRole('button', { name: 'Delete training' }).click();
-	await expect(page).toHaveURL(/\/attendance\?season=2026-2027$/);
+	await expect(page).toHaveURL(/\/season\?season=2026-2027$/);
 	expect(messages).toEqual(['Delete the training of Tue 3 Nov? Its attendance is removed.']);
 	await expect(page.locator('[data-date="2026-11-03"]').getByTestId('training-status')).toHaveText(
 		'Not opened'
@@ -413,17 +423,37 @@ test("a new season proposes last season's weekly trainings", async ({ page }) =>
 
 // The overview (attendance at training, story C), on the data of the tests above.
 test.describe('the overview', () => {
-	test('an earlier season can be chosen, and "Back" returns to it', async ({ page }) => {
+	test('an earlier season can be chosen on "Attendance"', async ({ page }) => {
 		const errors = watchConsole(page);
 		// 2025-2026 has no data, but a season in the address is in the choice.
 		await page.goto('/attendance?season=2025-2026');
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2025-2026');
-		await expect(page.getByRole('button', { name: 'Add training' })).toHaveCount(0);
 		const choice = page.getByTestId('season-choice');
 		await expect(choice).toHaveValue('2025-2026');
 		await choice.selectOption('2026-2027');
 		await expect(page).toHaveURL(/\/attendance\?season=2026-2027$/);
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2026-2027');
+		// Back to 2025-2026 with the browser (the choice offers it only while it is chosen).
+		await page.goBack();
+		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2025-2026');
+		// The list of trainings is on "Season".
+		await expect(page.getByRole('button', { name: 'Add training' })).toHaveCount(0);
+		await expect(page.getByTestId('training-row')).toHaveCount(0);
+		await expectAccessible(page);
+		await expectNoHorizontalScroll(page, 320);
+		expect(errors).toEqual([]);
+	});
+
+	test('an earlier season can be chosen on "Season", and "Back" returns to it', async ({
+		page
+	}) => {
+		const errors = watchConsole(page);
+		await page.goto('/season?season=2025-2026');
+		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Season 2025-2026');
+		await expect(page.getByRole('button', { name: 'Add training' })).toHaveCount(0);
+		await page.getByTestId('season-choice').selectOption('2026-2027');
+		await expect(page).toHaveURL(/\/season\?season=2026-2027$/);
 
 		// An open "Add training" form and its error do not move to another season.
 		await page.getByRole('button', { name: 'Add training' }).click();
@@ -433,19 +463,15 @@ test.describe('the overview', () => {
 		await form.getByLabel('End').fill('21:00');
 		await form.getByRole('button', { name: 'Save' }).click();
 		await expect(form.getByRole('alert')).toHaveText('There is already a training on this date.');
-		// Back to 2025-2026 with the browser (the choice offers it only while it is chosen).
 		await page.goBack();
-		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
-		await expect(page.getByRole('heading', { level: 1 })).toHaveText('Attendance · 2025-2026');
+		await expect(page).toHaveURL(/\/season\?season=2025-2026$/);
 		await expect(page.getByTestId('add-training')).toHaveCount(0);
 		await expect(page.getByRole('alert')).toHaveCount(0);
 
-		// The last training day of May 2026 belongs to 2025-2026.
+		// The last training day of May 2026 belongs to 2025-2026: "Back" goes to that season.
 		await page.goto('/training/2026-05-26');
 		await page.getByRole('link', { name: 'Back' }).click();
-		await expect(page).toHaveURL(/\/attendance\?season=2025-2026$/);
-		await expectAccessible(page);
-		await expectNoHorizontalScroll(page, 320);
+		await expect(page).toHaveURL(/\/season\?season=2025-2026$/);
 		// The refused save shows in the console as a failed request.
 		expect(errors.filter((line) => !line.includes('400'))).toEqual([]);
 	});
@@ -471,7 +497,7 @@ test.describe('the overview', () => {
 
 		// The link opens the oldest day that is not opened: Tue 1 Sep. Zane was at school.
 		await page.getByRole('link', { name: '11 training days not opened' }).click();
-		await expect(page).toHaveURL(/\/training\/2026-09-01$/);
+		await expect(page).toHaveURL(/\/training\/2026-09-01\?from=attendance$/);
 		await page.getByRole('button', { name: 'Open training' }).click();
 		const atTraining = page.getByTestId('training-player').filter({ hasText: 'Zane' });
 		await atTraining.getByRole('button', { name: /Zane/ }).click();
@@ -484,15 +510,21 @@ test.describe('the overview', () => {
 			'1 there · 1 absent, valid · 0 absent, not valid'
 		);
 
-		// Three more Tuesdays from the list, everyone there.
+		// Three more Tuesdays from "Season", everyone there.
 		for (const [date, left] of [
 			['2026-09-08', '9 training days not opened'],
 			['2026-09-15', '8 training days not opened'],
 			['2026-09-22', '7 training days not opened']
 		]) {
-			await page.locator(`[data-date="${date}"]`).getByRole('button').first().click();
+			await page.goto('/season');
+			await page.getByTestId('labels').getByRole('button', { name: 'Past', exact: true }).click();
+			await page
+				.locator(`[data-testid="training-row"][data-date="${date}"]`)
+				.getByRole('button')
+				.first()
+				.click();
 			await expect(page).toHaveURL(new RegExp(`/training/${date}$`));
-			await page.getByRole('link', { name: 'Back' }).click();
+			await page.goto('/attendance');
 			await expect(page.getByTestId('not-opened')).toHaveText(left);
 		}
 		await expect(zane).toContainText('of 5 trainings');
@@ -526,22 +558,16 @@ test.describe('the overview', () => {
 		await page.goto('/training/2026-09-01');
 		await page.getByRole('button', { name: 'Cancel training' }).click();
 		await expect(page.getByTestId('training-top')).toHaveText('Cancelled');
-		await page.getByRole('link', { name: 'Back' }).click();
+		await page.goto('/attendance');
 		await expect(zane).toContainText('of 4 trainings');
 		await expect(zane.getByTestId('totals-counts')).toHaveText(
 			'4 there · 0 absent, valid · 0 absent, not valid'
 		);
 
-		// "Show cancelled" off hides the row, not the totals.
-		await page.getByRole('switch', { name: 'Show cancelled' }).uncheck();
-		await expect(page.locator('[data-date="2026-09-01"]')).toHaveCount(0);
-		await expect(zane).toContainText('of 4 trainings');
-		await page.getByRole('switch', { name: 'Show cancelled' }).check();
-
 		await page.goto('/training/2026-09-01');
 		await page.getByRole('button', { name: 'Undo cancel' }).click();
 		await expect(page.getByTestId('training-top')).toHaveText('1 absent');
-		await page.getByRole('link', { name: 'Back' }).click();
+		await page.goto('/attendance');
 		await expect(zane).toContainText('of 5 trainings');
 		expect(errors).toEqual([]);
 	});

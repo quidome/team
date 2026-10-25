@@ -79,6 +79,25 @@ async fn reason_id(coordinator: &Coordinator, name: &str) -> i64 {
         .unwrap()
 }
 
+/// The training rows of `GET /api/season{query}` (the page "Season"), as the season, today and
+/// the parts "coming" and "past".
+async fn training_list(coordinator: &Coordinator, query: &str) -> Value {
+    let answer = coordinator
+        .ok("GET", &format!("/api/season{query}"), None)
+        .await;
+    let rows = |part: &str| -> Vec<Value> {
+        answer[part]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| !event["training"].is_null())
+            .map(|event| event["training"].clone())
+            .collect()
+    };
+    json!({ "season": answer["season"], "today": answer["today"],
+            "coming": rows("coming"), "past": rows("past") })
+}
+
 fn dates(rows: &Value) -> Vec<&str> {
     rows.as_array()
         .unwrap()
@@ -116,7 +135,7 @@ async fn the_list_has_one_row_per_date(pool: PgPool) {
     // An extra training on a Wednesday.
     insert_training(&pool, date(2026, 10, 7), false).await;
 
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     assert_eq!(list["season"], "2026-2027");
     assert_eq!(list["today"], "2026-10-12");
     assert_eq!(
@@ -139,9 +158,7 @@ async fn the_list_has_one_row_per_date(pool: PgPool) {
     assert_eq!(row(&list, "2026-10-13")["opened"], false);
 
     // Last season has no weekly trainings and no trainings.
-    let last = coordinator
-        .ok("GET", "/api/trainings?season=2025-2026", None)
-        .await;
+    let last = training_list(&coordinator, "?season=2025-2026").await;
     assert!(last["coming"].as_array().unwrap().is_empty());
     assert!(last["past"].as_array().unwrap().is_empty());
 }
@@ -244,7 +261,7 @@ async fn a_date_or_season_that_cannot_be_read_is_refused(pool: PgPool) {
         .await;
     assert_eq!(answer, (400, json!({ "error": "invalid_date" })));
     let answer = coordinator
-        .send("GET", "/api/trainings?season=2026", None)
+        .send("GET", "/api/season?season=2026", None)
         .await;
     assert_eq!(answer, (400, json!({ "error": "invalid_season" })));
 }
@@ -355,7 +372,7 @@ async fn add_and_change_a_training(pool: PgPool) {
         page["training"],
         json!({ "start": "19:00", "end": "20:30", "cancelled": false })
     );
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     assert_eq!(row(&list, "2026-10-22")["extra"], true);
 
     // "Change" to Tue 20 Oct: the absence stays.
@@ -457,14 +474,14 @@ async fn cancel_and_undo_keep_the_absences(pool: PgPool) {
         .await;
     assert_eq!(page["training"]["cancelled"], true);
     assert_eq!(stored_absences(&pool).await, 2);
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     assert_eq!(row(&list, "2026-10-06")["status"], "cancelled");
 
     let page = coordinator
         .ok("POST", "/api/trainings/2026-10-06/uncancel", None)
         .await;
     assert_eq!(page["training"]["cancelled"], false);
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     assert_eq!(row(&list, "2026-10-06")["status"], "absent");
     assert_eq!(row(&list, "2026-10-06")["absent"], 2);
 
@@ -530,7 +547,7 @@ async fn delete_a_training_deletes_its_absences(pool: PgPool) {
     assert_eq!(status, 204);
     assert!(stored_trainings(&pool).await.is_empty());
     assert_eq!(stored_absences(&pool).await, 0);
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     assert_eq!(row(&list, "2026-10-06")["status"], "not_opened");
     let (status, _) = coordinator
         .send("DELETE", "/api/trainings/2026-10-06", None)
@@ -691,7 +708,7 @@ async fn a_weekly_training_change_never_touches_a_training(pool: PgPool) {
                          "from": "2026-09-02", "until": "2027-05-26" })),
         )
         .await;
-    let list = coordinator.ok("GET", "/api/trainings", None).await;
+    let list = training_list(&coordinator, "").await;
     let tuesday = row(&list, "2026-10-06");
     assert_eq!(tuesday["start"], "19:45");
     assert_eq!(tuesday["status"], "absent");

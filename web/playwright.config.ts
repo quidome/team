@@ -71,6 +71,13 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// The page "Season" shows the games and the trainings the earlier tests made.
+			name: 'season',
+			testMatch: 'season.e2e.ts',
+			dependencies: ['trainings'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

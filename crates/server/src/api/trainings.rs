@@ -1,8 +1,9 @@
-//! `/api/trainings`: the trainings of a season, the next training, and one training with its
-//! players (attendance at training, story B). Names never go to the log; only dates and ids do.
+//! `/api/trainings`: "Add training", the next training, one training with its players, and the
+//! actions on a training (attendance at training, story B). The list of a season is in
+//! `GET /api/season`. Names never go to the log; only dates and ids do.
 
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use super::format::{clock_time, day, path_date, query_season, time};
+use super::format::{clock_time, day, path_date, time};
 use super::players::RoleKind;
 use super::reasons::{AbsenceReason, view as reason_view};
 use crate::app::AppState;
@@ -37,17 +38,6 @@ pub struct TrainingRow {
     pub opened: bool,
     /// A training on a date that is not a training day.
     pub extra: bool,
-}
-
-/// The list of a season: today and later, nearest first; before today, newest first.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct TrainingList {
-    pub season: String,
-    pub today: String,
-    pub season_first_day: String,
-    pub season_last_day: String,
-    pub coming: Vec<TrainingRow>,
-    pub past: Vec<TrainingRow>,
 }
 
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
@@ -143,7 +133,7 @@ fn taken(error: StoreError) -> AppError {
     }
 }
 
-fn row_view(row: &SeasonRow) -> TrainingRow {
+pub(crate) fn row_view(row: &SeasonRow) -> TrainingRow {
     let (status, absent) = match row.status {
         DayStatus::NotOpened => ("not_opened", 0),
         DayStatus::AllThere => ("all_there", 0),
@@ -161,8 +151,9 @@ fn row_view(row: &SeasonRow) -> TrainingRow {
     }
 }
 
-/// The list of `season`.
-pub(crate) async fn list_of(state: &AppState, season: Season) -> Result<TrainingList, AppError> {
+/// The first coming row of `season`: today's training until midnight, else the next training day
+/// or training.
+async fn next_of(state: &AppState, season: Season) -> Result<Option<TrainingRow>, AppError> {
     let today = today_in_netherlands(state.clock.as_ref());
     let weekly = weekly_trainings::for_season(&state.pool, season).await?;
     let stored = trainings::for_season(&state.pool, season).await?;
@@ -170,14 +161,7 @@ pub(crate) async fn list_of(state: &AppState, season: Season) -> Result<Training
     let absences = trainings::absences_at(&state.pool, &ids).await?;
     let roles = players::roles_in(&state.pool, &[season]).await?;
     let list = season_list(season, &weekly, &stored, &absences, &roles, today);
-    Ok(TrainingList {
-        season: season.to_string(),
-        today: day(today),
-        season_first_day: day(season.first_day()),
-        season_last_day: day(season.last_day()),
-        coming: list.coming.iter().map(row_view).collect(),
-        past: list.past.iter().map(row_view).collect(),
-    })
+    Ok(list.coming.first().map(row_view))
 }
 
 /// The training day `date`: its training with the players, or nothing yet.
@@ -238,25 +222,6 @@ async fn fill(
 
 #[utoipa::path(
     get,
-    path = "/api/trainings",
-    operation_id = "trainings",
-    params(SeasonQuery),
-    responses(
-        (status = 200, description = "The training days and trainings of the season, one row per date", body = TrainingList),
-        (status = 400, description = "`invalid_season`"),
-        (status = 401, description = "Not logged in"),
-    )
-)]
-pub async fn list(
-    State(state): State<AppState>,
-    Query(query): Query<SeasonQuery>,
-) -> Result<Json<TrainingList>, AppError> {
-    let season = query_season(query.season, state.clock.as_ref())?;
-    Ok(Json(list_of(&state, season).await?))
-}
-
-#[utoipa::path(
-    get,
     path = "/api/trainings/next",
     operation_id = "nextTraining",
     responses(
@@ -266,12 +231,7 @@ pub async fn list(
 )]
 pub async fn next(State(state): State<AppState>) -> Result<Json<Option<TrainingRow>>, AppError> {
     let season = current_season(state.clock.as_ref());
-    let mut list = list_of(&state, season).await?;
-    Ok(Json(if list.coming.is_empty() {
-        None
-    } else {
-        Some(list.coming.swap_remove(0))
-    }))
+    Ok(Json(next_of(&state, season).await?))
 }
 
 #[utoipa::path(

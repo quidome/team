@@ -93,6 +93,7 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
         .await;
     coordinator.ok("GET", "/api/team", None).await;
     coordinator.ok("GET", "/api/attendance", None).await;
+    coordinator.ok("GET", "/api/season", None).await;
 
     let text = log.text();
     assert!(text.contains("player added"), "{text}");

@@ -41,6 +41,18 @@ pub async fn newest_before(
     Ok(row.map(Row::into_followed_team))
 }
 
+/// The seasons with a chosen team, oldest first. A season where only a club was saved has no
+/// games to show.
+pub async fn seasons(db: impl PgExecutor<'_>) -> Result<Vec<Season>, StoreError> {
+    let years = sqlx::query_scalar!(
+        r#"SELECT season_year AS "season_year!" FROM followed_teams
+           WHERE team_number IS NOT NULL ORDER BY season_year"#
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(years.into_iter().map(Season::from_start_year).collect())
+}
+
 struct Row {
     season_year: i32,
     club_number: i64,

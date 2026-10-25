@@ -1,6 +1,6 @@
 # Technical spec: The page "Season"
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-10-25-season-page](./)
 **Date**: 2026-10-25
@@ -199,7 +199,7 @@ approved 2026-10-25; epic `technical.md` approved 2026-10-25):
 ## Test plan
 - **Existing tests that must still pass**: core tests of `season_list`, `season_overview`, `schedule`; `tests/attendance.rs` unchanged; `tests/schedule.rs`, `tests/changes.rs`, `tests/readings.rs` unchanged; `tests/trainings.rs` (changed in step 5); `web/e2e/choose.e2e.ts` (the schedule stays on the start page), `changes.e2e.ts`, `logged-in.e2e.ts`, `players.e2e.ts` unchanged; `trainings.e2e.ts` (changed in steps 4 and 5).
 - **New tests**: per step, above.
-- **Not testable in the browser** (clock fixed at 12 October 2026, no new season): "Choose the team to see its games." (server test only), week 53 and the clock change (core only).
+- **Not testable in the browser** (clock fixed at 12 October 2026, no new season): week 53 and the clock change (core only). "Choose the team to see its games." is tested in the browser after all: the choose tests end with a club saved without a team (step 3).
 - **Checks while working**: `cargo test -p team_core`; `cargo test -p team --test season`, `--test trainings`, `--test attendance`; `cd web && npx playwright test season trainings` (after `just check-web`); `cargo clippy --workspace --all-targets -- -D warnings` at the end of each step; `just check` once before the commit.
 
 ## Compatibility and performance
@@ -209,12 +209,12 @@ approved 2026-10-25; epic `technical.md` approved 2026-10-25):
 - Technical debt until story B: the game rows exist in `Schedule.svelte` and in `SeasonEvents.svelte`. Written in `docs/architecture.md` at the close if B is not done by then.
 
 ## Progress
-- [ ] Step 1 – core: the order of events, and `not_opened`
-- [ ] Step 2 – server: `GET /api/season`
-- [ ] Step 3 – the page "Season", read only
-- [ ] Step 4 – the actions on "Season", and "Back"
-- [ ] Step 5 – "Attendance" without its list
-- [ ] All checks pass
+- [x] Step 1 – core: the order of events, and `not_opened`
+- [x] Step 2 – server: `GET /api/season`
+- [x] Step 3 – the page "Season", read only
+- [x] Step 4 – the actions on "Season", and "Back"
+- [x] Step 5 – "Attendance" without its list
+- [x] All checks pass (`just check`, 2026-10-25)
 
 ## Deviations
 None from `functional.md`. Readings that the design makes exact (no change of behaviour):
@@ -223,4 +223,182 @@ None from `functional.md`. Readings that the design makes exact (no change of be
 - "Choose the team to see its games." links to the start page, where the choose step is.
 - `?from=start` moves from story B to this story (epic `technical.md` named it in B).
 
+Found while building (2026-10-25):
+- Step 3: `Labels` holds arrays (`what: What[]`, `when: When[]`), not `Set`s, because the toggle groups bind to arrays; the behaviour is the same.
+- Step 3: `season.e2e.ts` runs in its own Playwright project `season` (after `trainings`), not inside `trainings`: files of one project can run at the same time, and both use one database.
+- Step 3: the first test of `season.e2e.ts` chooses Blue Drakes M16 1 again, because `choose.e2e.ts` ends with a club saved without a team; before that it checks "Choose the team to see its games.".
+- Step 4: "Back" also returns to "Attendance" when the training was opened from its line of training days not opened (`?from=attendance`), so "Back" goes to the page it came from in every case; a "Change" to another date keeps `from`.
+- Step 4: the lint rule `svelte/no-navigation-without-resolve` accepts only a `resolve()` call, and `resolve()` takes no query on a route with a parameter (`/training/[date]`). The three addresses with `?from=` are a resolved path plus the query, with a lint exception and its reason at each place (as in `src/lib/utils.ts`).
+- Step 4: "Season" shows "The new games could not be loaded. Load the page again." when the events cannot be loaded after a good reading, as the start page does for its schedule now.
+- Step 4: the tests of `trainings.e2e.ts` that used "Back" to return to "Attendance" changed in this step, not in step 5, because "Back" changed here: they open trainings from "Season" and load "Attendance" by its address to check the totals; the delete test expects "Season".
+- Step 5: `list_of` is gone too: `GET /api/trainings/next` now has its own small `next_of` (the first coming row), until story B removes the route.
+- Step 5: `tests/trainings.rs` reads the training rows of `GET /api/season` through a helper `training_list` with the old shape (season, today, coming, past), so its checks stay as they were; `tests/players.rs` names `GET /api/season` instead of `GET /api/trainings` in its list of routes that need a login.
+- Step 5: the test "an earlier season can be chosen, and Back returns to it" is split into one for "Attendance" (season choice) and one for "Season" (season choice, "Add training", "Back"); the part "Show cancelled hides the row, not the totals" left the test of cancelled trainings, because the rows are no longer on "Attendance" (hiding is tested on "Season").
+- After the reviews (R3): the page "Season" loads `/api/season` again itself after a good reading (`reload`), not with `invalidate`, so the "Game list" card keeps its result line, as the start page does.
+- After the reviews (A5): without a chosen team, "Season" has no "Game list" card (as the start page).
+- After the reviews (A1, coordinator): a return to "Season" from a training opened there keeps the labels and the place in the list, once; the spec says labels are not kept "at each visit", and a return from a training is not a new visit. Kept in `sessionStorage` for that one date only.
+- After the reviews (R4, coordinator): the season choice offers the seasons with a chosen team (plus trainings, roles, weekly trainings, the current and the chosen season), not every season with a choice.
+- After the reviews (R5, coordinator): "Season" shows "No training days or trainings this season. Add a weekly training in Settings." when the season has none, as "Attendance" did.
+
 ## Review findings
+Build review, 2026-10-25, `/review build` (fresh agent). Read: the diff against `main` (committed
+and not, with the new files), `change.md`, this spec, the epic's `functional.md` and
+`technical.md`, `docs/architecture.md`, the decision records, `CLAUDE.md` and `AGENTS.md`. Runs:
+`cargo test -p team_core` (185 passed); `cargo test -p team --test season --test trainings --test
+attendance --test player_logs --test players` (all passed); `cargo fmt --check`, `cargo clippy
+--workspace --all-targets -- -D warnings`, `cargo sqlx prepare --workspace --check` (all clean);
+`openapi` written to a scratch file is the same as `web/openapi.json`. Browser tests not run: the
+builder had a Playwright run on the same ports during the review. `crates/server/tests/season.rs`
+changed on disk during the review (13:26), not by the reviewer; the findings are on the version
+read before that time. No other text was given in the arguments.
+
+No finding against the rules: the order of events is in the core (`season_view.rs`, no I/O,
+decision 0001); everything is worked out at each request (0020); the route is under the protected
+router and in `players.rs`'s login list (0007); no `unwrap`/`expect` outside tests; no player
+names in the new route (`player_logs.rs`). `not_opened` moved out of `season_overview` with the
+same result (`tests/attendance.rs` unchanged and passing; the new core test fails if `coming` were
+read). `season.rs` builds on `ScheduleGame`, `row_view` and `api::changes::list` as the design
+said; nothing is rebuilt except the game rows of `SeasonEvents.svelte`, which is the debt named
+under "Compatibility".
+
+**R1 – The test of the "Game list" card cannot fail on its claim (claim, step 4).** "the 'Game
+list' card reads, and the new games show at once" checks `last-read`, a first game in "Coming",
+and no `season-load-error`. The games were already in the list before the tap (the first test
+chose the team, which reads the game list), and the fake source gives the same games again, so
+the test also passes when `onRead={reload}` is removed. Nothing shows that the list changed
+without a page load. A check that can fail: let the fake source (or `page.route` on
+`/api/season`) give one game more or less after the tap, and expect that row to show or go
+without a reload. Checked by trace: `season.e2e.ts` (the test and the first test), the season
+page (`ReadGameList ... onRead={reload}`).
+  - 2026-10-25: Fixed: the test answers `/api/season` with a renamed home team after the tap, and checks that the new name shows; a run with `onRead={reload}` removed (and the front end built) fails on it.
+
+**R2 – "Back" to "Attendance" is built but not tested (claim, sibling of step 4).** The deviation
+says "Back" returns to "Attendance" with `?from=attendance`, and that "Change" to another date
+keeps `from`. `trainings.e2e.ts` only checks that the address has `?from=attendance`; no test
+taps "Back" there, and no test moves a training opened with `?from=` to another date. A mistake in
+`backOf` or in the query kept by "Change" would pass every check. Checked by a search
+(`from=attendance` in `web/e2e`: one hit, line 500) and a trace of `training/[date]/+page.svelte`
+(`backOf`, the `goto` after "Change").
+  - 2026-10-25: Fixed: the test "Back returns to the page the training was opened from" taps "Back" after the link on "Attendance" (`?from=attendance`), and moves a training opened with `?from=start` to another date with "Change" (the address keeps `from`; "Back" goes to the start page).
+
+**R3 – The step 4 design said `invalidate`; the build reloads by hand, and this is not under
+Deviations (docs).** The spec: "its `onRead` calls `invalidate` for `/api/season`". The page
+keeps its own `answer` and calls `loadSeason` again, with a comment why (a new load would build
+the card again and lose its result line). The choice is sound and the behaviour is the same, but
+it is a difference from the approved design without a line under Deviations. Checked by trace:
+step 4 above, `routes/season/+page.svelte` (`reload`).
+  - 2026-10-25: Fixed: written under **Deviations** (the page loads `/api/season` again itself, so the card keeps its result line).
+
+**R4 – A season with only a club choice and no team is offered (sibling of `followed_teams::seasons`).**
+`followed_teams::seasons` takes every row of `followed_teams`, also one with a club and no team
+(the state the choose tests leave behind). In a later season such a season is in the choice and
+shows only "No games or trainings in … yet." The spec says "the earlier seasons with games or
+trainings"; the design chose "seasons with a choice" on purpose, and a season with a team but no
+kept games is the same case (`a_season_with_only_a_choice_is_in_the_seasons` asserts it). Small;
+for the accept review to weigh, or `WHERE team_number IS NOT NULL` if a season without a team
+should not be offered. Checked by trace: `followed_teams.rs` (`seasons`), `api/season.rs`
+(`seasons`); not run.
+  - 2026-10-25: Fixed (coordinator: offer only seasons with a team): `followed_teams::seasons` takes only choices with a team; `a_season_with_only_a_choice_is_in_the_seasons` checks that a season with only a club is not offered.
+
+**R5 – The hint to add a weekly training is gone (sibling of step 5).** "Attendance" had, with an
+empty list, "No training days or trainings this season. Add a weekly training in Settings." with
+a link. That line went with the list, and "Season" shows only "No games or trainings in … yet."
+(as the spec says), so a new coordinator no longer gets the way to Settings. Not a rule break;
+for the accept review. Checked by the diff of `routes/attendance/+page.svelte` and a trace of
+`routes/season/+page.svelte`.
+  - 2026-10-25: Fixed (coordinator: put it back on "Season"): "No training days or trainings this season. Add a weekly training in Settings." shows on "Season" when the season has no training days and no trainings; the test of another season checks it.
+
+**R6 – The open button of a training row has no date in its name (a11y, sibling of the move).**
+On "Attendance" the row's button read "Tue 6 Oct · 19:45 …"; in `SeasonEvents.svelte` it reads
+"Training · 19:45 · Not opened", the same for every Tuesday, because the date moved to the
+heading. The "Cancel" button next to it kept its date (`aria-label`). A screen reader that lists
+buttons hears many equal names; the axe check does not flag it. Adding the date to an
+`aria-label` (as "Cancel" does) would fix it. Checked by trace of both rows; not run with a
+screen reader.
+  - 2026-10-25: Fixed: each training button has its date for screen readers (a hidden "Tue 13 Oct" in its name).
+
+**R7 – Comments and living documents the diff made false (docs).**
+- `crates/server/src/api/trainings.rs` line 1: "the trainings of a season" – the list route is gone.
+- `web/src/lib/components/SeasonEvents.svelte` line 3: "training rows as on 'Attendance'" – "Attendance" has no rows now; "as 'Attendance' had".
+- For `/close`: `docs/architecture.md` lines 83 and 88 (`GET /api/trainings?season=`), `docs/product/trainings-and-attendance.md` lines 49 and 69 ("choose the season on 'Attendance' and tap the row", "Back … return to 'Attendance'", the route list), and the `CLAUDE.md` list of core rules (no "season view" yet).
+Checked by a search (`git grep` for `api/trainings`, `TrainingList`, `list_of`, "on \"Attendance\"").
+  - 2026-10-25: Fixed in the code: the first comment of `api/trainings.rs` and the header of `SeasonEvents.svelte`. Not fixed now: `docs/architecture.md`, `docs/product/trainings-and-attendance.md` and the list in `CLAUDE.md` are living documents, updated at `/close`.
+
+Accept review, 2026-10-25, `/review accept` (fresh agent). No extra text came with the arguments.
+Read: `change.md`, the epic's `idea.md` and `functional.md` (story A, the facts and the spec
+review notes), this spec, the diff against `main` with the new files, and `docs/product/trainings-and-attendance.md`
+for R5. I formed my view before reading **Deviations**. Runs: `npm run build`, then
+`npx playwright test --project season` (78 passed, with the projects it depends on; this run
+may be the Playwright run that the build review met on the same ports). Then the server on its
+own port against the database that run left (clock 12 October 2026, dev login), with
+`GET /api/season` and a phone-sized browser (390×844). I opened only trainings that were already
+opened, and saved nothing. Screenshots removed afterwards.
+
+**Verdict: accepted with notes.** Story A does what the coordinator asked for: one page with every
+event of the season, under week and date headings. The labels combine as the spec says. The page
+opens on "Coming" at each visit. The list of trainings and its actions moved off "Attendance".
+Run: the week headings ("Week 42 · 12 Oct – 18 Oct"), coming nearest first, past newest first,
+with "Coming" + "Past" as two parts each with its own headings; "Trainings" + "Past" gives only
+the past training rows, newest first. Each acceptance criterion of story A matches by trace and
+the browser tests. The items below are the differences, sorted.
+
+**A1 – "Back" (and the phone's back) to "Season" drops the labels and the place in the list
+(neutral drift, a point the spec left open).** The behaviour of story A: "To correct a training of
+three weeks ago, the coordinator turns on 'Trainings' and 'Past'". After the correction, "Back"
+gives "Coming" at the top of the page. To correct a second past training, the coordinator turns
+the labels on and scrolls again. This follows the letter: "labels are not kept between visits",
+"at each visit". But spec review note 2 worried about a *later* visit that hides events. It did not
+worry about coming back from a training opened from this list. Whether that return counts as a new
+visit is not decided anywhere. Story B's "Last" covers the common case (last week's training, one
+tap from the start page), so this does not block. For the coordinator: should a return from a
+training opened on "Season" keep its labels (and scroll)? Checked by a run: "Trainings" + "Past"
+on, tap the row of Tue 22 Sep, then "Back" and, a second time, `history.back()`. Both gave
+`/season?season=2026-2027` with only "Coming" pressed and scroll 0. The cause is a trace:
+`afterNavigate` sets `startLabels()` on every navigation to the page.
+  - 2026-10-25: Fixed (coordinator: keep the labels on a return): a training opened from "Season" keeps the labels and the place for one return ("Back", the browser's back, or after "Delete training"); a new visit still opens with "Coming". Written under **Deviations**; the test "a return from a training keeps the labels".
+
+**A2 – The labels are at the top of the list, not fixed on the screen (faithful adaptation).**
+"The labels that are on are always visible at the top of the list": the design read this as
+"placed at the top" (Deviations). Scrolled down to November, the labels and the part heading are
+out of view. Only the date heading stays fixed. This serves the intent of note 2: the labels do
+not carry over to another visit, and the coordinator set them on this visit. Checked by a run:
+after a scroll of 2500 px the labels are at −2141 px; screenshot of the scrolled list.
+  - 2026-10-25: No change needed.
+
+**A3 – The hint "Add a weekly training in Settings" is gone (neutral drift; agrees with R5).**
+`docs/product/trainings-and-attendance.md` line 24 promises it for a season with no training days.
+Functional "Consistency" says "the rules of trainings stay", but story A gives only "No games or
+trainings in … yet.". A season with games and no weekly training shows no hint at all. The
+coordinator meets this case at the start of each season. Advice: put the line back on "Season"
+when the season has no training rows (a small fix), or remove it from the product doc at `/close`
+by a choice the coordinator makes. Checked by a search (`Add a weekly` in `docs/product`, `web/src`:
+only the product doc) and the old `attendance/+page.svelte` (`git show HEAD:`, line 380).
+  - 2026-10-25: Fixed: see R5.
+
+**A4 – "Back" also returns to "Attendance" (faithful adaptation).** The spec names "the start page
+or 'Season'"; the build adds `?from=attendance` for the line of training days not opened that
+stays on "Attendance". That is the intent ("the page it came from") in the one case the spec did
+not list. Checked by trace (`backOf` in `training/[date]/+page.svelte`); not run (see R2).
+  - 2026-10-25: No change needed; now also run (see R2).
+
+**A5 – No "Game list" card on "Season" without a team (faithful adaptation).** The card shows only
+when `games === 'shown'`. With no team chosen there are no games for the card to read, and
+"Choose the team to see its games." is the next step. Not written under Deviations. Checked by
+trace (`season/+page.ts`).
+  - 2026-10-25: Written under **Deviations**.
+
+**A6 – An earlier season with only a club choice is offered and shows an empty page (neutral
+drift; agrees with R4).** The spec: "the earlier seasons with games or trainings". The build:
+also seasons with a choice, a team, or a club alone. This is rare in real use, and harmless (an
+empty line). Checked by trace (`api/season.rs`, `seasons`); not run.
+  - 2026-10-25: Fixed: see R4.
+
+**A7 – The page on a phone: the first event is low on the first screen (neutral drift, no
+action).** At 390×844 the "Game list" card, "Add training", the labels and "Show cancelled" come
+first, and the first event row starts about 660 px down. The spec puts the card at the top, and
+the job of this page is a rare look-up, so this matches. Worth a look when story B makes "Season"
+the place for the card. Checked by a run (screenshot at the top of `/season`).
+  - 2026-10-25: No change needed now; the order of the start page and "Season" is looked at again in story B.
+
+No concerning deviation. A1 and A3 are for the coordinator. A3 also belongs on the list for
+`/close`, next to R7.

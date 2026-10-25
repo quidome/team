@@ -28,7 +28,8 @@
 		trainingError = null;
 		try {
 			if (!next.opened) await openTraining(next.date);
-			await goto(resolve('/training/[date]', { date: next.date }));
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query `from` is added (resolve() takes no query on a route with a parameter)
+			await goto(`${resolve('/training/[date]', { date: next.date })}?from=start`);
 		} catch (failure) {
 			trainingError =
 				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
@@ -54,6 +55,8 @@
 
 {#snippet links()}
 	<nav aria-label="Team" class="text-sm" data-testid="team-links">
+		<a href={resolve('/season')} class="font-medium underline underline-offset-4">Season</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/attendance')} class="font-medium underline underline-offset-4">Attendance</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>

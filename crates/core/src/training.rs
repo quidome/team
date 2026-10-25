@@ -142,6 +142,18 @@ pub fn season_list<'a>(
     SeasonList { coming, past }
 }
 
+/// The training days before today that were never opened, oldest first. "Attendance" and the
+/// open items of the start page both count them with this function.
+pub fn not_opened(list: &SeasonList<'_>) -> Vec<NaiveDate> {
+    // `past` is newest first.
+    list.past
+        .iter()
+        .rev()
+        .filter(|row| row.status == DayStatus::NotOpened)
+        .map(|row| row.date)
+        .collect()
+}
+
 /// The absences at `training` of players with a role on its date.
 pub fn absent_count(training: &Training, absences: &[Absence], roles: &[PlayerRole]) -> usize {
     absences
@@ -545,6 +557,24 @@ mod tests {
         // Today's training is coming until the end of the day.
         let list = season_list(season(), &weekly, &[], &[], &[], date(2026, 10, 13));
         assert_eq!(list.coming[0].date, date(2026, 10, 13));
+    }
+
+    #[test]
+    fn not_opened_is_oldest_first_and_leaves_out_today() {
+        let weekly = tuesdays();
+        // 29 September is opened; 13 October is today.
+        let trainings = [training(1, date(2026, 9, 29))];
+        let list = season_list(season(), &weekly, &trainings, &[], &[], date(2026, 10, 13));
+        assert_eq!(
+            not_opened(&list),
+            [
+                date(2026, 9, 1),
+                date(2026, 9, 8),
+                date(2026, 9, 15),
+                date(2026, 9, 22),
+                date(2026, 10, 6),
+            ]
+        );
     }
 
     #[test]

@@ -11,6 +11,7 @@ pub mod players;
 pub mod reasons;
 pub mod schedule;
 pub mod season;
+pub mod season_view;
 pub mod team_choice;
 pub mod training;
 
@@ -36,6 +37,7 @@ pub use players::{
 pub use reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
 pub use season::{Season, SeasonError};
+pub use season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use team_choice::{
     ChoiceState, FollowedTeam, ScheduleTarget, Team, TeamChoiceError, TeamNeededReason,
     choice_state, choose_team, own_teams, same_choice, schedule_target,
@@ -43,5 +45,6 @@ pub use team_choice::{
 pub use training::{
     DayStatus, SeasonList, SeasonRow, Training, TrainingError, TrainingId, WeeklyProposal,
     WeeklyTraining, WeeklyTrainingId, absent_count, check_training, check_weekly_training,
-    day_times, proposals_from, proposed_times, proposed_window, season_list, training_days,
+    day_times, not_opened, proposals_from, proposed_times, proposed_window, season_list,
+    training_days,
 };

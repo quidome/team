@@ -358,6 +358,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/season': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['season'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/selection': {
 		parameters: {
 			query?: never;
@@ -397,7 +413,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		get: operations['trainings'];
+		get?: never;
 		put?: never;
 		post: operations['addTraining'];
 		delete?: never;
@@ -703,6 +719,26 @@ export interface components {
 		DifferenceView: 'date' | 'start_time' | 'start_time_known' | 'place' | 'home_and_away' | 'team';
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
+		/**
+		 * @description One event: a game or a training (or a training day not opened). Exactly one of `game` and
+		 *     `training` is set.
+		 */
+		EventView: {
+			/** @description Dutch local date, for example "2026-10-31". */
+			date: string;
+			game?: null | components['schemas']['ScheduleGame'];
+			training?: null | components['schemas']['TrainingRow'];
+			/**
+			 * Format: int32
+			 * @description The ISO week number.
+			 */
+			week: number;
+			/** @description The Monday and the Sunday of the week. */
+			week_first_day: string;
+			week_last_day: string;
+		};
+		/** @enum {string} */
+		GamesState: 'shown' | 'team_needed' | 'none';
 		/** @description A role in a player's history. */
 		HistoryRole: {
 			/** @description Only a role of the current season can be corrected. */
@@ -1034,6 +1070,28 @@ export interface components {
 			 */
 			unseen_changes: number;
 		};
+		SeasonAnswer: {
+			club?: null | components['schemas']['ClubView'];
+			/** @description Today and later, nearest first. */
+			coming: components['schemas']['EventView'][];
+			current_season: string;
+			games: components['schemas']['GamesState'];
+			/** @description Before today, newest first. */
+			past: components['schemas']['EventView'][];
+			/** @description The season of the events, for example "2026-2027". */
+			season: string;
+			/** @description The first and last day of the season, for "Add training". */
+			season_first_day: string;
+			season_last_day: string;
+			/**
+			 * @description The seasons with trainings, roles, weekly trainings or a choice, and the current and the
+			 *     chosen season; newest first.
+			 */
+			seasons: string[];
+			team?: null | components['schemas']['TeamView'];
+			/** @description Dutch date: events of today and later are coming. */
+			today: string;
+		};
 		SeenAnswer: {
 			/**
 			 * Format: int32
@@ -1142,15 +1200,6 @@ export interface components {
 			end: string;
 			/** @description For example "19:45". */
 			start: string;
-		};
-		/** @description The list of a season: today and later, nearest first; before today, newest first. */
-		TrainingList: {
-			coming: components['schemas']['TrainingRow'][];
-			past: components['schemas']['TrainingRow'][];
-			season: string;
-			season_first_day: string;
-			season_last_day: string;
-			today: string;
 		};
 		/** @description One row of the list: a training, or a training day that is not opened. */
 		TrainingRow: {
@@ -2242,6 +2291,43 @@ export interface operations {
 			};
 		};
 	};
+	season: {
+		parameters: {
+			query?: {
+				/** @description For example "2026-2027"; the current season when left out. */
+				season?: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description All events of the season, coming and past */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['SeasonAnswer'];
+				};
+			};
+			/** @description `invalid_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	get: {
 		parameters: {
 			query?: never;
@@ -2331,43 +2417,6 @@ export interface operations {
 				content: {
 					'application/json': components['schemas']['TeamPageView'];
 				};
-			};
-			/** @description Not logged in */
-			401: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content?: never;
-			};
-		};
-	};
-	trainings: {
-		parameters: {
-			query?: {
-				/** @description For example "2026-2027"; the current season when left out. */
-				season?: string;
-			};
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		requestBody?: never;
-		responses: {
-			/** @description The training days and trainings of the season, one row per date */
-			200: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					'application/json': components['schemas']['TrainingList'];
-				};
-			};
-			/** @description `invalid_season` */
-			400: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content?: never;
 			};
 			/** @description Not logged in */
 			401: {

@@ -7,7 +7,7 @@ use chrono::NaiveDate;
 use crate::players::{Group, Player, PlayerId, PlayerRole, Role, place, role_on};
 use crate::reasons::ReasonId;
 use crate::season::Season;
-use crate::training::{DayStatus, Training, TrainingId, WeeklyTraining, season_list};
+use crate::training::{Training, TrainingId, WeeklyTraining, not_opened, season_list};
 
 /// A player who was not at a training, with the reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,15 +224,9 @@ pub fn season_overview<'a>(
     }
 
     let list = season_list(season, weekly, trainings, absences, roles, today);
-    let not_opened: Vec<NaiveDate> = list
-        .past
-        .iter()
-        .filter(|row| row.status == DayStatus::NotOpened)
-        .map(|row| row.date)
-        .collect();
+    let not_opened = not_opened(&list);
     overview.not_opened = not_opened.len();
-    // `past` is newest first.
-    overview.first_not_opened = not_opened.last().copied();
+    overview.first_not_opened = not_opened.first().copied();
     overview
 }
 

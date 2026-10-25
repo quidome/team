@@ -10,6 +10,7 @@ pub mod players;
 pub mod readings;
 pub mod reasons;
 pub mod schedule;
+pub mod season;
 pub mod selection;
 pub mod team;
 pub mod trainings;
@@ -32,6 +33,7 @@ use utoipa::OpenApi;
         readings::latest,
         readings::confirm_gone,
         schedule::get,
+        season::get,
         changes::get,
         changes::seen,
         players::list,
@@ -47,7 +49,6 @@ use utoipa::OpenApi;
         team::team_leave,
         team::team_undo,
         attendance::get,
-        trainings::list,
         trainings::next,
         trainings::get,
         trainings::open,
