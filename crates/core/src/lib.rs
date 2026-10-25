@@ -12,6 +12,7 @@ pub mod reasons;
 pub mod schedule;
 pub mod season;
 pub mod season_view;
+pub mod start_page;
 pub mod team_choice;
 pub mod training;
 
@@ -38,9 +39,12 @@ pub use reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedule};
 pub use season::{Season, SeasonError};
 pub use season_view::{Event, EventKind, SeasonEvents, season_events};
+pub use start_page::{
+    OpenItem, ReadingState, last_training, next_events, open_item_seasons, open_items,
+};
 pub use team_choice::{
-    ChoiceState, FollowedTeam, ScheduleTarget, Team, TeamChoiceError, TeamNeededReason,
-    choice_state, choose_team, own_teams, same_choice, schedule_target,
+    ChoiceState, FollowedTeam, Team, TeamChoiceError, TeamNeededReason, choice_state, choose_team,
+    own_teams, same_choice,
 };
 pub use training::{
     DayStatus, SeasonList, SeasonRow, Training, TrainingError, TrainingId, WeeklyProposal,

@@ -3,10 +3,12 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::PgExecutor;
-use team_core::{ClubNumber, Counts, HoldReason, Season, TeamNumber};
+use sqlx::{PgExecutor, PgPool};
+use team_core::{ClubNumber, Counts, HoldReason, Season, TeamNumber, out_of_date};
 
+use crate::clock::{Clock, in_netherlands};
 use crate::db::StoreError;
+use crate::reading::Target;
 
 /// Why a reading failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -371,4 +373,44 @@ impl Row {
             result,
         })
     }
+}
+
+/// The state of the game list of a reading target, as the "Game list" card and the open items of
+/// the start page show it.
+#[derive(Debug, Clone)]
+pub struct ReadingStatus {
+    pub latest: Option<Reading>,
+    pub last_good: Option<Reading>,
+    /// The held-back reading the coordinator can confirm: the newest reading that did not fail,
+    /// when it is held back. A failed reading after it does not hide it.
+    pub held_back: Option<Reading>,
+    /// The time of the last good reading, when 3 nightly run moments passed without a good
+    /// reading (only with a team: without one there is no nightly reading).
+    pub out_of_date_since: Option<DateTime<Utc>>,
+}
+
+/// The state of the game list of `target` at the clock's moment.
+pub async fn status(
+    pool: &PgPool,
+    clock: &dyn Clock,
+    target: &Target,
+) -> Result<ReadingStatus, StoreError> {
+    let latest = latest(pool, target.club, target.season).await?;
+    let last_good = last_good(pool, target.club, target.season).await?;
+    let now = in_netherlands(clock.now());
+    let out_of_date_since = last_good
+        .as_ref()
+        .filter(|reading| {
+            target.team.is_some() && out_of_date(now, in_netherlands(reading.started_at))
+        })
+        .map(|reading| reading.finished_at);
+    let held_back = newest_not_failed(pool, target.club, target.season)
+        .await?
+        .filter(|reading| matches!(reading.result, ReadingResult::HeldBack(_)));
+    Ok(ReadingStatus {
+        latest,
+        last_good,
+        held_back,
+        out_of_date_since,
+    })
 }

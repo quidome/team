@@ -1,20 +1,18 @@
-import {
-	loadLatestReading,
-	loadNextTraining,
-	loadPageSelection,
-	loadSchedule
-} from '#lib/api/client.js';
+import { loadPageSelection, loadStart, type StartAnswer } from '#lib/api/client.js';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async (event) => {
 	const { selection } = await loadPageSelection(event);
-	// With a team needed, the schedule is last season's (or none).
+	// With a club chosen (a team chosen, or still needed in a new season): the start page.
 	const state = selection?.state;
-	// The next training does not need a chosen team.
-	const [readings, schedule, nextTraining] = await Promise.all([
-		state === 'chosen' ? loadLatestReading(event.fetch) : null,
-		state === 'chosen' || state === 'team_needed' ? loadSchedule(event.fetch) : null,
-		selection ? loadNextTraining(event.fetch) : null
-	]);
-	return { selection, readings, schedule, nextTraining };
+	let start: StartAnswer | null = null;
+	let startError = false;
+	if (state === 'chosen' || state === 'team_needed') {
+		try {
+			start = await loadStart(event.fetch);
+		} catch {
+			startError = true;
+		}
+	}
+	return { selection, start, startError };
 };

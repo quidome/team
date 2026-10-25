@@ -24,32 +24,8 @@ test('log out posts to the server and returns to the start page', async ({ page 
 	await expect(page.getByTestId('user-name')).toHaveText('Developer');
 });
 
-test('an earlier season with no kept games says which season', async ({ page }) => {
-	// choose.e2e.ts ends with Green Giants saved and a team needed; the answer of the schedule is
-	// replaced by a last season with no games.
-	await page.route('**/api/schedule', (route) =>
-		route.fulfill({
-			json: {
-				schedule: {
-					season: '2025-2026',
-					last_season: true,
-					club: { number: 21, name: 'Green Giants', town: 'Leusden' },
-					team: { number: 1, name: 'M16 1' },
-					coming: [],
-					past: []
-				}
-			}
-		})
-	);
-	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Last season · 2025-2026' })).toBeVisible();
-	await expect(page.getByTestId('schedule-empty')).toHaveText(
-		'The tool has no games of 2025-2026.'
-	);
-});
-
 test('screenshots of the start page for the look', async ({ page }) => {
-	// The schedule's screenshots are taken in choose.e2e.ts, while M16 1 is chosen.
+	// The screenshots of "Season" are taken in choose.e2e.ts, while M16 1 is chosen.
 	for (const colorScheme of ['light', 'dark'] as const) {
 		await page.emulateMedia({ colorScheme });
 		await page.goto('/');

@@ -13,7 +13,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use crate::api::schedule::ScheduleReasonView;
+use crate::api::season::ScheduleReasonView;
 use crate::app::AppState;
 use crate::changes;
 use crate::clock::{current_season, today_in_netherlands};

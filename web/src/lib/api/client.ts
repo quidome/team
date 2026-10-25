@@ -142,13 +142,7 @@ export async function confirmGone(id: number): Promise<Reading> {
 	return dataOf(await api.POST('/api/readings/{id}/confirm-gone', { params: { path: { id } } }));
 }
 
-export type Schedule = components['schemas']['ScheduleView'];
 export type ScheduleGame = components['schemas']['ScheduleGame'];
-
-/** The schedule to show (story 3b), or null when there is none yet. */
-export async function loadSchedule(fetch: typeof globalThis.fetch): Promise<Schedule | null> {
-	return (await dataOf(await api.GET('/api/schedule', { fetch }))).schedule ?? null;
-}
 
 export type Change = components['schemas']['ChangeView'];
 export type ChangeGame = components['schemas']['ChangeGame'];
@@ -369,6 +363,14 @@ export async function loadSeason(
 	return dataOf(await api.GET('/api/season', { fetch, params: { query: { season } } }));
 }
 
+export type StartAnswer = components['schemas']['StartAnswer'];
+export type OpenItemView = components['schemas']['OpenItemView'];
+
+/** The start page: the open items, the last training and the next events. */
+export async function loadStart(fetch: typeof globalThis.fetch): Promise<StartAnswer> {
+	return dataOf(await api.GET('/api/start', { fetch }));
+}
+
 export type AttendanceOverview = components['schemas']['AttendanceOverview'];
 export type PlayerTotals = components['schemas']['PlayerTotalsView'];
 
@@ -379,15 +381,6 @@ export async function loadAttendance(
 	season?: string
 ): Promise<AttendanceOverview> {
 	return dataOf(await api.GET('/api/attendance', { fetch, params: { query: { season } } }));
-}
-
-/** The card on the start page: the next training, or null. */
-export async function loadNextTraining(
-	fetch: typeof globalThis.fetch
-): Promise<TrainingRow | null> {
-	const result = await api.GET('/api/trainings/next', { fetch });
-	if (!result.response.ok) throw apiError(result.error, result.response.status);
-	return result.data ?? null;
 }
 
 /** One date: its training with the players, or nothing yet. */

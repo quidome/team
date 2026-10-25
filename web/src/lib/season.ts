@@ -102,20 +102,26 @@ export function weekHeading(
 	return `Week ${event.week} · ${dayMonth(event.week_first_day)} – ${dayMonth(event.week_last_day)}`;
 }
 
+/** The events grouped by date; the order of the server stays ("Next" on the start page). */
+export function groupByDate(events: EventView[]): { date: string; events: EventView[] }[] {
+	const days: { date: string; events: EventView[] }[] = [];
+	for (const event of events) {
+		const last = days.at(-1);
+		if (last?.date === event.date) last.events.push(event);
+		else days.push({ date: event.date, events: [event] });
+	}
+	return days;
+}
+
 /** The events grouped by week, then by date; the order of the server stays. */
 export function groupByWeek(
 	events: EventView[]
 ): { week: EventView; days: { date: string; events: EventView[] }[] }[] {
-	const weeks: { week: EventView; days: { date: string; events: EventView[] }[] }[] = [];
+	const weeks: { week: EventView; events: EventView[] }[] = [];
 	for (const event of events) {
-		let week = weeks.at(-1);
-		if (week?.week.week_first_day !== event.week_first_day) {
-			week = { week: event, days: [] };
-			weeks.push(week);
-		}
-		const day = week.days.at(-1);
-		if (day?.date === event.date) day.events.push(event);
-		else week.days.push({ date: event.date, events: [event] });
+		const week = weeks.at(-1);
+		if (week?.week.week_first_day === event.week_first_day) week.events.push(event);
+		else weeks.push({ week: event, events: [event] });
 	}
-	return weeks;
+	return weeks.map(({ week, events }) => ({ week, days: groupByDate(events) }));
 }

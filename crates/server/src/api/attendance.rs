@@ -9,12 +9,13 @@ use team_core::{PlayerTotals, ReasonId, season_overview};
 use utoipa::ToSchema;
 
 use super::format::{day, query_season};
+use super::season::{SeasonTrainings, trainings_of};
 use super::trainings::SeasonQuery;
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::error::AppError;
 use crate::reasons::StoredReason;
-use crate::{players, reasons, trainings, weekly_trainings};
+use crate::{players, reasons, trainings};
 
 /// A training that a player missed and that counts.
 #[derive(Debug, Serialize, ToSchema)]
@@ -104,11 +105,12 @@ pub async fn get(
     let current = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
     let players = players::all(&state.pool, &state.config.player_name_key).await?;
-    let roles = players::roles_in(&state.pool, &[season]).await?;
-    let weekly = weekly_trainings::for_season(&state.pool, season).await?;
-    let stored = trainings::for_season(&state.pool, season).await?;
-    let ids: Vec<_> = stored.iter().map(|training| training.id).collect();
-    let absences = trainings::absences_at(&state.pool, &ids).await?;
+    let SeasonTrainings {
+        weekly,
+        trainings: stored,
+        absences,
+        roles,
+    } = trainings_of(&state, season).await?;
     let reasons = reasons::all(&state.pool).await?;
     let valid: Vec<(ReasonId, bool)> = reasons
         .iter()

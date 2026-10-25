@@ -73,8 +73,3 @@ export function noChangesLine(filter: Filter): string {
 	if (filter === 'duty') return 'No changes of possible duty games not seen.';
 	return 'No changes not seen.';
 }
-
-/** "1 change not seen", "3 changes not seen". */
-export function unseenLine(count: number): string {
-	return count === 1 ? '1 change not seen' : `${count} changes not seen`;
-}

@@ -25,7 +25,7 @@ test('without a team, "Season" shows the trainings and asks for the team', async
 	await page.getByTestId('club-result').filter({ hasText: 'Blue Drakes' }).click();
 	await page.getByTestId('team-choice').filter({ hasText: 'M16 1' }).click();
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
-	await expect(page.getByTestId('game').first()).toBeVisible();
+	await expect(page.getByTestId('next')).toBeVisible();
 });
 
 test('"Season" is first in the links and opens with "Coming" on', async ({ page }) => {

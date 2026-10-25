@@ -78,6 +78,13 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// The start page shows the open items of the data the earlier tests made.
+			name: 'start',
+			testMatch: 'start.e2e.ts',
+			dependencies: ['season'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

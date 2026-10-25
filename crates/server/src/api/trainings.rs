@@ -9,7 +9,7 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
     AttendanceError, DayStatus, PlayerId, ReasonId, Season, SeasonRow, Training, absent_count,
-    check_checking, check_mark, check_training, day_times, players_at, proposed_times, season_list,
+    check_checking, check_mark, check_training, day_times, players_at, proposed_times,
 };
 use utoipa::ToSchema;
 
@@ -158,19 +158,6 @@ pub(crate) fn row_view(row: &SeasonRow) -> TrainingRow {
     }
 }
 
-/// The first coming row of `season`: today's training until midnight, else the next training day
-/// or training.
-async fn next_of(state: &AppState, season: Season) -> Result<Option<TrainingRow>, AppError> {
-    let today = today_in_netherlands(state.clock.as_ref());
-    let weekly = weekly_trainings::for_season(&state.pool, season).await?;
-    let stored = trainings::for_season(&state.pool, season).await?;
-    let ids: Vec<_> = stored.iter().map(|training| training.id).collect();
-    let absences = trainings::absences_at(&state.pool, &ids).await?;
-    let roles = players::roles_in(&state.pool, &[season]).await?;
-    let list = season_list(season, &weekly, &stored, &absences, &roles, today);
-    Ok(list.coming.first().map(row_view))
-}
-
 /// The training day `date`: its training with the players, or nothing yet.
 pub(crate) async fn day_of(state: &AppState, date: NaiveDate) -> Result<TrainingDay, AppError> {
     let season = Season::of(date);
@@ -228,20 +215,6 @@ async fn fill(
         })
         .collect();
     Ok(())
-}
-
-#[utoipa::path(
-    get,
-    path = "/api/trainings/next",
-    operation_id = "nextTraining",
-    responses(
-        (status = 200, description = "Today's training until midnight, else the next training day or training of the current season; `null` when there is none", body = Option<TrainingRow>),
-        (status = 401, description = "Not logged in"),
-    )
-)]
-pub async fn next(State(state): State<AppState>) -> Result<Json<Option<TrainingRow>>, AppError> {
-    let season = current_season(state.clock.as_ref());
-    Ok(Json(next_of(&state, season).await?))
 }
 
 #[utoipa::path(

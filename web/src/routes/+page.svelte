@@ -1,50 +1,39 @@
+<!--
+	The start page (story B of start page and season): what still needs the coordinator ("Open
+	items"), the last training ("Last"), and the games of the team and the trainings of this week and
+	next week ("Next"), then the links. Without a club: only the choose step; in a new season without
+	a team: the choose step above the three parts. Not logged in: "Log in".
+-->
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ApiError, loadSchedule, openTraining, type TrainingRow } from '#lib/api/client.js';
+	import { ApiError, openTraining, type TrainingRow } from '#lib/api/client.js';
 	import ChooseTeam from '#lib/components/ChooseTeam.svelte';
-	import ReadGameList from '#lib/components/ReadGameList.svelte';
-	import Schedule from '#lib/components/Schedule.svelte';
+	import EventRow from '#lib/components/EventRow.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { unseenLine } from '#lib/changes.js';
 	import { formatDay } from '#lib/schedule.js';
-	import { statusText } from '#lib/trainings.js';
+	import { groupByDate } from '#lib/season.js';
+	import { openItemLink, openItemText, trainingLink } from '#lib/start.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	// Replaced after a reading on this page, without loading the page again: that would build the
-	// "Game list" card again and lose its result line.
-	let schedule = $derived(data.schedule);
-	let hasReading = $derived(Boolean(data.readings?.last_good));
-	let scheduleError = $state(false);
+	let busy = $state(false);
+	let error = $state<string | null>(null);
 
-	let opening = $state(false);
-	let trainingError = $state<string | null>(null);
-
-	/** A tap on the card opens the training (and so makes it exist), then shows it. */
-	async function openNext(next: TrainingRow) {
-		opening = true;
-		trainingError = null;
+	/** A tap on a training: open it when it is not opened yet, then show it; "Back" returns here. */
+	async function open(row: TrainingRow) {
+		busy = true;
+		error = null;
 		try {
-			if (!next.opened) await openTraining(next.date);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve -- the path is resolved; only the query `from` is added (resolve() takes no query on a route with a parameter)
-			await goto(`${resolve('/training/[date]', { date: next.date })}?from=start`);
+			if (!row.opened) await openTraining(row.date);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve -- trainingLink() builds the address with resolve()
+			await goto(trainingLink(row.date));
 		} catch (failure) {
-			trainingError =
+			error =
 				failure instanceof ApiError ? failure.message : 'Something went wrong. Please try again.';
-			opening = false;
-		}
-	}
-
-	/** After a good reading. A failure here is not a failed reading, so the card does not show it. */
-	async function refreshSchedule() {
-		hasReading = true;
-		try {
-			schedule = await loadSchedule(fetch);
-			scheduleError = false;
-		} catch {
-			scheduleError = true;
+		} finally {
+			busy = false;
 		}
 	}
 </script>
@@ -65,26 +54,81 @@
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/settings')} class="font-medium underline underline-offset-4">Settings</a>
 	</nav>
-	{#if data.nextTraining}
-		{@const next = data.nextTraining}
-		<button
-			type="button"
-			class="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2 text-left text-sm shadow-xs disabled:opacity-60"
-			disabled={opening}
-			onclick={() => openNext(next)}
-			data-testid="training-card"
-		>
-			<span class="min-w-0 truncate">
-				<span class="font-medium">Training · {formatDay(next.date)}</span>
-				{#if next.status !== 'cancelled'}
-					<span class="text-muted-foreground">· {next.start}</span>
-				{/if}
-			</span>
-			<span class="shrink-0 text-muted-foreground">{statusText(next, true)}</span>
-		</button>
-		{#if trainingError}
-			<p class="mt-1 text-sm" role="alert">{trainingError}</p>
+{/snippet}
+
+{#snippet parts()}
+	{#if data.startError}
+		<p class="text-sm" role="alert" data-testid="start-error">
+			The start page could not be loaded. Load the page again.
+		</p>
+	{:else if data.start}
+		{@const start = data.start}
+		<section aria-labelledby="open-items-heading" class="space-y-2" data-testid="open-items">
+			<h2 id="open-items-heading" class="text-lg font-semibold tracking-tight">Open items</h2>
+			{#if start.open_items.length === 0}
+				<p class="text-sm text-muted-foreground" data-testid="nothing-open">Nothing open.</p>
+			{:else}
+				<ul class="space-y-2">
+					{#each start.open_items as item (item.kind)}
+						<li>
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- openItemLink() builds the address with resolve() -->
+							<a
+								href={openItemLink(item)}
+								class="flex min-h-12 items-center rounded-xl border bg-card px-4 py-2 text-sm font-medium shadow-xs"
+								data-testid="open-item"
+								data-kind={item.kind}
+							>
+								{openItemText(item)}
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+
+		{#if error}
+			<p class="text-sm" role="alert">{error}</p>
 		{/if}
+
+		{#if start.last}
+			{@const last = start.last}
+			<section aria-labelledby="last-heading" class="space-y-2" data-testid="last">
+				<h2 id="last-heading" class="text-lg font-semibold tracking-tight">Last</h2>
+				<p class="text-sm font-semibold text-muted-foreground">{formatDay(last.date)}</p>
+				<ul>
+					<EventRow event={last} {busy} onOpen={open} />
+				</ul>
+			</section>
+		{/if}
+
+		<section aria-labelledby="next-heading" class="space-y-2" data-testid="next">
+			<h2 id="next-heading" class="text-lg font-semibold tracking-tight">Next</h2>
+			{#if start.next.length === 0}
+				<p class="text-sm text-muted-foreground" data-testid="no-coming-events">
+					No coming events.
+				</p>
+			{:else}
+				<div class="space-y-4">
+					{#each groupByDate(start.next) as day (day.date)}
+						<section aria-labelledby="next-day-{day.date}">
+							<h3
+								id="next-day-{day.date}"
+								class="py-1 text-sm font-semibold text-muted-foreground"
+								data-testid="day"
+							>
+								{formatDay(day.date)}
+							</h3>
+							<ul class="space-y-2">
+								{#each day.events as event (event.game ? `g${event.game.id}` : `t${event.date}`)}
+									<EventRow {event} {busy} onOpen={open} />
+								{/each}
+							</ul>
+						</section>
+					{/each}
+				</div>
+			{/if}
+		</section>
 	{/if}
 {/snippet}
 
@@ -100,7 +144,7 @@
 		<ChooseTeam onSaved={invalidateAll} />
 	</section>
 {:else if data.selection?.state === 'team_needed'}
-	<section class="space-y-5">
+	<section class="space-y-6">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">Choose your team</h1>
 			{#if data.selection.reason === 'new_season'}
@@ -115,22 +159,9 @@
 				</p>
 			{/if}
 		</div>
-		{@render links()}
 		<ChooseTeam club={data.selection.club} clubKept onSaved={invalidateAll} />
-		{#if schedule?.last_season}
-			<section aria-labelledby="last-season-heading" class="space-y-3 pt-4">
-				<div>
-					<h2 id="last-season-heading" class="text-lg font-semibold tracking-tight">
-						Last season · {schedule.season}
-					</h2>
-					<p class="text-sm text-muted-foreground" data-testid="last-season-team">
-						{schedule.club.name}
-						{schedule.team.name}
-					</p>
-				</div>
-				<Schedule {schedule} hasReading pastOpen />
-			</section>
-		{/if}
+		{@render parts()}
+		{@render links()}
 	</section>
 {:else if data.selection?.state === 'chosen'}
 	<section class="space-y-6">
@@ -141,38 +172,11 @@
 					{data.selection.club.name}
 					{data.selection.team.name}
 				</h1>
-				{#if schedule && schedule.unseen_changes > 0}
-					<a
-						href={resolve('/changes')}
-						class="mt-1 inline-block text-sm font-medium text-team underline underline-offset-4"
-						data-testid="unseen-changes"
-					>
-						{unseenLine(schedule.unseen_changes)}
-					</a>
-				{/if}
-				<div class="mt-1">{@render links()}</div>
 			</div>
 			<Button href={resolve('/choose')} variant="outline">Change</Button>
 		</div>
-		{#if data.readings}
-			<div class="rounded-xl border bg-card p-5 shadow-xs">
-				<h2 class="mb-3 font-medium">Game list</h2>
-				{#key data.readings}
-					<ReadGameList readings={data.readings} onRead={refreshSchedule} />
-				{/key}
-			</div>
-		{/if}
-		{#if schedule}
-			<section aria-labelledby="schedule-heading" class="space-y-3">
-				<h2 id="schedule-heading" class="text-lg font-semibold tracking-tight">Schedule</h2>
-				{#if scheduleError}
-					<p class="text-sm" role="alert" data-testid="schedule-error">
-						The new schedule could not be loaded. Load the page again.
-					</p>
-				{/if}
-				<Schedule {schedule} {hasReading} />
-			</section>
-		{/if}
+		{@render parts()}
+		{@render links()}
 	</section>
 {:else}
 	<section class="flex min-h-[60dvh] flex-col items-center justify-center text-center">

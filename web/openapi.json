@@ -959,29 +959,6 @@
         }
       }
     },
-    "/api/schedule": {
-      "get": {
-        "tags": [
-          "schedule"
-        ],
-        "operationId": "schedule",
-        "responses": {
-          "200": {
-            "description": "The schedule to show, or `null` when there is none",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScheduleAnswer"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not logged in"
-          }
-        }
-      }
-    },
     "/api/season": {
       "get": {
         "tags": [
@@ -1079,6 +1056,29 @@
         }
       }
     },
+    "/api/start": {
+      "get": {
+        "tags": [
+          "start"
+        ],
+        "operationId": "start",
+        "responses": {
+          "200": {
+            "description": "The open items, the last training and the next events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartAnswer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/team": {
       "get": {
         "tags": [
@@ -1131,36 +1131,6 @@
           },
           "400": {
             "description": "`training_exists`, `outside_season`, `end_before_start`, `invalid_time`"
-          },
-          "401": {
-            "description": "Not logged in"
-          }
-        }
-      }
-    },
-    "/api/trainings/next": {
-      "get": {
-        "tags": [
-          "trainings"
-        ],
-        "operationId": "nextTraining",
-        "responses": {
-          "200": {
-            "description": "Today's training until midnight, else the next training day or training of the current season; `null` when there is none",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "type": "null"
-                    },
-                    {
-                      "$ref": "#/components/schemas/TrainingRow"
-                    }
-                  ]
-                }
-              }
-            }
           },
           "401": {
             "description": "Not logged in"
@@ -2616,6 +2586,114 @@
           }
         }
       },
+      "OpenItemView": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A held-back reading of the game list waits for the coordinator.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reading_held_back"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The game list has not been read well for 3 nights, since the last good reading.",
+            "required": [
+              "since",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "out_of_date"
+                ]
+              },
+              "since": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Changes not seen yet.",
+            "required": [
+              "count",
+              "kind"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "changes"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Training days before today that were never opened; `first` is the oldest.",
+            "required": [
+              "first",
+              "count",
+              "kind"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "first": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "not_opened"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Trainings before today that are neither cancelled nor checked; `first` is the oldest.",
+            "required": [
+              "first",
+              "count",
+              "kind"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "first": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "not_checked"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "One open item. Dates are Dutch dates, for example \"2026-10-22\"."
+      },
       "PlayerChange": {
         "type": "object",
         "required": [
@@ -3094,24 +3172,9 @@
           }
         }
       },
-      "ScheduleAnswer": {
-        "type": "object",
-        "properties": {
-          "schedule": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ScheduleView",
-                "description": "`null`: no club is chosen, or a team is needed and no earlier season had one."
-              }
-            ]
-          }
-        }
-      },
       "ScheduleGame": {
         "type": "object",
+        "description": "A game of the schedule: the team's games and the home games of other club teams.",
         "required": [
           "id",
           "date",
@@ -3167,54 +3230,6 @@
           "team",
           "duty"
         ]
-      },
-      "ScheduleView": {
-        "type": "object",
-        "required": [
-          "season",
-          "last_season",
-          "club",
-          "team",
-          "unseen_changes",
-          "coming",
-          "past"
-        ],
-        "properties": {
-          "club": {
-            "$ref": "#/components/schemas/ClubView"
-          },
-          "coming": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ScheduleGame"
-            },
-            "description": "Today (Dutch date) and later, in time order."
-          },
-          "last_season": {
-            "type": "boolean",
-            "description": "True: a new season started and its team is not chosen yet; these are the games of the\nteam of the newest earlier season."
-          },
-          "past": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ScheduleGame"
-            },
-            "description": "Before today, newest date first, in time order within a date."
-          },
-          "season": {
-            "type": "string",
-            "description": "The season of the games, for example \"2026-2027\"."
-          },
-          "team": {
-            "$ref": "#/components/schemas/TeamView"
-          },
-          "unseen_changes": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The number of changes not seen yet (`GET /api/changes`); 0 for last season's schedule.",
-            "minimum": 0
-          }
-        }
       },
       "SeasonAnswer": {
         "type": "object",
@@ -3425,6 +3440,40 @@
           }
         ],
         "description": "The state of the choice. `season` is always the current season."
+      },
+      "StartAnswer": {
+        "type": "object",
+        "required": [
+          "open_items",
+          "next"
+        ],
+        "properties": {
+          "last": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EventView",
+                "description": "The last training before today that is not cancelled, as an event; `null` when there is\nnone."
+              }
+            ]
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "description": "The games of the team and the trainings from today until the Sunday of next week, in time\norder; when there are none, the first coming one."
+          },
+          "open_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenItemView"
+            },
+            "description": "What still needs the coordinator, in the order of the start page."
+          }
+        }
       },
       "TeamPageView": {
         "type": "object",

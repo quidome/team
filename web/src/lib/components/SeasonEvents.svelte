@@ -1,16 +1,12 @@
 <!--
 	One part of the page "Season" ("Coming" or "Past"): the events under a heading per week and per
-	date. Game rows look as in the schedule; a tap on a training row opens the training, and "Cancel"
-	cancels a training day that is not opened.
+	date, each row an `EventRow`.
 -->
 <script lang="ts">
 	import type { EventView, TrainingRow } from '#lib/api/client.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
-	import { Button } from '#lib/components/ui/button/index.js';
+	import EventRow from '#lib/components/EventRow.svelte';
 	import { formatDay } from '#lib/schedule.js';
 	import { groupByWeek, weekHeading } from '#lib/season.js';
-	import { checkedText, statusText } from '#lib/trainings.js';
-	import MapPin from '@lucide/svelte/icons/map-pin';
 
 	let {
 		events,
@@ -51,98 +47,7 @@
 					</h4>
 					<ul class="space-y-2">
 						{#each day.events as event (event.game ? `g${event.game.id}` : `t${event.date}`)}
-							{#if event.game}
-								{@const game = event.game}
-								{@const ofTeam = game.reason === 'team'}
-								{@const gone = !game.in_list}
-								<li
-									class={[
-										'flex gap-3 rounded-xl border bg-card p-3 shadow-xs',
-										ofTeam && 'border-l-4 border-l-team bg-team-soft',
-										gone && 'bg-muted shadow-none'
-									]}
-									data-testid="game"
-									data-of-team={ofTeam}
-								>
-									<div class="w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
-										{#if game.start_time}
-											{game.start_time}
-										{:else}
-											<span class="text-xs leading-tight font-normal text-muted-foreground italic">
-												time not known yet
-											</span>
-										{/if}
-									</div>
-									<div class="min-w-0 flex-1">
-										<p
-											class={['text-sm leading-snug', gone && 'text-muted-foreground line-through']}
-										>
-											<span class="block font-medium">{game.home}</span>
-											<span class="block font-medium">
-												<span class="sr-only">against</span>
-												{game.away}
-											</span>
-										</p>
-										<p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-											<MapPin class="size-3.5 shrink-0" aria-hidden="true" />
-											<span class="truncate">{game.hall}, {game.town}</span>
-										</p>
-										{#if gone}
-											<Badge variant="outline" class="mt-2 border-gone/40 text-gone">
-												no longer in the game list
-											</Badge>
-										{/if}
-									</div>
-									{#if ofTeam}
-										<Badge class="self-start bg-team text-primary-foreground">Team</Badge>
-									{/if}
-								</li>
-							{:else if event.training}
-								{@const row = event.training}
-								<li
-									class="flex items-stretch gap-2 rounded-xl border bg-card shadow-xs"
-									data-testid="training-row"
-									data-date={row.date}
-								>
-									<button
-										type="button"
-										class="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-3 px-4 py-2 text-left disabled:opacity-60"
-										disabled={busy}
-										onclick={() => onOpen(row)}
-									>
-										<span class="min-w-0 tabular-nums">
-											<span class="sr-only">{formatDay(row.date)}</span>
-											<span class="font-medium">Training</span>
-											<span class="text-muted-foreground">· {row.start}</span>
-											{#if row.extra}
-												<span class="text-muted-foreground">· extra</span>
-											{/if}
-										</span>
-										<span
-											class="shrink-0 text-sm {row.status === 'not_opened' ||
-											row.status === 'cancelled'
-												? 'text-muted-foreground'
-												: ''}"
-											data-testid="training-status"
-										>
-											{statusText(row)}{checkedText(row)}
-										</span>
-									</button>
-									{#if row.status === 'not_opened'}
-										<div class="flex items-center pr-2">
-											<Button
-												variant="ghost"
-												size="sm"
-												disabled={busy}
-												onclick={() => onCancel(row)}
-												aria-label="Cancel training of {formatDay(row.date)}"
-											>
-												Cancel
-											</Button>
-										</div>
-									{/if}
-								</li>
-							{/if}
+							<EventRow {event} {busy} {onOpen} {onCancel} />
 						{/each}
 					</ul>
 				</section>

@@ -41,27 +41,35 @@ test('the coordinator finds the club and chooses the team', async ({ page }) => 
 	await expectAccessible(page);
 	await teams.filter({ hasText: 'M16 1' }).click();
 
-	// Choosing the team starts the first reading: the schedule shows without a tap.
+	// Choosing the team starts the first reading. The start page: nothing open yet (a first
+	// reading records no changes, and there are no trainings), and in "Next" the first game of the
+	// team, because the two weeks from Mon 12 Oct have none.
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
 	await expect(page.getByRole('link', { name: 'Change' })).toBeVisible();
-	await expect(page.getByTestId('game')).toHaveCount(23);
-	await expect(page.getByTestId('day').first()).toHaveText('Sat 31 Oct');
+	await expect(page.getByTestId('nothing-open')).toHaveText('Nothing open.');
+	const next = page.getByTestId('next');
+	await expect(next.getByTestId('day')).toHaveText(['Sat 31 Oct']);
+	await expect(next.locator('[data-testid="game"][data-of-team="true"]')).toHaveCount(1);
+	await expectAccessible(page);
+
+	// The "Game list" card is on "Season".
+	await page.goto('/season');
 	await expect(page.getByTestId('last-read')).toHaveText(
 		/^Last read: \w{3} \d{1,2} \w+ \d{4} \d{2}:\d{2}$/
 	);
-	await expectAccessible(page);
 	expect(errors).toEqual([]);
 });
 
-test('reading the game list again has no changes, and the schedule stays', async ({ page }) => {
+test('reading the game list again has no changes, and the games stay', async ({ page }) => {
 	const errors = watchConsole(page);
-	await page.goto('/');
+	await page.goto('/season');
+	const games = page.getByTestId('part-coming').getByTestId('game');
 	await expect(page.getByTestId('last-read')).toBeVisible();
 	await expect(page.getByTestId('reading-result')).toHaveCount(0);
-	await expect(page.getByTestId('game')).toHaveCount(23);
+	await expect(games).toHaveCount(23);
 	await page.getByRole('button', { name: 'Read the game list' }).click();
 	await expect(page.getByTestId('reading-result')).toHaveText('No changes');
-	await expect(page.getByTestId('game')).toHaveCount(23);
+	await expect(games).toHaveCount(23);
 	await expect(page.getByRole('button', { name: 'Read the game list' })).toBeEnabled();
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
@@ -77,7 +85,7 @@ test('after 3 nights without a good reading the card says the games may be out o
 		const latest = await (await route.fetch()).json();
 		await route.fulfill({ json: { ...latest, out_of_date_since: '2026-10-09T01:00:05Z' } });
 	});
-	await page.goto('/');
+	await page.goto('/season');
 	const warning = page.getByTestId('out-of-date');
 	await expect(warning).toHaveText('The games may be out of date since Fri 9 October 2026 03:00.');
 	await expect(warning).toHaveAttribute('role', 'alert');
@@ -90,18 +98,38 @@ test('after 3 nights without a good reading the card says the games may be out o
 	expect(errors).toEqual([]);
 });
 
-// The server's clock is 12 October 2026 (DEV_NOW): the schedule of M16 1 has 23 coming games
-// (5 of the team) and 14 past games.
-test.describe('the schedule', () => {
+test('the open item of the game list goes to its card on "Season"', async ({ page }) => {
+	// The server reads well each time, so its answer is replaced.
+	await page.route('**/api/start', async (route) => {
+		const start = await (await route.fetch()).json();
+		start.open_items = [{ kind: 'out_of_date', since: '2026-10-09' }];
+		await route.fulfill({ json: start });
+	});
+	await page.goto('/');
+	const item = page.getByTestId('open-item');
+	await expect(item).toHaveText('The games may be out of date since Fri 9 Oct.');
+	await item.click();
+	await expect(page).toHaveURL(/\/season#game-list$/);
+	await expect(page.getByTestId('game-list-card')).toBeInViewport();
+});
+
+// The server's clock is 12 October 2026 (DEV_NOW): the games of M16 1 are 23 coming games (5 of
+// the team) and 14 past games, on "Season" (no trainings yet in these tests).
+test.describe('the games on "Season"', () => {
+	const label = (page: import('@playwright/test').Page, name: string) =>
+		page.getByTestId('labels').getByRole('button', { name, exact: true });
+	const coming = (page: import('@playwright/test').Page) =>
+		page.getByTestId('part-coming').getByTestId('game');
+
 	test.beforeEach(async ({ page }) => {
-		await page.goto('/');
+		await page.goto('/season');
 	});
 
 	test('shows the coming games grouped by date, with the team marked', async ({ page }) => {
-		const days = page.getByTestId('day');
+		const days = page.getByTestId('part-coming').getByTestId('day');
 		await expect(days).toHaveCount(12);
 		await expect(days.first()).toHaveText('Sat 31 Oct');
-		await expect(page.getByTestId('game')).toHaveCount(23);
+		await expect(coming(page)).toHaveCount(23);
 		const teamGames = page.locator('[data-testid="game"][data-of-team="true"]');
 		await expect(teamGames).toHaveCount(5);
 		await expect(teamGames.getByText('Team', { exact: true })).toHaveCount(5);
@@ -115,89 +143,68 @@ test.describe('the schedule', () => {
 		await expect(firstDay.last()).toContainText('Blue Drakes X12 1');
 	});
 
-	test('the filter shows games of the team or possible duty games', async ({ page }) => {
-		await page.getByRole('radio', { name: 'Games of the team' }).click();
-		await expect(page.getByTestId('game')).toHaveCount(5);
+	test('the labels show games of the team or possible duty games', async ({ page }) => {
+		await label(page, 'Games of the team').click();
+		await expect(coming(page)).toHaveCount(5);
 		await expect(page.locator('[data-testid="game"][data-of-team="false"]')).toHaveCount(0);
 
-		await page.getByRole('radio', { name: 'Possible duty games' }).click();
-		await expect(page.getByTestId('game')).toHaveCount(18);
+		await label(page, 'Games of the team').click();
+		await label(page, 'Possible duty games').click();
+		await expect(coming(page)).toHaveCount(18);
 		await expect(page.locator('[data-testid="game"][data-of-team="true"]')).toHaveCount(0);
 
-		await page.getByRole('radio', { name: 'All' }).click();
-		await expect(page.getByTestId('game')).toHaveCount(23);
+		// Both labels of one group add up.
+		await label(page, 'Games of the team').click();
+		await expect(coming(page)).toHaveCount(23);
 	});
 
-	test('past games open on request', async ({ page }) => {
-		await expect(page.getByTestId('past-games')).toHaveCount(0);
-		await page.getByRole('button', { name: 'Show past games' }).click();
-		await expect(page.getByTestId('past-games').getByTestId('game')).toHaveCount(14);
+	test('past games show with "Past"', async ({ page }) => {
+		await expect(page.getByTestId('part-past')).toHaveCount(0);
+		await label(page, 'Past').click();
+		await expect(page.getByTestId('part-past').getByTestId('game')).toHaveCount(14);
 		await expect(page.getByTestId('game')).toHaveCount(37);
-		await page.getByRole('button', { name: 'Hide past games' }).click();
+		await label(page, 'Past').click();
 		await expect(page.getByTestId('game')).toHaveCount(23);
 	});
 
-	test('a filter that leaves no games says so', async ({ page }) => {
+	test('labels that leave no games say so', async ({ page }) => {
 		// As from mid-December, when the team has no coming games until the second half appears.
-		await page.route('**/api/schedule', async (route) => {
+		await page.route('**/api/season*', async (route) => {
 			const response = await route.fetch();
 			const body = await response.json();
-			body.schedule.coming = body.schedule.coming.filter(
-				(game: { reason: string }) => game.reason === 'duty'
+			body.coming = body.coming.filter(
+				(event: { game?: { reason: string } }) => event.game?.reason === 'duty'
 			);
 			await route.fulfill({ response, json: body });
 		});
-		await page.goto('/');
-		await expect(page.getByTestId('game')).toHaveCount(18);
-		await page.getByRole('radio', { name: 'Games of the team' }).click();
-		await expect(page.getByTestId('game')).toHaveCount(0);
-		await expect(page.getByTestId('no-coming-games')).toHaveText('No coming games of the team.');
-		await page.getByRole('button', { name: 'Show past games' }).click();
-		await expect(page.getByTestId('game')).toHaveCount(5);
+		await page.goto('/season');
+		await expect(coming(page)).toHaveCount(18);
+		await label(page, 'Games of the team').click();
+		await expect(coming(page)).toHaveCount(0);
+		await expect(page.getByTestId('part-coming').getByTestId('part-empty')).toHaveText(
+			'No coming games of the team.'
+		);
+		await label(page, 'Past').click();
+		await expect(page.getByTestId('part-past').getByTestId('game')).toHaveCount(5);
 	});
 
-	test('a schedule that cannot be loaded after a reading does not look like a failed reading', async ({
+	test('games that cannot be loaded after a reading do not look like a failed reading', async ({
 		page
 	}) => {
-		// Only the reload after the tap fails: the page has loaded its schedule first.
-		await expect(page.getByTestId('game')).toHaveCount(23);
-		await page.route('**/api/schedule', (route) => route.fulfill({ status: 500, json: {} }));
+		// Only the load after the tap fails: the page has loaded its games first.
+		await expect(coming(page)).toHaveCount(23);
+		await page.route('**/api/season*', (route) => route.fulfill({ status: 500, json: {} }));
 		await page.getByRole('button', { name: 'Read the game list' }).click();
 		await expect(page.getByTestId('reading-result')).toHaveText('No changes');
-		await expect(page.getByTestId('schedule-error')).toBeVisible();
+		await expect(page.getByTestId('season-load-error')).toBeVisible();
 		await expect(page.getByText('Something went wrong')).toHaveCount(0);
-		await expect(page.getByTestId('game')).toHaveCount(23);
-	});
-
-	test('without changes not seen, the start page has no line for them', async ({ page }) => {
-		await expect(page.getByTestId('game')).toHaveCount(23);
-		await expect(page.getByTestId('unseen-changes')).toHaveCount(0);
-	});
-
-	test('the line of changes not seen opens the list, and the next games stay in view', async ({
-		page
-	}) => {
-		await page.route('**/api/schedule', async (route) => {
-			const response = await route.fetch();
-			const body = await response.json();
-			body.schedule.unseen_changes = 3;
-			await route.fulfill({ response, json: body });
-		});
-		await page.setViewportSize({ width: 390, height: 800 });
-		await page.goto('/');
-		const line = page.getByTestId('unseen-changes');
-		await expect(line).toHaveText('3 changes not seen');
-		const firstGame = await page.getByTestId('game').first().boundingBox();
-		expect(firstGame && firstGame.y + firstGame.height).toBeLessThanOrEqual(800);
-		await line.click();
-		await expect(page).toHaveURL('/changes');
-		await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
+		await expect(coming(page)).toHaveCount(23);
 	});
 
 	test('is accessible, has no console errors and fits a small phone', async ({ page }) => {
 		const errors = watchConsole(page);
 		await page.reload();
-		await page.getByRole('button', { name: 'Show past games' }).click();
+		await label(page, 'Past').click();
 		await expect(page.getByTestId('game')).toHaveCount(37);
 		await expectAccessible(page);
 		await expectNoHorizontalScroll(page, 320);
@@ -208,12 +215,34 @@ test.describe('the schedule', () => {
 		for (const colorScheme of ['light', 'dark'] as const) {
 			await page.emulateMedia({ colorScheme });
 			await page.reload();
-			await expect(page.getByTestId('game')).toHaveCount(23);
+			await expect(coming(page)).toHaveCount(23);
 			await page.screenshot({
-				path: `test-results/look/schedule-${colorScheme}.png`,
+				path: `test-results/look/season-${colorScheme}.png`,
 				fullPage: true
 			});
 		}
+	});
+});
+
+test.describe('the open items of changes', () => {
+	test('without changes not seen, there is no open item for them', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByTestId('nothing-open')).toHaveText('Nothing open.');
+		await expect(page.locator('[data-kind="changes"]')).toHaveCount(0);
+	});
+
+	test('changes not seen are an open item that opens the list', async ({ page }) => {
+		await page.route('**/api/start', async (route) => {
+			const start = await (await route.fetch()).json();
+			start.open_items = [{ kind: 'changes', count: 3 }];
+			await route.fulfill({ json: start });
+		});
+		await page.goto('/');
+		const item = page.locator('[data-kind="changes"]');
+		await expect(item).toHaveText('3 changes not seen');
+		await item.click();
+		await expect(page).toHaveURL('/changes');
+		await expect(page.getByRole('heading', { name: 'Changes' })).toBeVisible();
 	});
 });
 
@@ -226,7 +255,8 @@ test('the coordinator changes the team later', async ({ page }) => {
 
 	await expect(page).toHaveURL('/');
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 2');
-	// The schedule follows the new team: its games are the team games now.
+	// The games follow the new team: on "Season" its games are the team games now.
+	await page.goto('/season');
 	const teamGames = page.locator('[data-testid="game"][data-of-team="true"]');
 	await expect(teamGames).toHaveCount(5);
 	await expect(teamGames.filter({ hasText: 'Blue Drakes M16 2' })).toHaveCount(5);

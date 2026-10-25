@@ -6,7 +6,7 @@ import { expectAccessible, expectNoHorizontalScroll, watchConsole } from './help
 
 test.describe.configure({ mode: 'serial' });
 
-test('a Tuesday weekly training gives the card on the start page', async ({ page }) => {
+test('a Tuesday weekly training is in "Next" on the start page', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/settings');
 	await page.getByRole('button', { name: 'Add weekly training' }).click();
@@ -18,12 +18,17 @@ test('a Tuesday weekly training gives the card on the start page', async ({ page
 	await weekly.getByRole('button', { name: 'Save weekly training' }).click();
 	await expect(page.getByTestId('weekly-training')).toHaveCount(1);
 
+	// The choose tests end with a club saved without a team: "Next" has the trainings only.
 	await page.goto('/');
 	await expect(
 		page.getByTestId('team-links').getByRole('link', { name: 'Attendance' })
 	).toBeVisible();
-	const card = page.getByTestId('training-card');
-	await expect(card).toHaveText(/Training · Tue 13 Oct\s*· 19:45\s*Not opened yet/);
+	const next = page.getByTestId('next');
+	await expect(next.getByTestId('day').first()).toHaveText('Tue 13 Oct');
+	await expect(next.getByTestId('training-row').first()).toHaveText(
+		/Training\s*· 19:45\s*Not opened/
+	);
+	await expect(next.getByTestId('game')).toHaveCount(0);
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 	expect(errors).toEqual([]);
@@ -133,17 +138,18 @@ test('a training reached by its address is opened only with "Open training"', as
 	expect(errors).toEqual([]);
 });
 
-test('a tap on the card opens the next training', async ({ page }) => {
+test('a tap on a training in "Next" opens it', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/');
-	await page.getByTestId('training-card').click();
+	await page.getByTestId('next').getByTestId('training-row').first().getByRole('button').click();
 	await expect(page).toHaveURL(/\/training\/2026-10-13\?from=start$/);
 	await expect(page.getByTestId('training-top')).toHaveText('All there');
 	// "Back" returns to the start page it came from.
 	await page.getByRole('link', { name: 'Back' }).click();
 	await expect(page).toHaveURL(/\/$/);
-	await page.goto('/');
-	await expect(page.getByTestId('training-card')).toHaveText(/All there/);
+	await expect(
+		page.getByTestId('next').getByTestId('training-row').first().getByTestId('training-status')
+	).toHaveText('All there');
 	expect(errors).toEqual([]);
 });
 

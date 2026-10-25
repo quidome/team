@@ -1,4 +1,4 @@
-// The schedule on the start page (story 3b): filter, grouping by date, and date words.
+// The filter of the list of changes (games of the team, possible duty games), and date words.
 import type { ScheduleGame } from '#lib/api/client.js';
 
 export type Filter = 'all' | 'team' | 'duty';
@@ -9,13 +9,6 @@ export const filters: { value: Filter; label: string }[] = [
 	{ value: 'duty', label: 'Possible duty games' }
 ];
 
-/** The line for a list with no games under the filter, for example "No coming games of the team." */
-export function noGamesLine(filter: Filter, period: 'coming' | 'past'): string {
-	if (filter === 'team') return `No ${period} games of the team.`;
-	if (filter === 'duty') return `No ${period} possible duty games.`;
-	return `No ${period} games.`;
-}
-
 /** The games (or changes) that the filter shows, by their `reason`. */
 export function filterGames<T extends Pick<ScheduleGame, 'reason'>>(
 	games: T[],
@@ -23,17 +16,6 @@ export function filterGames<T extends Pick<ScheduleGame, 'reason'>>(
 ): T[] {
 	if (filter === 'all') return games;
 	return games.filter((game) => game.reason === filter);
-}
-
-/** Groups games by date and keeps their order (the server sorts them). */
-export function groupByDate(games: ScheduleGame[]): { date: string; games: ScheduleGame[] }[] {
-	const groups: { date: string; games: ScheduleGame[] }[] = [];
-	for (const game of games) {
-		const last = groups.at(-1);
-		if (last?.date === game.date) last.games.push(game);
-		else groups.push({ date: game.date, games: [game] });
-	}
-	return groups;
 }
 
 /** "Sat 31 Oct" for a Dutch date such as "2026-10-31". */

@@ -342,22 +342,6 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/api/schedule': {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		get: operations['schedule'];
-		put?: never;
-		post?: never;
-		delete?: never;
-		options?: never;
-		head?: never;
-		patch?: never;
-		trace?: never;
-	};
 	'/api/season': {
 		parameters: {
 			query?: never;
@@ -383,6 +367,22 @@ export interface paths {
 		};
 		get: operations['get'];
 		put: operations['save'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/start': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['start'];
+		put?: never;
 		post?: never;
 		delete?: never;
 		options?: never;
@@ -416,22 +416,6 @@ export interface paths {
 		get?: never;
 		put?: never;
 		post: operations['addTraining'];
-		delete?: never;
-		options?: never;
-		head?: never;
-		patch?: never;
-		trace?: never;
-	};
-	'/api/trainings/next': {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		get: operations['nextTraining'];
-		put?: never;
-		post?: never;
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -887,6 +871,35 @@ export interface components {
 			/** @description The dates of those trainings, for example "2026-09-01", in order. */
 			trainings: string[];
 		};
+		/** @description One open item. Dates are Dutch dates, for example "2026-10-22". */
+		OpenItemView:
+			| {
+					/** @enum {string} */
+					kind: 'reading_held_back';
+			  }
+			| {
+					/** @enum {string} */
+					kind: 'out_of_date';
+					since: string;
+			  }
+			| {
+					/** Format: int32 */
+					count: number;
+					/** @enum {string} */
+					kind: 'changes';
+			  }
+			| {
+					count: number;
+					first: string;
+					/** @enum {string} */
+					kind: 'not_opened';
+			  }
+			| {
+					count: number;
+					first: string;
+					/** @enum {string} */
+					kind: 'not_checked';
+			  };
 		PlayerChange: {
 			first_name: string;
 			/** @description A hidden player is not offered in "Add player" of the team page and not in "Add all". */
@@ -1042,9 +1055,7 @@ export interface components {
 			player: components['schemas']['PlayerDetail'];
 			same_name: boolean;
 		};
-		ScheduleAnswer: {
-			schedule?: null | components['schemas']['ScheduleView'];
-		};
+		/** @description A game of the schedule: the team's games and the home games of other club teams. */
 		ScheduleGame: {
 			away: string;
 			/** @description Dutch local date, for example "2026-10-31". */
@@ -1066,26 +1077,6 @@ export interface components {
 		};
 		/** @enum {string} */
 		ScheduleReasonView: 'team' | 'duty';
-		ScheduleView: {
-			club: components['schemas']['ClubView'];
-			/** @description Today (Dutch date) and later, in time order. */
-			coming: components['schemas']['ScheduleGame'][];
-			/**
-			 * @description True: a new season started and its team is not chosen yet; these are the games of the
-			 *     team of the newest earlier season.
-			 */
-			last_season: boolean;
-			/** @description Before today, newest date first, in time order within a date. */
-			past: components['schemas']['ScheduleGame'][];
-			/** @description The season of the games, for example "2026-2027". */
-			season: string;
-			team: components['schemas']['TeamView'];
-			/**
-			 * Format: int32
-			 * @description The number of changes not seen yet (`GET /api/changes`); 0 for last season's schedule.
-			 */
-			unseen_changes: number;
-		};
 		SeasonAnswer: {
 			club?: null | components['schemas']['ClubView'];
 			/** @description Today and later, nearest first. */
@@ -1146,6 +1137,16 @@ export interface components {
 					state: 'chosen';
 					team: components['schemas']['TeamView'];
 			  };
+		StartAnswer: {
+			last?: null | components['schemas']['EventView'];
+			/**
+			 * @description The games of the team and the trainings from today until the Sunday of next week, in time
+			 *     order; when there are none, the first coming one.
+			 */
+			next: components['schemas']['EventView'][];
+			/** @description What still needs the coordinator, in the order of the start page. */
+			open_items: components['schemas']['OpenItemView'][];
+		};
 		/** @description The team of the current season. */
 		TeamPageView: {
 			/**
@@ -2286,33 +2287,6 @@ export interface operations {
 			};
 		};
 	};
-	schedule: {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		requestBody?: never;
-		responses: {
-			/** @description The schedule to show, or `null` when there is none */
-			200: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					'application/json': components['schemas']['ScheduleAnswer'];
-				};
-			};
-			/** @description Not logged in */
-			401: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content?: never;
-			};
-		};
-	};
 	season: {
 		parameters: {
 			query?: {
@@ -2422,6 +2396,33 @@ export interface operations {
 			};
 		};
 	};
+	start: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The open items, the last training and the next events */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['StartAnswer'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	team: {
 		parameters: {
 			query?: never;
@@ -2477,33 +2478,6 @@ export interface operations {
 					[name: string]: unknown;
 				};
 				content?: never;
-			};
-			/** @description Not logged in */
-			401: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content?: never;
-			};
-		};
-	};
-	nextTraining: {
-		parameters: {
-			query?: never;
-			header?: never;
-			path?: never;
-			cookie?: never;
-		};
-		requestBody?: never;
-		responses: {
-			/** @description Today's training until midnight, else the next training day or training of the current season; `null` when there is none */
-			200: {
-				headers: {
-					[name: string]: unknown;
-				};
-				content: {
-					'application/json': null | components['schemas']['TrainingRow'];
-				};
 			};
 			/** @description Not logged in */
 			401: {

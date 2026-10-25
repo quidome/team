@@ -211,7 +211,11 @@
 		{/if}
 
 		{#if data.readings}
-			<div class="rounded-xl border bg-card p-5 shadow-xs" data-testid="game-list-card">
+			<div
+				id="game-list"
+				class="scroll-mt-20 rounded-xl border bg-card p-5 shadow-xs"
+				data-testid="game-list-card"
+			>
 				<h2 class="mb-3 font-medium">Game list</h2>
 				{#key data.readings}
 					<ReadGameList readings={data.readings} onRead={reload} />

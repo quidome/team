@@ -6,7 +6,7 @@
 mod common;
 
 use common::Harness;
-use common::game_list::{M16_1, Reader, games_with, utc};
+use common::game_list::{M16_1, Reader, game_mut, games_with, utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -267,4 +267,36 @@ async fn a_season_that_cannot_be_read_is_refused(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     let (status, body) = reader.send("GET", "/api/season?season=abc", None).await;
     assert_eq!((status, body), (400, json!({ "error": "invalid_season" })));
+}
+
+/// A team game of M16 1 on 31 October 2026 at 16:00.
+const TIME_GAME: i64 = 1073152;
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_start_time_that_is_not_known_comes_last_in_its_date(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.answer(games_with(|games| {
+        game_mut(games, TIME_GAME)["tijd"] = json!("00:00");
+    }));
+    reader.read_good().await;
+
+    let coming = events(&season(&reader, "").await, "coming");
+    let on_31_october: Vec<&Value> = games(&coming)
+        .into_iter()
+        .filter(|event| event["date"] == "2026-10-31")
+        .collect();
+    let times: Vec<&Value> = on_31_october
+        .iter()
+        .map(|event| &event["game"]["start_time"])
+        .collect();
+    assert_eq!(
+        times,
+        [
+            &json!("13:00"),
+            &json!("14:30"),
+            &json!("17:30"),
+            &Value::Null
+        ]
+    );
+    assert_eq!(on_31_october[3]["game"]["id"], TIME_GAME);
 }

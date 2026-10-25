@@ -238,10 +238,29 @@ async fn seen(reader: &Reader, changes: Value) -> Value {
     body
 }
 
+/// The number of changes not seen (the open item of the start page) and the games of the current
+/// season ("Season"), in the shape the schedule had.
 async fn schedule(reader: &Reader) -> Value {
-    let (status, body) = reader.send("GET", "/api/schedule", None).await;
-    assert_eq!(status, 200, "{body}");
-    body["schedule"].clone()
+    let (status, start) = reader.send("GET", "/api/start", None).await;
+    assert_eq!(status, 200, "{start}");
+    let unseen = start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "changes")
+        .map_or(json!(0), |item| item["count"].clone());
+    let (status, season) = reader.send("GET", "/api/season", None).await;
+    assert_eq!(status, 200, "{season}");
+    let games = |part: &str| -> Vec<Value> {
+        season[part]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|event| !event["game"].is_null())
+            .map(|event| event["game"].clone())
+            .collect()
+    };
+    json!({ "unseen_changes": unseen, "coming": games("coming"), "past": games("past") })
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
@@ -442,7 +461,9 @@ async fn seen_deletes_a_change_only_with_its_version(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_schedule_counts_unseen_changes_and_hides_a_gone_game_after_seen(pool: PgPool) {
+async fn the_start_page_counts_unseen_changes_and_season_hides_a_gone_game_after_seen(
+    pool: PgPool,
+) {
     let reader = read_once(pool).await;
     assert_eq!(schedule(&reader).await["unseen_changes"], 0);
 

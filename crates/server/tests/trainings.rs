@@ -164,36 +164,6 @@ async fn the_list_has_one_row_per_date(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_card_is_the_next_training(pool: PgPool) {
-    let mut coordinator = Coordinator::start(pool.clone()).await;
-    // No weekly trainings: no card.
-    assert_eq!(
-        coordinator.ok("GET", "/api/trainings/next", None).await,
-        Value::Null
-    );
-    add_tuesdays(&coordinator).await;
-
-    // Tue 13 Oct, 23:59 Dutch time (21:59 UTC): still today's training.
-    at(&mut coordinator, 2026, 10, 13, 21, 59).await;
-    let next = coordinator.ok("GET", "/api/trainings/next", None).await;
-    assert_eq!(next["date"], "2026-10-13");
-    assert_eq!(next["status"], "not_opened");
-
-    // Wednesday: next Tuesday, also when it is cancelled.
-    at(&mut coordinator, 2026, 10, 14, 10, 0).await;
-    insert_training(&pool, date(2026, 10, 20), true).await;
-    let next = coordinator.ok("GET", "/api/trainings/next", None).await;
-    assert_eq!(next["date"], "2026-10-20");
-    assert_eq!(next["status"], "cancelled");
-
-    // An extra training on Thu 15 Oct comes first.
-    insert_training(&pool, date(2026, 10, 15), false).await;
-    let next = coordinator.ok("GET", "/api/trainings/next", None).await;
-    assert_eq!(next["date"], "2026-10-15");
-    assert_eq!(next["extra"], true);
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn the_training_page_lists_the_players_with_a_role(pool: PgPool) {
     let coordinator = Coordinator::start(pool.clone()).await;
     add_tuesdays(&coordinator).await;
