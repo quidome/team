@@ -11,7 +11,7 @@ days and trainings) in one list with week and date headings and labels that comb
 or training is found there; the list of trainings with its actions moves here from "Attendance".
 
 ## Requirements summary
-Story A of the epic [Start page and season](../2026-10-25-start-page-and-season/) (`functional.md`
+Story A of the epic [Start page and season](../../2026-10-25-start-page-and-season/) (`functional.md`
 approved 2026-10-25; epic `technical.md` approved 2026-10-25):
 
 - **Address**: `/season?season=2025-2026`; the current season when left out; a reload keeps it. The start page links to "Season", first in the line of links ("Season · Attendance · Team · Players · Settings").

@@ -11,7 +11,7 @@ training. The roles of a player, one after the other, are the player's history.
 
 Two pages: **Players** (every player the coordinator ever entered) and **Team** (the team of the
 current season). The start page links to both, to [attendance](trainings-and-attendance.md) and to
-the settings ("Attendance · Team · Players · Settings").
+the settings ("Season · Attendance · Team · Players · Settings").
 
 ## Behaviour
 ### Players

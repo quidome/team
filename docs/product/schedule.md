@@ -20,6 +20,8 @@ players of the team can have jury and referee duties ("possible duty games").
 - Choosing a team reads the game list at once, so the schedule shows without a tap.
 - **New season.** Until the team is chosen again, the start page shows the choose step and below it "Last season · 2026-2027" with last season's team and its games (open, newest first). This view has no read action. A renamed hall shows its newest name, also for earlier seasons.
 
+- All games of the season, also past ones, are on [Season](season.md), together with the trainings, per week.
+
 ## Errors and limits
 - No games and no reading yet: "The game list has not been read yet."
 - No games after a reading: "The game list has no games for this season yet." The "Game list" card shows when it was last read.
