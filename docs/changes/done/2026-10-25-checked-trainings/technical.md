@@ -11,7 +11,7 @@ past training nobody looked at can stay in view (the open items of story B use i
 every training before today counts as checked.
 
 ## Requirements summary
-Story C of the epic [Start page and season](../../2026-10-25-start-page-and-season/) (`functional.md`
+Story C of the epic [Start page and season](../2026-10-25-start-page-and-season/) (`functional.md`
 approved 2026-10-25, story C; epic `technical.md` approved 2026-10-25):
 
 - A training (opened or added) whose date is today or earlier has "Checked" on its page. A tap saves at once; the page then shows "Checked" (a state, not a button) with "Undo check". "Undo check" saves at once and shows "Checked" (the button) again.

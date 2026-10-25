@@ -8,7 +8,7 @@ created: 2026-10-25
 
 # The start page as a landing page
 
-Story B of the epic [Start page and season](../../2026-10-25-start-page-and-season/). The start page
+Story B of the epic [Start page and season](../2026-10-25-start-page-and-season/). The start page
 shows "Open items" (problems with the game list, changes not seen, training days not opened,
 trainings not checked), "Last" (the last training before today) and "Next" (the games of the team
 and the trainings of this week and next week), and the links "Season · Attendance · Team · Players ·

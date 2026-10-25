@@ -1,7 +1,7 @@
 ---
 title: Start page and season
 type: feature
-stage: implement
+stage: done
 closure: review accept   # epic: each story has its own closure (A and B review build + accept, C review build); a fresh agent checks the whole result after story B
 created: 2026-10-25
 ---
@@ -20,3 +20,4 @@ open item until the coordinator checks it. The base on which duties show their o
 | 2026-10-25 | discover | idea ready for discovery |
 | 2026-10-25 | design | functional.md approved: three stories (A the page "Season", B the start page as a landing page with "Open items", "Last" and "Next", C checked trainings); spec review: all three "serves – note", notes 1–7 answered (1, 2, 4 by the coordinator) |
 | 2026-10-25 | implement | technical.md approved: an epic of three stories in the order A the page "Season" (review build + accept, release 1), C checked trainings (review build, release 1 or 2), B the start page (review build + accept); epic closure review accept; "Last" uses the seasons of the open items (coordinator, fixed in functional.md) |
+| 2026-10-25 | done | closed after the epic review accept (accepted with notes, A1 fixed): decision record 0022; vision and architecture updated; the three stories closed before (living documents updated at each close) |

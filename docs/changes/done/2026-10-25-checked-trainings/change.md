@@ -8,7 +8,7 @@ created: 2026-10-25
 
 # Checked trainings
 
-Story C of the epic [Start page and season](../../2026-10-25-start-page-and-season/). The coordinator
+Story C of the epic [Start page and season](../2026-10-25-start-page-and-season/). The coordinator
 confirms that the attendance of a training is complete ("Checked", with "Undo check"); a past
 training that is not checked will be an open item on the start page (story B). At the release
 every training before today counts as checked. "Season" shows "Checked" on the row. The functional
