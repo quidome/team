@@ -140,6 +140,10 @@ pub fn app(state: AppState) -> Router {
         .route("/trainings/{date}/cancel", post(trainings::cancel))
         .route("/trainings/{date}/uncancel", post(trainings::uncancel))
         .route(
+            "/trainings/{date}/checked",
+            put(trainings::check).delete(trainings::uncheck),
+        )
+        .route(
             "/trainings/{date}/absences/{player}",
             put(trainings::mark).delete(trainings::there),
         )

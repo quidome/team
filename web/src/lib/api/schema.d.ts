@@ -486,6 +486,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/trainings/{date}/checked': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['checkTraining'];
+		post?: never;
+		delete: operations['uncheckTraining'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/trainings/{date}/open': {
 		parameters: {
 			query?: never;
@@ -1205,6 +1221,8 @@ export interface components {
 		TrainingRow: {
 			/** @description The number of absences of players with a role on the date (0 when not opened). */
 			absent: number;
+			/** @description The training is checked (always false when not opened). */
+			checked: boolean;
 			/** @description For example "2026-10-13". */
 			date: string;
 			end: string;
@@ -1219,7 +1237,11 @@ export interface components {
 		};
 		/** @description An opened training. */
 		TrainingView: {
+			/** @description "Checked" is offered: not checked yet, and its date is today or earlier. */
+			can_check: boolean;
 			cancelled: boolean;
+			/** @description The coordinator confirmed that the attendance is complete. */
+			checked: boolean;
 			end: string;
 			start: string;
 		};
@@ -2737,6 +2759,80 @@ export interface operations {
 				};
 			};
 			/** @description `invalid_date`, `not_a_training_day` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	checkTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training, checked */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date`; `not_opened`: no training on the date; `not_yet`: the date is after today and the training is not checked; `cancelled`: the training is cancelled and not checked */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	uncheckTraining: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The date of the training */
+				date: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The training, not checked */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['TrainingDay'];
+				};
+			};
+			/** @description `invalid_date`; `not_opened`: no training on the date */
 			400: {
 				headers: {
 					[name: string]: unknown;

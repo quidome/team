@@ -56,6 +56,8 @@ use utoipa::OpenApi;
         trainings::change,
         trainings::cancel,
         trainings::uncancel,
+        trainings::check,
+        trainings::uncheck,
         trainings::delete,
         trainings::mark,
         trainings::there,

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE trainings SET checked_at = COALESCE(checked_at, $2) WHERE date = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b52f595604f99423888109855b1326bd757a3330609ba49fe93cc79d213283b"
+}

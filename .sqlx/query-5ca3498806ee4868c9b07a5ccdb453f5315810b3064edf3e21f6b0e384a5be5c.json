@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled\n           FROM trainings WHERE date = $1",
+  "query": "SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled,\n                  checked_at IS NOT NULL AS checked\n           FROM trainings WHERE date = $1",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,11 @@
         "ordinal": 4,
         "name": "cancelled",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "checked",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -39,8 +44,9 @@
       false,
       false,
       false,
+      null,
       null
     ]
   },
-  "hash": "d874220a05ec3e729ae9a34460ece859f819c783a1623d8e5c638a1494c6b864"
+  "hash": "5ca3498806ee4868c9b07a5ccdb453f5315810b3064edf3e21f6b0e384a5be5c"
 }

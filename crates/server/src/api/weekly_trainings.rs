@@ -95,6 +95,9 @@ impl From<TrainingError> for AppError {
             TrainingError::WeeklyTrainingsOverlap => "weekly_trainings_overlap",
             TrainingError::TrainingExists => "training_exists",
             TrainingError::NotATrainingDay => "not_a_training_day",
+            TrainingError::NotOpened => "not_opened",
+            TrainingError::NotYet => "not_yet",
+            TrainingError::Cancelled => "cancelled",
         })
     }
 }

@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use sqlx::{PgExecutor, PgPool};
+use sqlx::{PgConnection, PgExecutor, PgPool};
 use team_core::{Absence, PlayerId, ReasonId, Season, Training, TrainingId};
 
 use crate::db::StoreError;
@@ -14,6 +14,7 @@ struct TrainingRow {
     start_time: NaiveTime,
     end_time: NaiveTime,
     cancelled: Option<bool>,
+    checked: Option<bool>,
 }
 
 impl From<TrainingRow> for Training {
@@ -24,6 +25,7 @@ impl From<TrainingRow> for Training {
             start: row.start_time,
             end: row.end_time,
             cancelled: row.cancelled.unwrap_or(false),
+            checked: row.checked.unwrap_or(false),
         }
     }
 }
@@ -35,7 +37,8 @@ pub async fn for_season(
 ) -> Result<Vec<Training>, StoreError> {
     let rows = sqlx::query_as!(
         TrainingRow,
-        r#"SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled
+        r#"SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled,
+                  checked_at IS NOT NULL AS checked
            FROM trainings WHERE date BETWEEN $1 AND $2 ORDER BY date"#,
         season.first_day(),
         season.last_day(),
@@ -69,7 +72,8 @@ pub async fn seasons(db: &PgPool) -> Result<Vec<Season>, StoreError> {
 pub async fn on(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<Option<Training>, StoreError> {
     let row = sqlx::query_as!(
         TrainingRow,
-        r#"SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled
+        r#"SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled,
+                  checked_at IS NOT NULL AS checked
            FROM trainings WHERE date = $1"#,
         date,
     )
@@ -194,6 +198,52 @@ pub async fn cancel(
 pub async fn uncancel(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<bool, StoreError> {
     let result = sqlx::query!(
         "UPDATE trainings SET cancelled_at = NULL WHERE date = $1",
+        date
+    )
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// The training on `date`, with a lock on its row for a check: another check or "Undo check" waits,
+/// a mark does not (`FOR NO KEY UPDATE` does not block the `FOR KEY SHARE` of an absence).
+pub async fn lock_for_check(
+    tx: &mut PgConnection,
+    date: NaiveDate,
+) -> Result<Option<Training>, StoreError> {
+    let row = sqlx::query_as!(
+        TrainingRow,
+        r#"SELECT id, date, start_time, end_time, cancelled_at IS NOT NULL AS cancelled,
+                  checked_at IS NOT NULL AS checked
+           FROM trainings WHERE date = $1 FOR NO KEY UPDATE"#,
+        date,
+    )
+    .fetch_optional(tx)
+    .await?;
+    Ok(row.map(Training::from))
+}
+
+/// Checks the training on `date`; a second check keeps the first moment. False: no training on
+/// the date.
+pub async fn check(
+    db: impl PgExecutor<'_>,
+    date: NaiveDate,
+    now: DateTime<Utc>,
+) -> Result<bool, StoreError> {
+    let result = sqlx::query!(
+        "UPDATE trainings SET checked_at = COALESCE(checked_at, $2) WHERE date = $1",
+        date,
+        now,
+    )
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// Undoes the check of the training on `date`. False: no training on the date.
+pub async fn uncheck(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<bool, StoreError> {
+    let result = sqlx::query!(
+        "UPDATE trainings SET checked_at = NULL WHERE date = $1",
         date
     )
     .execute(db)

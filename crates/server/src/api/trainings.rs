@@ -9,7 +9,7 @@ use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
     AttendanceError, DayStatus, PlayerId, ReasonId, Season, SeasonRow, Training, absent_count,
-    check_mark, check_training, day_times, players_at, proposed_times, season_list,
+    check_checking, check_mark, check_training, day_times, players_at, proposed_times, season_list,
 };
 use utoipa::ToSchema;
 
@@ -38,6 +38,8 @@ pub struct TrainingRow {
     pub opened: bool,
     /// A training on a date that is not a training day.
     pub extra: bool,
+    /// The training is checked (always false when not opened).
+    pub checked: bool,
 }
 
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
@@ -60,6 +62,10 @@ pub struct TrainingView {
     pub start: String,
     pub end: String,
     pub cancelled: bool,
+    /// The coordinator confirmed that the attendance is complete.
+    pub checked: bool,
+    /// "Checked" is offered: not checked yet, and its date is today or earlier.
+    pub can_check: bool,
 }
 
 /// A player at a training.
@@ -148,6 +154,7 @@ pub(crate) fn row_view(row: &SeasonRow) -> TrainingRow {
         absent,
         opened: row.training.is_some(),
         extra: row.extra,
+        checked: row.training.is_some_and(|training| training.checked),
     }
 }
 
@@ -205,6 +212,9 @@ async fn fill(
         start: clock_time(training.start),
         end: clock_time(training.end),
         cancelled: training.cancelled,
+        checked: training.checked,
+        can_check: !training.checked
+            && check_checking(Some(training), today_in_netherlands(state.clock.as_ref())).is_ok(),
     });
     view.absent = absent_count(training, &absences, &roles);
     view.players = players_at(&all, &roles, &absences, training)
@@ -388,6 +398,61 @@ pub async fn uncancel(
         return Err(AppError::NotFound);
     }
     tracing::info!(%date, "training cancel undone");
+    Ok(Json(day_of(&state, date).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/trainings/{date}/checked",
+    operation_id = "checkTraining",
+    params(("date" = String, Path, description = "The date of the training")),
+    responses(
+        (status = 200, description = "The training, checked", body = TrainingDay),
+        (status = 400, description = "`invalid_date`; `not_opened`: no training on the date; `not_yet`: the date is after today and the training is not checked; `cancelled`: the training is cancelled and not checked"),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn check(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    let today = today_in_netherlands(state.clock.as_ref());
+    // The rule and the write in one transaction: a check or "Undo check" of another screen waits
+    // for the row, a mark does not (it touches no column of the lock).
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    check_checking(
+        trainings::lock_for_check(&mut tx, date).await?.as_ref(),
+        today,
+    )?;
+    if !trainings::check(&mut *tx, date, state.clock.now()).await? {
+        return Err(AppError::BadRequest("not_opened"));
+    }
+    tx.commit().await.map_err(StoreError::from)?;
+    tracing::info!(%date, "training checked");
+    Ok(Json(day_of(&state, date).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/trainings/{date}/checked",
+    operation_id = "uncheckTraining",
+    params(("date" = String, Path, description = "The date of the training")),
+    responses(
+        (status = 200, description = "The training, not checked", body = TrainingDay),
+        (status = 400, description = "`invalid_date`; `not_opened`: no training on the date"),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn uncheck(
+    State(state): State<AppState>,
+    Path(date): Path<String>,
+) -> Result<Json<TrainingDay>, AppError> {
+    let date = path_date(&date)?;
+    if !trainings::uncheck(&state.pool, date).await? {
+        return Err(AppError::BadRequest("not_opened"));
+    }
+    tracing::info!(%date, "training check undone");
     Ok(Json(day_of(&state, date).await?))
 }
 

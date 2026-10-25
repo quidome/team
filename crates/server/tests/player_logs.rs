@@ -85,6 +85,12 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
         )
         .await;
     coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    coordinator
+        .ok("DELETE", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    coordinator
         .send("DELETE", "/api/trainings/2026-10-06", None)
         .await;
     coordinator.ok("GET", "/api/players", None).await;

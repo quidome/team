@@ -17,6 +17,11 @@ export function statusText(row: Pick<TrainingRow, 'status' | 'absent'>, card = f
 	}
 }
 
+/** " · Checked" after the status of a checked training, else "". */
+export function checkedText(row: Pick<TrainingRow, 'checked'>): string {
+	return row.checked ? ' · Checked' : '';
+}
+
 /** "3 training days not opened", "1 training day not opened". */
 export function notOpenedText(count: number): string {
 	return count === 1 ? '1 training day not opened' : `${count} training days not opened`;

@@ -9,7 +9,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { groupByWeek, weekHeading } from '#lib/season.js';
-	import { statusText } from '#lib/trainings.js';
+	import { checkedText, statusText } from '#lib/trainings.js';
 	import MapPin from '@lucide/svelte/icons/map-pin';
 
 	let {
@@ -125,7 +125,7 @@
 												: ''}"
 											data-testid="training-status"
 										>
-											{statusText(row)}
+											{statusText(row)}{checkedText(row)}
 										</span>
 									</button>
 									{#if row.status === 'not_opened'}

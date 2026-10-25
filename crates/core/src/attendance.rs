@@ -269,6 +269,7 @@ mod tests {
             start: NaiveTime::from_hms_opt(19, 45, 0).expect("valid time"),
             end: NaiveTime::from_hms_opt(21, 0, 0).expect("valid time"),
             cancelled: false,
+            checked: false,
         }
     }
 

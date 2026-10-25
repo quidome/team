@@ -44,7 +44,7 @@ pub use team_choice::{
 };
 pub use training::{
     DayStatus, SeasonList, SeasonRow, Training, TrainingError, TrainingId, WeeklyProposal,
-    WeeklyTraining, WeeklyTrainingId, absent_count, check_training, check_weekly_training,
-    day_times, not_opened, proposals_from, proposed_times, proposed_window, season_list,
-    training_days,
+    WeeklyTraining, WeeklyTrainingId, absent_count, check_checking, check_training,
+    check_weekly_training, day_times, not_checked, not_opened, proposals_from, proposed_times,
+    proposed_window, season_list, training_days,
 };

@@ -3,8 +3,10 @@
 	"Cancelled", and the players with a role on the date, each "there" at first. A tap on a player
 	opens the reasons ("There" on top for an absent player); a tap on a reason saves at once. The
 	taps of one player are sent one after the other; a tap that fails shows the stored state again
-	with "Not saved. Try again." Below: "Change", "Cancel training" or "Undo cancel", "Delete
-	training". A date that is not opened shows "Open training".
+	with "Not saved. Try again." "Checked" (a training of today or earlier, not cancelled) confirms
+	that the attendance is complete; a checked training shows "Checked" with "Undo check". Below:
+	"Change", "Cancel training" or "Undo cancel", "Delete training". A date that is not opened shows
+	"Open training".
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -15,15 +17,18 @@
 		ApiError,
 		cancelTraining,
 		changeTraining,
+		checkTraining,
 		deleteTraining,
 		loadTraining,
 		markAbsent,
 		markThere,
 		openTraining,
 		uncancelTraining,
+		uncheckTraining,
 		type TrainingDay
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import { fullName } from '#lib/players.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { onMount } from 'svelte';
@@ -137,6 +142,41 @@
 			}
 		} catch (failure) {
 			error = message(failure);
+		} finally {
+			busy = false;
+		}
+	}
+
+	/** "Checked" or "Undo check": saved at once, as a mark. A refusal of the server (for example the
+	 * training was deleted on another screen) shows its message; any other failure shows "Not saved.
+	 * Try again.". Both then show the stored training; a tap made meanwhile keeps the marks. */
+	async function saveCheck(work: () => Promise<TrainingDay>) {
+		const page = day;
+		if (!page) return;
+		busy = true;
+		notSaved = false;
+		error = null;
+		const before = taps;
+		const keep = (answer: TrainingDay) => {
+			const [keptShown, keptStored] = [shown, stored];
+			day = answer;
+			if (taps !== before || waiting > 0) {
+				shown = keptShown;
+				stored = keptStored;
+			}
+		};
+		try {
+			keep(await work());
+		} catch (failure) {
+			// `internal` is a server error, not a refusal: the save failed.
+			if (failure instanceof ApiError && failure.code && failure.code !== 'internal')
+				error = failure.message;
+			else notSaved = true;
+			try {
+				keep(await loadTraining(fetch, page.date));
+			} catch {
+				// The page keeps what it shows.
+			}
 		} finally {
 			busy = false;
 		}
@@ -287,6 +327,32 @@
 						Undo cancel
 					</Button>
 				</div>
+			{/if}
+
+			{#if page.training.checked}
+				<div
+					class="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-xs"
+				>
+					<p class="flex items-center gap-2 text-sm font-medium" data-testid="checked">
+						<CheckIcon class="size-4" aria-hidden="true" />
+						Checked
+					</p>
+					<Button
+						variant="outline"
+						disabled={busy}
+						onclick={() => saveCheck(() => uncheckTraining(page.date))}
+					>
+						Undo check
+					</Button>
+				</div>
+			{:else if page.training.can_check}
+				<Button
+					class="w-full"
+					disabled={busy}
+					onclick={() => saveCheck(() => checkTraining(page.date))}
+				>
+					Checked
+				</Button>
 			{/if}
 
 			{#if page.players.length === 0}

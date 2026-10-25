@@ -149,7 +149,7 @@ async fn the_list_has_one_row_per_date(pool: PgPool) {
     assert_eq!(
         row(&list, "2026-10-06"),
         &json!({ "date": "2026-10-06", "start": "19:45", "end": "21:00", "status": "absent",
-                 "absent": 2, "opened": true, "extra": false })
+                 "absent": 2, "opened": true, "extra": false, "checked": false })
     );
     assert_eq!(row(&list, "2026-09-29")["status"], "all_there");
     assert_eq!(row(&list, "2026-09-22")["status"], "cancelled");
@@ -229,7 +229,7 @@ async fn the_training_page_lists_the_players_with_a_role(pool: PgPool) {
     assert_eq!(page["season"], "2026-2027");
     assert_eq!(
         page["training"],
-        json!({ "start": "19:45", "end": "21:00", "cancelled": false })
+        json!({ "start": "19:45", "end": "21:00", "cancelled": false, "checked": false, "can_check": true })
     );
     assert_eq!(page["absent"], 1);
     let players: Vec<(&Value, &Value, &Value)> = page["players"]
@@ -370,7 +370,7 @@ async fn add_and_change_a_training(pool: PgPool) {
         .await;
     assert_eq!(
         page["training"],
-        json!({ "start": "19:00", "end": "20:30", "cancelled": false })
+        json!({ "start": "19:00", "end": "20:30", "cancelled": false, "checked": false, "can_check": false })
     );
     let list = training_list(&coordinator, "").await;
     assert_eq!(row(&list, "2026-10-22")["extra"], true);
@@ -500,7 +500,7 @@ async fn cancel_a_day_that_is_not_opened(pool: PgPool) {
         .await;
     assert_eq!(
         page["training"],
-        json!({ "start": "19:45", "end": "21:00", "cancelled": true })
+        json!({ "start": "19:45", "end": "21:00", "cancelled": true, "checked": false, "can_check": false })
     );
     let first: chrono::DateTime<chrono::Utc> =
         sqlx::query_scalar("SELECT cancelled_at FROM trainings")
@@ -855,4 +855,244 @@ async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
         page["now_there"],
         json!([{ "player": casey, "trainings": ["2027-09-07"] }])
     );
+}
+
+/// The training row of `on` in `GET /api/season`.
+async fn season_row(coordinator: &Coordinator, on: &str) -> Value {
+    row(&training_list(coordinator, "").await, on).clone()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn check_and_undo_check_a_training(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    assert_eq!(
+        season_row(&coordinator, "2026-10-06").await["checked"],
+        false
+    );
+
+    let page = coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    assert_eq!(page["training"]["checked"], true);
+    assert_eq!(page["players"].as_array().unwrap().len(), 2);
+    assert_eq!(page["training"]["can_check"], false);
+    let again = coordinator
+        .ok("GET", "/api/trainings/2026-10-06", None)
+        .await;
+    assert_eq!(again["training"]["checked"], true);
+    assert_eq!(
+        season_row(&coordinator, "2026-10-06").await["checked"],
+        true
+    );
+
+    let page = coordinator
+        .ok("DELETE", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    assert_eq!(page["training"]["checked"], false);
+    assert_eq!(
+        season_row(&coordinator, "2026-10-06").await["checked"],
+        false
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn check_errors_have_their_codes(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    team_with_tuesdays(&coordinator).await;
+    // Tue 6 Oct is a training day that is not opened.
+    let answer = coordinator
+        .send("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_opened" })));
+    let answer = coordinator
+        .send("DELETE", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_opened" })));
+    // Tue 13 Oct is tomorrow: opened (an absence noted in advance), but not complete yet.
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-13/open", None)
+        .await;
+    let page = coordinator
+        .ok("GET", "/api/trainings/2026-10-13", None)
+        .await;
+    assert_eq!(page["training"]["can_check"], false);
+    let answer = coordinator
+        .send("PUT", "/api/trainings/2026-10-13/checked", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "not_yet" })));
+    let answer = coordinator
+        .send("PUT", "/api/trainings/13-10-2026/checked", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "invalid_date" })));
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_check_stays_through_marks_cancel_and_change(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+
+    coordinator
+        .ok(
+            "PUT",
+            &format!("/api/trainings/2026-10-06/absences/{avery}"),
+            absent(school),
+        )
+        .await;
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/cancel", None)
+        .await;
+    assert_eq!(page["training"]["checked"], true);
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/uncancel", None)
+        .await;
+    assert_eq!(page["training"]["checked"], true);
+    // Moved to Thursday of next week: it stays checked, also after today.
+    let page = coordinator
+        .ok(
+            "PUT",
+            "/api/trainings/2026-10-06",
+            times("2026-10-15", "19:45", "21:00"),
+        )
+        .await;
+    assert_eq!(page["date"], "2026-10-15");
+    assert_eq!(page["training"]["checked"], true);
+    // A checked training after today can be checked again (the tap came twice).
+    let page = coordinator
+        .ok("PUT", "/api/trainings/2026-10-15/checked", None)
+        .await;
+    assert_eq!(page["training"]["checked"], true);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn delete_training_removes_the_check(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    team_with_tuesdays(&coordinator).await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    let (status, _) = coordinator
+        .send("DELETE", "/api/trainings/2026-10-06", None)
+        .await;
+    assert_eq!(status, 204);
+    let page = coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    assert_eq!(page["training"]["checked"], false);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_check_does_not_wait_for_a_mark(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    let (avery, _, school, _) = team_with_tuesdays(&coordinator).await;
+    let page = coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    assert_eq!(page["training"]["checked"], false);
+    let training: i64 = sqlx::query_scalar("SELECT id FROM trainings WHERE date = '2026-10-06'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    // Another screen marks Avery absent at the same moment: its insert is not committed yet.
+    let mut other = pool.begin().await.unwrap();
+    insert_absence_in(&mut other, training, avery, school).await;
+
+    let check = coordinator.send("PUT", "/api/trainings/2026-10-06/checked", None);
+    let answer = tokio::time::timeout(Duration::from_millis(300), check)
+        .await
+        .expect("the check waited for the mark");
+    assert_eq!(answer.0, 200, "{}", answer.1);
+    other.commit().await.unwrap();
+
+    let page = coordinator
+        .ok("GET", "/api/trainings/2026-10-06", None)
+        .await;
+    assert_eq!(page["training"]["checked"], true);
+    assert_eq!(page["absent"], 1);
+}
+
+async fn insert_absence_in(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    training: i64,
+    player: i64,
+    reason: i64,
+) {
+    sqlx::query("INSERT INTO absences (training_id, player_id, reason_id) VALUES ($1, $2, $3)")
+        .bind(training)
+        .bind(player)
+        .bind(reason)
+        .execute(&mut **tx)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_cancelled_training_is_not_checked(pool: PgPool) {
+    let coordinator = Coordinator::start(pool).await;
+    team_with_tuesdays(&coordinator).await;
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/cancel", None)
+        .await;
+    assert_eq!(page["training"]["can_check"], false);
+    let answer = coordinator
+        .send("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    assert_eq!(answer, (400, json!({ "error": "cancelled" })));
+    let page = coordinator
+        .ok("POST", "/api/trainings/2026-10-06/uncancel", None)
+        .await;
+    assert_eq!(page["training"]["can_check"], true);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_check_waits_for_an_undo_check_on_another_screen(pool: PgPool) {
+    let coordinator = Coordinator::start(pool.clone()).await;
+    team_with_tuesdays(&coordinator).await;
+    // A checked training moved to Thu 15 Oct, after today: it stays checked.
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/open", None)
+        .await;
+    coordinator
+        .ok("PUT", "/api/trainings/2026-10-06/checked", None)
+        .await;
+    coordinator
+        .ok(
+            "PUT",
+            "/api/trainings/2026-10-06",
+            times("2026-10-15", "19:45", "21:00"),
+        )
+        .await;
+    // Another screen undoes the check: not committed yet.
+    let mut other = pool.begin().await.unwrap();
+    sqlx::query("UPDATE trainings SET checked_at = NULL WHERE date = '2026-10-15'")
+        .execute(&mut *other)
+        .await
+        .unwrap();
+
+    let check = coordinator.send("PUT", "/api/trainings/2026-10-15/checked", None);
+    tokio::pin!(check);
+    let waited = tokio::time::timeout(Duration::from_millis(300), &mut check).await;
+    assert!(
+        waited.is_err(),
+        "the check did not wait for the other screen"
+    );
+    other.commit().await.unwrap();
+    // After the undo, the training is after today and not checked: the rule refuses it.
+    assert_eq!(check.await, (400, json!({ "error": "not_yet" })));
+    let page = coordinator
+        .ok("GET", "/api/trainings/2026-10-15", None)
+        .await;
+    assert_eq!(page["training"]["checked"], false);
 }

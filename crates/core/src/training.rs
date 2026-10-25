@@ -41,6 +41,12 @@ pub enum TrainingError {
     TrainingExists,
     #[error("the date is not a training day")]
     NotATrainingDay,
+    #[error("there is no training on this date")]
+    NotOpened,
+    #[error("the training is after today and not checked")]
+    NotYet,
+    #[error("the training is cancelled and not checked")]
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -55,6 +61,8 @@ pub struct Training {
     pub end: NaiveTime,
     /// Cancelled trainings keep their absences and do not count.
     pub cancelled: bool,
+    /// The coordinator confirmed that the attendance is complete.
+    pub checked: bool,
 }
 
 /// What a row of the list says about its date.
@@ -140,6 +148,32 @@ pub fn season_list<'a>(
         rows.into_values().partition(|row| row.date >= today);
     past.reverse();
     SeasonList { coming, past }
+}
+
+/// A check of the training on its date: there must be one, not cancelled (it has no attendance to
+/// confirm), and its date must be today or earlier. A checked training passes: a check stays
+/// through "Cancel" and through a move to a later date.
+pub fn check_checking(training: Option<&Training>, today: NaiveDate) -> Result<(), TrainingError> {
+    match training {
+        None => Err(TrainingError::NotOpened),
+        Some(training) if training.checked => Ok(()),
+        Some(training) if training.cancelled => Err(TrainingError::Cancelled),
+        Some(training) if training.date > today => Err(TrainingError::NotYet),
+        Some(_) => Ok(()),
+    }
+}
+
+/// The trainings before today that are not cancelled and not checked, oldest first: the open
+/// items of the start page.
+pub fn not_checked(list: &SeasonList<'_>) -> Vec<NaiveDate> {
+    // `past` is newest first.
+    list.past
+        .iter()
+        .rev()
+        .filter_map(|row| row.training)
+        .filter(|training| !training.cancelled && !training.checked)
+        .map(|training| training.date)
+        .collect()
 }
 
 /// The training days before today that were never opened, oldest first. "Attendance" and the
@@ -517,6 +551,7 @@ mod tests {
             start: time(19, 45),
             end: time(21, 0),
             cancelled: false,
+            checked: false,
         }
     }
 
@@ -557,6 +592,67 @@ mod tests {
         // Today's training is coming until the end of the day.
         let list = season_list(season(), &weekly, &[], &[], &[], date(2026, 10, 13));
         assert_eq!(list.coming[0].date, date(2026, 10, 13));
+    }
+
+    #[test]
+    fn checking_needs_a_training() {
+        assert_eq!(
+            check_checking(None, date(2026, 10, 12)),
+            Err(TrainingError::NotOpened)
+        );
+    }
+
+    #[test]
+    fn checking_a_training_after_today_waits_for_its_date() {
+        let today = date(2026, 10, 13);
+        assert_eq!(
+            check_checking(Some(&training(1, date(2026, 10, 14))), today),
+            Err(TrainingError::NotYet)
+        );
+        assert_eq!(check_checking(Some(&training(1, today)), today), Ok(()));
+        assert_eq!(
+            check_checking(Some(&training(1, date(2026, 10, 12))), today),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn a_cancelled_training_is_not_checked_but_a_check_stays() {
+        let today = date(2026, 10, 13);
+        let mut cancelled = training(1, date(2026, 10, 6));
+        cancelled.cancelled = true;
+        assert_eq!(
+            check_checking(Some(&cancelled), today),
+            Err(TrainingError::Cancelled)
+        );
+        cancelled.checked = true;
+        assert_eq!(check_checking(Some(&cancelled), today), Ok(()));
+    }
+
+    #[test]
+    fn a_checked_training_after_today_can_be_checked_again() {
+        let mut moved = training(1, date(2026, 10, 20));
+        moved.checked = true;
+        assert_eq!(check_checking(Some(&moved), date(2026, 10, 13)), Ok(()));
+    }
+
+    #[test]
+    fn not_checked_leaves_out_checked_cancelled_and_coming_trainings() {
+        let weekly = tuesdays();
+        let mut checked = training(1, date(2026, 9, 29));
+        checked.checked = true;
+        let mut cancelled = training(2, date(2026, 9, 22));
+        cancelled.cancelled = true;
+        let trainings = [
+            checked,
+            cancelled,
+            training(3, date(2026, 9, 15)),
+            training(4, date(2026, 10, 6)),
+            // Today: not yet an open item.
+            training(5, date(2026, 10, 13)),
+        ];
+        let list = season_list(season(), &weekly, &trainings, &[], &[], date(2026, 10, 13));
+        assert_eq!(not_checked(&list), [date(2026, 9, 15), date(2026, 10, 6)]);
     }
 
     #[test]

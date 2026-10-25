@@ -334,6 +334,77 @@ test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async (
 	expect(errors).toEqual([]);
 });
 
+test('"Checked" and "Undo check" on a training', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await expect(page.getByTestId('checked')).toHaveText('Checked');
+	await expect(page.getByRole('button', { name: 'Undo check' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	await page.reload();
+	await expect(page.getByTestId('checked')).toHaveText('Checked');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// "Season" shows it on the row.
+	await page.goto('/season');
+	await pastLabel(page).click();
+	await expect(
+		page
+			.locator('[data-testid="training-row"][data-date="2026-10-06"]')
+			.getByTestId('training-status')
+	).toHaveText(/ · Checked$/);
+
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Undo check' }).click();
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+	await expect(page.getByTestId('checked')).toHaveCount(0);
+
+	// A training after today is not complete yet: no "Checked".
+	await page.goto('/training/2026-10-13');
+	await expect(page.getByTestId('training-top')).not.toHaveText('Not opened');
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
+test('a check that cannot be saved shows "Not saved. Try again." and the stored state', async ({
+	page
+}) => {
+	// The server saves the check, but its answer is lost: the page shows what is stored.
+	await page.route('**/api/trainings/2026-10-06/checked', async (route) => {
+		await route.fetch();
+		await route.fulfill({ status: 500, json: { error: 'internal' } });
+	});
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
+	await expect(page.getByTestId('checked')).toHaveText('Checked');
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.getByRole('button', { name: 'Undo check' }).click();
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+});
+
+test('a check of a training deleted on another screen says so', async ({ page }) => {
+	await page.route('**/api/trainings/2026-10-06/checked', (route) =>
+		route.fulfill({ status: 400, json: { error: 'not_opened' } })
+	);
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await expect(page.getByRole('alert')).toHaveText(
+		'This training no longer exists. Load the page again.'
+	);
+	await expect(page.getByTestId('not-saved')).toHaveCount(0);
+});
+
+test('a cancelled training has no "Checked"', async ({ page }) => {
+	await page.goto('/training/2026-10-06');
+	await page.getByRole('button', { name: 'Cancel training' }).click();
+	await expect(page.getByTestId('training-top')).toHaveText('Cancelled');
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Undo cancel' }).click();
+	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+});
+
 test('no player with a role, and no reasons', async ({ page }) => {
 	const errors = watchConsole(page);
 	let players = false;

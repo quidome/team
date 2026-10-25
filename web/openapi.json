@@ -1429,6 +1429,78 @@
         }
       }
     },
+    "/api/trainings/{date}/checked": {
+      "put": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "checkTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training, checked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`; `not_opened`: no training on the date; `not_yet`: the date is after today and the training is not checked; `cancelled`: the training is cancelled and not checked"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "trainings"
+        ],
+        "operationId": "uncheckTraining",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "The date of the training",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The training, not checked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_date`; `not_opened`: no training on the date"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/trainings/{date}/open": {
       "put": {
         "tags": [
@@ -3558,13 +3630,18 @@
           "status",
           "absent",
           "opened",
-          "extra"
+          "extra",
+          "checked"
         ],
         "properties": {
           "absent": {
             "type": "integer",
             "description": "The number of absences of players with a role on the date (0 when not opened).",
             "minimum": 0
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "The training is checked (always false when not opened)."
           },
           "date": {
             "type": "string",
@@ -3597,11 +3674,21 @@
         "required": [
           "start",
           "end",
-          "cancelled"
+          "cancelled",
+          "checked",
+          "can_check"
         ],
         "properties": {
+          "can_check": {
+            "type": "boolean",
+            "description": "\"Checked\" is offered: not checked yet, and its date is today or earlier."
+          },
           "cancelled": {
             "type": "boolean"
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "The coordinator confirmed that the attendance is complete."
           },
           "end": {
             "type": "string"

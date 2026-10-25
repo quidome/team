@@ -72,6 +72,9 @@ export function messageFor(error: unknown, status: number): string {
 		reason_hidden: 'This reason is hidden.',
 		invalid_date: 'This date cannot be read.',
 		invalid_season: 'This season cannot be read.',
+		not_opened: 'This training no longer exists. Load the page again.',
+		not_yet: 'A training after today cannot be checked yet.',
+		cancelled: 'A cancelled training cannot be checked.',
 		player_has_absences:
 			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
@@ -451,6 +454,16 @@ export async function changeTraining(
 /** "Undo cancel". */
 export async function uncancelTraining(date: string): Promise<TrainingDay> {
 	return dataOf(await api.POST('/api/trainings/{date}/uncancel', { params: { path: { date } } }));
+}
+
+/** "Checked": the coordinator confirms that the attendance of the training is complete. */
+export async function checkTraining(date: string): Promise<TrainingDay> {
+	return dataOf(await api.PUT('/api/trainings/{date}/checked', { params: { path: { date } } }));
+}
+
+/** "Undo check". */
+export async function uncheckTraining(date: string): Promise<TrainingDay> {
+	return dataOf(await api.DELETE('/api/trainings/{date}/checked', { params: { path: { date } } }));
 }
 
 /** "Delete training": the training and its attendance. */
