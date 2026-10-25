@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage design: functional spec approved again for the new screens (2026-10-25). Next: `/design docs/changes/2026-10-18-duties` (the epic's technical.md, then story A [Duty places](changes/2026-10-18-duty-places/)). Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
+1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement: functional and technical spec approved again for the new screens (2026-10-25), four stories. Next: story A [Duty places](changes/2026-10-18-duty-places/): `/design docs/changes/2026-10-18-duty-places`. Then B (release 1 with A), C, D, and the epic review accept. Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
 
 Small:
 - Look at the start page of v0.4.0 on the phone: its speed, and the open items after a nightly reading (epic review A8 of start page and season; released 2026-10-25, migration 0010 checked the 8 trainings before that day).

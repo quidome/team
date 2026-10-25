@@ -1,7 +1,7 @@
 ---
 title: Duties
 type: feature
-stage: design
+stage: implement
 closure: review accept   # epic: each story has its own closure (review build + accept); a fresh agent checks the whole result after story D
 created: 2026-10-18
 ---
@@ -23,3 +23,4 @@ committee. An epic of four stories (see `idea.md`).
 | 2026-10-18 | implement | technical.md approved: an epic of four stories (A duty places, B who does each duty place and the totals — release 1 with A —, C the message for the next game, D the message for the referee committee), each with closure review build + accept; epic closure review accept; another team mid-season keeps the old duties (coordinator) |
 | 2026-10-25 | discover | back to discover (from the design of story A): the screens of all four stories change. First the landing page and season overview (backlog item 1); then this spec is changed for them: no "Duties" page as the place for everything, open items as reminders, "handled" for possible duty games, labels in the overview. |
 | 2026-10-25 | design | functional.md approved again (the rules stay, the screens change: the page of a game, the duty labels on "Season", duty open items for 4 weeks (drivers: this week and next), "Last" and "Next" with games with duties, "Messages" on the start page, a page "Duties" with the totals); spec review: A–C "serves – note", D "serves", notes S10–S17 answered (S10, S13, S14, S16 by the coordinator); technical.md must be changed for the new screens |
+| 2026-10-25 | implement | technical.md approved again for the new screens: the same tables and core rules, a row with 0 places means "handled", the places travel on the answers of "Season" and the start page, two new open items, the page of a game, a page "Duties" with the totals, "Messages" on the start page; four stories, each with closure review build + accept; epic closure review accept |
