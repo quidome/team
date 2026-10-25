@@ -109,3 +109,72 @@ Readings of the spec that the design makes exact (no change of behaviour):
 - "The labels that are on are always visible": the labels are toggles at the top of the list, in their on state.
 
 ## Review findings
+Accept review of the whole epic, 2026-10-25, by `/review accept` (fresh agent). No extra text was
+given in the arguments. Read: `functional.md` (with its spec review), `idea.md`, `change.md`, this
+spec (the **Deviations** only after forming a view), the three feature commits (`256e12c` A,
+`bf353bc` C, `42dc575` B) and the code they leave: core `start_page.rs`, `season_view.rs`,
+`training.rs`; server `api/start.rs`, `api/season.rs`, `readings.rs`, migration 0010; front end
+`/`, `/season`, `/attendance`, `/training/[date]`, `EventRow`, `SeasonEvents`, `Labels`,
+`season.ts`, `start.ts`. Runs: `cargo test -p team_core` (201 passed), `cargo test -p team --test
+start --test season --test trainings` (8, 10, 23 passed), `npx playwright test start season` (93
+passed, all projects ran), and the screenshots `web/test-results/look/landing-light.png` and
+`season-light.png` looked at.
+
+**Verdict: accepted with notes.** Every acceptance criterion of A, B and C is met in intent: the
+start page answers "must I do something, and what comes next?" in one screen; "Season" gives the
+rare look-up its own page with week and date headings and labels that combine; "Checked" closes the
+gap between "all there" and "not looked at". The notes below are small and none needs a correction
+before Close.
+
+A1. **"Next" shows cancelled trainings, whatever "Show cancelled" says** – neutral drift. The
+    landing screenshot shows "Tue 20 Oct · Training 19:45 · Cancelled" in "Next". The spec says
+    "each as on Season", and "Season" hides cancelled trainings when "Show cancelled" is off; "Next"
+    has no such switch and always shows them. Showing a cancelled training in the coming two weeks
+    is arguably useful (the coordinator sees the training is off), so this is drift, not a fault.
+    A side effect: a cancelled training in the two weeks counts as "an event", so the fallback
+    ("the first coming event after them") does not run, and the fallback itself can pick a cancelled
+    training. Checked by trace: `next_events` in `crates/core/src/start_page.rs` (the filter
+    `of_the_team` keeps every training row) and the screenshot.
+   - 2026-10-25: Fixed (coordinator: count only real events): in `next_events` a cancelled training in the two weeks still shows but does not count, and the fallback skips cancelled trainings. Core tests `a_cancelled_training_in_the_window_does_not_count` and `the_first_coming_event_is_not_a_cancelled_training` (both fail with the old rule); `docs/product/start-page.md` updated.
+A2. **"The labels that are on are always visible at the top of the list"** – faithful adaptation.
+    The labels are toggles above the list, not sticky; on a long season page (the screenshot is
+    7676 px high) they scroll out of view while the date headings stay. Since labels are no longer
+    kept between visits and the page opens with "Coming", the worry behind the criterion (spec
+    review note 2, a hidden filter) is answered. Design wrote this reading under **Deviations**.
+    Checked by trace: `Labels.svelte`, `SeasonEvents.svelte` (only the `h4` is `sticky`).
+   - 2026-10-25: No change needed.
+A3. **A return from a training to "Season" keeps the labels and the place** – faithful
+    adaptation. The spec says labels are not kept between visits; the build keeps them once, in
+    `sessionStorage`, only for "Back" from a training opened on "Season", so "turn on Trainings +
+    Past, correct a training, go back" does not throw the filter away. Every other visit starts
+    with "Coming". After "Change" to another date the return no longer matches (keyed on the date)
+    and the page starts with "Coming" – harmless. Checked by trace: `keepForReturn` / `takeReturn`
+    in `web/src/lib/season.ts`, `afterNavigate` in `routes/season/+page.svelte`.
+   - 2026-10-25: No change needed.
+A4. **"Back" from a training opened from "Attendance" returns to "Attendance"** – faithful to
+    the spec ("the page it came from"), but the **Deviations** line "every other way in returns to
+    'Season' of the training's season" is not true: the line of training days not opened on
+    "Attendance" links with `?from=attendance`, and `backOf` sends that back to `/attendance`. The
+    behaviour is right; the sentence in this spec is wrong (for Close to keep out of the living
+    docs). Checked by a search (`from=attendance`: `routes/attendance/+page.svelte:118`,
+    `routes/training/[date]/+page.svelte:239`).
+   - 2026-10-25: No change needed in the code or the living documents: `docs/product/trainings-and-attendance.md` already says that "Back" returns to "Attendance" from there; the wrong sentence is only in the history of story A.
+A5. **A new season without a team also shows "Last"** – faithful adaptation. Story B's edge case
+    names "Open items" and "Next"; the build renders all three parts under the choose step. "Last"
+    belongs with them (the last training of June in July). Checked by trace: `routes/+page.svelte`,
+    branch `team_needed`.
+   - 2026-10-25: No change needed.
+A6. **"Checked" as action and as state** (spec review note 6, left to Design) – faithful. Before
+    the tap a full-width primary button "Checked"; after it a card with a check icon, the word
+    "Checked" and an outline button "Undo check". The two read differently on a phone. Checked by
+    trace: `routes/training/[date]/+page.svelte`. The look on a real phone: not checked.
+   - 2026-10-25: No change needed.
+A7. **The release marks past trainings as checked once** – meets the intent. Migration 0010 sets
+    `checked_at` for `date <` the Dutch today; sqlx runs a migration once, so "runs twice" is
+    covered by the migration table, not by the statement (a manual second run would also check
+    trainings of the days between the runs). Checked by trace: `migrations/0010_trainings_checked.sql`.
+   - 2026-10-25: No change needed.
+A8. **Not checked**: the answer time of `/api/start` on a phone (the warning "must load fast"),
+    July and August and the clock change in a browser (the browser clock stays at 12 October 2026;
+    only core tests cover them), and "Checked" on two screens at once beyond the server race test.
+   - 2026-10-25: Not checked by the review; covered by the core and server tests as far as they go. After the release, a look on the phone (the speed of the start page, and the start page after a night with a reading).

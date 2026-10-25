@@ -6,7 +6,7 @@ use chrono::{Datelike, Days, NaiveDate};
 use crate::schedule::ScheduleReason;
 use crate::season::Season;
 use crate::season_view::{Event, EventKind, SeasonEvents};
-use crate::training::{SeasonList, SeasonRow, not_checked, not_opened};
+use crate::training::{DayStatus, SeasonList, SeasonRow, not_checked, not_opened};
 
 /// The state of the game list for the open items (Dutch dates).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -92,8 +92,9 @@ pub fn last_training<'a>(lists: &'a [SeasonList<'a>]) -> Option<&'a SeasonRow<'a
 }
 
 /// The games of the team and the training rows from `today` until the Sunday of next week (on a
-/// Sunday: today and the next week). When there are none, the first coming one of those kinds
-/// after it. Possible duty games are left out.
+/// Sunday: today and the next week). Cancelled trainings show but do not count: when the window
+/// has nothing else, the first coming event after it that is not cancelled follows them.
+/// Possible duty games are left out.
 pub fn next_events<'a>(events: &'a SeasonEvents<'a>, today: NaiveDate) -> Vec<&'a Event<'a>> {
     let days_left = 6 - u64::from(today.weekday().num_days_from_monday()) + 7;
     let until = today
@@ -103,17 +104,24 @@ pub fn next_events<'a>(events: &'a SeasonEvents<'a>, today: NaiveDate) -> Vec<&'
         EventKind::Game(scheduled) => scheduled.reason == ScheduleReason::TeamGame,
         EventKind::Training(_) => true,
     };
-    let within: Vec<&Event<'_>> = events
+    let cancelled = |event: &&Event<'_>| matches!(event.kind, EventKind::Training(row) if row.status == DayStatus::Cancelled);
+    let mut within: Vec<&Event<'_>> = events
         .coming
         .iter()
         .filter(of_the_team)
         .filter(|event| event.date <= until)
         .collect();
-    if within.is_empty() {
-        events.coming.iter().filter(of_the_team).take(1).collect()
-    } else {
-        within
+    if within.iter().all(cancelled) {
+        within.extend(
+            events
+                .coming
+                .iter()
+                .filter(of_the_team)
+                .filter(|event| event.date > until && !cancelled(event))
+                .take(1),
+        );
     }
+    within
 }
 
 #[cfg(test)]
@@ -123,7 +131,7 @@ mod tests {
     use super::*;
     use crate::schedule::ScheduledGame;
     use crate::schedule::tests::{CLUB_TEAM, OPPONENT, TEAM, game};
-    use crate::training::{DayStatus, Training, TrainingId};
+    use crate::training::{Training, TrainingId};
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
@@ -395,6 +403,39 @@ mod tests {
             scheduled(3, date(2026, 12, 19), ScheduleReason::TeamGame),
         ];
         let events = coming(&games, &[]);
+        assert_eq!(
+            dates(&next_events(&events, date(2026, 10, 26))),
+            [date(2026, 12, 12)]
+        );
+    }
+
+    /// A cancelled training on `on`.
+    fn cancelled_day(on: NaiveDate, training: &Training) -> SeasonRow<'_> {
+        let mut row = row(on, Some(training));
+        row.status = DayStatus::Cancelled;
+        row
+    }
+
+    #[test]
+    fn a_cancelled_training_in_the_window_does_not_count() {
+        let mut cancelled = training(1, date(2026, 10, 27));
+        cancelled.cancelled = true;
+        let games = [scheduled(1, date(2026, 12, 12), ScheduleReason::TeamGame)];
+        let rows = [cancelled_day(date(2026, 10, 27), &cancelled)];
+        let events = coming(&games, &rows);
+        assert_eq!(
+            dates(&next_events(&events, date(2026, 10, 26))),
+            [date(2026, 10, 27), date(2026, 12, 12)]
+        );
+    }
+
+    #[test]
+    fn the_first_coming_event_is_not_a_cancelled_training() {
+        let mut cancelled = training(1, date(2026, 12, 1));
+        cancelled.cancelled = true;
+        let games = [scheduled(1, date(2026, 12, 12), ScheduleReason::TeamGame)];
+        let rows = [cancelled_day(date(2026, 12, 1), &cancelled)];
+        let events = coming(&games, &rows);
         assert_eq!(
             dates(&next_events(&events, date(2026, 10, 26))),
             [date(2026, 12, 12)]
