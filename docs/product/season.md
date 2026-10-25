@@ -20,7 +20,7 @@ training or a game).
 - **"Cancel"** on a training day that is not opened cancels it without opening it. **"Show cancelled"** (on by default) hides cancelled trainings when off; each phone or computer keeps its own setting.
 - **"Add training"** (only in the current season) adds a training on a date of the season without a training: the times are filled in from a weekly training on that day of the week, or typed.
 - **Season choice**, when there is more than one season: the current season, and the earlier seasons with a chosen team, roles, weekly trainings or trainings. The season is in the address (`/season?season=2025-2026`), so a reload keeps it.
-- **The "Game list" card** is at the top of the current season when a team is chosen: "Read the game list", the result of the last reading, the held-back warning and "may be out of date" ([read the game list](read-the-game-list.md)). After a good reading, the list shows the new games at once.
+- **The "Game list" card** is at the top of the current season when a team is chosen (the open items of the game list on the start page link to it, `/season#game-list`): "Read the game list", the result of the last reading, the held-back warning and "may be out of date" ([read the game list](read-the-game-list.md)). After a good reading, the list shows the new games at once.
 
 ## Errors and limits
 - No team chosen in the current season: the trainings, and "Choose the team to see its games." with a link to the start page.

@@ -11,7 +11,7 @@ items, the last training and the events of this week and next week, in one reque
 the card of the next training, the "Game list" card and the view "Last season" leave it.
 
 ## Requirements summary
-Story B of the epic [Start page and season](../2026-10-25-start-page-and-season/) (`functional.md`
+Story B of the epic [Start page and season](../../2026-10-25-start-page-and-season/) (`functional.md`
 approved 2026-10-25, story B; epic `technical.md` approved 2026-10-25):
 
 - **With a club and team chosen**, from the top: the team header (team, season, "Change"); "Open items"; "Last"; "Next"; the links "Season · Attendance · Team · Players · Settings".
