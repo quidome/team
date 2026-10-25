@@ -54,3 +54,33 @@ For `/discover`:
 - The language of the messages (idea of 2026-10-10: messages from templates, in a language of the coordinator's choice; the screens stay in English).
 - Is "possible duty games" still the right phrase now that "duty place" exists (open question in the vision)?
 - What the message for the referee committee must contain exactly, and whether it is one message for a weekend or for each game.
+
+## Change of 2026-10-25: duty places given to club teams
+From the reviews of story A (`/vision idea: duty places given to club teams from the schedule of
+the referee committee`). This replaces the table and referee part of the idea above ("copies the
+team's part"); drivers stay as they are.
+
+- **The problem.** The referee committee gives the places to club teams, not to players. Today the
+  coordinator reads its schedule and works out "our team has 1 referee and 1 table place". That
+  step is extra work and can go wrong. A place with no team in the tool also cannot follow the
+  team when another team is chosen (review finding R1 of story A).
+- **The idea.** The coordinator copies the schedule of the referee committee as it is. Every home
+  game of the club, also a home game of the team, has the same 4 duty places: referee 1, referee 2,
+  table 1 and table 2. Each place gets a club team from a pull-down list, or stays empty. Up to 4
+  different teams at one game; the two table places usually go to one team. The tool does not name
+  the tasks at the table (the players arrange that themselves). No typing.
+- **Handled.** A home game is handled when the coordinator taps a button such as "This game is ok
+  now", also with empty places. Until then it is an open item.
+- **The team's places.** The places given to the team are the team's duty places. In story B the
+  coordinator puts a player of the team on each of them.
+- **Not now.** Reading the committee's sheet into the tool (it is an untidy sheet; entry by hand
+  with pull-down lists is better for now).
+- **Words.** "Jury" becomes "table"; "duty place" and "referee committee" have a new meaning
+  (`docs/language.md`, 2026-10-25).
+- The idea of 2026-09-27 in `ideas.md` ("Club duty allocation") is the same idea; its line is removed.
+
+For `/discover`: which club teams the pull-down list offers (the teams of the club in the game
+list of that season?); what a game shows when a place's team leaves the game list; whether "ok"
+must be tapped again after a change of the game or of a place; what the start page and "Season"
+show for home games where the team has no place; the message for the referee committee with all
+places, or only the team's.

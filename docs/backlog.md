@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement: functional and technical spec approved again for the new screens (2026-10-25), four stories. Next: story A [Duty places](changes/2026-10-18-duty-places/), technical spec approved (7 steps): `/implement docs/changes/2026-10-18-duty-places`. Then B (release 1 with A), C, D, and the epic review accept. Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
+1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage discover (2026-10-25): the duty places of each home game of the club (referee 1 and 2, table 1 and 2) are given to club teams, copied from the schedule of the referee committee (`idea.md`, change of 2026-10-25). Next: `/discover docs/changes/2026-10-18-duties`, then `/design` of the epic and of story A [Duty places](changes/2026-10-18-duty-places/) (stage design; its 7 steps are built on disk, not committed, and reviewed: R2, R3, R7, R8, A6 stay to fix). Then B (release 1 with A), C, D, and the epic review accept.
 
 Small:
 - Look at the start page of v0.4.0 on the phone: its speed, and the open items after a nightly reading (epic review A8 of start page and season; released 2026-10-25, migration 0010 checked the 8 trainings before that day).

@@ -1,7 +1,7 @@
 ---
 title: Duty places
 type: feature
-stage: implement
+stage: design
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-18
 ---
@@ -22,3 +22,4 @@ is the epic's (`functional.md`, story A and the shared rules); the architecture 
 | 2026-10-25 | design | stopped after Phase 1 (architecture): the coordinator wants the screens split by job (landing page, season overview, open items; `ideas.md` 2026-10-15, extended 2026-10-25). Back to Discover of the epic after the landing page. Phase 1 answers: drivers only when the home club is another club; every away game with drivers counts as having duty places; the duties of a club no longer chosen stay stored and out of view; the needs come from the choice of the game's own season; a row with all 0 places means "handled". |
 | 2026-10-25 | design | the epic design was approved again for the new screens (start page, "Season", decision 0022); it replaces the Phase 1 of 2026-10-18 above. Next: `/design` of this story again |
 | 2026-10-25 | implement | technical.md approved: one story of 7 steps (migration and core `duties`; store and routes of a game; the places on the answers; the page of a game; "Season"; the start page; the list of changes); closure review build + accept |
+| 2026-10-25 | design | all 7 steps built and both reviews run (R1–R9, A1–A7), not committed; then back to design: the epic goes back to discover because the duty places of a home game are given to club teams (`/vision` 2026-10-25). The new design reuses most of the code on disk; findings R2, R3, R7, R8 and A6 stay to fix. |

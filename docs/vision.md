@@ -2,14 +2,14 @@
 
 ## The user's problem space
 One coordinator runs one youth team in a club. Each week the same work comes back: which games
-are there, who is at training, who drives to away games, and which players cover the jury and
-referee places that the team must fill. The team talks in a WhatsApp group; the coordinator
+are there, who is at training, who drives to away games, and which players cover the table and
+referee places that the referee committee gives to the team. The team talks in a WhatsApp group; the coordinator
 keeps the record. Today the record is a Google Sheet, because the first version of this tool was
 not good enough. Keeping it up to date by hand, and writing the same kinds of messages again and
 again, costs time.
 
 Three groups read what the coordinator produces:
-- **The team and the parents**: when their child plays, when they must drive or do jury duty, and whether the work is shared equally.
+- **The team and the parents**: when their child plays, when they must drive or do table or referee duty, and whether the work is shared equally.
 - **The club's referee committee**: which of our players do which duty at the coming weekend's games.
 - **The coordinator**: what happened, and what must still be arranged.
 
@@ -64,10 +64,10 @@ These stay ideas until real use shows the need.
 
 ## User journeys
 0. **Open the tool.** A few times a week, the coordinator opens the tool on the phone and sees the next events and the open items: what still needs the coordinator. One tap completes the record of the last training. The whole season is one tap further, for any game or training.
-1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because our players do jury duty at those games when we play at home. When a game moves, the tool shows the change.
+1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because the club's home games have table and referee places that the club teams fill. When a game moves, the tool shows the change.
 2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows.
-3. **Set the duties of a game.** The coordinator sets how many duties a game needs. An away game needs drivers. A home game means jury or referee places at other club games.
-4. **The message for the next game.** Around training, the coordinator copies one message for the team about the next game: time, place, and who drives or does jury duty.
+3. **Set the duties of a game.** The coordinator copies the schedule of the referee committee: at each home game of the club, which club team has referee 1, referee 2, table 1 and table 2, with a pull-down list for each place, and then marks the game as ok. An away game of the team needs drivers.
+4. **The message for the next game.** Around training, the coordinator copies one message for the team about the next game: time, place, and who drives or does table or referee duty.
 5. **The message for the referee committee.** Before the weekend, the coordinator copies a message with each game, its start time, and which player (first and last name) does which duty.
 6. **The overview for the parents.** Now and then, the coordinator shares an overview of the coming games and duties, and how many duties each player has done.
 
@@ -91,7 +91,7 @@ The first design answered the questions about logging in, the backend language, 
 and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from the spec of
 `docs/changes/done/2026-10-10-games-from-game-list/`:
 - The word list calls the game list "the federation's list", but the source appears to be a private site built on the federation's data. Must the meaning change?
-- Is a word needed for the home games of other club teams, where players can get jury and referee duties (the spec says "possible duty games" in plain words)?
+- Is a word needed for the home games of other club teams, where players can get table and referee duties (the spec says "possible duty games" in plain words)?
 
 ## Change log
 | Date | Change |
@@ -124,3 +124,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-25 | Where we are: the start page with the open items is built (story B); all three stories of start page and season are built, the review of the whole and a release come next |
 | 2026-10-25 | Start page and season closed after its review of the whole (decision 0022); a release comes next, then duties again from Discover |
 | 2026-10-25 | Where we are: start page and season is released (v0.4.0) and runs on the cluster; migration 0010 checked the 8 trainings before that day |
+| 2026-10-25 | Duty places are given to club teams: the coordinator copies the schedule of the referee committee (4 places at each home game of the club: referee 1 and 2, table 1 and 2, each for a club team or empty), from the review of story A of duties; word "jury" becomes "table"; words duty place, referee committee changed |
