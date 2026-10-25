@@ -1,7 +1,7 @@
 ---
 title: The page "Season"
 type: feature
-stage: design
+stage: implement
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-25
 ---
@@ -20,3 +20,4 @@ functional spec is the epic's (`functional.md`, story A); the architecture is in
 | Date | Stage | Note |
 |------|-------|------|
 | 2026-10-25 | design | created from story A of the epic |
+| 2026-10-25 | implement | technical.md approved: a story of 5 steps (core order and `not_opened`; `GET /api/season`; the page read only; the actions and "Back"; "Attendance" without its list); closure review build + accept; `?from=start` moved here from story B |

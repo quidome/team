@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Start page and season](changes/2026-10-25-start-page-and-season/) – feature, epic, stage implement: three stories, technical spec approved. Story A [The page "Season"](changes/2026-10-25-season-page/) is next: `/design docs/changes/2026-10-25-season-page`. Then C (checked trainings), B (the start page), and the epic review accept.
+1. [Start page and season](changes/2026-10-25-start-page-and-season/) – feature, epic, stage implement: three stories, technical spec approved. Story A [The page "Season"](changes/2026-10-25-season-page/) is next: technical spec approved (5 steps), `/implement docs/changes/2026-10-25-season-page`. Then C (checked trainings), B (the start page), and the epic review accept.
 2. [Duties](changes/2026-10-18-duties/) – feature, epic, back to discover after item 1: the screens change (start page, "Season", open items). Story A [Duty places](changes/2026-10-18-duty-places/) stopped in design after Phase 1 (2026-10-25); its structure (table `game_duties`, core `duties`, routes) stays usable. A row with all 0 places now means "handled, no places".
 
 Small:
