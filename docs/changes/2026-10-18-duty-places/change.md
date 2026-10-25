@@ -19,3 +19,4 @@ is the epic's (`functional.md`, story A and the shared rules); the architecture 
 | Date | Stage | Note |
 |------|-------|------|
 | 2026-10-18 | design | created from story A of the epic |
+| 2026-10-25 | design | stopped after Phase 1 (architecture): the coordinator wants the screens split by job (landing page, season overview, open items; `ideas.md` 2026-10-15, extended 2026-10-25). Back to Discover of the epic after the landing page. Phase 1 answers: drivers only when the home club is another club; every away game with drivers counts as having duty places; the duties of a club no longer chosen stay stored and out of view; the needs come from the choice of the game's own season; a row with all 0 places means "handled". |
