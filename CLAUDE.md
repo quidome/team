@@ -21,6 +21,15 @@ The pinned Nix dev shell (Rust, sqlx-cli, Node for the front end, PostgreSQL cli
 
 Database tests use `#[sqlx::test]` and need `DATABASE_URL` pointing at a running PostgreSQL (`just db-up`); each test gets its own database.
 
+### Checks while working
+
+Waiting for checks is about a third of the time the user waits (measured over the sessions up to 2026-10-25). So:
+
+- While working, run only the tests of the part that changed: `cargo test -p team_core`, or `cargo test -p team --test <file>` for `crates/server/tests/<file>.rs`. Add `cargo clippy --workspace --all-targets -- -D warnings` when the change is done.
+- Browser tests: only the file of the changed page, `cd web && npx playwright test <name>` for `web/e2e/<name>.e2e.ts` (after `just check-web` when the front end changed).
+- Run `just check` once, before a commit, not after each step.
+- After a push, do not watch the CI run unless the user asks; GitHub reports a failed run.
+
 ## Architecture
 
 See `docs/architecture.md` and `docs/decisions/`. In short:
