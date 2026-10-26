@@ -15,8 +15,12 @@ export function watchConsole(page: Page): string[] {
 	return errors;
 }
 
-/** No serious or critical accessibility problems. */
+/** No serious or critical accessibility problems. Waits for running animations first: axe
+ * measures colour contrast halfway a fade (`transition-all` on the label buttons) otherwise. */
 export async function expectAccessible(page: Page) {
+	await page.evaluate(() =>
+		Promise.all(document.getAnimations().map((animation) => animation.finished))
+	);
 	const results = await new AxeBuilder({ page }).analyze();
 	const serious = results.violations.filter(
 		(violation) => violation.impact === 'serious' || violation.impact === 'critical'
