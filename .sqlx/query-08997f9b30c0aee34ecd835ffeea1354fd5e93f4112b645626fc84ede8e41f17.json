@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id, kind, number, planned_player, outcome, done_by\n         FROM duty_assignments\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3\n         ORDER BY kind, number",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "planned_player",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "outcome",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "done_by",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "08997f9b30c0aee34ecd835ffeea1354fd5e93f4112b645626fc84ede8e41f17"
+}

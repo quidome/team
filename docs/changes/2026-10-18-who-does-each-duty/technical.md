@@ -1,6 +1,6 @@
 # Technical spec: Who does each duty place, and the duty totals
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: [2026-10-18-who-does-each-duty](./)
 **Date**: 2026-10-27
@@ -165,9 +165,9 @@ then `cargo clippy --workspace --all-targets -- -D warnings`. `just check` once,
 - Player names come decrypted from `players.rs` (decision 0021) and never go into a log.
 
 ## Progress
-- [ ] Step 1 – the table and the rules of one place
-- [ ] Step 2 – totals, names and clashes in the core
-- [ ] Step 3 – store and routes
+- [x] Step 1 – the table and the rules of one place (2026-10-27: core 242 tests, 9 new; migration test of the keys; `tests/games.rs` 19 and `tests/season.rs` 8 pass; clippy clean)
+- [x] Step 2 – totals, names and clashes in the core (2026-10-27: core 251 tests, 9 new; clippy clean)
+- [x] Step 3 – store and routes (2026-10-27: `tests/games.rs` 28, 9 new; the race test fails without `FOR UPDATE`, checked by hand; all server tests pass; `just prepare`, `just api-types`; clippy and svelte-check clean)
 - [ ] Step 4 – the choice on the page of a game
 - [ ] Step 5 – the open item "games with open places"
 - [ ] Step 6 – the page "Duties"
@@ -181,5 +181,10 @@ None from `functional.md` (changed with the coordinator on 2026-10-27 for A1, th
 - "The totals ... in the current season" in the choice: the game's season (the same for a game of this season).
 - "Two players with the same first name": within the players with a role in that season plus the players on its places.
 - A player on a place without the role "plays games" on that date still counts.
+
+Found during the build:
+- 2026-10-27, step 1: a number of drivers is checked against the **highest** filled driver place, not the count (the design). The refusal `places_filled` carries `filled` (the count) and `highest`. When they differ (driver place 3 has a player, 1 and 2 are open), the page says "Driver place 3 has a player. Clear it first." instead of "1 place is filled. Clear one first.", which would be false. Otherwise the text of the spec. (coordinator)
+- 2026-10-27, step 3: the clash and the role of the player are read before the lock of the game, from the stored duties of the season. The lock covers this game only; a duty saved at the same moment at another game is not seen by the check. One coordinator, so accepted; the database keys still refuse two players on one place and one player twice at a game.
+- 2026-10-27, step 3: the names on the places come with each place (`player.name`), worked out once per season from the players with a role in it or on its places (`display_names`); the step-4 choice reuses them.
 
 ## Review findings

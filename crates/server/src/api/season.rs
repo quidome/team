@@ -9,11 +9,12 @@ use axum::extract::{Query, State};
 use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
-    Absence, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind, FollowedTeam,
-    Game, GamePlaces, PlaceKind, PlacesOf, PlayerRole, Schedule, ScheduleReason, ScheduledGame,
-    Season, SeasonList, StoredDuties, Team, TeamNumber, TeamRef, Training, WeeklyTraining,
-    game_places, kept_games, not_entered, open_places, players_playing_on, required_duties,
-    schedule, season_events, season_list,
+    Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
+    FollowedTeam, Game, GamePlaces, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole,
+    Schedule, ScheduleReason, ScheduledGame, Season, SeasonList, StoredDuties, Team, TeamNumber,
+    TeamRef, Training, WeeklyTraining, display_names, game_places, kept_games, not_entered,
+    open_places, players_playing_on, plays_games_on, required_duties, schedule, season_events,
+    season_list,
 };
 use utoipa::ToSchema;
 
@@ -118,6 +119,36 @@ pub struct PlaceView {
     pub number: u8,
     /// A player is on the place.
     pub filled: bool,
+    /// The player on the place, when filled.
+    pub player: Option<PlayerOnPlaceView>,
+}
+
+/// A player and the name shown ("Anna", or "Anna B." when two players share a first name).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PlayerNameView {
+    pub id: i64,
+    pub name: String,
+}
+
+/// The player on a duty place, with the outcome after the game.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PlayerOnPlaceView {
+    pub id: i64,
+    pub name: String,
+    /// The player has no role "plays games" on the date of the game ("Not in the team on this
+    /// date").
+    pub not_in_team: bool,
+    pub outcome: OutcomeView,
+    /// The player who did it instead ("Someone else"), with `outcome` `done_by`.
+    pub done_by: Option<PlayerNameView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OutcomeView {
+    AsPlanned,
+    DoneBy,
+    NotDone,
 }
 
 impl From<PlaceKind> for PlaceKindView {
@@ -148,28 +179,65 @@ impl From<&TeamRef> for TeamView {
     }
 }
 
-fn place_view(place: &DutyPlace) -> PlaceView {
-    PlaceView {
-        kind: place.kind.into(),
-        number: place.number,
-        filled: place.filled,
-    }
+/// What the views of the places of one game need besides its places: the players on them.
+struct PlacesOfGame<'a> {
+    duties: &'a SeasonDuties,
+    assignments: &'a [Assignment],
+    date: NaiveDate,
 }
 
-fn drivers_view(part: &DriverPart) -> DriverPartView {
-    DriverPartView {
-        places: part.places.iter().map(place_view).collect(),
-        proposal: part.proposal,
-        proposed: part.proposed,
-        more_than_proposed: part.more_than_proposed,
-        required: part.required,
-        counts: part.counts,
+impl PlacesOfGame<'_> {
+    fn name(&self, player: PlayerId) -> PlayerNameView {
+        PlayerNameView {
+            id: player.0,
+            name: self.duties.names.get(&player).cloned().unwrap_or_default(),
+        }
     }
-}
 
-impl From<&GamePlaces> for PlacesView {
-    fn from(places: &GamePlaces) -> Self {
-        Self {
+    fn place_view(&self, place: &DutyPlace) -> PlaceView {
+        let assignment = self
+            .assignments
+            .iter()
+            .find(|assignment| (assignment.kind, assignment.number) == (place.kind, place.number));
+        PlaceView {
+            kind: place.kind.into(),
+            number: place.number,
+            filled: place.filled,
+            player: assignment.map(|assignment| {
+                let PlayerNameView { id, name } = self.name(assignment.planned);
+                let (outcome, done_by) = match assignment.outcome {
+                    Outcome::AsPlanned => (OutcomeView::AsPlanned, None),
+                    Outcome::DoneBy(player) => (OutcomeView::DoneBy, Some(self.name(player))),
+                    Outcome::NotDone => (OutcomeView::NotDone, None),
+                };
+                PlayerOnPlaceView {
+                    id,
+                    name,
+                    not_in_team: !plays_games_on(&self.duties.roles, assignment.planned, self.date),
+                    outcome,
+                    done_by,
+                }
+            }),
+        }
+    }
+
+    fn drivers_view(&self, part: &DriverPart) -> DriverPartView {
+        DriverPartView {
+            places: part
+                .places
+                .iter()
+                .map(|place| self.place_view(place))
+                .collect(),
+            proposal: part.proposal,
+            proposed: part.proposed,
+            more_than_proposed: part.more_than_proposed,
+            required: part.required,
+            counts: part.counts,
+        }
+    }
+
+    fn view(&self, places: &GamePlaces) -> PlacesView {
+        PlacesView {
             schedule: places.schedule.as_ref().map(|part| SchedulePartView {
                 places: part
                     .places
@@ -181,11 +249,15 @@ impl From<&GamePlaces> for PlacesView {
                     })
                     .collect(),
                 entered: part.entered,
-                of_team: part.of_team.iter().map(place_view).collect(),
+                of_team: part
+                    .of_team
+                    .iter()
+                    .map(|place| self.place_view(place))
+                    .collect(),
                 required: part.required,
                 counts: part.counts,
             }),
-            drivers: places.drivers.as_ref().map(drivers_view),
+            drivers: places.drivers.as_ref().map(|part| self.drivers_view(part)),
             not_entered: not_entered(places),
             open_places: open_places(places),
         }
@@ -204,15 +276,41 @@ pub enum ScheduleReasonView {
 }
 
 /// What the duties of the games of a season are made from.
+#[derive(Default)]
 pub(crate) struct SeasonDuties {
     pub stored: BTreeMap<i64, StoredDuties>,
-    /// The roles of the season, for the driver proposal.
+    /// The roles of the season, for the driver proposal and the choice of a player.
     pub roles: Vec<PlayerRole>,
+    /// The players on the places, by source id.
+    pub assignments: BTreeMap<i64, Vec<Assignment>>,
+    /// The names shown of the players of the season (a role in it, or on one of its places;
+    /// `team_core::display_names`).
+    pub names: BTreeMap<PlayerId, String>,
 }
 
 impl SeasonDuties {
+    /// The players on the places of the game `source_id`.
+    pub fn assignments_of(&self, source_id: i64) -> &[Assignment] {
+        self.assignments.get(&source_id).map_or(&[], Vec::as_slice)
+    }
+
+    /// The games kept on "Season" for their duties.
+    pub fn kept(&self) -> BTreeSet<i64> {
+        kept_games(&self.stored, &self.assignments)
+    }
+
+    /// The view of `places`, the duties of `game`, with the players on them.
+    pub fn view(&self, game: &Game, places: &GamePlaces) -> PlacesView {
+        PlacesOfGame {
+            duties: self,
+            assignments: self.assignments_of(game.source_id),
+            date: game.date,
+        }
+        .view(places)
+    }
+
     /// The duties of `game` for `team` of `club` (decision 0022: the only rule is
-    /// `team_core::game_places`). No places are filled before story B.
+    /// `team_core::game_places`).
     pub fn places_of(
         &self,
         game: &Game,
@@ -225,7 +323,11 @@ impl SeasonDuties {
             required_duties(game, club, team),
             self.stored.get(&game.source_id),
             team,
-            &BTreeSet::new(),
+            &self
+                .assignments_of(game.source_id)
+                .iter()
+                .map(|assignment| (assignment.kind, assignment.number))
+                .collect(),
             players_playing_on(&self.roles, game.date),
             in_list,
             game.date < today,
@@ -233,16 +335,44 @@ impl SeasonDuties {
     }
 }
 
-/// The stored duties and the roles of `season` of `club`.
+/// The stored duties, the players on the places, the roles and the names of `season` of `club`.
 pub(crate) async fn duties_of(
     state: &AppState,
     club: ClubNumber,
     season: Season,
 ) -> Result<SeasonDuties, AppError> {
     let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
-    let stored = duties::for_season(&mut db, club, season).await?;
+    load_duties(state, &mut db, club, season).await
+}
+
+async fn load_duties(
+    state: &AppState,
+    db: &mut sqlx::PgConnection,
+    club: ClubNumber,
+    season: Season,
+) -> Result<SeasonDuties, AppError> {
+    let stored = duties::for_season(&mut *db, club, season).await?;
+    let assignments = duties::assignments_for_season(&mut *db, club, season).await?;
     let roles = players::roles_in(&mut *db, &[season]).await?;
-    Ok(SeasonDuties { stored, roles })
+    let mut of_season: BTreeSet<PlayerId> = roles.iter().map(|role| role.player).collect();
+    for assignment in assignments.values().flatten() {
+        of_season.insert(assignment.planned);
+        if let Outcome::DoneBy(player) = assignment.outcome {
+            of_season.insert(player);
+        }
+    }
+    let players: Vec<Player> = players::all(&mut *db, &state.config.player_name_key)
+        .await?
+        .into_iter()
+        .filter(|player| of_season.contains(&player.id))
+        .collect();
+    let names = display_names(&players);
+    Ok(SeasonDuties {
+        stored,
+        roles,
+        assignments,
+        names,
+    })
 }
 
 impl From<ScheduleReason> for ScheduleReasonView {
@@ -323,10 +453,16 @@ pub struct EventView {
 }
 
 /// The event with the duties of its game, if it has any.
-pub(crate) fn event_view_with(event: &Event, places: &PlacesOf) -> Result<EventView, StoreError> {
+pub(crate) fn event_view_with(
+    event: &Event,
+    places: &PlacesOf,
+    duties: &SeasonDuties,
+) -> Result<EventView, StoreError> {
     let mut view = event_view(event)?;
     if let (Some(game), EventKind::Game(scheduled)) = (view.game.as_mut(), event.kind) {
-        game.places = places.get(&scheduled.game.source_id).map(PlacesView::from);
+        game.places = places
+            .get(&scheduled.game.source_id)
+            .map(|places| duties.view(&scheduled.game, places));
     }
     Ok(view)
 }
@@ -374,6 +510,7 @@ pub async fn get(
         club,
         team,
         schedule,
+        duties,
         ..
     } = games;
     let trainings = trainings_of(&state, season).await?;
@@ -394,12 +531,12 @@ pub async fn get(
         coming: events
             .coming
             .iter()
-            .map(|event| event_view_with(event, &places))
+            .map(|event| event_view_with(event, &places, &duties))
             .collect::<Result<_, _>>()?,
         past: events
             .past
             .iter()
-            .map(|event| event_view_with(event, &places))
+            .map(|event| event_view_with(event, &places, &duties))
             .collect::<Result<_, _>>()?,
     }))
 }
@@ -467,10 +604,7 @@ pub(crate) async fn games_of(
             team: None,
             schedule: Schedule::default(),
             unseen_changes: 0,
-            duties: SeasonDuties {
-                stored: BTreeMap::new(),
-                roles: Vec::new(),
-            },
+            duties: SeasonDuties::default(),
         });
     };
     let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
@@ -483,17 +617,14 @@ pub(crate) async fn games_of(
     let open: BTreeSet<i64> = changes.iter().map(|change| change.id).collect();
     let unseen_changes = u32::try_from(changes.len())
         .map_err(|_| StoreError::Invalid(format!("{} changes", changes.len())))?;
-    let duties = SeasonDuties {
-        stored: duties::for_season(&mut db, club.number, season).await?,
-        roles: players::roles_in(&mut *db, &[season]).await?,
-    };
+    let duties = load_duties(state, &mut db, club.number, season).await?;
     let schedule = schedule(
         stored,
         club.number,
         team.number,
         today,
         &open,
-        &kept_games(&duties.stored),
+        &duties.kept(),
     );
     Ok(SeasonGames {
         state: GamesState::Shown,

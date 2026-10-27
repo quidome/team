@@ -100,6 +100,38 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}/assignments/{kind}/{number}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setAssignment'];
+		post?: never;
+		delete: operations['clearAssignment'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/assignments/{kind}/{number}/outcome': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setOutcome'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}/drivers': {
 		parameters: {
 			query?: never;
@@ -643,6 +675,11 @@ export interface components {
 			name: string;
 			valid: boolean;
 		};
+		/** @description The player to put on a place. */
+		AssignmentInput: {
+			/** Format: int64 */
+			player: number;
+		};
 		/** @description A player at a training. */
 		AtTrainingView: {
 			first_name: string;
@@ -1022,6 +1059,20 @@ export interface components {
 					/** @enum {string} */
 					kind: 'not_checked';
 			  };
+		/**
+		 * @description A correction after the game: as planned, done by `player` ("Someone else"), or not done
+		 *     ("Nobody").
+		 */
+		OutcomeInput: {
+			outcome: components['schemas']['OutcomeView'];
+			/**
+			 * Format: int64
+			 * @description With `done_by` only.
+			 */
+			player?: number | null;
+		};
+		/** @enum {string} */
+		OutcomeView: 'as_planned' | 'done_by' | 'not_done';
 		/** @description The team of a place; `null`: "—". */
 		PlaceInput: {
 			/** Format: int64 */
@@ -1036,6 +1087,7 @@ export interface components {
 			kind: components['schemas']['DutyKindView'];
 			/** Format: int32 */
 			number: number;
+			player?: null | components['schemas']['PlayerOnPlaceView'];
 		};
 		/** @description The duties of a game, in two parts that count on their own. */
 		PlacesView: {
@@ -1057,6 +1109,8 @@ export interface components {
 			first_name: string;
 			/** @description The player has absences, so "Delete player" is not offered. */
 			has_absences: boolean;
+			/** @description The player is on a duty place, or did one, so "Delete player" is not offered. */
+			has_duties: boolean;
 			hidden: boolean;
 			/** @description All roles of all seasons, newest first. */
 			history: components['schemas']['HistoryRole'][];
@@ -1083,6 +1137,25 @@ export interface components {
 			id: number;
 			last_name?: string | null;
 			role_today?: null | components['schemas']['RoleKind'];
+		};
+		/** @description A player and the name shown ("Anna", or "Anna B." when two players share a first name). */
+		PlayerNameView: {
+			/** Format: int64 */
+			id: number;
+			name: string;
+		};
+		/** @description The player on a duty place, with the outcome after the game. */
+		PlayerOnPlaceView: {
+			done_by?: null | components['schemas']['PlayerNameView'];
+			/** Format: int64 */
+			id: number;
+			name: string;
+			/**
+			 * @description The player has no role "plays games" on the date of the game ("Not in the team on this
+			 *     date").
+			 */
+			not_in_team: boolean;
+			outcome: components['schemas']['OutcomeView'];
 		};
 		/** @description A player that "Add player" offers. */
 		PlayerSummary: {
@@ -1724,6 +1797,164 @@ export interface operations {
 			};
 		};
 	};
+	setAssignment: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description `drive`, `table` or `referee` */
+				kind: string;
+				/** @description The place: 1 or 2, or the driver place 1 to 10 */
+				number: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AssignmentInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `invalid_place`, `unknown_player`, `not_a_place_of_the_team`, `player_at_game`, `not_in_team`, `clash` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	clearAssignment: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description `drive`, `table` or `referee` */
+				kind: string;
+				/** @description The place: 1 or 2, or the driver place 1 to 10 */
+				number: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The place is open; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `invalid_place` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setOutcome: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description `drive`, `table` or `referee` */
+				kind: string;
+				/** @description The place: 1 or 2, or the driver place 1 to 10 */
+				number: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['OutcomeInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	setDrivers: {
 		parameters: {
 			query?: never;
@@ -1751,7 +1982,7 @@ export interface operations {
 					'application/json': components['schemas']['GamePage'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled`) */
+			/** @description `invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled` and `highest`) */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -2197,7 +2428,7 @@ export interface operations {
 				};
 				content?: never;
 			};
-			/** @description `player_has_absences` */
+			/** @description `player_has_absences`, `player_has_duties` */
 			400: {
 				headers: {
 					[name: string]: unknown;

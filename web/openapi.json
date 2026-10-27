@@ -229,6 +229,225 @@
         }
       }
     },
+    "/api/games/{season}/{id}/assignments/{kind}/{number}": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setAssignment",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "description": "`drive`, `table` or `referee`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "description": "The place: 1 or 2, or the driver place 1 to 10",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `invalid_place`, `unknown_player`, `not_a_place_of_the_team`, `player_at_game`, `not_in_team`, `clash`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "clearAssignment",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "description": "`drive`, `table` or `referee`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "description": "The place: 1 or 2, or the driver place 1 to 10",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The place is open; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `invalid_place`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/assignments/{kind}/{number}/outcome": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setOutcome",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "description": "`drive`, `table` or `referee`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "description": "The place: 1 or 2, or the driver place 1 to 10",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutcomeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
     "/api/games/{season}/{id}/drivers": {
       "put": {
         "tags": [
@@ -277,7 +496,7 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled`)"
+            "description": "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled` and `highest`)"
           },
           "401": {
             "description": "Not logged in"
@@ -716,7 +935,7 @@
             "description": "Deleted, with its roles"
           },
           "400": {
-            "description": "`player_has_absences`"
+            "description": "`player_has_absences`, `player_has_duties`"
           },
           "401": {
             "description": "Not logged in"
@@ -2040,6 +2259,19 @@
           }
         }
       },
+      "AssignmentInput": {
+        "type": "object",
+        "description": "The player to put on a place.",
+        "required": [
+          "player"
+        ],
+        "properties": {
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AtTrainingView": {
         "type": "object",
         "description": "A player at a training.",
@@ -3148,6 +3380,34 @@
         ],
         "description": "One open item. Dates are Dutch dates, for example \"2026-10-22\"."
       },
+      "OutcomeInput": {
+        "type": "object",
+        "description": "A correction after the game: as planned, done by `player` (\"Someone else\"), or not done\n(\"Nobody\").",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/OutcomeView"
+          },
+          "player": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "With `done_by` only."
+          }
+        }
+      },
+      "OutcomeView": {
+        "type": "string",
+        "enum": [
+          "as_planned",
+          "done_by",
+          "not_done"
+        ]
+      },
       "PlaceInput": {
         "type": "object",
         "description": "The team of a place; `null`: \"—\".",
@@ -3188,6 +3448,17 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "player": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlayerOnPlaceView",
+                "description": "The player on the place, when filled."
+              }
+            ]
           }
         }
       },
@@ -3266,7 +3537,8 @@
           "season_last_day",
           "history",
           "now_there",
-          "has_absences"
+          "has_absences",
+          "has_duties"
         ],
         "properties": {
           "first_name": {
@@ -3275,6 +3547,10 @@
           "has_absences": {
             "type": "boolean",
             "description": "The player has absences, so \"Delete player\" is not offered."
+          },
+          "has_duties": {
+            "type": "boolean",
+            "description": "The player is on a duty place, or did one, so \"Delete player\" is not offered."
           },
           "hidden": {
             "type": "boolean"
@@ -3352,6 +3628,60 @@
                 "description": "The role today; `null` when the player is not in the team today."
               }
             ]
+          }
+        }
+      },
+      "PlayerNameView": {
+        "type": "object",
+        "description": "A player and the name shown (\"Anna\", or \"Anna B.\" when two players share a first name).",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PlayerOnPlaceView": {
+        "type": "object",
+        "description": "The player on a duty place, with the outcome after the game.",
+        "required": [
+          "id",
+          "name",
+          "not_in_team",
+          "outcome"
+        ],
+        "properties": {
+          "done_by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlayerNameView",
+                "description": "The player who did it instead (\"Someone else\"), with `outcome` `done_by`."
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "not_in_team": {
+            "type": "boolean",
+            "description": "The player has no role \"plays games\" on the date of the game (\"Not in the team on this\ndate\")."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/OutcomeView"
           }
         }
       },

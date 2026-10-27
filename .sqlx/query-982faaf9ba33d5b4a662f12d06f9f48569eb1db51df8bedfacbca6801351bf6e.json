@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE duty_assignments SET outcome = $6, done_by = $7\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3\n           AND kind = $4 AND number = $5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Text",
+        "Int2",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "982faaf9ba33d5b4a662f12d06f9f48569eb1db51df8bedfacbca6801351bf6e"
+}

@@ -1,11 +1,15 @@
-//! The duties of games (tables `game_duties` and `duty_teams`; story A of duties). Every write
-//! takes the row lock of its game first (`lock`): two screens wait for each other.
+//! The duties of games (tables `game_duties` and `duty_teams`, story A of duties; and
+//! `duty_assignments`, the players on the places, story B). Every write takes the row lock of its
+//! game first (`lock`): two screens wait for each other.
 
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use sqlx::PgConnection;
-use team_core::{ClubNumber, PlaceKind, Season, StoredDuties, TeamNumber, TeamRef};
+use sqlx::{PgConnection, PgExecutor};
+use team_core::{
+    Assignment, ClubNumber, DutyKind, Outcome, PlaceKind, PlayerId, Season, StoredDuties,
+    TeamNumber, TeamRef,
+};
 
 use crate::db::StoreError;
 
@@ -29,6 +33,23 @@ fn kind_of(text: &str) -> Result<PlaceKind, StoreError> {
         "referee" => Ok(PlaceKind::Referee),
         "table" => Ok(PlaceKind::Table),
         other => Err(StoreError::Invalid(format!("duty place kind {other}"))),
+    }
+}
+
+fn duty_kind_text(kind: DutyKind) -> &'static str {
+    match kind {
+        DutyKind::Drive => "drive",
+        DutyKind::Table => "table",
+        DutyKind::Referee => "referee",
+    }
+}
+
+fn duty_kind_of(text: &str) -> Result<DutyKind, StoreError> {
+    match text {
+        "drive" => Ok(DutyKind::Drive),
+        "table" => Ok(DutyKind::Table),
+        "referee" => Ok(DutyKind::Referee),
+        other => Err(StoreError::Invalid(format!("duty kind {other}"))),
     }
 }
 
@@ -67,6 +88,179 @@ fn place_of(row: TeamRow) -> Result<((PlaceKind, u8), TeamRef), StoreError> {
             name: row.team_name,
         },
     ))
+}
+
+struct AssignmentRow {
+    source_id: i64,
+    kind: String,
+    number: i16,
+    planned_player: i64,
+    outcome: String,
+    done_by: Option<i64>,
+}
+
+fn assignment_of(row: AssignmentRow) -> Result<(i64, Assignment), StoreError> {
+    let outcome = match (row.outcome.as_str(), row.done_by) {
+        ("as_planned", None) => Outcome::AsPlanned,
+        ("done_by", Some(player)) => Outcome::DoneBy(PlayerId(player)),
+        ("not_done", None) => Outcome::NotDone,
+        (other, _) => return Err(StoreError::Invalid(format!("duty outcome {other}"))),
+    };
+    Ok((
+        row.source_id,
+        Assignment {
+            kind: duty_kind_of(&row.kind)?,
+            number: small(row.number)?,
+            planned: PlayerId(row.planned_player),
+            outcome,
+        },
+    ))
+}
+
+/// The players on the places of the games of `club` in `season`, by source id, in the order of
+/// kind and number.
+pub async fn assignments_for_season(
+    db: &mut PgConnection,
+    club: ClubNumber,
+    season: Season,
+) -> Result<BTreeMap<i64, Vec<Assignment>>, StoreError> {
+    let rows = sqlx::query_as!(
+        AssignmentRow,
+        "SELECT source_id, kind, number, planned_player, outcome, done_by
+         FROM duty_assignments WHERE club_number = $1 AND season_year = $2
+         ORDER BY source_id, kind, number",
+        club.0,
+        season.start_year(),
+    )
+    .fetch_all(&mut *db)
+    .await?;
+    let mut assignments: BTreeMap<i64, Vec<Assignment>> = BTreeMap::new();
+    for row in rows {
+        let (source_id, assignment) = assignment_of(row)?;
+        assignments.entry(source_id).or_default().push(assignment);
+    }
+    Ok(assignments)
+}
+
+/// The players on the places of one game; the game must be locked.
+pub async fn assignments_of_game(
+    tx: &mut PgConnection,
+    key: GameKey,
+) -> Result<Vec<Assignment>, StoreError> {
+    let rows = sqlx::query_as!(
+        AssignmentRow,
+        "SELECT source_id, kind, number, planned_player, outcome, done_by
+         FROM duty_assignments
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3
+         ORDER BY kind, number",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    rows.into_iter()
+        .map(|row| assignment_of(row).map(|(_, assignment)| assignment))
+        .collect()
+}
+
+/// Puts `player` on a place of the game, as planned (a correction is reset); the game must be
+/// locked.
+pub async fn set_assignment(
+    tx: &mut PgConnection,
+    key: GameKey,
+    kind: DutyKind,
+    number: u8,
+    player: PlayerId,
+    now: DateTime<Utc>,
+) -> Result<(), StoreError> {
+    sqlx::query!(
+        "INSERT INTO duty_assignments
+             (club_number, season_year, source_id, kind, number, planned_player)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (club_number, season_year, source_id, kind, number)
+         DO UPDATE SET planned_player = EXCLUDED.planned_player, outcome = 'as_planned',
+                       done_by = NULL",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        duty_kind_text(kind),
+        i16::from(number),
+        player.0,
+    )
+    .execute(&mut *tx)
+    .await?;
+    touch(tx, key, now).await
+}
+
+/// Makes a place of the game open again; the game must be locked.
+pub async fn clear_assignment(
+    tx: &mut PgConnection,
+    key: GameKey,
+    kind: DutyKind,
+    number: u8,
+    now: DateTime<Utc>,
+) -> Result<(), StoreError> {
+    sqlx::query!(
+        "DELETE FROM duty_assignments
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3
+           AND kind = $4 AND number = $5",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        duty_kind_text(kind),
+        i16::from(number),
+    )
+    .execute(&mut *tx)
+    .await?;
+    touch(tx, key, now).await
+}
+
+/// The outcome of a filled place after the game; the game must be locked.
+pub async fn set_outcome(
+    tx: &mut PgConnection,
+    key: GameKey,
+    kind: DutyKind,
+    number: u8,
+    outcome: Outcome,
+    now: DateTime<Utc>,
+) -> Result<(), StoreError> {
+    let (text, done_by) = match outcome {
+        Outcome::AsPlanned => ("as_planned", None),
+        Outcome::DoneBy(player) => ("done_by", Some(player.0)),
+        Outcome::NotDone => ("not_done", None),
+    };
+    sqlx::query!(
+        "UPDATE duty_assignments SET outcome = $6, done_by = $7
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3
+           AND kind = $4 AND number = $5",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        duty_kind_text(kind),
+        i16::from(number),
+        text,
+        done_by,
+    )
+    .execute(&mut *tx)
+    .await?;
+    touch(tx, key, now).await
+}
+
+/// Whether `player` is on a place, or did one, in any season ("Delete player" is then refused).
+pub async fn player_has_duties(
+    db: impl PgExecutor<'_>,
+    player: PlayerId,
+) -> Result<bool, StoreError> {
+    let found = sqlx::query_scalar!(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM duty_assignments WHERE planned_player = $1 OR done_by = $1
+           ) AS "found!""#,
+        player.0
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(found)
 }
 
 /// The stored duties of the games of `club` in `season`, by source id.

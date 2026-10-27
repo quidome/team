@@ -238,8 +238,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ChangesAnswer>, A
         if let Some(game) = stored.iter().find(|game| game.game.source_id == change.id) {
             change.places = duties
                 .places_of(&game.game, game.in_list, club, team, today)
-                .as_ref()
-                .map(PlacesView::from);
+                .map(|places| duties.view(&game.game, &places));
         }
     }
     Ok(Json(ChangesAnswer {
