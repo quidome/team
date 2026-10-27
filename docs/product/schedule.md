@@ -5,9 +5,9 @@ What it does **now**, for the coordinator. Updated at each /close that changes i
 ## Purpose
 The coordinator sees the games that matter, from the game list, and stops keeping the schedule in
 the sheet: all games of the team, and the home games of other club teams, where players of the
-team can have jury and referee duties ("possible duty games"). The games show on
-[Season](season.md), together with the trainings; the games of the team of the next two weeks also
-show in "Next" on the [start page](start-page.md).
+team can have table and referee duties ("possible duty games"). The games show on
+[Season](season.md), together with the trainings, each with its [duty places](duties.md); the
+games of the team of the next two weeks also show in "Next" on the [start page](start-page.md).
 
 ## Behaviour
 - **Which games.** All games of the team, home and away, and the home games of other club teams. Away games of other club teams are kept, but not shown. The games of a season are those of the team chosen for that season; without a chosen team there are no games.
@@ -16,6 +16,8 @@ show in "Next" on the [start page](start-page.md).
 - Each game shows the start time, the home team, the away team, and the hall and town. A game of the team has a coloured edge and the badge "Team".
 - A start time of 00:00 in the game list shows "time not known yet". No results are shown.
 - A game that is no longer in the game list is shown crossed out, with "no longer in the game list", while its change is in the [list of changes](list-of-changes.md). After "seen", or when its date has passed, it is hidden. A gone game with no change (for example gone in the first reading after a choice) is hidden at once. In an earlier season gone games are hidden.
+- A game with a place that names a team, or with drivers set above 0, stays shown also when it is gone or no longer in the schedule (for example home and away swapped), with what changed ([duties](duties.md)). It shows with the possible duty games.
+- A tap on a game opens its page, with its duty places.
 - After a good reading on the "Game list" card ("Season"), the new games show at once.
 - Choosing a team reads the game list at once.
 - An earlier season's games are on "Season" through its season choice. A renamed hall shows its newest name, also for earlier seasons.
@@ -26,5 +28,5 @@ show in "Next" on the [start page](start-page.md).
 
 ## Interface
 - Screens: [Season](season.md) (`/season`) and "Next" on the [start page](start-page.md) (`/`).
-- Server addresses (need a login): `GET /api/season` (the games with the trainings of a season) and `GET /api/start` ("Next"). Each game has its reason ("team" or "duty") and whether it is still in the game list.
-- The rule for which games show is `team_core::schedule`.
+- Server addresses (need a login): `GET /api/season` (the games with the trainings of a season) and `GET /api/start` ("Next"). Each game has its reason ("team", "duty", or "kept" for a game kept for its duties), whether it is still in the game list, and its places.
+- The rule for which games show is `team_core::schedule`, with the games of `team_core::kept_games`.

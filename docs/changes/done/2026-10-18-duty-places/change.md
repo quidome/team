@@ -1,14 +1,14 @@
 ---
 title: Duty places
 type: feature
-stage: close
+stage: done
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-18
 ---
 
 # Duty places
 
-Story A of the epic [Duties](../2026-10-18-duties/). The coordinator records the duty places of
+Story A of the epic [Duties](../../2026-10-18-duties/). The coordinator records the duty places of
 the team at each game: referee and jury places at home games of other club teams, and drivers at
 away games of the team (proposed as one per 3 players). A page for each game, the page "Duties",
 the mark "duties" in the schedule, and "has duties" in the list of changes. The functional spec
@@ -25,3 +25,4 @@ is the epic's (`functional.md`, story A and the shared rules); the architecture 
 | 2026-10-25 | design | all 7 steps built and both reviews run (R1–R9, A1–A7), not committed; then back to design: the epic goes back to discover because the duty places of a home game are given to club teams (`/vision` 2026-10-25). The new design reuses most of the code on disk; findings R2, R3, R7, R8 and A6 stay to fix. |
 | 2026-10-26 | implement | technical.md approved again for places given to club teams: two tables (`game_duties` with "Schedule entered" and drivers, `duty_teams` one row per place that names a team), two parts per game that count on their own, one route per place, games with places kept on "Season" (D5); the first build copied from `origin/duty-places-v1` and reworked; 7 steps; closure review build + accept |
 | 2026-10-27 | implement | 7 steps built on the branch `duty-places` (commit `e6147aa`); review build (R1–R5) and accept (accepted with notes, A1–A6): R1 accepted, R2 no defect (D3), R3, R4 and A1 for story B, R5 and A3 for `/close`; technical.md done |
+| 2026-10-27 | close | product doc `duties.md` new; schedule, Season, start page, list of changes, architecture (duty places, the row lock pattern, two debts), `CLAUDE.md`, vision and ideas updated; decisions D1–D3, D5 go into one record at the close of story B; folder moved to `changes/done/` |

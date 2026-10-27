@@ -2,7 +2,7 @@
 
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
-1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement (2026-10-25): the duties belong to the game; the 4 places of each home game of the club (referee 1 and 2, table 1 and 2) are given to club teams, copied from the schedule of the referee committee. Now: story A [Duty places](changes/2026-10-18-duty-places/), stage close (built and reviewed 2026-10-27 on the branch `duty-places`; for story B: keep a past game whose filled driver places are on a proposed number (R3), a race test that fails without the row lock (R4), and the coordinator decides whether a past swapped game counts its places (A1)). Then B (release 1 with A), C, D, and the epic review accept.
+1. [Duties](changes/2026-10-18-duties/) – feature, epic, stage implement (2026-10-25): the duties belong to the game; the 4 places of each home game of the club (referee 1 and 2, table 1 and 2) are given to club teams, copied from the schedule of the referee committee. Story A [Duty places](changes/done/2026-10-18-duty-places/) is closed (2026-10-27). Now: story B (players on the places, the totals; with R3, R4 and A1 of story A's reviews: keep a past game whose filled driver places are on a proposed number, a race test that fails without the row lock, and the coordinator decides whether a past swapped game counts its places). Then release 1 (A and B), C, D, and the epic review accept.
 
 Small:
 - Look at the start page of v0.4.0 on the phone: its speed, and the open items after a nightly reading (epic review A8 of start page and season; released 2026-10-25, migration 0010 checked the 8 trainings before that day).
