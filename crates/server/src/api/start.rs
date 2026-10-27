@@ -171,7 +171,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .transpose()?;
     let next = next_events(&events, &places, today)
         .into_iter()
-        .map(|event| event_view_with(event, &places))
+        .map(|event| event_view_with(event, &places, &games.duties))
         .collect::<Result<_, _>>()?;
 
     // The last games with places: the current season; in July and August, when it has none
@@ -179,7 +179,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     let mut last_games_season = None;
     let mut last_game_views: Vec<EventView> = last_games(&events, &places)
         .into_iter()
-        .map(|event| event_view_with(event, &places))
+        .map(|event| event_view_with(event, &places, &games.duties))
         .collect::<Result<_, _>>()?;
     if last_game_views.is_empty() {
         for (&season, trainings) in seasons.iter().zip(&inputs).skip(1) {
@@ -189,7 +189,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             let earlier_events = season_events(&earlier.schedule, &list);
             last_game_views = last_games(&earlier_events, &earlier_places)
                 .into_iter()
-                .map(|event| event_view_with(event, &earlier_places))
+                .map(|event| event_view_with(event, &earlier_places, &earlier.duties))
                 .collect::<Result<_, _>>()?;
             if !last_game_views.is_empty() {
                 last_games_season = Some(season);

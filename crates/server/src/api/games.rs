@@ -1,7 +1,8 @@
-//! `/api/games/{season}/{id}`: the page of a game and its duties (story A of duties). A game is a
-//! game of the club chosen for its season, with a team, that is in the schedule or kept for its
-//! duties; also when it left the game list. Every write: lock the game, read, the core check,
-//! write, in one transaction; each answers the page.
+//! `/api/games/{season}/{id}`: the page of a game and its duties (story A of duties: the places
+//! and drivers; story B: the players on them). A game is a game of the club chosen for its season,
+//! with a team, that is in the schedule or kept for its duties; also when it left the game list.
+//! Every write: lock the game, read, the core check, write, in one transaction; each answers the
+//! page.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -9,20 +10,22 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Club, DutyError, Game, PlaceKind, RequiredDuties, ScheduleReason, ScheduledGame, Season,
-    StoredDuties, Team, TeamNumber, check_drivers, check_entered, check_team, club_teams,
-    in_schedule, kept_games, pick_team, required_duties,
+    Assignment, ClashLevel, Club, DutyError, DutyKind, Game, GameDuties, GamePlaces, Outcome,
+    PlaceKind, PlayerId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties,
+    StoredGame, Team, TeamNumber, check_assignment, check_drivers, check_entered, check_outcome,
+    check_team, clashes, club_teams, game_places, in_schedule, kept_games, pick_team,
+    players_playing_on, plays_games_on, required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
-use super::season::{PlacesView, ScheduleGame, duties_of};
+use super::season::{OutcomeView, ScheduleGame, SeasonDuties, duties_of};
 use crate::api::clubs::TeamView;
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::duties::{self, GameKey};
 use crate::error::AppError;
-use crate::{followed_teams, games};
+use crate::{followed_teams, games, players};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct GamePage {
@@ -43,6 +46,21 @@ pub struct PlaceInput {
     pub team: Option<i64>,
 }
 
+/// The player to put on a place.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AssignmentInput {
+    pub player: i64,
+}
+
+/// A correction after the game: as planned, done by `player` ("Someone else"), or not done
+/// ("Nobody").
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct OutcomeInput {
+    pub outcome: OutcomeView,
+    /// With `done_by` only.
+    pub player: Option<i64>,
+}
+
 /// The number of drivers; `null`: the proposal.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct DriversInput {
@@ -57,10 +75,16 @@ impl From<DutyError> for AppError {
             DutyError::OutOfRange => Self::BadRequest("out_of_range"),
             DutyError::UnknownTeam => Self::BadRequest("unknown_team"),
             DutyError::PlayerOnPlace => Self::BadRequest("player_on_place"),
-            DutyError::BelowFilled { filled } => Self::Refused {
+            DutyError::NotAPlaceOfTheTeam => Self::BadRequest("not_a_place_of_the_team"),
+            DutyError::PlayerAtGame => Self::BadRequest("player_at_game"),
+            DutyError::NotInTeam => Self::BadRequest("not_in_team"),
+            DutyError::Clash => Self::BadRequest("clash"),
+            DutyError::NotPast => Self::BadRequest("not_past"),
+            DutyError::NoPlayerOnPlace => Self::BadRequest("no_player_on_place"),
+            DutyError::BelowFilled { filled, highest } => Self::Refused {
                 status: StatusCode::BAD_REQUEST,
                 code: "places_filled",
-                details: json!({ "filled": filled }),
+                details: json!({ "filled": filled, "highest": highest }),
             },
         }
     }
@@ -76,6 +100,8 @@ struct Found {
     reason: ScheduleReason,
     /// The pull-down list of the places.
     club_teams: Vec<team_core::TeamRef>,
+    /// All stored games of the season, for the clashes.
+    stored: Vec<StoredGame>,
 }
 
 impl Found {
@@ -89,6 +115,100 @@ impl Found {
 
     fn required(&self) -> RequiredDuties {
         required_duties(&self.game, self.club.number, self.team.number)
+    }
+
+    /// The game is before `today`.
+    fn past(&self, today: chrono::NaiveDate) -> bool {
+        self.game.date < today
+    }
+
+    /// The places of the game from what is locked: `stored` and the players `at_game`.
+    fn places(
+        &self,
+        stored: &StoredDuties,
+        at_game: &[Assignment],
+        duties: &SeasonDuties,
+        today: chrono::NaiveDate,
+    ) -> Option<GamePlaces> {
+        game_places(
+            self.required(),
+            Some(stored),
+            self.team.number,
+            &at_game
+                .iter()
+                .map(|assignment| (assignment.kind, assignment.number))
+                .collect(),
+            players_playing_on(&duties.roles, self.game.date),
+            self.in_list,
+            self.past(today),
+        )
+    }
+
+    /// The closest clash of `player` for a place at this game (`team_core::clashes`): the places
+    /// of the player at other games of the season, and the other games of the team in the list.
+    fn clash(
+        &self,
+        duties: &SeasonDuties,
+        player: PlayerId,
+        today: chrono::NaiveDate,
+    ) -> Option<ClashLevel> {
+        let places: Vec<(&Game, GamePlaces)> = self
+            .stored
+            .iter()
+            .filter_map(|stored| {
+                let places = duties.places_of(
+                    &stored.game,
+                    stored.in_list,
+                    self.club.number,
+                    self.team.number,
+                    today,
+                )?;
+                Some((&stored.game, places))
+            })
+            .collect();
+        let season: Vec<GameDuties<'_>> = places
+            .iter()
+            .map(|(game, places)| GameDuties {
+                game,
+                places,
+                assignments: duties.assignments_of(game.source_id),
+                past: game.date < today,
+            })
+            .collect();
+        let team_games: Vec<&Game> = self
+            .stored
+            .iter()
+            .filter(|stored| {
+                stored.in_list
+                    && (stored.game.home.team == self.team.number
+                        || stored.game.away.team == self.team.number)
+            })
+            .map(|stored| &stored.game)
+            .collect();
+        worst_clash(&clashes(player, &self.game, &season, &team_games))
+    }
+}
+
+/// The players a write locked with its game.
+struct Locked {
+    stored: StoredDuties,
+    at_game: Vec<Assignment>,
+}
+
+impl Locked {
+    /// The places with a player of `kind`.
+    fn filled(&self, kind: DutyKind) -> std::collections::BTreeSet<(DutyKind, u8)> {
+        self.at_game
+            .iter()
+            .filter(|assignment| assignment.kind == kind)
+            .map(|assignment| (assignment.kind, assignment.number))
+            .collect()
+    }
+
+    fn on(&self, kind: DutyKind, number: u8) -> Option<&Assignment> {
+        self.at_game
+            .iter()
+            .find(|assignment| (assignment.kind, assignment.number) == (kind, number))
     }
 }
 
@@ -112,15 +232,17 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
     let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
     let stored = games::stored(&mut db, club.number, season).await?;
     let duties = duties::for_season(&mut db, club.number, season).await?;
+    let assignments = duties::assignments_for_season(&mut db, club.number, season).await?;
     let all: Vec<Game> = stored.iter().map(|stored| stored.game.clone()).collect();
     let club_teams = club_teams(&club, &all, &duties);
     let found = stored
-        .into_iter()
+        .iter()
         .find(|stored| stored.game.source_id == id)
+        .cloned()
         .ok_or(AppError::NotFound)?;
     let reason = in_schedule(&found.game, club.number, Some(team.number))
         .or_else(|| {
-            kept_games(&duties)
+            kept_games(&duties, &assignments)
                 .contains(&id)
                 .then_some(ScheduleReason::Kept)
         })
@@ -133,6 +255,7 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
         in_list: found.in_list,
         reason,
         club_teams,
+        stored,
     })
 }
 
@@ -147,12 +270,15 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         found.team.number,
         today,
     );
+    let view = places
+        .as_ref()
+        .map(|places| duties.view(&found.game, places));
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
         reason: found.reason,
         in_list: found.in_list,
     });
-    game.places = places.as_ref().map(PlacesView::from);
+    game.places = view;
     Ok(GamePage {
         season: found.season.to_string(),
         current_season: current_season(state.clock.as_ref()).to_string(),
@@ -166,12 +292,13 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
 /// a refused or failed write rolls back.
 async fn write<F>(state: &AppState, found: &Found, change: F) -> Result<(), AppError>
 where
-    F: AsyncFnOnce(&mut sqlx::PgConnection, &StoredDuties) -> Result<(), AppError>,
+    F: AsyncFnOnce(&mut sqlx::PgConnection, &Locked) -> Result<(), AppError>,
 {
     let now = state.clock.now();
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     let stored = duties::lock(&mut tx, found.key(), now).await?;
-    change(&mut tx, &stored).await?;
+    let at_game = duties::assignments_of_game(&mut tx, found.key()).await?;
+    change(&mut tx, &Locked { stored, at_game }).await?;
     tx.commit().await.map_err(StoreError::from)?;
     tracing::info!(season = %found.season, game = found.game.source_id, "duties saved");
     Ok(())
@@ -245,13 +372,12 @@ pub async fn set_place(
         .transpose()?;
     let required = found.required();
     let now = state.clock.now();
-    write(&state, &found, async |tx, stored| {
-        // No player is on a place before story B.
+    write(&state, &found, async |tx, locked| {
         check_team(
             required,
-            stored.teams.get(&(kind, number)),
+            locked.stored.teams.get(&(kind, number)),
             team.as_ref(),
-            false,
+            locked.on(kind.into(), number).is_some(),
         )?;
         duties::set_team(tx, found.key(), kind, number, team.as_ref(), now).await?;
         Ok(())
@@ -332,7 +458,7 @@ pub async fn unset_entered(
     request_body = DriversInput,
     responses(
         (status = 200, description = "Saved; the game with its duties", body = GamePage),
-        (status = 400, description = "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled`)"),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled` and `highest`)"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
     )
@@ -345,10 +471,156 @@ pub async fn set_drivers(
     let found = find(&state, &season, &id).await?;
     let required = found.required();
     let now = state.clock.now();
-    write(&state, &found, async |tx, _| {
-        // No driver place is filled before story B.
-        check_drivers(required, input.drivers, 0)?;
+    write(&state, &found, async |tx, locked| {
+        check_drivers(required, input.drivers, &locked.filled(DutyKind::Drive))?;
         duties::set_drivers(tx, found.key(), input.drivers, now).await?;
+        Ok(())
+    })
+    .await?;
+    Ok(Json(page(&state, found).await?))
+}
+
+/// The place of an assignment path: `drive`, `table` or `referee`, and its number (1 to 10).
+fn duty_place(kind: &str, number: &str) -> Result<(DutyKind, u8), AppError> {
+    let kind = match kind {
+        "drive" => DutyKind::Drive,
+        "table" => DutyKind::Table,
+        "referee" => DutyKind::Referee,
+        _ => return Err(AppError::BadRequest("invalid_place")),
+    };
+    match number.parse::<u8>() {
+        Ok(number @ 1..=10) => Ok((kind, number)),
+        _ => Err(AppError::BadRequest("invalid_place")),
+    }
+}
+
+/// The player `id`, when it exists.
+async fn player(state: &AppState, id: i64) -> Result<PlayerId, AppError> {
+    players::by_id(&state.pool, &state.config.player_name_key, PlayerId(id))
+        .await?
+        .map(|player| player.id)
+        .ok_or(AppError::BadRequest("unknown_player"))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/assignments/{kind}/{number}",
+    operation_id = "setAssignment",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+        ("kind" = String, Path, description = "`drive`, `table` or `referee`"),
+        ("number" = String, Path, description = "The place: 1 or 2, or the driver place 1 to 10"),
+    ),
+    request_body = AssignmentInput,
+    responses(
+        (status = 200, description = "Saved; the game with its duties", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `invalid_place`, `unknown_player`, `not_a_place_of_the_team`, `player_at_game`, `not_in_team`, `clash`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_assignment(
+    State(state): State<AppState>,
+    Path((season, id, kind, number)): Path<(String, String, String, String)>,
+    Json(input): Json<AssignmentInput>,
+) -> Result<Json<GamePage>, AppError> {
+    let (kind, number) = duty_place(&kind, &number)?;
+    let found = find(&state, &season, &id).await?;
+    let player = player(&state, input.player).await?;
+    let today = today_in_netherlands(state.clock.as_ref());
+    let duties = duties_of(&state, found.club.number, found.season).await?;
+    let plays = plays_games_on(&duties.roles, player, found.game.date);
+    let clash = found.clash(&duties, player, today);
+    let now = state.clock.now();
+    write(&state, &found, async |tx, locked| {
+        let places = found
+            .places(&locked.stored, &locked.at_game, &duties, today)
+            .ok_or(DutyError::NotAPlaceOfTheTeam)?;
+        check_assignment(&places, kind, number, player, &locked.at_game, plays, clash)?;
+        duties::set_assignment(tx, found.key(), kind, number, player, now).await?;
+        Ok(())
+    })
+    .await?;
+    Ok(Json(page(&state, found).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/games/{season}/{id}/assignments/{kind}/{number}",
+    operation_id = "clearAssignment",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+        ("kind" = String, Path, description = "`drive`, `table` or `referee`"),
+        ("number" = String, Path, description = "The place: 1 or 2, or the driver place 1 to 10"),
+    ),
+    responses(
+        (status = 200, description = "The place is open; the game with its duties", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `invalid_place`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn clear_assignment(
+    State(state): State<AppState>,
+    Path((season, id, kind, number)): Path<(String, String, String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    let (kind, number) = duty_place(&kind, &number)?;
+    let found = find(&state, &season, &id).await?;
+    let now = state.clock.now();
+    write(&state, &found, async |tx, _| {
+        duties::clear_assignment(tx, found.key(), kind, number, now).await?;
+        Ok(())
+    })
+    .await?;
+    Ok(Json(page(&state, found).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/assignments/{kind}/{number}/outcome",
+    operation_id = "setOutcome",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+        ("kind" = String, Path, description = "`drive`, `table` or `referee`"),
+        ("number" = String, Path, description = "The place: 1 or 2, or the driver place 1 to 10"),
+    ),
+    request_body = OutcomeInput,
+    responses(
+        (status = 200, description = "Saved; the game with its duties", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_outcome(
+    State(state): State<AppState>,
+    Path((season, id, kind, number)): Path<(String, String, String, String)>,
+    Json(input): Json<OutcomeInput>,
+) -> Result<Json<GamePage>, AppError> {
+    let (kind, number) = duty_place(&kind, &number)?;
+    let found = find(&state, &season, &id).await?;
+    let new = match (input.outcome, input.player) {
+        (OutcomeView::AsPlanned, None) => Outcome::AsPlanned,
+        (OutcomeView::NotDone, None) => Outcome::NotDone,
+        (OutcomeView::DoneBy, Some(id)) => Outcome::DoneBy(player(&state, id).await?),
+        _ => return Err(AppError::BadRequest("invalid_outcome")),
+    };
+    let today = today_in_netherlands(state.clock.as_ref());
+    let plays = match new {
+        Outcome::DoneBy(player) => {
+            let duties = duties_of(&state, found.club.number, found.season).await?;
+            plays_games_on(&duties.roles, player, found.game.date)
+        }
+        Outcome::AsPlanned | Outcome::NotDone => true,
+    };
+    let past = found.past(today);
+    let now = state.clock.now();
+    write(&state, &found, async |tx, locked| {
+        let outcome = check_outcome(past, locked.on(kind, number), new, &locked.at_game, plays)?;
+        duties::set_outcome(tx, found.key(), kind, number, outcome, now).await?;
         Ok(())
     })
     .await?;

@@ -120,6 +120,14 @@ pub fn app(state: AppState) -> Router {
             put(games::set_entered).delete(games::unset_entered),
         )
         .route("/games/{season}/{id}/drivers", put(games::set_drivers))
+        .route(
+            "/games/{season}/{id}/assignments/{kind}/{number}",
+            put(games::set_assignment).delete(games::clear_assignment),
+        )
+        .route(
+            "/games/{season}/{id}/assignments/{kind}/{number}/outcome",
+            put(games::set_outcome),
+        )
         .route("/start", get(start::get))
         .route("/changes", get(changes::get))
         .route("/changes/seen", post(changes::seen))
