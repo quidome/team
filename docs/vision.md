@@ -40,6 +40,7 @@ It is not:
 - A nightly encrypted copy of the team database is kept on the home storage (since 18 October 2026, built in `gitops-lab`); a copy outside the house comes later.
 - The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
 - The start page and the page "Season" run on the cluster (v0.4.0, released 25 October 2026): the start page shows the open items (problems with the game list, changes not seen, training days not opened, trainings not checked), the last training and the events of this week and next week; "Season" shows all games and trainings of a season per week, with labels that combine; the coordinator confirms with "Checked" that the attendance of a training is complete. Duties come next, again from Discover.
+- The first part of duties is built and reviewed, not yet released (story A, duty places, 27 October 2026): each game has its own page; the coordinator copies the referee committee's schedule into the tool (the 4 table and referee places of each home game of the club, each given to a club team, and "Schedule entered") and sets the drivers of the team's away games (proposed as one per 3 players); "Season" shows the places with the labels "Entered", "Not entered" and "Open places", and the start page has the open item "schedule not entered". Players on the places and the totals come next (story B).
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -125,3 +126,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-25 | Start page and season closed after its review of the whole (decision 0022); a release comes next, then duties again from Discover |
 | 2026-10-25 | Where we are: start page and season is released (v0.4.0) and runs on the cluster; migration 0010 checked the 8 trainings before that day |
 | 2026-10-25 | Duty places are given to club teams: the coordinator copies the schedule of the referee committee (4 places at each home game of the club: referee 1 and 2, table 1 and 2, each for a club team or empty), from the review of story A of duties; word "jury" becomes "table"; words duty place, referee committee changed |
+| 2026-10-27 | Where we are: duty places are built and reviewed (story A of duties); players on the places and the totals come next (story B) |

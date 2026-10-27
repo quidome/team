@@ -1,6 +1,7 @@
 //! `GET /api/start`: the start page (story B of start page and season): the open items, the last
-//! training, and the events of this week and next week, in one answer. Each open item comes from
-//! the function of its source: the "Game list" card, the list of changes, "Attendance".
+//! training and the last games with places of the team, and the events of this week and next
+//! week, in one answer. Each open item comes from the function of its source: the "Game list"
+//! card, the list of changes, the page of a game, "Attendance".
 
 use std::collections::BTreeMap;
 
