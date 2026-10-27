@@ -1,6 +1,6 @@
 # Technical spec: Duty places
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: [2026-10-18-duty-places](./)
 **Date**: 2026-10-26 (replaces the version approved 2026-10-25, which was built once on the branch `duty-places-v1` before the duty places were given to club teams)
@@ -245,3 +245,139 @@ Found while building (2026-10-26):
 - Step 2: as planned, the race test of the row lock (`a_save_waits_for_a_save_of_the_same_game_on_another_screen`) cannot fail without the lock in story A (as R6); story B adds the one that does.
 
 ## Review findings
+Build review, 2026-10-27 (fresh agent; input: the diff `main..duty-places` at `e6147aa`, clean tree;
+this change folder, the epic's `functional.md` for intent, `docs/architecture.md`, the valid decision
+records, `CLAUDE.md`). No other text came with the arguments.
+
+Overall: the rules sit in the core (`duties`, `schedule`, `start_page`), the server only moves data,
+each write is one transaction under the row lock of the game, logs carry season and game id only, no
+`unwrap`/`expect` outside tests. No finding blocks the close of story A.
+
+- **R1 – Two rules live in the front end** (low). `dutiesOf` in `web/src/lib/changes.ts` decides when
+  a change "has duties" (`of_team` not empty or a part no longer required; drivers likewise), and
+  `hasPage` guesses whether the page of the game exists (`kind !== 'out_of_schedule' || places`),
+  which mirrors `find` in `api/games.rs` (`in_schedule` or `kept_games`). By trace the two agree
+  today (a game outside `in_schedule` has `places` only when it is kept), but they are copies of
+  server rules, the kind the step 2 deviation avoided by putting `not_entered` and `open_places` on
+  `PlacesView` ("New rules go in `crates/core` first", decision 0022). Suggestion: `has_duties` and
+  `has_page` on `ChangeView` from the core, or accept and record. ("Entered" in `season.ts` is a
+  plain read of two fields; no finding.) Checked: reading and a trace of `in_schedule`,
+  `required_duties`, `game_places` and `kept_games`.
+  - 2026-10-27: Not fixed, accepted by the coordinator: the two checks stay in `web/src/lib/changes.ts`; they agree with the server today (trace of the review). A later change that moves them to the core puts them on `ChangeView`.
+- **R2 – The pull-down list of an answer is from before the write** (low). `set_place`,
+  `set_entered` and `set_drivers` answer `page(&state, found)`, and `found.club_teams` was made in
+  `find` before the write. A team that only a place still names (it left the game list) stays in the
+  list after that place is set to "—"; choosing it on another place from the same screen gives
+  `unknown_team`, after which the page reloads without it. Fix: build `club_teams` in `page` from the
+  duties it already reads. Checked: trace of `find`, `write` and `page`; not run.
+  - 2026-10-27: Not fixed, no defect: games are never deleted (a game that leaves the game list stays stored with `in_list` false), and the pull-down list is `own_teams` over all stored games of the season (D3), so a team stays in the list for the whole season, named by a place or not. Checked: a fix that built the list again in `page`, with a server test that sets the place of a leaving team to "—"; the team was still offered, with and without the fix. Fix and test reverted (coordinator).
+- **R3 – A past gone game keeps only named places and set drivers, not the proposal** (note for story
+  B). `kept_games` keeps a game whose place names a team or whose drivers are set above 0. A past
+  away game of the team that left the game list, with the drivers still proposed, is dropped by
+  `schedule` once its change is seen, so it leaves "Season", "Open places" and "Last", although
+  "a past game counts, also when gone" (epic, Edge cases) and `game_places` would count it. In story
+  A no place has a player, so nothing is lost yet; in story B a filled driver place on a proposed
+  number must also keep the game (or `kept_games` must keep every past game with a counting part).
+  Checked: trace of `schedule`, `kept_games`, `game_places`; not run. The same rule decides the
+  earlier season in the "Last" fallback of `api/start.rs`.
+  - 2026-10-27: Not fixed, for story B: in story A no place has a player. Story B keeps a past game whose filled driver places are on a proposed number (or every past game with a counting part); in `docs/backlog.md`.
+- **R4 – Claims about checks** (verified, one known gap). Run on 2026-10-27: `cargo test -p team
+  --test games` 19 passed; `cargo test -p team_core` 233 passed; `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `npm run build` then `npx playwright test` 109 passed;
+  `just api-types` gives no diff on the committed files, so the `api-types-check` deviation of step 7
+  is settled by the commit. Search `jury|handled|not_handled|NotHandled` in `crates`, `web/src`,
+  `web/e2e`, `migrations`: no hits. By trace, `a_place_waits_for_an_insert_of_the_same_place_on_another_screen`
+  fails without `ON CONFLICT` (the `PUT` waits on the uncommitted `game_duties` key in `lock`, then
+  its plain insert of `duty_teams` hits the primary key: 500, as the progress says), and
+  `a_failed_save_writes_nothing` fails without the transaction (the `game_duties` row of `lock` would
+  stay). `a_save_waits_for_a_save_of_the_same_game_on_another_screen` cannot fail without the lock,
+  as written; the architecture asks that each such test can fail, so story B must add its test
+  (a check that reads filled places).
+  - 2026-10-27: Not fixed, for story B: its first check that reads filled places gets the race test that fails without the row lock; in `docs/backlog.md`.
+- **R5 – Text the diff made false or left incomplete** (for `/close`). The module doc of
+  `crates/server/src/api/start.rs` lists the sources of the open items without the page of a game.
+  `CLAUDE.md` (Architecture) names neither the core `duties` nor the server `duties.rs` and
+  `api/games.rs`. `docs/architecture.md`: the core row (`schedule` "gone games only while their
+  change shows", `open_items` order, `next_events` "team games"), the server row (`games.rs` "places"
+  is the source's places, no `duties.rs` or `api/games` route), migrations up to `0010`, the start
+  page ("About 10 queries"), "Season" (the return kept "for that one date"; now also a game).
+  `docs/product/schedule.md` still says "jury". Checked: search (`duties` in `CLAUDE.md`: 0 hits;
+  `jury` in `docs/product`: 1 hit) and reading.
+  - 2026-10-27: Not fixed here, for `/close`: the module doc of `api/start.rs`, `CLAUDE.md`, `docs/architecture.md` and `docs/product/schedule.md`.
+
+Accept review, 2026-10-27 (fresh agent; input: the mode `accept` and this change folder, nothing
+else in the arguments). Read: the epic's `idea.md` and `functional.md` (story A, the facts, the
+edge cases, the interface), `change.md` of both, the objective and requirements of this file, and
+the result: the diff `main..duty-places` at `e6147aa` and the program. Run: `npm run build`, then
+`npx playwright test` (109 passed); then the server on the browser-test database (clock 12 October
+2026, logged in as Developer, port 4110) at phone width: the start page, the open item and its
+list, the page of a home game of the team and of an away game, a choice of two places, "Season"
+with the rows and the labels. The view below was formed before reading **Deviations**.
+
+**Verdict: accepted with notes.** Story A does what was meant: the coordinator can walk "Season"
+with "Not entered" + "Coming", copy the committee's schedule with four pull-down lists that save
+at once, tap "Schedule entered", and come back with the labels kept; the drivers are proposed and
+can be set; the rows, the open item, "Next", "Last" and the list of changes show the places of
+the team. One rule reading (A1) must be settled before story B counts totals.
+
+- **A1 – A past game that is no longer a home game of the club counts its places** (concerning
+  deviation, not blocking story A; settle before story B). The spec says of a swapped game "its
+  places do not count and it is no open item", and of a game no longer needing drivers "the same
+  way"; it lets past duties count only for a game that left the game list and for drivers of an
+  old team after another team was chosen. `game_places` uses one rule for both parts, `counts =
+  past || (in_list && required)`, so once its date passes a swapped game counts again: the team's
+  table or referee places of a home game that was played at another club, and drivers set for an
+  away game that became a home game. In story A it shows in "Last" (`has_team_places`) with the
+  warning "This game is no longer a home game of the club."; in story B those places would count
+  as **done** in the totals, which is the thing the totals must not do ("the totals and open
+  items must never count a duty of a game that is gone or no longer needs duties", warnings of the
+  spec). The core cannot tell a swap from another team chosen, which the spec treats differently
+  for drivers. Not listed under **Deviations** ("None from `functional.md`"). Ask the coordinator
+  which wins for a past swapped game, then fix the rule or record the reading. Checked: trace of
+  `game_places`, `has_team_places`, `last_games`; the core tests
+  `drivers_no_longer_needed_stay_until_cleared_and_do_not_count` (past: counts) and
+  `a_swapped_game_keeps_its_places_and_its_drivers_count` (coming only); no test of a past swap.
+  - 2026-10-27: Not fixed, the coordinator decides in the design of story B, which adds the totals: in story A no totals count the places (the game only shows under "Last" with its warning). In `docs/backlog.md`.
+- **A2 – The readings under Deviations** (faithful adaptation). The window of 27 days after today;
+  a game of the team in the club's own hall gets the 4 places and no drivers (the answer of Phase
+  1, "drivers only when the home club is another club"); the proposal capped at 10; a kept game
+  under "Possible duty games"; "Last" newest first with a heading per date and without a training;
+  "This game cannot be found."; "Proposal: N" shown while a number is set; "Schedule entered"
+  shown only while needed or on; the warnings not repeated next to the badge on a row. Each keeps
+  the intent of the criterion it touches. Checked: reading against story A and the facts; the
+  start page and the two game pages seen at 390 px.
+  - 2026-10-27: No action.
+- **A3 – D4: a drivers number equal to the proposal stays "proposed"** (neutral drift). The spec
+  says a set number "stays, without 'proposed'". With D4, typing the number the screen proposes
+  keeps following the team, so a coordinator who means "4, fixed" gets 4 that may later move.
+  "Proposal: N" and the label "(proposed)" make it visible, and it was decided on purpose (A4 of
+  the first build). Acceptable; worth a line in the product doc at `/close`. Checked: reading of
+  `driversInput` and step 4 of the progress (its test fails when the number is sent).
+  - 2026-10-27: Not fixed, as decided (D4); `/close` adds a line to the product doc.
+- **A4 – Past home games say "Schedule not entered" for ever on "Season"** (neutral drift,
+  accepted in S19). `not_entered` holds for past games (`counts` is true for a past game), so the
+  catch-up of this season's past places leaves every past home game of the club with "Schedule not
+  entered" on its row and under the label "Not entered" (without "Coming"). The open item stays
+  free of past games, as the spec asks. Seen on the server: the past rows; checked by trace of
+  `not_entered` and `schedule_not_entered`.
+  - 2026-10-27: No action (accepted in S19).
+- **A5 – The one button "Schedule entered" in both states** (neutral drift, small). The page shows
+  the state as text ("Schedule not entered" / "Schedule entered") next to a button that is always
+  named "Schedule entered": filled before the tap, outlined (`aria-pressed`) after. This is what the
+  spec wrote; on a phone, "undo" is not obvious from the button. A note for real use, no change
+  needed now. Checked: seen on the page of a home game; reading of the page.
+  - 2026-10-27: No action; a note for real use.
+- **A6 – Things the spec left open, as built** (faithful adaptation). The team's own home games
+  are in the open item and the walk (S20, accepted); the pull-down lists hold the club teams of the
+  season's stored games plus the teams places still name (D3), sorted as text ("M16 1", "M16 2",
+  …, "X14 1" on the server: fine for this club); a moved coming game with only places of other
+  teams does not say "has duties" (the line is about the team's places); a coming gone game with
+  only "Schedule entered" or proposed drivers leaves "Season" once its change is seen (nothing of
+  the team is lost in story A; for story B see R3). Checked: the server answer of
+  `/api/games/2026-2027/1073152`, reading of `dutiesOf` and `kept_games`.
+  - 2026-10-27: No action.
+
+Not checked: July and August ("Last" from the season before), another team chosen, a real swap or
+gone game (the browser clock and the fake source cannot make them; covered by server tests, read
+only). The places this review chose on the browser-test database are reset by the next browser test
+run.
