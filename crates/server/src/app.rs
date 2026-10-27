@@ -18,8 +18,8 @@ use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 use crate::api::{
-    attendance, changes, clubs, health, me, players, readings, reasons, season, selection, start,
-    team, trainings, weekly_trainings,
+    attendance, changes, clubs, games, health, me, players, readings, reasons, season, selection,
+    start, team, trainings, weekly_trainings,
 };
 use crate::auth;
 use crate::auth::oidc::Oidc;
@@ -110,6 +110,16 @@ pub fn app(state: AppState) -> Router {
         .route("/readings/latest", get(readings::latest))
         .route("/readings/{id}/confirm-gone", post(readings::confirm_gone))
         .route("/season", get(season::get))
+        .route("/games/{season}/{id}", get(games::get))
+        .route(
+            "/games/{season}/{id}/places/{kind}/{number}",
+            put(games::set_place),
+        )
+        .route(
+            "/games/{season}/{id}/schedule-entered",
+            put(games::set_entered).delete(games::unset_entered),
+        )
+        .route("/games/{season}/{id}/drivers", put(games::set_drivers))
         .route("/start", get(start::get))
         .route("/changes", get(changes::get))
         .route("/changes/seen", post(changes::seen))

@@ -41,12 +41,15 @@ test('the coordinator finds the club and chooses the team', async ({ page }) => 
 	await expectAccessible(page);
 	await teams.filter({ hasText: 'M16 1' }).click();
 
-	// Choosing the team starts the first reading. The start page: nothing open yet (a first
-	// reading records no changes, and there are no trainings), and in "Next" the first game of the
-	// team, because the two weeks from Mon 12 Oct have none.
+	// Choosing the team starts the first reading. The start page: only the home games of the next
+	// 4 weeks are open (schedule not entered yet; a first reading records no changes, and there are
+	// no trainings), and in "Next" the first game of the team, because the two weeks from Mon 12 Oct
+	// have none.
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
 	await expect(page.getByRole('link', { name: 'Change' })).toBeVisible();
-	await expect(page.getByTestId('nothing-open')).toHaveText('Nothing open.');
+	await expect(page.getByTestId('open-item')).toHaveText([
+		/^\d+ home games: schedule not entered$/
+	]);
 	const next = page.getByTestId('next');
 	await expect(next.getByTestId('day')).toHaveText(['Sat 31 Oct']);
 	await expect(next.locator('[data-testid="game"][data-of-team="true"]')).toHaveCount(1);
@@ -227,7 +230,7 @@ test.describe('the games on "Season"', () => {
 test.describe('the open items of changes', () => {
 	test('without changes not seen, there is no open item for them', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByTestId('nothing-open')).toHaveText('Nothing open.');
+		await expect(page.locator('[data-kind="schedule_not_entered"]')).toBeVisible();
 		await expect(page.locator('[data-kind="changes"]')).toHaveCount(0);
 	});
 

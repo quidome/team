@@ -4,7 +4,8 @@ import type { EventView } from '#lib/api/client.js';
 
 export type What = 'team' | 'duty' | 'training';
 export type When = 'coming' | 'past';
-export type Labels = { what: What[]; when: When[] };
+export type Duties = 'entered' | 'not_entered' | 'open_places';
+export type Labels = { what: What[]; when: When[]; duties: Duties[] };
 
 export const whatLabels: { value: What; label: string }[] = [
 	{ value: 'team', label: 'Games of the team' },
@@ -17,46 +18,71 @@ export const whenLabels: { value: When; label: string }[] = [
 	{ value: 'past', label: 'Past' }
 ];
 
-/** The labels at each visit: "Coming" on, no label of "What". */
-export const startLabels = (): Labels => ({ what: [], when: ['coming'] });
+export const dutyLabels: { value: Duties; label: string }[] = [
+	{ value: 'entered', label: 'Entered' },
+	{ value: 'not_entered', label: 'Not entered' },
+	{ value: 'open_places', label: 'Open places' }
+];
 
-/** What "Season" keeps while a training opened from it is shown: a return from that training
- * (with "Back", the browser's back, or after "Delete training") shows the same labels and place. */
-type Return = { season: string; date: string; labels: Labels; scrollY: number };
+/** The labels at each visit: "Coming" on, no label of "What" or "Duties". */
+export const startLabels = (): Labels => ({ what: [], when: ['coming'], duties: [] });
+
+/** What "Season" keeps while a training or a game opened from it is shown: a return from it (with
+ * "Back", the browser's back, or after "Delete training") shows the same labels and place. */
+type Return = { season: string; key: string; labels: Labels; scrollY: number };
 const returnKey = 'team.season.return';
 
-/** Keeps the labels and the place of the page before it opens the training of `date`. */
-export function keepForReturn(season: string, date: string, labels: Labels, scrollY: number) {
+/** The key of what a row opens: the date of a training, `game:<id>` for a game. */
+export const trainingKey = (date: string) => date;
+export const gameKey = (id: number | string) => `game:${id}`;
+
+/** Keeps the labels and the place of the page before it opens the training or game of `key`. */
+export function keepForReturn(season: string, key: string, labels: Labels, scrollY: number) {
 	try {
-		sessionStorage.setItem(returnKey, JSON.stringify({ season, date, labels, scrollY }));
+		sessionStorage.setItem(returnKey, JSON.stringify({ season, key, labels, scrollY }));
 	} catch {
 		// No storage: the return starts with "Coming".
 	}
 }
 
-/** What was kept for a return from the training of `date` in `season`, once; else `null`. */
-export function takeReturn(season: string, date: string | undefined): Return | null {
+/** What was kept for a return from the training or game of `key` in `season`, once; else
+ * `null`. */
+export function takeReturn(season: string, key: string | undefined): Return | null {
 	try {
 		const text = sessionStorage.getItem(returnKey);
 		sessionStorage.removeItem(returnKey);
 		const kept = text ? (JSON.parse(text) as Return) : null;
-		return kept && kept.season === season && kept.date === date ? kept : null;
+		return kept && kept.season === season && kept.key === key && kept.labels.duties ? kept : null;
 	} catch {
 		return null;
 	}
 }
 
-/** What an event is, for the labels of "What". */
+/** What an event is, for the labels of "What". A game kept for its duties shows with the
+ * possible duty games. */
 export function whatOf(event: EventView): What {
-	return event.game ? event.game.reason : 'training';
+	if (!event.game) return 'training';
+	return event.game.reason === 'kept' ? 'duty' : event.game.reason;
 }
 
-/** The events that show: their "What" is on (or no "What" is on), and a cancelled training only
- * while "Show cancelled" is on. */
+/** Whether a game has the label `duty` of "Duties". "Entered" and "Not entered" are only for
+ * games that need the schedule of the committee; "Not entered" is the rule of the open item. */
+function hasDuty(event: EventView, duty: Duties): boolean {
+	const places = event.game?.places;
+	if (!places) return false;
+	if (duty === 'entered') return !!places.schedule?.required && places.schedule.entered;
+	if (duty === 'not_entered') return places.not_entered;
+	return places.open_places > 0;
+}
+
+/** The events that show: their "What" is on (or no "What" is on), a label of "Duties" that is on
+ * (or none is on: with one on, trainings and other games do not show), and a cancelled training
+ * only while "Show cancelled" is on. */
 export function visible(events: EventView[], labels: Labels, showCancelled: boolean): EventView[] {
 	return events.filter(
 		(event) =>
 			(labels.what.length === 0 || labels.what.includes(whatOf(event))) &&
+			(labels.duties.length === 0 || labels.duties.some((duty) => hasDuty(event, duty))) &&
 			(showCancelled || event.training?.status !== 'cancelled')
 	);
 }
@@ -81,8 +107,11 @@ function noun(what: What[]): string {
 	return 'events';
 }
 
-/** "No coming trainings.", "No past possible duty games.", "No coming events." */
+/** "No coming trainings.", "No past possible duty games.", "No coming events.", "No coming games
+ * with these labels." */
 export function emptyLine(labels: Labels, part: When): string {
+	// With a label of "Duties" on, only games show.
+	if (labels.duties.length > 0) return `No ${part} games with these labels.`;
 	return `No ${part} ${noun(labels.what)}.`;
 }
 

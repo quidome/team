@@ -287,7 +287,7 @@ async fn with_nothing_chosen_there_are_no_changes(pool: PgPool) {
     let response = harness.get("/api/changes", Some(&cookie)).await;
     assert_eq!(response.status(), 200);
     let body: Value = serde_json::from_str(&common::body_text(response).await).unwrap();
-    assert_eq!(body, json!({ "changes": [] }));
+    assert_eq!(body, json!({ "changes": [], "season": null }));
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]

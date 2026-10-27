@@ -4,6 +4,7 @@ pub mod access;
 pub mod attendance;
 pub mod club;
 pub mod comparison;
+pub mod duties;
 pub mod game;
 pub mod guard;
 pub mod nightly;
@@ -27,6 +28,12 @@ pub use comparison::{
     StoredGame, change_between, compare, count, list_changes, no_longer_in_list, same_number_pairs,
     update_open_changes,
 };
+pub use duties::{
+    DriverPart, DutyError, DutyKind, DutyPlace, GamePlaces, PlaceKind, RequiredDuties,
+    SCHEDULE_PLACES, SchedulePart, SchedulePlace, StoredDuties, TeamRef, check_drivers,
+    check_entered, check_team, club_teams, driver_proposal, game_places, has_team_places,
+    kept_games, not_entered, open_places, pick_team, players_playing_on, required_duties,
+};
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
 pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date};
@@ -40,7 +47,8 @@ pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedul
 pub use season::{Season, SeasonError};
 pub use season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use start_page::{
-    OpenItem, ReadingState, last_training, next_events, open_item_seasons, open_items,
+    OpenItem, PlacesOf, ReadingState, last_games, last_training, next_events, open_item_seasons,
+    open_items, schedule_not_entered,
 };
 pub use team_choice::{
     ChoiceState, FollowedTeam, Team, TeamChoiceError, TeamNeededReason, choice_state, choose_team,

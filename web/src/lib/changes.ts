@@ -1,5 +1,6 @@
 // The list of changes (story 4): words, the summary line and the labels.
 import type { Change, ChangeGame } from '#lib/api/client.js';
+import { placesText, placesWarnings } from '#lib/duties.js';
 import { kinds } from '#lib/reading.js';
 import { formatDay, type Filter } from '#lib/schedule.js';
 
@@ -72,4 +73,24 @@ export function noChangesLine(filter: Filter): string {
 	if (filter === 'team') return 'No changes of the team not seen.';
 	if (filter === 'duty') return 'No changes of possible duty games not seen.';
 	return 'No changes not seen.';
+}
+
+/** "has duties · Table 1, 2: open, open" and the warnings, for a change of a game with places of
+ * the team or a part it no longer needs; `null` for other changes. */
+export function dutiesOf(change: Change): { line: string; warnings: string[] } | null {
+	const places = change.places;
+	if (!places) return null;
+	const { schedule, drivers } = places;
+	const has =
+		(schedule && (schedule.of_team.length > 0 || !schedule.required)) ||
+		(drivers && (drivers.places.length > 0 || !drivers.required));
+	if (!has) return null;
+	// A gone game says so in its line of what happened.
+	const warnings = placesWarnings({ in_list: true, places });
+	return { line: `has duties · ${placesText(places)}`, warnings };
+}
+
+/** Whether the page of the game exists: not for a game that left the schedule without places. */
+export function hasPage(change: Change): boolean {
+	return change.kind !== 'out_of_schedule' || !!change.places;
 }

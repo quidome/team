@@ -13,7 +13,7 @@ use team_core::{
 };
 use utoipa::ToSchema;
 
-use crate::api::season::ScheduleReasonView;
+use crate::api::season::{PlacesView, ScheduleReasonView, duties_of};
 use crate::app::AppState;
 use crate::changes;
 use crate::clock::{current_season, today_in_netherlands};
@@ -25,6 +25,9 @@ use crate::{followed_teams, games};
 pub struct ChangesAnswer {
     /// Empty unless a team is chosen for the current season. In the order of the games.
     pub changes: Vec<ChangeView>,
+    /// The season of the changes (the current season), for the page of a game; `null` without a
+    /// chosen team.
+    pub season: Option<String>,
 }
 
 /// A change from the game as the coordinator last saw it to the game now.
@@ -44,6 +47,8 @@ pub struct ChangeView {
     pub before: Option<ChangeGame>,
     /// The game now; `null` for a game no longer in the game list.
     pub after: Option<ChangeGame>,
+    /// The duties of the game, as on "Season" ("has duties"); `null` when it has none.
+    pub places: Option<PlacesView>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -151,6 +156,7 @@ fn view(listed: ListedChange, version: i64) -> Option<ChangeView> {
         reason: listed.reason.into(),
         before: listed.last_seen.as_ref().map(|seen| (&seen.game).into()),
         after: listed.now.in_list.then(|| (&listed.now.game).into()),
+        places: None,
     })
 }
 
@@ -215,14 +221,31 @@ async fn list_loaded(
     )
 )]
 pub async fn get(State(state): State<AppState>) -> Result<Json<ChangesAnswer>, AppError> {
-    let changes = match chosen(&state).await? {
-        Some((club, team, season)) => {
-            let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
-            list_loaded(&state, &mut db, club, team, season).await?
-        }
-        None => Vec::new(),
+    let Some((club, team, season)) = chosen(&state).await? else {
+        return Ok(Json(ChangesAnswer {
+            changes: Vec::new(),
+            season: None,
+        }));
     };
-    Ok(Json(ChangesAnswer { changes }))
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
+    let stored = games::stored(&mut db, club, season).await?;
+    let mut changes = list(&state, &mut db, club, team, season, &stored).await?;
+    drop(db);
+    // "has duties": the duties of each game, from the same rule as "Season" (decision 0022).
+    let duties = duties_of(&state, club, season).await?;
+    let today = today_in_netherlands(state.clock.as_ref());
+    for change in &mut changes {
+        if let Some(game) = stored.iter().find(|game| game.game.source_id == change.id) {
+            change.places = duties
+                .places_of(&game.game, game.in_list, club, team, today)
+                .as_ref()
+                .map(PlacesView::from);
+        }
+    }
+    Ok(Json(ChangesAnswer {
+        changes,
+        season: Some(season.to_string()),
+    }))
 }
 
 #[utoipa::path(

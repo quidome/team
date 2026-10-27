@@ -57,6 +57,9 @@ export function messageFor(error: unknown, status: number): string {
 	const date = (error as { date?: unknown } | undefined)?.date;
 	if (code === 'role_starts_later' && typeof date === 'string')
 		return `This player's role starts on ${formatDay(date)}. To change it, use "Correct" in the history.`;
+	const filled = (error as { filled?: unknown } | undefined)?.filled;
+	if (code === 'places_filled' && typeof filled === 'number')
+		return `${filled} ${filled === 1 ? 'place is' : 'places are'} filled. Clear one first.`;
 	const players: Record<string, string> = {
 		first_name_required: 'A first name is needed.',
 		until_before_from: 'The end must be after the start.',
@@ -84,7 +87,14 @@ export function messageFor(error: unknown, status: number): string {
 		invalid_weekday: 'Choose a day of the week.',
 		invalid_time: 'Enter a time such as 19:45.',
 		reason_name_required: 'A name is needed.',
-		reason_name_taken: 'There is already a reason with this name.'
+		reason_name_taken: 'There is already a reason with this name.',
+		not_a_home_game: 'This game is no longer a home game of the club.',
+		no_drivers_needed: 'This game no longer needs drivers of the team.',
+		out_of_range: 'Enter a number from 0 to 10.',
+		unknown_team: 'This team is not a team of the club. Load the page again.',
+		player_on_place: 'Clear the player first.',
+		invalid_place: 'This place cannot be read.',
+		invalid_game: 'This game cannot be read.'
 	};
 	if (typeof code === 'string' && code in players) return players[code];
 	if (status === 404) return 'This no longer exists. Load the page again.';
@@ -144,12 +154,73 @@ export async function confirmGone(id: number): Promise<Reading> {
 
 export type ScheduleGame = components['schemas']['ScheduleGame'];
 
+export type PlacesView = components['schemas']['PlacesView'];
+export type GamePage = components['schemas']['GamePage'];
+export type PlaceKind = components['schemas']['PlaceKindView'];
+
+/** The page of a game with its duty places (story A of duties). */
+export async function loadGame(
+	fetch: typeof globalThis.fetch,
+	season: string,
+	id: string
+): Promise<GamePage> {
+	return dataOf(
+		await api.GET('/api/games/{season}/{id}', { fetch, params: { path: { season, id } } })
+	);
+}
+
+/** Puts a club team on a place of a home game of the club, or empties it (`null`: "—"). */
+export async function setPlace(
+	season: string,
+	id: string,
+	kind: PlaceKind,
+	number: number,
+	team: number | null
+): Promise<GamePage> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/places/{kind}/{number}', {
+			params: { path: { season, id, kind, number: String(number) } },
+			body: { team }
+		})
+	);
+}
+
+/** "Schedule entered" on or off. */
+export async function setScheduleEntered(
+	season: string,
+	id: string,
+	entered: boolean
+): Promise<GamePage> {
+	const params = { path: { season, id } };
+	return dataOf(
+		entered
+			? await api.PUT('/api/games/{season}/{id}/schedule-entered', { params })
+			: await api.DELETE('/api/games/{season}/{id}/schedule-entered', { params })
+	);
+}
+
+/** The number of drivers of an away game; `null` uses the proposal. */
+export async function setDrivers(
+	season: string,
+	id: string,
+	drivers: number | null
+): Promise<GamePage> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/drivers', {
+			params: { path: { season, id } },
+			body: { drivers }
+		})
+	);
+}
+
 export type Change = components['schemas']['ChangeView'];
 export type ChangeGame = components['schemas']['ChangeGame'];
 
-/** The changes not seen yet (story 4). */
-export async function loadChanges(fetch: typeof globalThis.fetch): Promise<Change[]> {
-	return (await dataOf(await api.GET('/api/changes', { fetch }))).changes;
+export type ChangesAnswer = components['schemas']['ChangesAnswer'];
+
+/** The changes not seen yet (story 4), and their season (for the page of a game). */
+export async function loadChanges(fetch: typeof globalThis.fetch): Promise<ChangesAnswer> {
+	return dataOf(await api.GET('/api/changes', { fetch }));
 }
 
 /** Marks these changes as seen; a change that a reading updated meanwhile stays. Gives the number

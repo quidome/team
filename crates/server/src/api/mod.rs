@@ -4,6 +4,7 @@ pub mod attendance;
 pub mod changes;
 pub mod clubs;
 pub(crate) mod format;
+pub mod games;
 pub mod health;
 pub mod me;
 pub mod players;
@@ -33,6 +34,11 @@ use utoipa::OpenApi;
         readings::latest,
         readings::confirm_gone,
         season::get,
+        games::get,
+        games::set_place,
+        games::set_entered,
+        games::unset_entered,
+        games::set_drivers,
         start::get,
         changes::get,
         changes::seen,

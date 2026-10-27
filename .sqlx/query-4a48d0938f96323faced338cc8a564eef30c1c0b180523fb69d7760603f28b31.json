@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO duty_teams\n                     (club_number, season_year, source_id, kind, number, team_number, team_name)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7)\n                 ON CONFLICT (club_number, season_year, source_id, kind, number)\n                 DO UPDATE SET team_number = EXCLUDED.team_number, team_name = EXCLUDED.team_name",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Text",
+        "Int2",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4a48d0938f96323faced338cc8a564eef30c1c0b180523fb69d7760603f28b31"
+}

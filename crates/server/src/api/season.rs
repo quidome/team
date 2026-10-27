@@ -2,16 +2,18 @@
 //! season): the games of the team and the possible duty games, and the training days and
 //! trainings, in one list with their ISO weeks.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use axum::Json;
 use axum::extract::{Query, State};
 use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
-    Absence, Club, Event, EventKind, FollowedTeam, PlayerRole, Schedule, ScheduleReason,
-    ScheduledGame, Season, SeasonList, Team, Training, WeeklyTraining, schedule, season_events,
-    season_list,
+    Absence, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind, FollowedTeam,
+    Game, GamePlaces, PlaceKind, PlacesOf, PlayerRole, Schedule, ScheduleReason, ScheduledGame,
+    Season, SeasonList, StoredDuties, Team, TeamNumber, TeamRef, Training, WeeklyTraining,
+    game_places, kept_games, not_entered, open_places, players_playing_on, required_duties,
+    schedule, season_events, season_list,
 };
 use utoipa::ToSchema;
 
@@ -22,7 +24,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{api, followed_teams, games, players, trainings, weekly_trainings};
+use crate::{api, duties, followed_teams, games, players, trainings, weekly_trainings};
 
 /// A game of the schedule: the team's games and the home games of other club teams.
 #[derive(Debug, Serialize, ToSchema)]
@@ -39,8 +41,155 @@ pub struct ScheduleGame {
     pub hall: String,
     pub town: String,
     pub reason: ScheduleReasonView,
-    /// False: the game is no longer in the game list; it shows until its change is seen.
+    /// False: the game is no longer in the game list; it shows until its change is seen, or
+    /// while it keeps duties.
     pub in_list: bool,
+    /// The duties of the game, when it has any (`team_core::game_places`).
+    pub places: Option<PlacesView>,
+}
+
+/// The duties of a game, in two parts that count on their own.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PlacesView {
+    /// The 4 places of the referee committee at a home game of the club.
+    pub schedule: Option<SchedulePartView>,
+    /// The drivers of an away game of the team.
+    pub drivers: Option<DriverPartView>,
+    /// A home game of the club whose schedule is not entered and whose places count.
+    pub not_entered: bool,
+    /// The places of the team that count and have no player.
+    pub open_places: usize,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SchedulePartView {
+    /// Referee 1, referee 2, table 1, table 2.
+    pub places: Vec<SchedulePlaceView>,
+    pub entered: bool,
+    /// The places that name the team chosen for the game's season.
+    pub of_team: Vec<PlaceView>,
+    /// False: the game is no longer a home game of the club.
+    pub required: bool,
+    /// False: a coming game that is gone or is no longer a home game of the club.
+    pub counts: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DriverPartView {
+    pub places: Vec<PlaceView>,
+    /// The proposal now: one driver for every 3 players with "plays games" on the date.
+    pub proposal: u8,
+    /// The number is the proposal (none was set).
+    pub proposed: bool,
+    /// The proposal dropped below the filled driver places.
+    pub more_than_proposed: bool,
+    /// False: the game no longer needs drivers of the team.
+    pub required: bool,
+    pub counts: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SchedulePlaceView {
+    pub kind: PlaceKindView,
+    pub number: u8,
+    /// `null`: empty ("—").
+    pub team: Option<TeamView>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaceKindView {
+    Referee,
+    Table,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DutyKindView {
+    Drive,
+    Table,
+    Referee,
+}
+
+/// A duty place of the team.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PlaceView {
+    pub kind: DutyKindView,
+    pub number: u8,
+    /// A player is on the place.
+    pub filled: bool,
+}
+
+impl From<PlaceKind> for PlaceKindView {
+    fn from(kind: PlaceKind) -> Self {
+        match kind {
+            PlaceKind::Referee => Self::Referee,
+            PlaceKind::Table => Self::Table,
+        }
+    }
+}
+
+impl From<DutyKind> for DutyKindView {
+    fn from(kind: DutyKind) -> Self {
+        match kind {
+            DutyKind::Drive => Self::Drive,
+            DutyKind::Table => Self::Table,
+            DutyKind::Referee => Self::Referee,
+        }
+    }
+}
+
+impl From<&TeamRef> for TeamView {
+    fn from(team: &TeamRef) -> Self {
+        Self {
+            number: team.number.0,
+            name: team.name.clone(),
+        }
+    }
+}
+
+fn place_view(place: &DutyPlace) -> PlaceView {
+    PlaceView {
+        kind: place.kind.into(),
+        number: place.number,
+        filled: place.filled,
+    }
+}
+
+fn drivers_view(part: &DriverPart) -> DriverPartView {
+    DriverPartView {
+        places: part.places.iter().map(place_view).collect(),
+        proposal: part.proposal,
+        proposed: part.proposed,
+        more_than_proposed: part.more_than_proposed,
+        required: part.required,
+        counts: part.counts,
+    }
+}
+
+impl From<&GamePlaces> for PlacesView {
+    fn from(places: &GamePlaces) -> Self {
+        Self {
+            schedule: places.schedule.as_ref().map(|part| SchedulePartView {
+                places: part
+                    .places
+                    .iter()
+                    .map(|place| SchedulePlaceView {
+                        kind: place.kind.into(),
+                        number: place.number,
+                        team: place.team.as_ref().map(TeamView::from),
+                    })
+                    .collect(),
+                entered: part.entered,
+                of_team: part.of_team.iter().map(place_view).collect(),
+                required: part.required,
+                counts: part.counts,
+            }),
+            drivers: places.drivers.as_ref().map(drivers_view),
+            not_entered: not_entered(places),
+            open_places: open_places(places),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -50,6 +199,50 @@ pub enum ScheduleReasonView {
     Team,
     /// A home game of another club team: a possible duty game.
     Duty,
+    /// No longer in the schedule (for example home and away swapped), kept for its duties.
+    Kept,
+}
+
+/// What the duties of the games of a season are made from.
+pub(crate) struct SeasonDuties {
+    pub stored: BTreeMap<i64, StoredDuties>,
+    /// The roles of the season, for the driver proposal.
+    pub roles: Vec<PlayerRole>,
+}
+
+impl SeasonDuties {
+    /// The duties of `game` for `team` of `club` (decision 0022: the only rule is
+    /// `team_core::game_places`). No places are filled before story B.
+    pub fn places_of(
+        &self,
+        game: &Game,
+        in_list: bool,
+        club: ClubNumber,
+        team: TeamNumber,
+        today: NaiveDate,
+    ) -> Option<GamePlaces> {
+        game_places(
+            required_duties(game, club, team),
+            self.stored.get(&game.source_id),
+            team,
+            &BTreeSet::new(),
+            players_playing_on(&self.roles, game.date),
+            in_list,
+            game.date < today,
+        )
+    }
+}
+
+/// The stored duties and the roles of `season` of `club`.
+pub(crate) async fn duties_of(
+    state: &AppState,
+    club: ClubNumber,
+    season: Season,
+) -> Result<SeasonDuties, AppError> {
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
+    let stored = duties::for_season(&mut db, club, season).await?;
+    let roles = players::roles_in(&mut *db, &[season]).await?;
+    Ok(SeasonDuties { stored, roles })
 }
 
 impl From<ScheduleReason> for ScheduleReasonView {
@@ -57,6 +250,7 @@ impl From<ScheduleReason> for ScheduleReasonView {
         match reason {
             ScheduleReason::TeamGame => Self::Team,
             ScheduleReason::DutyGame => Self::Duty,
+            ScheduleReason::Kept => Self::Kept,
         }
     }
 }
@@ -74,6 +268,7 @@ impl From<ScheduledGame> for ScheduleGame {
             town: game.place.town,
             reason: scheduled.reason.into(),
             in_list: scheduled.in_list,
+            places: None,
         }
     }
 }
@@ -127,6 +322,15 @@ pub struct EventView {
     pub training: Option<TrainingRow>,
 }
 
+/// The event with the duties of its game, if it has any.
+pub(crate) fn event_view_with(event: &Event, places: &PlacesOf) -> Result<EventView, StoreError> {
+    let mut view = event_view(event)?;
+    if let (Some(game), EventKind::Game(scheduled)) = (view.game.as_mut(), event.kind) {
+        game.places = places.get(&scheduled.game.source_id).map(PlacesView::from);
+    }
+    Ok(view)
+}
+
 pub(crate) fn event_view(event: &Event) -> Result<EventView, StoreError> {
     let (week, monday, sunday) = event
         .week()
@@ -163,13 +367,15 @@ pub async fn get(
     let season = query_season(query.season, state.clock.as_ref())?;
     let current = current_season(state.clock.as_ref());
     let today = today_in_netherlands(state.clock.as_ref());
+    let games = games_of(&state, season, current, today).await?;
+    let places = places_of_season(&games, today);
     let SeasonGames {
         state: games_state,
         club,
         team,
         schedule,
         ..
-    } = games_of(&state, season, current, today).await?;
+    } = games;
     let trainings = trainings_of(&state, season).await?;
     let list = trainings.list(season, today);
     let events = season_events(&schedule, &list);
@@ -188,12 +394,12 @@ pub async fn get(
         coming: events
             .coming
             .iter()
-            .map(event_view)
+            .map(|event| event_view_with(event, &places))
             .collect::<Result<_, _>>()?,
         past: events
             .past
             .iter()
-            .map(event_view)
+            .map(|event| event_view_with(event, &places))
             .collect::<Result<_, _>>()?,
     }))
 }
@@ -207,6 +413,32 @@ pub(crate) struct SeasonGames {
     pub schedule: Schedule,
     /// The changes not seen yet (the list of changes); 0 outside the current season.
     pub unseen_changes: u32,
+    /// The stored duties and the roles of the season; empty without a chosen team.
+    pub duties: SeasonDuties,
+}
+
+/// The duties of the games of `games` (the schedule of a season), by source id; empty without a
+/// team.
+pub(crate) fn places_of_season(games: &SeasonGames, today: NaiveDate) -> PlacesOf {
+    let (Some(club), Some(team)) = (&games.club, &games.team) else {
+        return PlacesOf::new();
+    };
+    games
+        .schedule
+        .coming
+        .iter()
+        .chain(&games.schedule.past)
+        .filter_map(|scheduled| {
+            let places = games.duties.places_of(
+                &scheduled.game,
+                scheduled.in_list,
+                club.number,
+                team.number,
+                today,
+            )?;
+            Some((scheduled.game.source_id, places))
+        })
+        .collect()
 }
 
 /// The games of `season` from the team chosen for it. In the current season a gone game shows
@@ -235,6 +467,10 @@ pub(crate) async fn games_of(
             team: None,
             schedule: Schedule::default(),
             unseen_changes: 0,
+            duties: SeasonDuties {
+                stored: BTreeMap::new(),
+                roles: Vec::new(),
+            },
         });
     };
     let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
@@ -247,13 +483,25 @@ pub(crate) async fn games_of(
     let open: BTreeSet<i64> = changes.iter().map(|change| change.id).collect();
     let unseen_changes = u32::try_from(changes.len())
         .map_err(|_| StoreError::Invalid(format!("{} changes", changes.len())))?;
-    let schedule = schedule(stored, club.number, team.number, today, &open);
+    let duties = SeasonDuties {
+        stored: duties::for_season(&mut db, club.number, season).await?,
+        roles: players::roles_in(&mut *db, &[season]).await?,
+    };
+    let schedule = schedule(
+        stored,
+        club.number,
+        team.number,
+        today,
+        &open,
+        &kept_games(&duties.stored),
+    );
     Ok(SeasonGames {
         state: GamesState::Shown,
         club: Some(club),
         team: Some(team),
         schedule,
         unseen_changes,
+        duties,
     })
 }
 

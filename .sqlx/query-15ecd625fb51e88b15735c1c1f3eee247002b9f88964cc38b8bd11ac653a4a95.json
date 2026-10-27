@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id, kind, number, team_number, team_name\n         FROM duty_teams WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "team_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "team_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "15ecd625fb51e88b15735c1c1f3eee247002b9f88964cc38b8bd11ac653a4a95"
+}

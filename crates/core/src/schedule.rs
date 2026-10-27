@@ -16,6 +16,8 @@ pub enum ScheduleReason {
     TeamGame,
     /// A home game of another club team: a possible duty game.
     DutyGame,
+    /// No longer in the schedule (for example home and away swapped), kept for its duties.
+    Kept,
 }
 
 /// `TeamGame`: the chosen team plays (home or away). `DutyGame`: the home club is the chosen club
@@ -55,7 +57,8 @@ pub struct Schedule {
 
 /// Keeps the stored games that [`in_schedule`] accepts and splits them on `today` (a game today
 /// is coming). A game no longer in the game list is kept only while `open` (the games with a
-/// change to show) has it: after "seen" it is hidden. Within a date, known start times come
+/// change to show) has it: after "seen" it is hidden. A game in `kept` (`duties::kept_games`)
+/// always stays, outside the schedule with the reason `Kept`. Within a date, known start times come
 /// first in time order, then the games whose start time is not known, then by source id.
 pub fn schedule(
     stored: Vec<StoredGame>,
@@ -63,13 +66,17 @@ pub fn schedule(
     team: TeamNumber,
     today: NaiveDate,
     open: &BTreeSet<i64>,
+    kept: &BTreeSet<i64>,
 ) -> Schedule {
     let mut schedule = Schedule::default();
     for StoredGame { game, in_list } in stored {
-        if !in_list && !open.contains(&game.source_id) {
+        let keep = kept.contains(&game.source_id);
+        if !in_list && !open.contains(&game.source_id) && !keep {
             continue;
         }
-        let Some(reason) = in_schedule(&game, club, Some(team)) else {
+        let Some(reason) =
+            in_schedule(&game, club, Some(team)).or(keep.then_some(ScheduleReason::Kept))
+        else {
             continue;
         };
         let scheduled = ScheduledGame {
@@ -235,7 +242,14 @@ pub(crate) mod tests {
                 in_list: true,
             },
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        );
         assert_eq!(ids(&schedule.coming), [1, 3]);
         assert_eq!(
             schedule
@@ -251,7 +265,14 @@ pub(crate) mod tests {
     #[test]
     fn a_game_today_is_coming_and_a_game_yesterday_is_past() {
         let games = vec![stored(1, 9, Some((10, 0))), stored(2, 10, Some((10, 0)))];
-        let schedule = schedule(games, CLUB, TEAM, day(10), &BTreeSet::new());
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(10),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        );
         assert_eq!(ids(&schedule.coming), [2]);
         assert_eq!(ids(&schedule.past), [1]);
     }
@@ -266,7 +287,14 @@ pub(crate) mod tests {
             stored(6, 14, Some((10, 0))),
             stored(5, 14, Some((10, 0))),
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        );
         assert_eq!(ids(&schedule.coming), [4, 5, 6, 3, 2, 1]);
     }
 
@@ -278,7 +306,14 @@ pub(crate) mod tests {
             stored(3, 14, Some((14, 0))),
             stored(4, 14, Some((10, 0))),
         ];
-        let schedule = schedule(games, CLUB, TEAM, day(20), &BTreeSet::new());
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(20),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        );
         assert!(schedule.coming.is_empty());
         assert_eq!(ids(&schedule.past), [4, 3, 2, 1]);
     }
@@ -288,7 +323,14 @@ pub(crate) mod tests {
         let mut gone = stored(1, 14, Some((10, 0)));
         gone.in_list = false;
         let games = vec![gone, stored(2, 14, Some((11, 0)))];
-        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::from([1]));
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::from([1]),
+            &BTreeSet::new(),
+        );
         assert_eq!(
             schedule
                 .coming
@@ -304,7 +346,55 @@ pub(crate) mod tests {
         let mut gone = stored(1, 14, Some((10, 0)));
         gone.in_list = false;
         let games = vec![gone, stored(2, 14, Some((11, 0)))];
-        let schedule = schedule(games, CLUB, TEAM, day(1), &BTreeSet::new());
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+        );
         assert_eq!(ids(&schedule.coming), [2]);
+    }
+
+    #[test]
+    fn a_kept_game_stays_after_its_change_is_seen() {
+        let mut gone = stored(1, 14, Some((10, 0)));
+        gone.in_list = false;
+        let games = vec![gone, stored(2, 14, Some((11, 0)))];
+        let schedule = schedule(
+            games,
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &BTreeSet::from([1]),
+        );
+        assert_eq!(ids(&schedule.coming), [1, 2]);
+        assert!(!schedule.coming[0].in_list);
+        assert_eq!(schedule.coming[0].reason, ScheduleReason::TeamGame);
+    }
+
+    #[test]
+    fn a_kept_game_outside_the_schedule_stays_with_the_reason_kept() {
+        // Home and away swapped: another club team now plays away.
+        let swapped = StoredGame {
+            game: game(1, OPPONENT, CLUB_TEAM),
+            in_list: true,
+        };
+        let outside = StoredGame {
+            game: game(2, OPPONENT, CLUB_TEAM),
+            in_list: true,
+        };
+        let schedule = schedule(
+            vec![swapped, outside],
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &BTreeSet::from([1]),
+        );
+        assert_eq!(ids(&schedule.coming), [1]);
+        assert_eq!(schedule.coming[0].reason, ScheduleReason::Kept);
     }
 }

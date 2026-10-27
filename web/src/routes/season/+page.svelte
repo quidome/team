@@ -1,8 +1,9 @@
 <!--
 	Season (story A of start page and season): all events of the chosen season (the current one by
 	default, `?season=` in the address): the games of the team, the possible duty games, and the
-	training days and trainings, under a heading per week and per date. Labels of "What" and "When"
-	narrow the list; the page opens with "Coming" at each visit. A tap on a training opens it;
+	training days and trainings, under a heading per week and per date. Labels of "What", "When"
+	and "Duties" narrow the list; the page opens with "Coming" at each visit. A tap on a training or
+	a game opens it, and a return from it keeps the labels and the place;
 	"Cancel" on a training day that is not opened, "Show cancelled", and "Add training" (only in the
 	current season). The current season has the "Game list" card.
 -->
@@ -16,6 +17,7 @@
 		loadSeason,
 		loadTraining,
 		openTraining,
+		type ScheduleGame,
 		type TrainingRow
 	} from '#lib/api/client.js';
 	import Labels from '#lib/components/Labels.svelte';
@@ -24,10 +26,12 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import {
 		emptyLine,
+		gameKey,
 		keepForReturn,
 		parts,
 		startLabels,
 		takeReturn,
+		trainingKey,
 		visible
 	} from '#lib/season.js';
 	import { onMount, tick } from 'svelte';
@@ -70,12 +74,15 @@
 	let addEnd = $state('');
 
 	// Every visit, and every other season, starts with "Coming", no open form and no error; a return
-	// from a training opened here keeps the labels and the place.
+	// from a training or a game opened here keeps the labels and the place.
 	afterNavigate(({ from }) => {
-		const kept =
-			from?.route.id === '/training/[date]' && answer
-				? takeReturn(answer.season, from.params?.date)
-				: null;
+		const key =
+			from?.route.id === '/training/[date]' && from.params?.date
+				? trainingKey(from.params.date)
+				: from?.route.id === '/game/[season]/[id]' && from.params?.id
+					? gameKey(from.params.id)
+					: undefined;
+		const kept = answer && key ? takeReturn(answer.season, key) : null;
 		labels = kept?.labels ?? startLabels();
 		if (kept) tick().then(() => window.scrollTo(0, kept.scrollY));
 		adding = false;
@@ -109,7 +116,7 @@
 		error = null;
 		try {
 			if (!row.opened) await openTraining(row.date);
-			if (answer) keepForReturn(answer.season, row.date, labels, window.scrollY);
+			if (answer) keepForReturn(answer.season, trainingKey(row.date), labels, window.scrollY);
 			await goto(resolve('/training/[date]', { date: row.date }));
 		} catch (failure) {
 			error = message(failure);
@@ -129,6 +136,11 @@
 		} finally {
 			busy = false;
 		}
+	}
+
+	/** A tap on a game: keep the labels and the place for the return. */
+	function openGame(game: ScheduleGame) {
+		if (answer) keepForReturn(answer.season, gameKey(game.id), labels, window.scrollY);
 	}
 
 	function startAdding() {
@@ -320,7 +332,15 @@
 							{emptyLine(labels, part)}
 						</p>
 					{:else}
-						<SeasonEvents {events} {part} {busy} onOpen={open} onCancel={cancel} />
+						<SeasonEvents
+							{events}
+							{part}
+							{busy}
+							onOpen={open}
+							onCancel={cancel}
+							gameSeason={page.season}
+							onGame={openGame}
+						/>
 					{/if}
 				</section>
 			{/each}
