@@ -1,7 +1,7 @@
 ---
 title: Duty places
 type: feature
-stage: implement
+stage: close
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-18
 ---
@@ -24,3 +24,4 @@ is the epic's (`functional.md`, story A and the shared rules); the architecture 
 | 2026-10-25 | implement | technical.md approved: one story of 7 steps (migration and core `duties`; store and routes of a game; the places on the answers; the page of a game; "Season"; the start page; the list of changes); closure review build + accept |
 | 2026-10-25 | design | all 7 steps built and both reviews run (R1–R9, A1–A7), not committed; then back to design: the epic goes back to discover because the duty places of a home game are given to club teams (`/vision` 2026-10-25). The new design reuses most of the code on disk; findings R2, R3, R7, R8 and A6 stay to fix. |
 | 2026-10-26 | implement | technical.md approved again for places given to club teams: two tables (`game_duties` with "Schedule entered" and drivers, `duty_teams` one row per place that names a team), two parts per game that count on their own, one route per place, games with places kept on "Season" (D5); the first build copied from `origin/duty-places-v1` and reworked; 7 steps; closure review build + accept |
+| 2026-10-27 | implement | 7 steps built on the branch `duty-places` (commit `e6147aa`); review build (R1–R5) and accept (accepted with notes, A1–A6): R1 accepted, R2 no defect (D3), R3, R4 and A1 for story B, R5 and A3 for `/close`; technical.md done |
