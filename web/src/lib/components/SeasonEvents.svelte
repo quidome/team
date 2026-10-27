@@ -3,7 +3,7 @@
 	date, each row an `EventRow`.
 -->
 <script lang="ts">
-	import type { EventView, TrainingRow } from '#lib/api/client.js';
+	import type { EventView, ScheduleGame, TrainingRow } from '#lib/api/client.js';
 	import EventRow from '#lib/components/EventRow.svelte';
 	import { formatDay } from '#lib/schedule.js';
 	import { groupByWeek, weekHeading } from '#lib/season.js';
@@ -13,7 +13,9 @@
 		part,
 		busy,
 		onOpen,
-		onCancel
+		onCancel,
+		gameSeason,
+		onGame
 	}: {
 		events: EventView[];
 		part: 'coming' | 'past';
@@ -21,6 +23,10 @@
 		onOpen: (row: TrainingRow) => void;
 		/** "Cancel" on a training day that is not opened. */
 		onCancel: (row: TrainingRow) => void;
+		/** The season of the games. */
+		gameSeason: string;
+		/** Called before the page of a game opens. */
+		onGame: (game: ScheduleGame) => void;
 	} = $props();
 
 	const weeks = $derived(groupByWeek(events));
@@ -47,7 +53,7 @@
 					</h4>
 					<ul class="space-y-2">
 						{#each day.events as event (event.game ? `g${event.game.id}` : `t${event.date}`)}
-							<EventRow {event} {busy} {onOpen} {onCancel} />
+							<EventRow {event} {busy} {onOpen} {onCancel} {gameSeason} {onGame} />
 						{/each}
 					</ul>
 				</section>

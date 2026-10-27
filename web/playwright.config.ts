@@ -85,6 +85,13 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// Duty places change data that the tests of the start page check.
+			name: 'duties',
+			testMatch: 'duties.e2e.ts',
+			dependencies: ['start'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

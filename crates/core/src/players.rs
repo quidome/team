@@ -108,7 +108,7 @@ impl PlayerRole {
         self.until.unwrap_or_else(|| self.season.last_day())
     }
 
-    fn covers(&self, date: NaiveDate) -> bool {
+    pub(crate) fn covers(&self, date: NaiveDate) -> bool {
         self.from <= date && date <= self.last_day()
     }
 }

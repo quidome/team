@@ -1,6 +1,6 @@
 # Technical spec: Duty places
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: [2026-10-18-duty-places](./)
 **Date**: 2026-10-26 (replaces the version approved 2026-10-25, which was built once on the branch `duty-places-v1` before the duty places were given to club teams)
@@ -206,13 +206,13 @@ change; epic `technical.md` approved 2026-10-25, second change):
 - Released with story B (release 1 of the epic).
 
 ## Progress
-- [ ] Step 1 – the tables and every core rule
-- [ ] Step 2 – store and routes of a game
-- [ ] Step 3 – the places on the answers
-- [ ] Step 4 – the page of a game
-- [ ] Step 5 – "Season"
-- [ ] Step 6 – the start page
-- [ ] Step 7 – the list of changes
+- [x] Step 1 – the tables and every core rule (2026-10-26: 233 core tests pass; clippy clean with `SQLX_OFFLINE=true`; `svelte-check` and lint clean. After Rancher Desktop forwarded port 5432 again: migrations 0010 and 0011 applied locally, 264 server tests pass)
+- [x] Step 2 – store and routes of a game (2026-10-26: 11 tests in `tests/games.rs`; 275 server tests pass; the race test of a place fails without `ON CONFLICT` (checked once: 500); clippy, `svelte-check` and lint clean)
+- [x] Step 3 – the places on the answers (2026-10-26: 8 new tests in `tests/games.rs`; 283 server and 233 core tests pass; 95 browser tests pass (see Deviations for the local accessibility check). `GET /api/start`: median 8.6 ms, min 7.8, max 21.5 over 20 requests, release build on the browser-test database (real game list, players, trainings) with "Schedule entered" and a place of the team on 10 coming home games of the club)
+- [x] Step 4 – the page of a game (2026-10-26: 7 browser tests in `web/e2e/duties.e2e.ts`, Playwright project `duties` after `start`; all 100 browser tests pass; `just check-web` passes. The drivers test fails when a save of the shown proposal sends the number instead of `null` (D4))
+- [x] Step 5 – "Season" (2026-10-27: 3 browser tests added to `web/e2e/duties.e2e.ts` (10 in all); all 103 browser tests pass; `just check-web` passes)
+- [x] Step 6 – the start page (2026-10-27: 3 browser tests added to `web/e2e/duties.e2e.ts` (13 in all); all 106 browser tests pass; `just check-web` passes; `start.e2e.ts` needed no change after Step 3)
+- [x] Step 7 – the list of changes (2026-10-27: 1 browser test added to `web/e2e/duties.e2e.ts` (14 in all); the search for `jury|handled|not_handled|NotHandled` in `crates/`, `web/src/` and `web/e2e/` has no hits; `just check` passes except `api-types-check`, see Deviations: 233 core and 283 server tests, all 109 browser tests, `check-sqlx`)
 - [ ] All checks pass
 
 ## Deviations
@@ -224,5 +224,24 @@ None from `functional.md`. Readings of the spec that the design makes exact:
 - A game kept on "Season" for its places (gone, or outside the schedule) shows with the label "Possible duty games".
 - "Last" shows the last training and the last games in date order, newest first, also without a training (R2, A6).
 - A game that cannot be found: "This game cannot be found." with a link to "Season" (first build, accepted as A7).
+
+Found while building (2026-10-26):
+- Step 0: only the core and the migration of the first build were copied. The copied server and front-end code use the old core types, so with all of it the workspace would not compile until step 3. Each later step takes its own files from `origin/duty-places-v1`, so each step stays mergeable alone.
+- Step 1: `filled` of `game_places` is the set of filled places by kind and number (`BTreeSet<(DutyKind, u8)>`), not a count for each kind: story B puts a player on one exact place. `check_team` also takes the current team of the place, so choosing the same team again is never refused.
+- Step 1: the server and the front end had to follow the new core rules to compile: `ScheduleReasonView::Kept` (the front end shows it with "Possible duty games"), and `OpenItemView::ScheduleNotEntered { games }` with `GameItemView` and its words ("Home game Sat 31 Oct: schedule not entered" / "5 home games: schedule not entered"). Until step 3 the start page passes no games and no places, and until step 4 a tap on the item goes to "Season". This is a small part of steps 3 and 6, done early.
+- Step 1: `SCHEDULE_PLACES` (the 4 places in their order) is public in the core, for the store and the views.
+- Step 2: `games_of` reads the stored duties only for `kept_games`; `SeasonGames.duties` comes in step 3, where "Season" and the start page read it (until then the field would be dead code, which clippy refuses).
+- Step 2: `find` also reads the stored duties and makes `club_teams` (all stored games of the season, also gone ones), so a `PUT` of a place takes the team and its name from that list; the page is read again after each write. The writes share one helper (`write`: begin, `lock`, the check and the write, commit, one log line with season and game id).
+- Step 2: `PlacesView` also carries `not_entered` and `open_places` from the core rules (decision 0022), so the labels and the rows need not work them out in the front end.
+- Step 3: the tests of the answers are in `tests/games.rs`, not in `tests/season.rs`, `tests/start.rs` and `tests/changes.rs`: they need its helpers that find a home game of another club team, an away game and a home game of the team. Changed in the other files: `tests/start.rs` (`a_held_back_reading_is_an_open_item` expects the item "schedule not entered" next to the held-back reading) and `tests/changes.rs` (the answer without a choice has `season: null`).
+- Step 3: `web/e2e/choose.e2e.ts` expects the new open item where it expected "Nothing open." (the real games have home games of the club in the 4 weeks).
+- Step 3: on this computer the browser test "the games on Season › is accessible, …" fails on `main` too (2026-10-26, checked in a worktree of `main`): axe measures the colour contrast of a label button while its colours fade (`transition-all` in `toggle.svelte`; foreground #b3afac on #d47d55). It is not caused by this change. With a wait for running animations in `expectAccessible` (only for that run, not kept) all 95 browser tests pass. Fixed apart, on `main` (commit `abe7009`, 2026-10-26).
+- Step 4: the page also shows "Proposal: N (one for every 3 players)" while a number is set, so the coordinator sees the proposal that a save turns back into "proposed" (D4); `driversNumber` in `duties.ts` gives "Drivers: 4 (proposed)" / "(more than proposed)". "Use proposal" and the proposal rule of a save are only for drivers the game still needs; on a game that no longer needs them, 0 removes them. "Schedule entered" shows only while the game needs the schedule, or while it is on (so it can be undone). Messages for the new refusals: `places_filled` "2 places are filled. Clear one first.", `player_on_place` "Clear the player first.", `not_a_home_game`, `no_drivers_needed` (the warning texts), `out_of_range` "Enter a number from 0 to 10.", `unknown_team`, `invalid_place`, `invalid_game`.
+- Step 5: `season.e2e.ts` and `choose.e2e.ts` needed no change: their tests do not count the label buttons, and a game row is a link inside the row (`data-testid="game-link"`), so the row itself stays. The row gets `data-id`. The row builds the link to the game itself from a `gameSeason` (the lint rule wants `resolve()` there); without it the row is no link (the start page until Step 6). With a label of "Duties" on, an empty part says "No coming games with these labels." "Not entered" uses `not_entered` of the server (the rule of the open item, decision 0022); "Entered" is a game that needs the schedule and has it entered. The warnings show on the row without "no longer in the game list", which the row already shows as a badge.
+- Step 6: "Last" shows its events under a heading per date, as "Next" does (before: one date line above the one training), since it can now hold a training and games of other dates. A game of an open item reads "Sat 31 Oct · 14:30 Blue Drakes X14 1 – BV Alphia X14 1" (`gameItemText`). The game links of "Next" use the season of the choice; those of "Last" use `last_games_season`.
+- Step 7: `loadChanges` gives the whole answer (with `season`), for the links to the games. A change links to its game except a change "out of the schedule" of a game without places (that page does not exist: 404). "has duties" shows for a game with places of the team, drivers, or a part it no longer needs; the warnings show without "no longer in the game list" (a gone game says so in its line of what happened).
+- Step 7: `tests/games.rs` sent the old place name `jury` to check that an unknown place kind is refused; it now sends `drive` (a duty kind with no place in the schedule), so the search has no hits and the test keeps its point.
+- Step 7: `api-types-check` (`git diff --exit-code` on `web/openapi.json` and `schema.d.ts`) fails while the change is not committed, since it compares with the last commit. Checked instead (2026-10-27): `just api-types` generates the same two files as in the working tree. It passes once the files are committed.
+- Step 2: as planned, the race test of the row lock (`a_save_waits_for_a_save_of_the_same_game_on_another_screen`) cannot fail without the lock in story A (as R6); story B adds the one that does.
 
 ## Review findings

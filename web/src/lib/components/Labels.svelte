@@ -1,10 +1,19 @@
 <!--
-	The labels of the page "Season": "What" (games of the team, possible duty games, trainings) and
-	"When" (coming, past). Several can be on; a group with none on shows all of that group.
+	The labels of the page "Season": "What" (games of the team, possible duty games, trainings),
+	"When" (coming, past) and "Duties" (entered, not entered, open places). Several can be on; a
+	group with none on shows all of that group.
 -->
 <script lang="ts">
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
-	import { whatLabels, whenLabels, type Labels, type What, type When } from '#lib/season.js';
+	import {
+		dutyLabels,
+		whatLabels,
+		whenLabels,
+		type Duties,
+		type Labels,
+		type What,
+		type When
+	} from '#lib/season.js';
 
 	let { labels = $bindable() }: { labels: Labels } = $props();
 
@@ -32,6 +41,17 @@
 		bind:value={() => labels.when, (value) => (labels = { ...labels, when: value as When[] })}
 	>
 		{#each whenLabels as option (option.value)}
+			<ToggleGroup.Item value={option.value} class={item}>{option.label}</ToggleGroup.Item>
+		{/each}
+	</ToggleGroup.Root>
+	<ToggleGroup.Root
+		type="multiple"
+		variant="outline"
+		class="grid w-full grid-cols-3"
+		aria-label="Duties"
+		bind:value={() => labels.duties, (value) => (labels = { ...labels, duties: value as Duties[] })}
+	>
+		{#each dutyLabels as option (option.value)}
 			<ToggleGroup.Item value={option.value} class={item}>{option.label}</ToggleGroup.Item>
 		{/each}
 	</ToggleGroup.Root>

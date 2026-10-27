@@ -180,6 +180,287 @@
         }
       }
     },
+    "/api/games/{season}/{id}": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "game",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/drivers": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setDrivers",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriversInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled`)"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/places/{kind}/{number}": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setPlace",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "description": "`referee` or `table`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "description": "1 or 2",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `invalid_place`, `unknown_team`, `not_a_home_game`, `player_on_place`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/schedule-entered": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setScheduleEntered",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule entered; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_home_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "unsetScheduleEntered",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule not entered; the game with its duties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
     "/api/health/liveness": {
       "get": {
         "tags": [
@@ -1990,6 +2271,17 @@
           "kind": {
             "$ref": "#/components/schemas/ChangeKindView"
           },
+          "places": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlacesView",
+                "description": "The duties of the game, as on \"Season\" (\"has duties\"); `null` when it has none."
+              }
+            ]
+          },
           "reason": {
             "$ref": "#/components/schemas/ScheduleReasonView",
             "description": "Now, or as last seen when the game is no longer in the schedule."
@@ -2013,6 +2305,13 @@
               "$ref": "#/components/schemas/ChangeView"
             },
             "description": "Empty unless a team is chosen for the current season. In the order of the games."
+          },
+          "season": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The season of the changes (the current season), for the page of a game; `null` without a\nchosen team."
           }
         }
       },
@@ -2133,6 +2432,68 @@
           "team"
         ]
       },
+      "DriverPartView": {
+        "type": "object",
+        "required": [
+          "places",
+          "proposal",
+          "proposed",
+          "more_than_proposed",
+          "required",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "boolean"
+          },
+          "more_than_proposed": {
+            "type": "boolean",
+            "description": "The proposal dropped below the filled driver places."
+          },
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceView"
+            }
+          },
+          "proposal": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The proposal now: one driver for every 3 players with \"plays games\" on the date.",
+            "minimum": 0
+          },
+          "proposed": {
+            "type": "boolean",
+            "description": "The number is the proposal (none was set)."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "False: the game no longer needs drivers of the team."
+          }
+        }
+      },
+      "DriversInput": {
+        "type": "object",
+        "description": "The number of drivers; `null`: the proposal.",
+        "properties": {
+          "drivers": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "DutyKindView": {
+        "type": "string",
+        "enum": [
+          "drive",
+          "table",
+          "referee"
+        ]
+      },
       "ErrorKind": {
         "type": "string",
         "enum": [
@@ -2186,6 +2547,77 @@
           },
           "week_last_day": {
             "type": "string"
+          }
+        }
+      },
+      "GameItemView": {
+        "type": "object",
+        "description": "A game of an open item: enough to show it in the list below the item and to open its page.",
+        "required": [
+          "season",
+          "id",
+          "date",
+          "home",
+          "away"
+        ],
+        "properties": {
+          "away": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "home": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's game id."
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the game, for example \"2026-2027\"."
+          },
+          "start_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GamePage": {
+        "type": "object",
+        "required": [
+          "season",
+          "current_season",
+          "team",
+          "game",
+          "club_teams"
+        ],
+        "properties": {
+          "club_teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamView"
+            },
+            "description": "The pull-down list of the places: the club teams of the season, sorted by name."
+          },
+          "current_season": {
+            "type": "string"
+          },
+          "game": {
+            "$ref": "#/components/schemas/ScheduleGame",
+            "description": "The game, with its duties."
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the game, for example \"2026-2027\"."
+          },
+          "team": {
+            "$ref": "#/components/schemas/TeamView",
+            "description": "The team chosen for the game's season."
           }
         }
       },
@@ -2645,6 +3077,28 @@
           },
           {
             "type": "object",
+            "description": "Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time\norder.",
+            "required": [
+              "games",
+              "kind"
+            ],
+            "properties": {
+              "games": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GameItemView"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "schedule_not_entered"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
             "description": "Training days before today that were never opened; `first` is the oldest.",
             "required": [
               "first",
@@ -2693,6 +3147,90 @@
           }
         ],
         "description": "One open item. Dates are Dutch dates, for example \"2026-10-22\"."
+      },
+      "PlaceInput": {
+        "type": "object",
+        "description": "The team of a place; `null`: \"—\".",
+        "properties": {
+          "team": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "PlaceKindView": {
+        "type": "string",
+        "enum": [
+          "referee",
+          "table"
+        ]
+      },
+      "PlaceView": {
+        "type": "object",
+        "description": "A duty place of the team.",
+        "required": [
+          "kind",
+          "number",
+          "filled"
+        ],
+        "properties": {
+          "filled": {
+            "type": "boolean",
+            "description": "A player is on the place."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DutyKindView"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "PlacesView": {
+        "type": "object",
+        "description": "The duties of a game, in two parts that count on their own.",
+        "required": [
+          "not_entered",
+          "open_places"
+        ],
+        "properties": {
+          "drivers": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DriverPartView",
+                "description": "The drivers of an away game of the team."
+              }
+            ]
+          },
+          "not_entered": {
+            "type": "boolean",
+            "description": "A home game of the club whose schedule is not entered and whose places count."
+          },
+          "open_places": {
+            "type": "integer",
+            "description": "The places of the team that count and have no player.",
+            "minimum": 0
+          },
+          "schedule": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SchedulePartView",
+                "description": "The 4 places of the referee committee at a home game of the club."
+              }
+            ]
+          }
+        }
       },
       "PlayerChange": {
         "type": "object",
@@ -3207,7 +3745,18 @@
           },
           "in_list": {
             "type": "boolean",
-            "description": "False: the game is no longer in the game list; it shows until its change is seen."
+            "description": "False: the game is no longer in the game list; it shows until its change is seen, or\nwhile it keeps duties."
+          },
+          "places": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlacesView",
+                "description": "The duties of the game, when it has any (`team_core::game_places`)."
+              }
+            ]
           },
           "reason": {
             "$ref": "#/components/schemas/ScheduleReasonView"
@@ -3224,11 +3773,77 @@
           }
         }
       },
+      "SchedulePartView": {
+        "type": "object",
+        "required": [
+          "places",
+          "entered",
+          "of_team",
+          "required",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "boolean",
+            "description": "False: a coming game that is gone or is no longer a home game of the club."
+          },
+          "entered": {
+            "type": "boolean"
+          },
+          "of_team": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceView"
+            },
+            "description": "The places that name the team chosen for the game's season."
+          },
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchedulePlaceView"
+            },
+            "description": "Referee 1, referee 2, table 1, table 2."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "False: the game is no longer a home game of the club."
+          }
+        }
+      },
+      "SchedulePlaceView": {
+        "type": "object",
+        "required": [
+          "kind",
+          "number"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/PlaceKindView"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "team": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TeamView",
+                "description": "`null`: empty (\"—\")."
+              }
+            ]
+          }
+        }
+      },
       "ScheduleReasonView": {
         "type": "string",
         "enum": [
           "team",
-          "duty"
+          "duty",
+          "kept"
         ]
       },
       "SeasonAnswer": {
@@ -3445,7 +4060,8 @@
         "type": "object",
         "required": [
           "open_items",
-          "next"
+          "next",
+          "last_games"
         ],
         "properties": {
           "last": {
@@ -3459,12 +4075,26 @@
               }
             ]
           },
+          "last_games": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventView"
+            },
+            "description": "The games of the last date before today with places of the team, in time order, in the\nseasons of the open items (in July and August also the season before)."
+          },
+          "last_games_season": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The season of `last_games`, for their pages; `null` when there are none."
+          },
           "next": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EventView"
             },
-            "description": "The games of the team and the trainings from today until the Sunday of next week, in time\norder; when there are none, the first coming one."
+            "description": "The games of the team, the home games of other club teams with places of the team, and\nthe trainings from today until the Sunday of next week, in time order; when there are\nnone, the first coming one."
           },
           "open_items": {
             "type": "array",

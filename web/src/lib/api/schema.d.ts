@@ -84,6 +84,70 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['game'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/drivers': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setDrivers'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/places/{kind}/{number}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setPlace'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/schedule-entered': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setScheduleEntered'];
+		post?: never;
+		delete: operations['unsetScheduleEntered'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/health/liveness': {
 		parameters: {
 			query?: never;
@@ -666,6 +730,7 @@ export interface components {
 			 */
 			id: number;
 			kind: components['schemas']['ChangeKindView'];
+			places?: null | components['schemas']['PlacesView'];
 			/** @description Now, or as last seen when the game is no longer in the schedule. */
 			reason: components['schemas']['ScheduleReasonView'];
 			/**
@@ -677,6 +742,11 @@ export interface components {
 		ChangesAnswer: {
 			/** @description Empty unless a team is chosen for the current season. In the order of the games. */
 			changes: components['schemas']['ChangeView'][];
+			/**
+			 * @description The season of the changes (the current season), for the page of a game; `null` without a
+			 *     chosen team.
+			 */
+			season?: string | null;
 		};
 		ClubTeams: {
 			/** @description The current season, for example "2026-2027". */
@@ -717,6 +787,28 @@ export interface components {
 		};
 		/** @enum {string} */
 		DifferenceView: 'date' | 'start_time' | 'start_time_known' | 'place' | 'home_and_away' | 'team';
+		DriverPartView: {
+			counts: boolean;
+			/** @description The proposal dropped below the filled driver places. */
+			more_than_proposed: boolean;
+			places: components['schemas']['PlaceView'][];
+			/**
+			 * Format: int32
+			 * @description The proposal now: one driver for every 3 players with "plays games" on the date.
+			 */
+			proposal: number;
+			/** @description The number is the proposal (none was set). */
+			proposed: boolean;
+			/** @description False: the game no longer needs drivers of the team. */
+			required: boolean;
+		};
+		/** @description The number of drivers; `null`: the proposal. */
+		DriversInput: {
+			/** Format: int32 */
+			drivers?: number | null;
+		};
+		/** @enum {string} */
+		DutyKindView: 'drive' | 'table' | 'referee';
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
 		/**
@@ -736,6 +828,31 @@ export interface components {
 			/** @description The Monday and the Sunday of the week. */
 			week_first_day: string;
 			week_last_day: string;
+		};
+		/** @description A game of an open item: enough to show it in the list below the item and to open its page. */
+		GameItemView: {
+			away: string;
+			date: string;
+			home: string;
+			/**
+			 * Format: int64
+			 * @description The source's game id.
+			 */
+			id: number;
+			/** @description The season of the game, for example "2026-2027". */
+			season: string;
+			start_time?: string | null;
+		};
+		GamePage: {
+			/** @description The pull-down list of the places: the club teams of the season, sorted by name. */
+			club_teams: components['schemas']['TeamView'][];
+			current_season: string;
+			/** @description The game, with its duties. */
+			game: components['schemas']['ScheduleGame'];
+			/** @description The season of the game, for example "2026-2027". */
+			season: string;
+			/** @description The team chosen for the game's season. */
+			team: components['schemas']['TeamView'];
 		};
 		/** @enum {string} */
 		GamesState: 'shown' | 'team_needed' | 'none';
@@ -889,6 +1006,11 @@ export interface components {
 					kind: 'changes';
 			  }
 			| {
+					games: components['schemas']['GameItemView'][];
+					/** @enum {string} */
+					kind: 'schedule_not_entered';
+			  }
+			| {
 					count: number;
 					first: string;
 					/** @enum {string} */
@@ -900,6 +1022,30 @@ export interface components {
 					/** @enum {string} */
 					kind: 'not_checked';
 			  };
+		/** @description The team of a place; `null`: "—". */
+		PlaceInput: {
+			/** Format: int64 */
+			team?: number | null;
+		};
+		/** @enum {string} */
+		PlaceKindView: 'referee' | 'table';
+		/** @description A duty place of the team. */
+		PlaceView: {
+			/** @description A player is on the place. */
+			filled: boolean;
+			kind: components['schemas']['DutyKindView'];
+			/** Format: int32 */
+			number: number;
+		};
+		/** @description The duties of a game, in two parts that count on their own. */
+		PlacesView: {
+			drivers?: null | components['schemas']['DriverPartView'];
+			/** @description A home game of the club whose schedule is not entered and whose places count. */
+			not_entered: boolean;
+			/** @description The places of the team that count and have no player. */
+			open_places: number;
+			schedule?: null | components['schemas']['SchedulePartView'];
+		};
 		PlayerChange: {
 			first_name: string;
 			/** @description A hidden player is not offered in "Add player" of the team page and not in "Add all". */
@@ -1068,15 +1214,36 @@ export interface components {
 			 * @description The source's game id.
 			 */
 			id: number;
-			/** @description False: the game is no longer in the game list; it shows until its change is seen. */
+			/**
+			 * @description False: the game is no longer in the game list; it shows until its change is seen, or
+			 *     while it keeps duties.
+			 */
 			in_list: boolean;
+			places?: null | components['schemas']['PlacesView'];
 			reason: components['schemas']['ScheduleReasonView'];
 			/** @description Dutch local start time, for example "13:00"; `null` when it is not known yet. */
 			start_time?: string | null;
 			town: string;
 		};
+		SchedulePartView: {
+			/** @description False: a coming game that is gone or is no longer a home game of the club. */
+			counts: boolean;
+			entered: boolean;
+			/** @description The places that name the team chosen for the game's season. */
+			of_team: components['schemas']['PlaceView'][];
+			/** @description Referee 1, referee 2, table 1, table 2. */
+			places: components['schemas']['SchedulePlaceView'][];
+			/** @description False: the game is no longer a home game of the club. */
+			required: boolean;
+		};
+		SchedulePlaceView: {
+			kind: components['schemas']['PlaceKindView'];
+			/** Format: int32 */
+			number: number;
+			team?: null | components['schemas']['TeamView'];
+		};
 		/** @enum {string} */
-		ScheduleReasonView: 'team' | 'duty';
+		ScheduleReasonView: 'team' | 'duty' | 'kept';
 		SeasonAnswer: {
 			club?: null | components['schemas']['ClubView'];
 			/** @description Today and later, nearest first. */
@@ -1140,8 +1307,16 @@ export interface components {
 		StartAnswer: {
 			last?: null | components['schemas']['EventView'];
 			/**
-			 * @description The games of the team and the trainings from today until the Sunday of next week, in time
-			 *     order; when there are none, the first coming one.
+			 * @description The games of the last date before today with places of the team, in time order, in the
+			 *     seasons of the open items (in July and August also the season before).
+			 */
+			last_games: components['schemas']['EventView'][];
+			/** @description The season of `last_games`, for their pages; `null` when there are none. */
+			last_games_season?: string | null;
+			/**
+			 * @description The games of the team, the home games of other club teams with places of the team, and
+			 *     the trainings from today until the Sunday of next week, in time order; when there are
+			 *     none, the first coming one.
 			 */
 			next: components['schemas']['EventView'][];
 			/** @description What still needs the coordinator, in the order of the start page. */
@@ -1496,6 +1671,248 @@ export interface operations {
 			};
 			/** @description The game list cannot be reached or is not understood */
 			502: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	game: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setDrivers: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['DriversInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled`) */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setPlace: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description `referee` or `table` */
+				kind: string;
+				/** @description 1 or 2 */
+				number: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PlaceInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `invalid_place`, `unknown_team`, `not_a_home_game`, `player_on_place` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setScheduleEntered: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Schedule entered; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_home_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	unsetScheduleEntered: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Schedule not entered; the game with its duties */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
 				headers: {
 					[name: string]: unknown;
 				};

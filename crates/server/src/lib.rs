@@ -8,6 +8,7 @@ pub mod cipher;
 pub mod clock;
 pub mod config;
 pub mod db;
+pub mod duties;
 pub mod error;
 pub mod followed_teams;
 pub mod games;

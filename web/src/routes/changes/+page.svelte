@@ -1,6 +1,7 @@
 <!--
-	The changes not seen yet (story 4): the quick filter, each change with its old and new values,
-	one summary line for many new possible duty games, and "seen" for one or all.
+	The changes not seen yet (story 4): the quick filter, each change with its old and new values
+	and "has duties" when the team has places at the game, one summary line for many new possible
+	duty games, and "seen" for one or all. A tap on the teams opens the page of the game.
 -->
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
@@ -11,7 +12,9 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import {
 		details,
+		dutiesOf,
 		gameOf,
+		hasPage,
 		kindLine,
 		noChangesLine,
 		seenAllLabel,
@@ -53,6 +56,7 @@
 {#snippet item(change: Change)}
 	{@const game = gameOf(change)}
 	{@const ofTeam = change.reason === 'team'}
+	{@const duties = dutiesOf(change)}
 	<li
 		class={[
 			'flex gap-3 rounded-xl border bg-card p-3 shadow-xs',
@@ -63,10 +67,24 @@
 	>
 		<div class="min-w-0 flex-1 space-y-1">
 			{#if game}
-				<p class="text-sm leading-snug font-medium">
+				{#snippet teams()}
 					<span class="block">{game.home}</span>
 					<span class="block"><span class="sr-only">against</span> {game.away}</span>
-				</p>
+				{/snippet}
+				{#if data.season && hasPage(change)}
+					<a
+						href="{resolve('/game/[season]/[id]', {
+							season: data.season,
+							id: String(change.id)
+						})}?from=changes"
+						class="block text-sm leading-snug font-medium underline-offset-4 hover:underline"
+						data-testid="change-game"
+					>
+						{@render teams()}
+					</a>
+				{:else}
+					<p class="text-sm leading-snug font-medium">{@render teams()}</p>
+				{/if}
 			{/if}
 			<p
 				class={['text-sm font-semibold', change.kind === 'gone' && 'text-gone']}
@@ -79,6 +97,12 @@
 					{line}
 				</p>
 			{/each}
+			{#if duties}
+				<p class="text-xs font-medium" data-testid="change-duties">{duties.line}</p>
+				{#each duties.warnings as warning (warning)}
+					<p class="text-xs text-gone" data-testid="places-warning">{warning}</p>
+				{/each}
+			{/if}
 		</div>
 		<div class="flex shrink-0 flex-col items-end gap-2">
 			{#if ofTeam}

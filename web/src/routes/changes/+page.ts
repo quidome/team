@@ -3,5 +3,7 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async (event) => {
 	const { me } = await event.parent();
-	return { changes: me ? await loadChanges(event.fetch) : null };
+	if (!me) return { changes: null, season: null };
+	const answer = await loadChanges(event.fetch);
+	return { changes: answer.changes, season: answer.season ?? null };
 };

@@ -69,7 +69,8 @@ async fn without_login_the_start_page_needs_a_login(pool: PgPool) {
 async fn a_held_back_reading_is_an_open_item(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;
-    assert_eq!(kinds(&start(&reader).await), Vec::<&str>::new());
+    // The real games have home games of the club in the next 4 weeks.
+    assert_eq!(kinds(&start(&reader).await), ["schedule_not_entered"]);
 
     // A game list with no games is held back.
     let mut empty = data("games-empty.json");
@@ -78,7 +79,10 @@ async fn a_held_back_reading_is_an_open_item(pool: PgPool) {
     let (_, held) = reader.read().await;
     assert_eq!(held["result"], "held_back", "{held}");
     assert!(!reader.latest().await["held_back"].is_null());
-    assert_eq!(kinds(&start(&reader).await), ["reading_held_back"]);
+    assert_eq!(
+        kinds(&start(&reader).await),
+        ["reading_held_back", "schedule_not_entered"]
+    );
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]

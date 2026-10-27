@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id, schedule_entered_at IS NOT NULL AS \"entered!\", drivers\n           FROM game_duties WHERE club_number = $1 AND season_year = $2 AND source_id = $3\n           FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "entered!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "drivers",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "0952a1af8614f6e8758f3155d194a0d9caf1179344f37b169276676863206ed0"
+}

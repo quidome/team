@@ -1,24 +1,32 @@
 <!--
 	The start page (story B of start page and season): what still needs the coordinator ("Open
-	items"), the last training ("Last"), and the games of the team and the trainings of this week and
-	next week ("Next"), then the links. Without a club: only the choose step; in a new season without
+	items"), the last training and the last games with duty places ("Last"), and the games of the
+	team, the games with places of the team and the trainings of this week and next week ("Next"),
+	then the links. An open item of more games opens their list below it. Without a club: only the choose step; in a new season without
 	a team: the choose step above the three parts. Not logged in: "Log in".
 -->
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { ApiError, openTraining, type TrainingRow } from '#lib/api/client.js';
+	import { ApiError, openTraining, type EventView, type TrainingRow } from '#lib/api/client.js';
 	import ChooseTeam from '#lib/components/ChooseTeam.svelte';
 	import EventRow from '#lib/components/EventRow.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { groupByDate } from '#lib/season.js';
-	import { openItemLink, openItemText, trainingLink } from '#lib/start.js';
+	import { gameItemText, gameLink, openItemLink, openItemText, trainingLink } from '#lib/start.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	let busy = $state(false);
+	/** The open item whose list of games is open. */
+	let expanded = $state<string | null>(null);
+
+	/** "Last": the last training and the last games, newest first. */
+	function lastEvents(last: EventView | null | undefined, games: EventView[]): EventView[] {
+		return [...(last ? [last] : []), ...games].sort((a, b) => b.date.localeCompare(a.date));
+	}
 	let error = $state<string | null>(null);
 
 	/** A tap on a training: open it when it is not opened yet, then show it; "Back" returns here. */
@@ -70,17 +78,46 @@
 			{:else}
 				<ul class="space-y-2">
 					{#each start.open_items as item (item.kind)}
+						{@const link = openItemLink(item)}
+						{@const itemClass =
+							'flex min-h-12 w-full items-center rounded-xl border bg-card px-4 py-2 text-left text-sm font-medium shadow-xs'}
 						<li>
-							<!-- eslint-disable svelte/no-navigation-without-resolve -- openItemLink() builds the address with resolve() -->
-							<a
-								href={openItemLink(item)}
-								class="flex min-h-12 items-center rounded-xl border bg-card px-4 py-2 text-sm font-medium shadow-xs"
-								data-testid="open-item"
-								data-kind={item.kind}
-							>
-								{openItemText(item)}
-							</a>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							{#if link}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- openItemLink() builds the address with resolve() -->
+								<a href={link} class={itemClass} data-testid="open-item" data-kind={item.kind}>
+									{openItemText(item)}
+								</a>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							{:else}
+								<button
+									type="button"
+									class={itemClass}
+									aria-expanded={expanded === item.kind}
+									aria-controls="open-item-{item.kind}"
+									data-testid="open-item"
+									data-kind={item.kind}
+									onclick={() => (expanded = expanded === item.kind ? null : item.kind)}
+								>
+									{openItemText(item)}
+								</button>
+								{#if expanded === item.kind && item.kind === 'schedule_not_entered'}
+									<ul id="open-item-{item.kind}" class="mt-2 space-y-1 pl-4">
+										{#each item.games as game (game.id)}
+											<li>
+												<!-- eslint-disable svelte/no-navigation-without-resolve -- gameLink() builds the address with resolve() -->
+												<a
+													href={gameLink(game.season, game.id)}
+													class="flex min-h-11 items-center text-sm underline underline-offset-4"
+													data-testid="open-item-game"
+												>
+													{gameItemText(game)}
+												</a>
+												<!-- eslint-enable svelte/no-navigation-without-resolve -->
+											</li>
+										{/each}
+									</ul>
+								{/if}
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -91,14 +128,32 @@
 			<p class="text-sm" role="alert">{error}</p>
 		{/if}
 
-		{#if start.last}
-			{@const last = start.last}
+		{@const last = lastEvents(start.last, start.last_games)}
+		{#if last.length > 0}
 			<section aria-labelledby="last-heading" class="space-y-2" data-testid="last">
 				<h2 id="last-heading" class="text-lg font-semibold tracking-tight">Last</h2>
-				<p class="text-sm font-semibold text-muted-foreground">{formatDay(last.date)}</p>
-				<ul>
-					<EventRow event={last} {busy} onOpen={open} />
-				</ul>
+				{#each groupByDate(last) as day (day.date)}
+					<section aria-labelledby="last-day-{day.date}">
+						<h3
+							id="last-day-{day.date}"
+							class="py-1 text-sm font-semibold text-muted-foreground"
+							data-testid="day"
+						>
+							{formatDay(day.date)}
+						</h3>
+						<ul class="space-y-2">
+							{#each day.events as event (event.game ? `g${event.game.id}` : `t${event.date}`)}
+								<EventRow
+									{event}
+									{busy}
+									onOpen={open}
+									gameSeason={start.last_games_season ?? undefined}
+									gameFrom="start"
+								/>
+							{/each}
+						</ul>
+					</section>
+				{/each}
 			</section>
 		{/if}
 
@@ -121,7 +176,13 @@
 							</h3>
 							<ul class="space-y-2">
 								{#each day.events as event (event.game ? `g${event.game.id}` : `t${event.date}`)}
-									<EventRow {event} {busy} onOpen={open} />
+									<EventRow
+										{event}
+										{busy}
+										onOpen={open}
+										gameSeason={data.selection?.season}
+										gameFrom="start"
+									/>
 								{/each}
 							</ul>
 						</section>
