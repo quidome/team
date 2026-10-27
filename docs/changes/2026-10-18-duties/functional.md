@@ -2,7 +2,7 @@
 
 **Status**: approved
 **Change**: [2026-10-18-duties](./)
-**Date**: 2026-10-25 (second change of that day: the duty places of a home game are given to club teams; it replaces the version approved earlier on 2026-10-25, which replaced the one of 2026-10-18)
+**Date**: 2026-10-25 (second change of that day: the duty places of a home game are given to club teams; it replaces the version approved earlier on 2026-10-25, which replaced the one of 2026-10-18); changed 2026-10-27 for story B (facts of 2026-10-27: what is stored is never changed by a reading; changes to past games with duties)
 
 ## Context
 The coordinator runs one youth team of the club. Besides the games and the trainings, the team
@@ -51,7 +51,7 @@ Facts from the coordinator (2026-10-25):
 - The totals are on a page "Duties"; the messages in a part "Messages" on the start page.
 - Drivers become an open item only in this week and next (the window of "Next"); table and referee places in the 4 weeks (S16).
 - Duties of an earlier season can be changed and corrected, as trainings of an earlier season can (S13).
-- The choice of a player shows a clash next to the name, without blocking it (S14).
+- The choice of a player shows a clash next to the name, without blocking it (S14). Changed on 2026-10-27: a clash closer than 1 hour 30 minutes blocks the choice (see the facts of 2026-10-27).
 
 Facts from the coordinator (second change of 2026-10-25, after the reviews of story A):
 - The coordinator copies the committee's schedule as it is, for **every home game of the club**, also the home games of the team: at each, referee 1, referee 2, table 1 and table 2, each a club team or empty. The tool does not name the tasks at the table.
@@ -60,6 +60,11 @@ Facts from the coordinator (second change of 2026-10-25, after the reviews of st
 - Each choice of a place saves at once.
 - The **places of the team** are, everywhere in this spec, the table and referee places that name the team plus the driver places of its away games. Drivers stay as they are (the committee does not plan them) (S21).
 - The few home games a week (S10) stay acceptable one by one, also with the home games of the team added.
+
+Facts from the coordinator (2026-10-27, at the design of story B):
+- What the coordinator stored is never changed by a reading of the game list. A past game counts what is stored: a filled place counts as done by its player unless corrected, also after a later swap, a removal from the game list or another team chosen (A1 of the reviews of story A).
+- Clashes (replaces S14 for close clashes): two games on the same court of the same hall never clash, because the next game on a court waits for the game before it. Two games on different courts (in the same hall or in another hall) whose start times are less than 1 hour 30 minutes apart block the choice; from 1 hour 30 minutes to less than 2 hours apart they give a warning, because games do not always finish in 1 hour 30 minutes. A game without a known start time gives a warning for every game on another court on the same date and never blocks. A game without a court counts as another court.
+- A change to a past game with duties of the team stays in the list of changes until the coordinator has seen it, so the coordinator can check that game. There is no separate conflict resolver: "Seen" means checked, and a correction on the page of the game changes what counts.
 
 ## User stories
 
@@ -95,7 +100,7 @@ never an open item for the schedule (S19).
 - A game that moves (another date, time or hall) keeps its places, their teams, the players on them and "Schedule entered". Its change in the list of changes says "has duties" with the places of the team (for example "Table 1, 2: Anna, open"), so the coordinator can tell the players and the committee.
 - A coming game (today or later) that leaves the game list keeps its places while it is gone; on its page and on its row on "Season" it shows "no longer in the game list". Its duties do not count, and it is no open item, while it is gone. If it comes back, they count again.
 - A game whose date has passed was played: its duties stay done, also when it leaves the game list later. Its page says "no longer in the game list".
-- A game that stops being a home game of the club (home and away swap) keeps its places, with "This game is no longer a home game of the club." on its page and on its row; its places do not count and it is no open item. Setting the places to "—" removes them. Its change in the list of changes says "has duties" too.
+- A game that stops being a home game of the club (home and away swap) keeps its places, with "This game is no longer a home game of the club." on its page and on its row; while it is coming its places do not count and it is no open item; once its date has passed they count as stored (facts of 2026-10-27). Setting the places to "—" removes them. Its change in the list of changes says "has duties" too.
 - An away game of the team that stops being one keeps its drivers the same way, with "This game no longer needs drivers of the team."
 - A team named on a place that is no longer in the game list keeps its name on the place, and stays in that pull-down list as long as a place names it.
 - Another team chosen in the middle of a season (rare): each place keeps its team, so the places of the old team are never places of the new team; where the schedule names the new team, those places are its places. Drivers of the old team: coming ones show "This game no longer needs drivers of the team." and do not count; past ones count. Choosing the old team again brings its places back.
@@ -109,9 +114,9 @@ never an open item for the schedule (S19).
 done, **so that** I can divide the places fairly and the totals are right.
 
 #### Acceptance criteria
-- [ ] On the page of a game, a tap on a duty place of the team (a place that names the team, or a driver place) opens the choice of a player: the players with the role "plays games" on the game's date, hidden players too (hidden only keeps lists short, as at a training), sorted by first name. Next to each name, that player's totals for that kind in the current season: "2 done · 1 planned". The tool marks no player as proposed.
+- [ ] On the page of a game, a tap on a duty place of the team (a place that names the team, or a driver place) opens the choice of a player: the players with the role "plays games" on the game's date, hidden players too (hidden only keeps lists short, as at a training), sorted by first name. Next to each name, that player's totals for that kind in the game's season (for a game of this season: the current season; coordinator, 2026-10-27): "2 done · 1 planned". The tool marks no player as proposed.
 - [ ] A tap on a player puts the player on the duty place and saves at once. "Clear" makes the place open again.
-- [ ] A player who already has a duty place at the same game is not offered for another place at that game. A player with a clash at the same time is offered with a note next to the name: "also Table 13:00" (a duty place at another game that overlaps) or "plays 14:30" (another game of the team that overlaps; the game itself is never a clash) (S22); the coordinator can still choose the player.
+- [ ] A player who already has a duty place at the same game is not offered for another place at that game. A clash is a duty place at another game ("also Table 13:00") or another game of the team ("plays 14:30"); the game itself is never a clash (S22). A clash on another court less than 1 hour 30 minutes apart shows next to the name and the player cannot be chosen; from 1 hour 30 minutes to less than 2 hours apart it shows as a warning and the player can be chosen (facts of 2026-10-27). A player already on a place stays on it when a later change makes a clash; the place shows the clash as a warning. "Someone else" on a past game is never blocked.
 - [ ] A filled duty place of a game before today (Dutch date) counts as **done** by its player. A filled duty place of today or later counts as **planned**. Open places count for nobody.
 - [ ] On a past game, the coordinator can correct a duty place: another player ("Someone else": the same choice), or "Nobody" (the place was not done; it counts for nobody and shows "not done (was Anna)", so the planned player stays visible). The correction replaces what counts.
 - [ ] **A new open item on the start page**: "Away game Sat 31 Oct: 2 drivers open", "Home game Sun 1 Nov: 1 table place open", or for more than one game "3 games with open places": the home games of the club from today to 4 weeks ahead with open places of the team, and the away games of the team in this week and next (the window of "Next") with open driver places, that still need duties of the team. A tap opens the game; for more than one, a tap opens the list of those games below the item, each a tap to its page.
@@ -134,6 +139,8 @@ or "Nobody".
 - A save that fails shows "Not saved. Try again." and the place shows what is stored.
 - A driver proposal that rises by itself (a player joins the team) opens new driver places; the game can become an open item without a save.
 - "Duties" with no duties in the season: "No duties yet this season."
+- A change to a past game where something is stored for the team (a place that names the team, a number of drivers set, or a player on a place of the team) is kept in the list of changes with "has duties", as a change to a coming game is, until the coordinator taps "Seen"; it does not drop off because its date has passed. A change to a past game without duties of the team is not kept, as now (facts of 2026-10-27).
+- A game where players are on driver places keeps those places, also when it no longer needs drivers of the team; while it is coming they do not count, once its date has passed they count as stored.
 
 ### Story C: The message for the next game
 **As the** coordinator, **I want to** copy one message about the team's next game, **so that** the
@@ -243,7 +250,7 @@ Season · Attendance · Duties · Team · Players · Settings
 - The choice of a player works like marking at a training: a tap saves at once, "Not saved. Try again." when it fails, the stored state shown again.
 - Players: only the role "plays games" on the date counts, as roles decide who is at a training; hidden players are offered.
 - Totals are worked out each time from what is stored, as the attendance totals are; "Duties" is to duties what "Attendance" is to trainings.
-- The list of changes keeps its behaviour; a change to a game with duties also says "has duties".
+- The list of changes keeps its behaviour; a change to a game with duties also says "has duties", and a change to a past game with duties of the team is kept until seen (story B).
 - A choice of a place saves at once, as a tap at a training; "Schedule entered" works like "Checked" at a training (a tap by the coordinator, also undone with a tap), but it says only that the schedule is entered, not that the duties were done.
 
 ## What changes for existing users
