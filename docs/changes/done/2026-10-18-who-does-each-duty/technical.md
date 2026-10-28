@@ -13,9 +13,9 @@ changes keeps changes to past games with duties, so the work is shared fairly an
 trusted.
 
 ## Requirements summary
-Story B of the epic [Duties](../2026-10-18-duties/) (`functional.md` approved 2026-10-25, second
+Story B of the epic [Duties](../../2026-10-18-duties/) (`functional.md` approved 2026-10-25, second
 change, and changed on 2026-10-27 at this design; epic `technical.md` approved 2026-10-25, second
-change). Story A ([Duty places](../done/2026-10-18-duty-places/)) is built and closed on the branch
+change). Story A ([Duty places](../2026-10-18-duty-places/)) is built and closed on the branch
 `duty-places`; both go to `main` together as release 1.
 
 - **Places of the team**: the table and referee places that name the team, plus the driver places of an away game of the team. Only these get players.
