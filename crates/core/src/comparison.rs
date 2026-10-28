@@ -55,13 +55,15 @@ pub struct GameChange {
 
 /// The changes of the games that are in the schedule before or after the reading, one change for
 /// each game, sorted by source id. Each change is [`change_between`] the stored game and the game
-/// after the reading, so the result line and the list of changes use one rule.
+/// after the reading, so the result line and the list of changes use one rule. `with_duties`:
+/// the games with duties of the team ([`change_between`]).
 pub fn compare(
     stored: &[StoredGame],
     read: &[Game],
     club: ClubNumber,
     team: Option<TeamNumber>,
     today: NaiveDate,
+    with_duties: &BTreeSet<i64>,
 ) -> Vec<GameChange> {
     let stored_by_id = by_id(stored);
     let mut changes = Vec::new();
@@ -71,7 +73,8 @@ pub fn compare(
             game: after.clone(),
             in_list: true,
         };
-        if let Some(change) = change_between(before, &now, club, team, today) {
+        let duties = with_duties.contains(&after.source_id);
+        if let Some(change) = change_between(before, &now, club, team, today, duties) {
             changes.push(GameChange {
                 source_id: after.source_id,
                 change,
@@ -85,7 +88,8 @@ pub fn compare(
             game: stored.game.clone(),
             in_list: false,
         };
-        if let Some(change) = change_between(Some(stored), &now, club, team, today) {
+        let duties = with_duties.contains(&stored.game.source_id);
+        if let Some(change) = change_between(Some(stored), &now, club, team, today, duties) {
             changes.push(GameChange {
                 source_id: stored.game.source_id,
                 change,
@@ -100,16 +104,19 @@ pub fn compare(
 
 /// The change from the game as the coordinator last saw it to the game now; `None`: nothing to
 /// show. `last_seen: None`: the game was not in the tool before. Only games of `today` or later
-/// (as last seen or now) give a change: a change to a past game needs no action.
+/// (as last seen or now) give a change: a change to a past game needs no action, unless the game
+/// has duties of the team (`has_duties`: a place that names the team, a number of drivers above
+/// 0, or a player on a place), whose record the coordinator may want to check.
 pub fn change_between(
     last_seen: Option<&StoredGame>,
     now: &StoredGame,
     club: ClubNumber,
     team: Option<TeamNumber>,
     today: NaiveDate,
+    has_duties: bool,
 ) -> Option<Change> {
     let past = |stored: &StoredGame| stored.game.date < today;
-    if past(now) && last_seen.is_none_or(past) {
+    if !has_duties && past(now) && last_seen.is_none_or(past) {
         return None;
     }
     let visible = |stored: &StoredGame| {
@@ -164,7 +171,8 @@ pub enum ChangeUpdate {
 
 /// The updates of the open changes after a reading, sorted by source id. For each game of the club
 /// and season: last seen is the copy in its open change, or else the stored game before this
-/// reading; now is the game after this reading.
+/// reading; now is the game after this reading. `with_duties`: the games with duties of the team
+/// ([`change_between`]); their changes stay also when the game is past.
 pub fn update_open_changes(
     open: &[OpenChange],
     stored: &[StoredGame],
@@ -172,6 +180,7 @@ pub fn update_open_changes(
     club: ClubNumber,
     team: TeamNumber,
     today: NaiveDate,
+    with_duties: &BTreeSet<i64>,
 ) -> Vec<ChangeUpdate> {
     let team = Some(team);
     let open_by_id: BTreeMap<i64, &OpenChange> =
@@ -199,15 +208,17 @@ pub fn update_open_changes(
     let mut updates = Vec::new();
     for (source_id, now) in &after {
         let source_id = *source_id;
+        let duties = with_duties.contains(&source_id);
         let before = stored_by_id.get(&source_id).copied();
         match open_by_id.get(&source_id) {
             Some(open) => {
-                let change = change_between(open.last_seen.as_ref(), now, club, team, today);
+                let change =
+                    change_between(open.last_seen.as_ref(), now, club, team, today, duties);
                 // A game that leaves the game list before its change was seen keeps the open
                 // change, with nothing to show while it is gone: if it comes back, it is compared
                 // with what the coordinator last saw, so a game never seen is "new", not "came
-                // back". A past game lets it go.
-                let kept_while_gone = !now.in_list && now.game.date >= today;
+                // back". A past game lets it go, unless it has duties of the team.
+                let kept_while_gone = !now.in_list && (now.game.date >= today || duties);
                 if change.is_none() && !kept_while_gone {
                     updates.push(ChangeUpdate::Remove { source_id });
                 } else if before != Some(now) {
@@ -215,7 +226,7 @@ pub fn update_open_changes(
                 }
             }
             None => {
-                if change_between(before, now, club, team, today).is_some() {
+                if change_between(before, now, club, team, today, duties).is_some() {
                     updates.push(ChangeUpdate::Insert {
                         source_id,
                         last_seen: before.cloned().map(Box::new),
@@ -367,13 +378,15 @@ pub struct ListedChange {
 /// The open changes to show: each one is [`change_between`] its last-seen game and the stored
 /// game now; changes that give nothing (for example of past games) are left out. In the order of
 /// the game's date and start time (now, or as last seen for a game no longer in the game list);
-/// not known start times last within a date; then by source id.
+/// not known start times last within a date; then by source id. `with_duties`: the games with
+/// duties of the team ([`change_between`]).
 pub fn list_changes(
     open: Vec<OpenChange>,
     stored: &[StoredGame],
     club: ClubNumber,
     team: TeamNumber,
     today: NaiveDate,
+    with_duties: &BTreeSet<i64>,
 ) -> Vec<ListedChange> {
     let team = Some(team);
     let stored_by_id = by_id(stored);
@@ -381,7 +394,8 @@ pub fn list_changes(
         .into_iter()
         .filter_map(|open| {
             let now = (*stored_by_id.get(&open.source_id)?).clone();
-            let change = change_between(open.last_seen.as_ref(), &now, club, team, today)?;
+            let duties = with_duties.contains(&open.source_id);
+            let change = change_between(open.last_seen.as_ref(), &now, club, team, today, duties)?;
             let last_seen_reason = open
                 .last_seen
                 .as_ref()
@@ -470,7 +484,7 @@ mod tests {
     }
 
     fn kinds(stored: &[StoredGame], read: &[Game]) -> Vec<(i64, Change)> {
-        compare(stored, read, CLUB, Some(TEAM), TODAY)
+        compare(stored, read, CLUB, Some(TEAM), TODAY, &BTreeSet::new())
             .into_iter()
             .map(|change| (change.source_id, change.change))
             .collect()
@@ -551,6 +565,7 @@ mod tests {
             CLUB,
             Some(TEAM),
             TODAY,
+            &BTreeSet::new(),
         );
         assert_eq!(changes[0].change, changed(&[Difference::StartTime]));
         assert_eq!(count(&changes).moved, 1);
@@ -632,7 +647,14 @@ mod tests {
         let mut moved = team_game();
         moved.date = NaiveDate::from_ymd_opt(2026, 11, 8).expect("valid date");
         moved.place.number = PlaceNumber(2);
-        let changes = compare(&stored(&[team_game()]), &[moved], CLUB, Some(TEAM), TODAY);
+        let changes = compare(
+            &stored(&[team_game()]),
+            &[moved],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+            &BTreeSet::new(),
+        );
         assert_eq!(
             changes[0].change,
             changed(&[Difference::Date, Difference::Place])
@@ -656,6 +678,7 @@ mod tests {
             CLUB,
             Some(TEAM),
             TODAY,
+            &BTreeSet::new(),
         );
         assert_eq!(changes[0].before, Some(team_game()));
         assert_eq!(changes[0].after, Some(moved));
@@ -712,7 +735,14 @@ mod tests {
             game(10, TEAM, OPPONENT),
         ];
         assert_eq!(
-            count(&compare(&before, &read, CLUB, Some(TEAM), TODAY)),
+            count(&compare(
+                &before,
+                &read,
+                CLUB,
+                Some(TEAM),
+                TODAY,
+                &BTreeSet::new()
+            )),
             Counts {
                 new: 1,
                 moved: 1,
@@ -768,6 +798,7 @@ mod tests {
             CLUB,
             Some(TEAM),
             TODAY,
+            &BTreeSet::new(),
         );
         assert_eq!(same_number_pairs(&changes), [(1, 2)]);
     }
@@ -780,6 +811,7 @@ mod tests {
             CLUB,
             Some(TEAM),
             TODAY,
+            &BTreeSet::new(),
         );
         assert_eq!(same_number_pairs(&changes), []);
     }
@@ -812,7 +844,14 @@ mod tests {
         moved.start_time = time(11);
         assert_eq!(kinds(&stored(&[yesterday.clone()]), &[moved]), []);
         assert_eq!(kinds(&stored(&[yesterday]), &[]), []);
-        let changes = compare(&[], &[on(team_game(), day(12))], CLUB, Some(TEAM), TODAY);
+        let changes = compare(
+            &[],
+            &[on(team_game(), day(12))],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+            &BTreeSet::new(),
+        );
         assert_eq!(changes, []);
         assert_eq!(count(&changes), Counts::default());
     }
@@ -845,7 +884,7 @@ mod tests {
     }
 
     fn updates(open: &[OpenChange], stored: &[StoredGame], read: &[Game]) -> Vec<ChangeUpdate> {
-        update_open_changes(open, stored, read, CLUB, TEAM, TODAY)
+        update_open_changes(open, stored, read, CLUB, TEAM, TODAY, &BTreeSet::new())
     }
 
     fn at(hour: u32) -> Game {
@@ -905,7 +944,14 @@ mod tests {
             in_list: false,
         };
         assert_eq!(
-            list_changes(open.to_vec(), &[gone.clone()], CLUB, TEAM, TODAY),
+            list_changes(
+                open.to_vec(),
+                &[gone.clone()],
+                CLUB,
+                TEAM,
+                TODAY,
+                &BTreeSet::new()
+            ),
             []
         );
         // While it stays gone, nothing happens.
@@ -923,7 +969,14 @@ mod tests {
             updates(&open, &[gone], &[at(10)]),
             [ChangeUpdate::Touch { source_id: 1 }]
         );
-        let listed = list_changes(open.to_vec(), &stored(&[at(10)]), CLUB, TEAM, TODAY);
+        let listed = list_changes(
+            open.to_vec(),
+            &stored(&[at(10)]),
+            CLUB,
+            TEAM,
+            TODAY,
+            &BTreeSet::new(),
+        );
         let kinds: Vec<_> = listed.iter().map(|listed| listed.change.clone()).collect();
         assert_eq!(kinds, [Change::New]);
     }
@@ -943,7 +996,14 @@ mod tests {
             updates(&open, &[gone], &[inside.clone()]),
             [ChangeUpdate::Touch { source_id: 1 }]
         );
-        let listed = list_changes(open.to_vec(), &stored(&[inside]), CLUB, TEAM, TODAY);
+        let listed = list_changes(
+            open.to_vec(),
+            &stored(&[inside]),
+            CLUB,
+            TEAM,
+            TODAY,
+            &BTreeSet::new(),
+        );
         assert!(
             matches!(
                 listed.as_slice(),
@@ -982,6 +1042,91 @@ mod tests {
         let yesterday = on(at(11), day(12));
         assert_eq!(
             updates(&open, &stored(&[yesterday.clone()]), &[yesterday]),
+            [ChangeUpdate::Remove { source_id: 1 }]
+        );
+    }
+
+    #[test]
+    fn a_change_to_a_past_game_with_duties_is_a_change_and_stays() {
+        let duties = BTreeSet::from([1]);
+        let yesterday = on(team_game(), day(12));
+        let mut moved = yesterday.clone();
+        moved.start_time = time(11);
+        let changes = compare(
+            &stored(&[yesterday.clone()]),
+            &[moved.clone()],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+            &duties,
+        );
+        assert_eq!(changes[0].change, changed(&[Difference::StartTime]));
+        // Gone from the game list after its date: a change too.
+        let gone = compare(
+            &stored(&[yesterday.clone()]),
+            &[],
+            CLUB,
+            Some(TEAM),
+            TODAY,
+            &duties,
+        );
+        assert_eq!(gone[0].change, Change::Gone);
+
+        // The reading inserts it, and a later reading keeps it, also while it is gone.
+        let inserted = update_open_changes(
+            &[],
+            &stored(&[yesterday.clone()]),
+            &[moved.clone()],
+            CLUB,
+            TEAM,
+            TODAY,
+            &duties,
+        );
+        assert!(matches!(
+            inserted[..],
+            [ChangeUpdate::Insert { source_id: 1, .. }]
+        ));
+        let open = [open(1, Some(yesterday))];
+        let kept = update_open_changes(
+            &open,
+            &stored(&[moved.clone()]),
+            &[moved.clone()],
+            CLUB,
+            TEAM,
+            TODAY,
+            &duties,
+        );
+        assert_eq!(kept, []);
+        let kept = update_open_changes(
+            &open,
+            &stored(&[moved.clone()]),
+            &[],
+            CLUB,
+            TEAM,
+            TODAY,
+            &duties,
+        );
+        assert_eq!(kept, [ChangeUpdate::Touch { source_id: 1 }]);
+        // The list of changes shows it.
+        let listed = list_changes(open.to_vec(), &stored(&[moved]), CLUB, TEAM, TODAY, &duties);
+        assert_eq!(listed[0].change, changed(&[Difference::StartTime]));
+    }
+
+    #[test]
+    fn a_past_change_without_duties_is_still_removed() {
+        let open = [open(1, Some(on(team_game(), day(11))))];
+        let yesterday = on(at(11), day(12));
+        let with_other = BTreeSet::from([2]);
+        assert_eq!(
+            update_open_changes(
+                &open,
+                &stored(&[yesterday.clone()]),
+                &[yesterday],
+                CLUB,
+                TEAM,
+                TODAY,
+                &with_other
+            ),
             [ChangeUpdate::Remove { source_id: 1 }]
         );
     }
@@ -1029,7 +1174,8 @@ mod tests {
                 },
                 CLUB,
                 Some(TEAM),
-                TODAY
+                TODAY,
+                false
             ),
             Some(Change::CameBack)
         );
@@ -1062,7 +1208,7 @@ mod tests {
                 in_list: false,
             },
         ];
-        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
         assert_eq!(
             listed
                 .iter()
@@ -1096,7 +1242,7 @@ mod tests {
             open_seen(game(5, TEAM, OPPONENT)),
         ];
         let stored = stored(&[team_game(), later, not_known, past, game(5, TEAM, OPPONENT)]);
-        let ids: Vec<i64> = list_changes(open, &stored, CLUB, TEAM, TODAY)
+        let ids: Vec<i64> = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new())
             .iter()
             .map(|listed| listed.source_id)
             .collect();
@@ -1129,7 +1275,7 @@ mod tests {
             game: game(1, CLUB_TEAM, OPPONENT),
             in_list: true,
         }];
-        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
         assert_eq!(listed[0].change, changed(&[Difference::Team]));
         assert_eq!(listed[0].reason, ScheduleReason::TeamGame);
 
@@ -1139,7 +1285,7 @@ mod tests {
             game: game(2, TEAM, OPPONENT),
             in_list: true,
         }];
-        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY);
+        let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
         assert_eq!(listed[0].reason, ScheduleReason::TeamGame);
     }
 }

@@ -3,6 +3,7 @@
 pub mod attendance;
 pub mod changes;
 pub mod clubs;
+pub mod duties;
 pub(crate) mod format;
 pub mod games;
 pub mod health;
@@ -58,6 +59,7 @@ use utoipa::OpenApi;
         team::team_leave,
         team::team_undo,
         attendance::get,
+        duties::get,
         trainings::get,
         trainings::open,
         trainings::add,

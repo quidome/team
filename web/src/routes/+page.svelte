@@ -56,6 +56,8 @@
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/attendance')} class="font-medium underline underline-offset-4">Attendance</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
+		<a href={resolve('/duties')} class="font-medium underline underline-offset-4">Duties</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/players')} class="font-medium underline underline-offset-4">Players</a>
@@ -100,7 +102,7 @@
 								>
 									{openItemText(item)}
 								</button>
-								{#if expanded === item.kind && item.kind === 'schedule_not_entered'}
+								{#if expanded === item.kind && (item.kind === 'schedule_not_entered' || item.kind === 'open_places')}
 									<ul id="open-item-{item.kind}" class="mt-2 space-y-1 pl-4">
 										{#each item.games as game (game.id)}
 											<li>

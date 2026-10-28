@@ -58,6 +58,9 @@ export function messageFor(error: unknown, status: number): string {
 	if (code === 'role_starts_later' && typeof date === 'string')
 		return `This player's role starts on ${formatDay(date)}. To change it, use "Correct" in the history.`;
 	const filled = (error as { filled?: unknown } | undefined)?.filled;
+	const highest = (error as { highest?: unknown } | undefined)?.highest;
+	if (code === 'places_filled' && typeof highest === 'number' && highest !== filled)
+		return `Driver place ${highest} has a player. Clear it first.`;
 	if (code === 'places_filled' && typeof filled === 'number')
 		return `${filled} ${filled === 1 ? 'place is' : 'places are'} filled. Clear one first.`;
 	const players: Record<string, string> = {
@@ -93,6 +96,13 @@ export function messageFor(error: unknown, status: number): string {
 		out_of_range: 'Enter a number from 0 to 10.',
 		unknown_team: 'This team is not a team of the club. Load the page again.',
 		player_on_place: 'Clear the player first.',
+		not_a_place_of_the_team: 'This place is no longer a place of the team. Load the page again.',
+		player_at_game: 'This player already has a place at this game.',
+		clash: 'This player is at another game at almost the same time.',
+		not_past: 'Only a past game can be corrected.',
+		no_player_on_place: 'This place has no player. Load the page again.',
+		invalid_outcome: 'Choose who did the duty.',
+		unknown_player: 'This player no longer exists. Load the page again.',
 		invalid_place: 'This place cannot be read.',
 		invalid_game: 'This game cannot be read.'
 	};
@@ -157,6 +167,9 @@ export type ScheduleGame = components['schemas']['ScheduleGame'];
 export type PlacesView = components['schemas']['PlacesView'];
 export type GamePage = components['schemas']['GamePage'];
 export type PlaceKind = components['schemas']['PlaceKindView'];
+export type DutyKind = components['schemas']['DutyKindView'];
+export type Choice = components['schemas']['ChoiceView'];
+export type PlaceOfTeam = components['schemas']['PlaceView'];
 
 /** The page of a game with its duty places (story A of duties). */
 export async function loadGame(
@@ -209,6 +222,53 @@ export async function setDrivers(
 		await api.PUT('/api/games/{season}/{id}/drivers', {
 			params: { path: { season, id } },
 			body: { drivers }
+		})
+	);
+}
+
+/** Puts `player` on a place of the team. */
+export async function setAssignment(
+	season: string,
+	id: string,
+	kind: DutyKind,
+	number: number,
+	player: number
+): Promise<GamePage> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/assignments/{kind}/{number}', {
+			params: { path: { season, id, kind, number: String(number) } },
+			body: { player }
+		})
+	);
+}
+
+/** "Clear": the place of the team has no player again. */
+export async function clearAssignment(
+	season: string,
+	id: string,
+	kind: DutyKind,
+	number: number
+): Promise<GamePage> {
+	return dataOf(
+		await api.DELETE('/api/games/{season}/{id}/assignments/{kind}/{number}', {
+			params: { path: { season, id, kind, number: String(number) } }
+		})
+	);
+}
+
+/** After the game: as planned, "Someone else" (`done_by` with `player`) or "Nobody" (`not_done`). */
+export async function setOutcome(
+	season: string,
+	id: string,
+	kind: DutyKind,
+	number: number,
+	outcome: 'as_planned' | 'done_by' | 'not_done',
+	player?: number
+): Promise<GamePage> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/assignments/{kind}/{number}/outcome', {
+			params: { path: { season, id, kind, number: String(number) } },
+			body: { outcome, player }
 		})
 	);
 }
@@ -436,10 +496,22 @@ export async function loadSeason(
 
 export type StartAnswer = components['schemas']['StartAnswer'];
 export type OpenItemView = components['schemas']['OpenItemView'];
+export type OpenGame = components['schemas']['OpenGameView'];
 
 /** The start page: the open items, the last training and the next events. */
 export async function loadStart(fetch: typeof globalThis.fetch): Promise<StartAnswer> {
 	return dataOf(await api.GET('/api/start', { fetch }));
+}
+
+export type DutiesOverview = components['schemas']['DutiesOverview'];
+
+/** The duty totals of each player in a season (story B of duties); the current season when
+ * `season` is left out. */
+export async function loadDuties(
+	fetch: typeof globalThis.fetch,
+	season?: string
+): Promise<DutiesOverview> {
+	return dataOf(await api.GET('/api/duties', { fetch, params: { query: { season } } }));
 }
 
 export type AttendanceOverview = components['schemas']['AttendanceOverview'];

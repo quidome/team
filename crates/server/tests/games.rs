@@ -533,6 +533,16 @@ async fn start(reader: &Reader) -> Value {
     ok(reader, "GET", "/api/start", None).await
 }
 
+/// The kinds of the open items of a start page, in order.
+fn kinds_of(start: &Value) -> Vec<&str> {
+    start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["kind"].as_str().unwrap())
+        .collect()
+}
+
 /// The game ids of the open item "schedule not entered" (empty without it).
 fn not_entered_ids(start: &Value) -> Vec<i64> {
     start["open_items"]
@@ -1066,6 +1076,125 @@ async fn a_close_clash_blocks_and_a_tight_one_does_not(pool: PgPool) {
     reader.read_good().await;
     let (status, answer) = assign(&reader, X14_31_OCT, "table", 1, anna).await;
     assert_eq!((status, answer["error"].as_str()), (400, Some("clash")));
+}
+
+/// The player `id` in the choice of a page.
+fn in_choice(page: &Value, id: i64) -> Option<&Value> {
+    page["players"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|player| player["id"] == id)
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_choice_has_the_players_of_the_date_with_their_totals_and_clashes(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    for id in [X12_3_OCT, X12_31_OCT, X14_31_OCT] {
+        set_place(&reader, id, "table", 1, Some(M16_1)).await;
+    }
+    let bram = add_player(&reader, "Bram", None, "plays_games").await;
+    let anna = add_player(&reader, "Anna", None, "plays_games").await;
+    let cas = add_player(&reader, "Cas", None, "only_trains").await;
+    assign(&reader, X12_3_OCT, "table", 1, anna).await;
+    assign(&reader, X12_31_OCT, "table", 1, anna).await;
+
+    let page = ok(&reader, "GET", &game_path(X14_31_OCT), None).await;
+    assert_eq!(page["past"], false);
+    let names: Vec<&str> = page["players"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|player| player["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Anna", "Bram"]);
+    assert!(in_choice(&page, cas).is_none());
+    let choice = in_choice(&page, anna).unwrap();
+    assert_eq!(
+        choice["totals"]["table"],
+        json!({ "done": 1, "planned": 1 })
+    );
+    assert_eq!(
+        choice["totals"]["drive"],
+        json!({ "done": 0, "planned": 0 })
+    );
+    assert_eq!(choice["at_game"], false);
+    assert_eq!(choice["plays_on_date"], true);
+    // Table at 13:00 on Veld 1, this game at 14:30 on Veld 2: a note only.
+    let duty = choice["clashes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|clash| clash["duty"] == "table")
+        .unwrap();
+    assert_eq!(duty["level"], "warning");
+    assert_eq!(duty["start"], "13:00");
+    // The team plays at 16:00: a note for each player.
+    assert_eq!(
+        in_choice(&page, bram).unwrap()["clashes"],
+        json!([{ "level": "warning", "duty": null, "start": "16:00" }])
+    );
+
+    // A player on a place of the game is in its choice, as at the game.
+    let page = ok(&reader, "GET", &game_path(X12_31_OCT), None).await;
+    assert_eq!(in_choice(&page, anna).unwrap()["at_game"], true);
+    let page = ok(&reader, "GET", &game_path(X12_3_OCT), None).await;
+    assert_eq!(page["past"], true);
+}
+
+/// The games of the open item "games with open places" (empty without it).
+fn open_places_games(start: &Value) -> Vec<Value> {
+    start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "open_places")
+        .map(|item| item["games"].as_array().unwrap().clone())
+        .unwrap_or_default()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn open_places_list_the_games_whose_places_of_the_team_have_no_player(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Mon 26 Oct: the drivers count until Sun 8 Nov, the table places until Sun 22 Nov.
+    reader.harness.clock.set(utc(2026, 10, 26, 12, 0));
+    reader.log_in_again().await;
+    assert!(open_places_games(&start(&reader).await).is_empty());
+
+    // 3 players: 1 driver at each away game of the team.
+    let mut players = Vec::new();
+    for name in ["Anna", "Bram", "Cas"] {
+        players.push(add_player(&reader, name, None, "plays_games").await);
+    }
+    set_place(&reader, X12_31_OCT, "table", 1, Some(M16_1)).await;
+    let answer = start(&reader).await;
+    // After "schedule not entered", before the trainings.
+    let kinds = kinds_of(&answer);
+    let at = kinds
+        .iter()
+        .position(|&kind| kind == "open_places")
+        .unwrap();
+    assert_eq!(kinds[at - 1], "schedule_not_entered");
+    let games = open_places_games(&answer);
+    // The away game of Sat 7 Nov; the one of 21 Nov is after next week.
+    let away: Vec<&Value> = games.iter().filter(|game| game["drive"] != 0).collect();
+    assert_eq!(away.len(), 1, "{games:?}");
+    assert_eq!(away[0]["id"], 1_073_159);
+    assert_eq!(away[0]["drive"], 1);
+    let table = games.iter().find(|game| game["id"] == X12_31_OCT).unwrap();
+    assert_eq!(
+        (&table["table"], &table["referee"], &table["drive"]),
+        (&json!(1), &json!(0), &json!(0))
+    );
+    assert_eq!(table["date"], "2026-10-31");
+    assert_eq!(table["season"], "2026-2027");
+
+    // A player on the place: the game drops off.
+    assign(&reader, X12_31_OCT, "table", 1, players[0]).await;
+    let games = open_places_games(&start(&reader).await);
+    assert!(games.iter().all(|game| game["id"] != X12_31_OCT));
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]

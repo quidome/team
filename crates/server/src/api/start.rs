@@ -9,8 +9,9 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    Event, EventKind, Game, OpenItem, ReadingState, Season, last_games, last_training, next_events,
-    open_item_seasons, open_items, schedule_not_entered, season_events,
+    DutyKind, Event, EventKind, Game, OpenItem, ReadingState, Season, last_games, last_training,
+    next_events, open_item_seasons, open_items, open_places_games, schedule_not_entered,
+    season_events,
 };
 use utoipa::ToSchema;
 
@@ -54,6 +55,9 @@ pub enum OpenItemView {
     /// Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time
     /// order.
     ScheduleNotEntered { games: Vec<GameItemView> },
+    /// Coming games with places of the team without a player, in time order: table and referee
+    /// places from today to 4 weeks ahead, driver places from today until the Sunday of next week.
+    OpenPlaces { games: Vec<OpenGameView> },
     /// Training days before today that were never opened; `first` is the oldest.
     NotOpened { first: String, count: usize },
     /// Trainings before today that are neither cancelled nor checked; `first` is the oldest.
@@ -73,6 +77,29 @@ pub struct GameItemView {
     pub away: String,
 }
 
+/// A game of the open item "games with open places", with its open places for each kind.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct OpenGameView {
+    #[serde(flatten)]
+    pub game: GameItemView,
+    pub referee: usize,
+    pub table: usize,
+    pub drive: usize,
+}
+
+impl GameItemView {
+    fn of(season: Season, game: &Game) -> Self {
+        Self {
+            season: season.to_string(),
+            id: game.source_id,
+            date: day(game.date),
+            start_time: game.start_time.map(clock_time),
+            home: game.home.team_name.clone(),
+            away: game.away.team_name.clone(),
+        }
+    }
+}
+
 impl OpenItemView {
     /// The view of `item`; the games of an item come from `games` (the games of `season`).
     fn of(item: OpenItem, season: Season, games: &BTreeMap<i64, &Game>) -> Self {
@@ -84,13 +111,20 @@ impl OpenItemView {
                 games: ids
                     .iter()
                     .filter_map(|id| games.get(id))
-                    .map(|game| GameItemView {
-                        season: season.to_string(),
-                        id: game.source_id,
-                        date: day(game.date),
-                        start_time: game.start_time.map(clock_time),
-                        home: game.home.team_name.clone(),
-                        away: game.away.team_name.clone(),
+                    .map(|game| GameItemView::of(season, game))
+                    .collect(),
+            },
+            OpenItem::OpenPlaces { games: open } => Self::OpenPlaces {
+                games: open
+                    .iter()
+                    .filter_map(|open| {
+                        let count = |kind| open.open.get(&kind).copied().unwrap_or(0);
+                        Some(OpenGameView {
+                            game: GameItemView::of(season, games.get(&open.id)?),
+                            referee: count(DutyKind::Referee),
+                            table: count(DutyKind::Table),
+                            drive: count(DutyKind::Drive),
+                        })
                     })
                     .collect(),
             },
@@ -158,6 +192,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         &reading,
         games.unseen_changes,
         schedule_not_entered(&events, &places, today),
+        open_places_games(&events, &places, today),
         &lists,
     );
     let last = last_training(&lists)

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id AS \"source_id!\" FROM duty_teams\n           WHERE club_number = $1 AND season_year = $2 AND team_number = $3\n           UNION\n           SELECT source_id FROM game_duties\n           WHERE club_number = $1 AND season_year = $2 AND drivers > 0\n           UNION\n           SELECT source_id FROM duty_assignments\n           WHERE club_number = $1 AND season_year = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0905be04ff276975315854af1a580f9ac5891baa7d6d42edb3479841e011c703"
+}

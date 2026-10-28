@@ -180,6 +180,43 @@
         }
       }
     },
+    "/api/duties": {
+      "get": {
+        "tags": [
+          "duties"
+        ],
+        "operationId": "duties",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "query",
+            "description": "For example \"2026-2027\"; the current season when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The duty totals of each player in the season and the seasons to choose from",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DutiesOverview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/games/{season}/{id}": {
       "get": {
         "tags": [
@@ -2547,6 +2584,88 @@
           }
         }
       },
+      "ChoiceView": {
+        "type": "object",
+        "description": "A player in the choice of a place.",
+        "required": [
+          "id",
+          "name",
+          "hidden",
+          "totals",
+          "clashes",
+          "at_game",
+          "plays_on_date"
+        ],
+        "properties": {
+          "at_game": {
+            "type": "boolean",
+            "description": "The player already has a place at this game: not offered for another one."
+          },
+          "clashes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClashView"
+            },
+            "description": "The clashes with other games."
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name shown (\"Anna\", \"Anna B.\")."
+          },
+          "plays_on_date": {
+            "type": "boolean",
+            "description": "The player has the role \"plays games\" on the date: else not offered."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/KindTotalsView",
+            "description": "The duties of the player in the game's season, for each kind."
+          }
+        }
+      },
+      "ClashLevelView": {
+        "type": "string",
+        "enum": [
+          "blocked",
+          "warning"
+        ]
+      },
+      "ClashView": {
+        "type": "object",
+        "description": "A clash with another game: a duty place there (\"also Table 13:00\") or a game of the team\n(\"plays 14:30\").",
+        "required": [
+          "level"
+        ],
+        "properties": {
+          "duty": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DutyKindView",
+                "description": "The kind of the duty place there; `null`: the player plays that game."
+              }
+            ]
+          },
+          "level": {
+            "$ref": "#/components/schemas/ClashLevelView"
+          },
+          "start": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Dutch local start time of the other game (\"13:00\"); `null` when not known."
+          }
+        }
+      },
       "ClubTeams": {
         "type": "object",
         "required": [
@@ -2718,6 +2837,39 @@
           }
         }
       },
+      "DutiesOverview": {
+        "type": "object",
+        "description": "The page \"Duties\".",
+        "required": [
+          "season",
+          "current_season",
+          "seasons",
+          "rows"
+        ],
+        "properties": {
+          "current_season": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DutyRowView"
+            },
+            "description": "One row for each player with the role \"plays games\" in the season or with a duty in it,\nalso players who left and hidden players; sorted by first name."
+          },
+          "season": {
+            "type": "string",
+            "description": "For example \"2026-2027\"."
+          },
+          "seasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The seasons to choose from, newest first: those with a chosen team, the current season and\nthe chosen season."
+          }
+        }
+      },
       "DutyKindView": {
         "type": "string",
         "enum": [
@@ -2725,6 +2877,32 @@
           "table",
           "referee"
         ]
+      },
+      "DutyRowView": {
+        "type": "object",
+        "description": "The totals of one player in the season.",
+        "required": [
+          "player",
+          "name",
+          "hidden",
+          "totals"
+        ],
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name shown (\"Anna\", \"Anna B.\")."
+          },
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/KindTotalsView"
+          }
+        }
       },
       "ErrorKind": {
         "type": "string",
@@ -2826,7 +3004,9 @@
           "current_season",
           "team",
           "game",
-          "club_teams"
+          "club_teams",
+          "past",
+          "players"
         ],
         "properties": {
           "club_teams": {
@@ -2842,6 +3022,17 @@
           "game": {
             "$ref": "#/components/schemas/ScheduleGame",
             "description": "The game, with its duties."
+          },
+          "past": {
+            "type": "boolean",
+            "description": "The game is before today: its places can be corrected (\"Someone else\", \"Nobody\")."
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChoiceView"
+            },
+            "description": "The choice of a player for the places of the team: the players with the role \"plays\ngames\" on the date (hidden players too), and the players already at the game; sorted by\nfirst name."
           },
           "season": {
             "type": "string",
@@ -2928,6 +3119,25 @@
           },
           "reason": {
             "$ref": "#/components/schemas/HoldKind"
+          }
+        }
+      },
+      "KindTotalsView": {
+        "type": "object",
+        "required": [
+          "drive",
+          "table",
+          "referee"
+        ],
+        "properties": {
+          "drive": {
+            "$ref": "#/components/schemas/TotalView"
+          },
+          "referee": {
+            "$ref": "#/components/schemas/TotalView"
+          },
+          "table": {
+            "$ref": "#/components/schemas/TotalView"
           }
         }
       },
@@ -3250,6 +3460,36 @@
           }
         }
       },
+      "OpenGameView": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GameItemView"
+          },
+          {
+            "type": "object",
+            "required": [
+              "referee",
+              "table",
+              "drive"
+            ],
+            "properties": {
+              "drive": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "referee": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "table": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        ],
+        "description": "A game of the open item \"games with open places\", with its open places for each kind."
+      },
       "OpenItemView": {
         "oneOf": [
           {
@@ -3325,6 +3565,28 @@
                 "type": "string",
                 "enum": [
                   "schedule_not_entered"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Coming games with places of the team without a player, in time order: table and referee\nplaces from today to 4 weeks ahead, driver places from today until the Sunday of next week.",
+            "required": [
+              "games",
+              "kind"
+            ],
+            "properties": {
+              "games": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OpenGameView"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "open_places"
                 ]
               }
             }
@@ -4545,6 +4807,25 @@
           },
           "start": {
             "type": "string"
+          }
+        }
+      },
+      "TotalView": {
+        "type": "object",
+        "required": [
+          "done",
+          "planned"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "planned": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
