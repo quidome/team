@@ -266,3 +266,84 @@ Handled on 2026-10-28 (the coordinator chose to fix all of R2):
 - R4, R5: nothing to do.
 - R6: the two comments are fixed; the documents (`docs/architecture.md`,
   `docs/product/players-and-team.md`, the module list in `CLAUDE.md`) are for Close.
+
+`/review accept`, 2026-10-28, fresh agent. Input: mode `accept`, the change folder; no other
+arguments. Read: the epic's `functional.md` (story B, the shared facts, "Interface",
+"Consistency"; the epic's `idea.md` not read), this folder's `change.md` and
+the objective, the diff `a1835b0..HEAD` (core `duties`, `start_page`, `comparison`; server
+`api/games.rs`, `api/duties.rs`, `api/season.rs`, `duties.rs`; the page of a game, `/duties`,
+`duties.ts`, `start.ts`, `duties.e2e.ts`). The view below was formed before reading
+**Deviations**. Runs: `cargo test -p team_core` (259 pass); `cargo test -p team --test duties
+--test games --test changes` (all pass); `npm run build` and `npx playwright test duties` with its
+dependent projects (114 pass, against the real server with the clock on 12 October 2026).
+
+Each acceptance criterion of story B matches the intent: the choice (players with "plays games"
+on the date, hidden ones too, by first name, "2 done · 1 planned" of that kind in the game's
+season, nobody proposed); a tap saves at once and "Clear"; not offered at the same game; the clash
+table (same court nothing, other court < 1:30 blocked, < 2:00 warning, time not known a warning,
+the game itself skipped; a player on a place keeps it with the clash as a note); done before
+today, planned from today, open counts for nobody; "Someone else" and "Nobody" with "not done
+(was Anna)"; the open item with its two windows and its list; "Duties" with its rows, columns,
+season choice and empty text; one rule for the totals in the choice and on "Duties"
+(`duty_totals` over `SeasonPlaces`); "Anna B." / "Anna V."; the edge cases (not in the team on
+this date, "Delete player", a rising proposal, a failed save, past changes with duties kept until
+"Seen"). Checked by reading each rule against the criterion and by the runs above.
+
+- **A1 – faithful adaptation: the players are in their own block "Players on the places".** The
+  spec puts the tap on "a duty place of the team" on the page; the page keeps the four pull-down
+  lists of story A and lists the places of the team below them, one line per place ("Table 2 ·
+  open"), each a tap to the choice. On a past filled place the first tap offers "Someone else",
+  "Nobody" and "Clear"; choosing the planned player in "Someone else" undoes a correction (a
+  point the spec left open). Checked by reading `web/src/routes/game/[season]/[id]/+page.svelte`
+  and the browser test `on a past game "Nobody" and "Someone else" correct a place`.
+- **A2 – faithful adaptation: the texts the spec did not give.** "Driver place 3 has a player.
+  Clear it first." when the count and the highest filled place differ (coordinator); the reasons
+  a player cannot be chosen ("on this place", "already at this game", "Not in the team on this
+  date", "at another game at almost the same time"); "plays (time not known)"; "Away game" /
+  "Home game" in the open item by the kind that is open; "1 referee place, 2 table places open".
+  All say what the spec means. Checked by reading `web/src/lib/duties.ts` and `start.ts`.
+- **A3 – neutral drift: filling an open place of a past game can be blocked by a clash.** The
+  spec says "'Someone else' on a past game is never blocked" and lets the coordinator enter past
+  duties of this season to catch up; the intent is that a record of what happened is not refused.
+  A past place without a player is filled through the planned route (`offers` → `assign`,
+  `set_assignment`), which passes the clash and blocks under 1:30 on another court. In practice
+  rare: the club's home games are 1:30 apart on Veld 1 and 2 (a warning only), and a block means
+  two places in different halls under 1:30, which hardly happened. Checked by trace
+  (`crates/core/src/duties.rs` `offers` computes `assign` with the clash also when `past`;
+  `api/games.rs::set_assignment` passes `found.clash`). For Close: one line, or an idea to never
+  block on a past game.
+- **A4 – neutral drift: after another team is chosen, the old team's past table and referee
+  places count but cannot be seen.** A past game counts what is stored (A1 of story A), also
+  after another team is chosen; `place_counts` counts any assignment of a past game. But the page
+  of the game, "Season" and "Last" show only the places that name the current team (`of_team`),
+  so a player's "1 done" on "Duties" can come from a place the coordinator cannot open or
+  correct, until the old team is chosen again. Driver places stay visible (the driver part exists
+  while a place has a player). The spec calls the case rare and says nothing on showing these
+  places. Checked by trace (`game_places` filters `of_team` by `team`; `place_counts` returns
+  true for `past`); not run.
+- **A5 – neutral drift: the clash note under a corrected place is the planned player's.** On a
+  past place "Bram (was Anna)" the notes under it are Anna's clashes, not Bram's
+  (`onChoice` is looked up by `on.id`, the planned player). Cosmetic. Checked by reading the page.
+- **A6 – neutral drift, accepted in Deviations: the clash and the role are read before the lock.**
+  A duty saved at the same moment at another game is not seen by the clash check. One
+  coordinator; the keys still hold. Nothing to do.
+
+No concerning deviation: nothing built works against what the coordinator meant, and the
+deviations listed above match what was built (checked: each entry of **Deviations** against the
+code). The deviation of step 7 (a gone past game with duties keeps its change) fits the facts of
+2026-10-27; the real game list keeps past games (`tests/data/game-list/games-37-2025-2026.json`
+holds the whole season), so it does not flood the list of changes.
+
+Verdict: **accepted with notes**. A3 and A4 are for Close (a line in the product documents, or
+ideas); A5 is small.
+
+
+Handled on 2026-10-28 (the coordinator chose: fix A3 and A5, note A4):
+- A3 fixed: a blocking clash never blocks a place of a past game (`check_assignment` takes `past`;
+  the player, the role on the date and the clash are one `Candidate`). Core tests
+  `a_blocking_clash_does_not_block_a_place_of_a_past_game` and the offers test.
+- A5 fixed: the note under a corrected place is of the player who did it (`doerOf`; none after
+  "Nobody"); browser test `under a corrected place the note is of the player who did it`.
+- A4: no code change; at Close an entry in `docs/ideas.md` (should the past places of an earlier
+  team show on the page of a game?).
+- A1, A2, A6: nothing to do.

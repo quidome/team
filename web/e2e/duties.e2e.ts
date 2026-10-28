@@ -694,3 +694,26 @@ test('"Delete player" is not offered for a player with a duty', async ({ page })
 	expect((await page.request.delete(path, origin)).ok()).toBe(true);
 	expect(errors).toEqual([]);
 });
+
+test('under a corrected place the note is of the player who did it', async ({ page }) => {
+	const game = await findGame(page, otherHomeGame);
+	await page.route(`**/api/games/2026-2027/${game.id}`, async (route) => {
+		const answer = await (await route.fetch()).json();
+		const yara = answer.players.find((player: { name: string }) => player.name === 'Yara');
+		const yusuf = answer.players.find((player: { name: string }) => player.name === 'Yusuf');
+		yara.clashes = [{ level: 'warning', duty: null, start: '10:00' }];
+		yusuf.clashes = [{ level: 'warning', duty: 'table', start: '13:00' }];
+		answer.game.places.schedule.of_team[0].player = {
+			id: yara.id,
+			name: 'Yara',
+			not_in_team: false,
+			outcome: 'done_by',
+			done_by: { id: yusuf.id, name: 'Yusuf' }
+		};
+		await route.fulfill({ json: answer });
+	});
+	await page.goto(`/game/2026-2027/${game.id}`);
+	const table2 = teamPlace(page, 'Table 2');
+	await expect(table2.getByTestId('place-player')).toHaveText('Yusuf (was Yara)');
+	await expect(table2.getByTestId('place-clash')).toHaveText(['also Table 13:00']);
+});

@@ -20,6 +20,14 @@ export function playerText(player: NonNullable<Place['player']>): string {
 	return player.name;
 }
 
+/** The player who does or did the duty of a filled place: the planned player, the player of
+ * "Someone else", or `null` after "Nobody". */
+export function doerOf(player: NonNullable<Place['player']>): number | null {
+	if (player.outcome === 'not_done') return null;
+	if (player.outcome === 'done_by' && player.done_by) return player.done_by.id;
+	return player.id;
+}
+
 /** The player of each place, or "open". */
 function fills(list: Place[]): string {
 	return list.map((place) => (place.player ? playerText(place.player) : 'open')).join(', ');
