@@ -90,8 +90,10 @@ jobs:
         id: sqlx-cli
         uses: actions/cache/restore@v4
         with:
-          path: ~/.cargo/bin/sqlx
-          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-${{ runner.os }}
+          path: |
+            ~/.cargo/bin/sqlx
+            ~/.cargo/bin/cargo-sqlx
+          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-both-${{ runner.os }}
 
       - name: Install sqlx-cli
         if: steps.sqlx-cli.outputs.cache-hit != 'true'
@@ -103,8 +105,10 @@ jobs:
         if: github.ref == 'refs/heads/main' && steps.sqlx-cli.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: ~/.cargo/bin/sqlx
-          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-${{ runner.os }}
+          path: |
+            ~/.cargo/bin/sqlx
+            ~/.cargo/bin/cargo-sqlx
+          key: sqlx-cli-${{ env.SQLX_CLI_VERSION }}-both-${{ runner.os }}
 
       - name: Install actionlint
         run: |
