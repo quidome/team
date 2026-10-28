@@ -985,6 +985,9 @@ async fn a_place_after_the_game_is_corrected(pool: PgPool) {
     .await;
     assert_eq!(on_place(&page, 0)["outcome"], "done_by");
     assert_eq!(on_place(&page, 0)["done_by"]["name"], "Bram");
+    // The same planned player again keeps the correction.
+    let (_, page) = assign(&reader, X12_3_OCT, "table", 1, anna).await;
+    assert_eq!(on_place(&page, 0)["outcome"], "done_by");
     // Another planned player resets the correction.
     let (_, page) = assign(&reader, X12_3_OCT, "table", 1, bram).await;
     assert_eq!(on_place(&page, 0)["outcome"], "as_planned");
@@ -1119,8 +1122,11 @@ async fn the_choice_has_the_players_of_the_date_with_their_totals_and_clashes(po
         choice["totals"]["drive"],
         json!({ "done": 0, "planned": 0 })
     );
-    assert_eq!(choice["at_game"], false);
-    assert_eq!(choice["plays_on_date"], true);
+    // Table 1 of the team is open; a warning does not block.
+    assert_eq!(
+        choice["offers"],
+        json!([{ "kind": "table", "number": 1, "assign": null, "correct": null }])
+    );
     // Table at 13:00 on Veld 1, this game at 14:30 on Veld 2: a note only.
     let duty = choice["clashes"]
         .as_array()
@@ -1136,11 +1142,24 @@ async fn the_choice_has_the_players_of_the_date_with_their_totals_and_clashes(po
         json!([{ "level": "warning", "duty": null, "start": "16:00" }])
     );
 
-    // A player on a place of the game is in its choice, as at the game.
+    // A player on a place of the game is on this place; a coming game has no corrections.
     let page = ok(&reader, "GET", &game_path(X12_31_OCT), None).await;
-    assert_eq!(in_choice(&page, anna).unwrap()["at_game"], true);
+    let offer = &in_choice(&page, anna).unwrap()["offers"][0];
+    assert_eq!(
+        (&offer["assign"], &offer["correct"]),
+        (&json!("on_this_place"), &Value::Null)
+    );
+    // A past game: "Someone else" offers Bram, not Anna again.
     let page = ok(&reader, "GET", &game_path(X12_3_OCT), None).await;
     assert_eq!(page["past"], true);
+    assert_eq!(
+        in_choice(&page, anna).unwrap()["offers"][0]["correct"],
+        "on_this_place"
+    );
+    assert_eq!(
+        in_choice(&page, bram).unwrap()["offers"][0]["correct"],
+        Value::Null
+    );
 }
 
 /// The games of the open item "games with open places" (empty without it).

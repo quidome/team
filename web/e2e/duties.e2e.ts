@@ -555,9 +555,10 @@ test('a blocked player is shown with the reason and cannot be chosen', async ({ 
 	await page.route(`**/api/games/2026-2027/${game.id}`, async (route) => {
 		const answer = await (await route.fetch()).json();
 		for (const player of answer.players)
-			if (player.name === 'Yara')
+			if (player.name === 'Yara') {
 				player.clashes = [{ level: 'blocked', duty: 'referee', start: '14:00' }];
-			else if (player.name === 'Yusuf')
+				for (const offer of player.offers) offer.assign = 'clash';
+			} else if (player.name === 'Yusuf')
 				player.clashes = [{ level: 'warning', duty: null, start: '15:00' }];
 		await route.fulfill({ json: answer });
 	});
@@ -670,4 +671,26 @@ test('"Duties" shows the totals of each player in a season', async ({ page }) =>
 	// The answer 400 of this address is expected, so the console is checked before it.
 	await page.goto('/duties?season=2026');
 	await expect(page.getByTestId('invalid-season')).toHaveText('This season cannot be read.');
+});
+
+test('"Delete player" is not offered for a player with a duty', async ({ page }) => {
+	const errors = watchConsole(page);
+	const game = await findGame(page, otherHomeGame);
+	const path = `/api/games/2026-2027/${game.id}/assignments/table/2`;
+	const players = (await (await page.request.get(`/api/games/2026-2027/${game.id}`)).json())
+		.players as { id: number; name: string }[];
+	const yusuf = players.find((player) => player.name === 'Yusuf')!;
+	await page.goto(`/players/${yusuf.id}`);
+	await expect(page.getByRole('button', { name: 'Delete player' })).toBeVisible();
+
+	expect((await page.request.put(path, { ...origin, data: { player: yusuf.id } })).ok()).toBe(true);
+	await page.reload();
+	await expect(page.getByTestId('player-name')).toHaveText('Yusuf');
+	await expect(page.getByRole('button', { name: 'Delete player' })).toHaveCount(0);
+	// The server refuses it too, with its own code.
+	const refused = await page.request.delete(`/api/players/${yusuf.id}`, origin);
+	expect(refused.status()).toBe(400);
+	expect((await refused.json()).error).toBe('player_has_duties');
+	expect((await page.request.delete(path, origin)).ok()).toBe(true);
+	expect(errors).toEqual([]);
 });

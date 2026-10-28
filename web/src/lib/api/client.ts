@@ -83,6 +83,8 @@ export function messageFor(error: unknown, status: number): string {
 		cancelled: 'A cancelled training cannot be checked.',
 		player_has_absences:
 			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
+		player_has_duties:
+			'This player has duties and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',

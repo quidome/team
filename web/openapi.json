@@ -2593,14 +2593,9 @@
           "hidden",
           "totals",
           "clashes",
-          "at_game",
-          "plays_on_date"
+          "offers"
         ],
         "properties": {
-          "at_game": {
-            "type": "boolean",
-            "description": "The player already has a place at this game: not offered for another one."
-          },
           "clashes": {
             "type": "array",
             "items": {
@@ -2619,9 +2614,12 @@
             "type": "string",
             "description": "The name shown (\"Anna\", \"Anna B.\")."
           },
-          "plays_on_date": {
-            "type": "boolean",
-            "description": "The player has the role \"plays games\" on the date: else not offered."
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfferView"
+            },
+            "description": "For each place of the team (in the order of the page): can the player be chosen there\n(`team_core::offers`, the checks of the saves)."
           },
           "totals": {
             "$ref": "#/components/schemas/KindTotalsView",
@@ -3439,6 +3437,16 @@
           }
         }
       },
+      "NotOfferedView": {
+        "type": "string",
+        "description": "Why a player cannot be chosen for a place.",
+        "enum": [
+          "on_this_place",
+          "at_game",
+          "not_in_team",
+          "clash"
+        ]
+      },
       "NowThere": {
         "type": "object",
         "description": "A player who counts as \"there\" at trainings after a role started or its start moved earlier.",
@@ -3457,6 +3465,46 @@
               "type": "string"
             },
             "description": "The dates of those trainings, for example \"2026-09-01\", in order."
+          }
+        }
+      },
+      "OfferView": {
+        "type": "object",
+        "description": "Whether a player can be chosen for one place of the team.",
+        "required": [
+          "kind",
+          "number"
+        ],
+        "properties": {
+          "assign": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotOfferedView",
+                "description": "As the planned player; `null`: can be chosen."
+              }
+            ]
+          },
+          "correct": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotOfferedView",
+                "description": "As \"Someone else\" on a past place with a player; `null`: can be chosen (or no correction\nis possible there)."
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DutyKindView"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },

@@ -124,21 +124,23 @@ export function clashText(clash: Choice['clashes'][number]): string {
 	return clash.start ? `${what} ${clash.start}` : `${what} (time not known)`;
 }
 
-/** Why a player cannot be chosen for a place, or `null` when the player can be chosen. `on`: the
- * player on the place. `correcting`: "Someone else" on a past game, which a clash never blocks;
- * the planned player can be chosen again there (as planned). */
+const notOfferedTexts = {
+	on_this_place: 'on this place',
+	at_game: 'already at this game',
+	not_in_team: 'Not in the team on this date',
+	clash: 'at another game at almost the same time'
+} as const;
+
+/** Why a player cannot be chosen for `place`, or `null` when the player can be chosen; the server
+ * works it out with the checks of the saves (`offers`). `correcting`: "Someone else". */
 export function notOffered(
 	choice: Choice,
-	on: Place['player'] | null | undefined,
+	place: Pick<Place, 'kind' | 'number'>,
 	correcting: boolean
 ): string | null {
-	const doneBy = on?.outcome === 'done_by' ? on.done_by?.id : undefined;
-	if (correcting && choice.id === on?.id)
-		return on?.outcome === 'as_planned' ? 'on this place' : null;
-	if (choice.id === (correcting ? doneBy : on?.id)) return 'on this place';
-	if (choice.at_game) return 'already at this game';
-	if (!choice.plays_on_date) return 'Not in the team on this date';
-	if (!correcting && choice.clashes.some((clash) => clash.level === 'blocked'))
-		return 'at another game at almost the same time';
-	return null;
+	const offer = choice.offers.find(
+		(offer) => offer.kind === place.kind && offer.number === place.number
+	);
+	const reason = correcting ? offer?.correct : offer?.assign;
+	return reason ? notOfferedTexts[reason] : null;
 }
