@@ -29,6 +29,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import {
 		clashText,
+		doerOf,
 		driversNumber,
 		notOffered,
 		placeName,
@@ -234,7 +235,8 @@
 					{#each teamPlaces(page) as place (`${place.kind}-${place.number}`)}
 						{@const name = placeName(place.kind, place.number)}
 						{@const on = place.player}
-						{@const onChoice = on ? page.players.find((player) => player.id === on.id) : undefined}
+						{@const doer = on ? doerOf(on) : null}
+						{@const onChoice = page.players.find((player) => player.id === doer)}
 						<li class="space-y-2" data-testid="team-place">
 							<button
 								type="button"

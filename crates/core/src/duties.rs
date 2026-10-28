@@ -528,19 +528,33 @@ fn elsewhere_at_game(at_game: &[Assignment], kind: DutyKind, number: u8, player:
         .any(|other| other.players().any(|p| p == player))
 }
 
+/// A player to put on a place: whether the player has the role "plays games" on the date of the
+/// game, and the closest clash (`worst_clash`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Candidate {
+    pub player: PlayerId,
+    pub plays_on_date: bool,
+    pub clash: Option<ClashLevel>,
+}
+
 /// Putting `player` on the place `kind` `number` of a game with `places` and the assignments
 /// `at_game`: only on a place of the team; not a player who has another place at the game; only a
-/// player with the role "plays games" on the date (`plays_on_date`); not with a blocking `clash`.
-/// The same player again is no change.
+/// player with the role "plays games" on the date (`plays_on_date`); not with a blocking `clash`,
+/// unless the game is `past`: then it records what happened, as "Someone else" does. The same
+/// player again is no change.
 pub fn check_assignment(
     places: &GamePlaces,
     kind: DutyKind,
     number: u8,
-    player: PlayerId,
     at_game: &[Assignment],
-    plays_on_date: bool,
-    clash: Option<ClashLevel>,
+    candidate: Candidate,
+    past: bool,
 ) -> Result<(), DutyError> {
+    let Candidate {
+        player,
+        plays_on_date,
+        clash,
+    } = candidate;
     if !is_place_of_the_team(places, kind, number) {
         return Err(DutyError::NotAPlaceOfTheTeam);
     }
@@ -556,7 +570,7 @@ pub fn check_assignment(
     if !plays_on_date {
         return Err(DutyError::NotInTeam);
     }
-    if clash == Some(ClashLevel::Blocked) {
+    if clash == Some(ClashLevel::Blocked) && !past {
         return Err(DutyError::Clash);
     }
     Ok(())
@@ -920,9 +934,20 @@ pub fn offers(
             let assign = if on.is_some_and(|on| on.planned == player) {
                 Some(NotOffered::OnThisPlace)
             } else {
-                check_assignment(places, kind, number, player, at_game, plays_on_date, clash)
-                    .err()
-                    .and_then(NotOffered::of)
+                check_assignment(
+                    places,
+                    kind,
+                    number,
+                    at_game,
+                    Candidate {
+                        player,
+                        plays_on_date,
+                        clash,
+                    },
+                    past,
+                )
+                .err()
+                .and_then(NotOffered::of)
             };
             let correct = on.filter(|_| past).and_then(|on| {
                 let already = match on.outcome {
@@ -1535,15 +1560,48 @@ mod tests {
     fn a_player_goes_only_on_a_place_of_the_team() {
         let places = table_places(CLUB_TEAM);
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 1, ANNA, &[], true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Ok(())
         );
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 2, ANNA, &[], true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                2,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::NotAPlaceOfTheTeam)
         );
         assert_eq!(
-            check_assignment(&places, DutyKind::Referee, 1, ANNA, &[], true, None),
+            check_assignment(
+                &places,
+                DutyKind::Referee,
+                1,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::NotAPlaceOfTheTeam)
         );
         // Drivers: only up to the number of driver places.
@@ -1558,11 +1616,33 @@ mod tests {
         )
         .expect("places");
         assert_eq!(
-            check_assignment(&drivers, DutyKind::Drive, 3, ANNA, &[], true, None),
+            check_assignment(
+                &drivers,
+                DutyKind::Drive,
+                3,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Ok(())
         );
         assert_eq!(
-            check_assignment(&drivers, DutyKind::Drive, 4, ANNA, &[], true, None),
+            check_assignment(
+                &drivers,
+                DutyKind::Drive,
+                4,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::NotAPlaceOfTheTeam)
         );
     }
@@ -1572,16 +1652,49 @@ mod tests {
         let places = table_places(TEAM);
         let at_game = [planned(DutyKind::Table, 1, ANNA)];
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 2, ANNA, &at_game, true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                2,
+                &at_game,
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::PlayerAtGame)
         );
         // The same player on the same place again is no change; another player replaces her.
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 1, ANNA, &at_game, true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &at_game,
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Ok(())
         );
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 1, BRAM, &at_game, true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &at_game,
+                Candidate {
+                    player: BRAM,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Ok(())
         );
         // A player who did another place ("Someone else") also has a place at the game.
@@ -1590,7 +1703,18 @@ mod tests {
             ..planned(DutyKind::Table, 1, ANNA)
         }];
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 2, CAS, &done_by, true, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                2,
+                &done_by,
+                Candidate {
+                    player: CAS,
+                    plays_on_date: true,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::PlayerAtGame)
         );
     }
@@ -1599,7 +1723,18 @@ mod tests {
     fn a_player_must_play_games_on_the_date_and_have_no_blocking_clash() {
         let places = table_places(TEAM);
         assert_eq!(
-            check_assignment(&places, DutyKind::Table, 1, ANNA, &[], false, None),
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: false,
+                    clash: None
+                },
+                false
+            ),
             Err(DutyError::NotInTeam)
         );
         assert_eq!(
@@ -1607,10 +1742,13 @@ mod tests {
                 &places,
                 DutyKind::Table,
                 1,
-                ANNA,
                 &[],
-                true,
-                Some(ClashLevel::Blocked)
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: Some(ClashLevel::Blocked)
+                },
+                false
             ),
             Err(DutyError::Clash)
         );
@@ -1619,10 +1757,49 @@ mod tests {
                 &places,
                 DutyKind::Table,
                 1,
-                ANNA,
                 &[],
-                true,
-                Some(ClashLevel::Warning)
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: Some(ClashLevel::Warning)
+                },
+                false
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn a_blocking_clash_does_not_block_a_place_of_a_past_game() {
+        let places = table_places(CLUB_TEAM);
+        let blocked = Some(ClashLevel::Blocked);
+        assert_eq!(
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: blocked
+                },
+                false
+            ),
+            Err(DutyError::Clash)
+        );
+        assert_eq!(
+            check_assignment(
+                &places,
+                DutyKind::Table,
+                1,
+                &[],
+                Candidate {
+                    player: ANNA,
+                    plays_on_date: true,
+                    clash: blocked
+                },
+                true
             ),
             Ok(())
         );
@@ -2000,9 +2177,22 @@ mod tests {
             reasons(offer(BRAM, true, None)),
             [(None, None), (None, None)]
         );
-        // A blocking clash blocks a planned player, never "Someone else".
+        // A blocking clash never blocks a place of a past game (A3 of the acceptance review)...
         assert_eq!(
             reasons(offer(BRAM, true, Some(ClashLevel::Blocked))),
+            [(None, None), (None, None)]
+        );
+        // ...but it blocks a coming one.
+        let coming = offers(
+            &places,
+            &at_game,
+            BRAM,
+            true,
+            Some(ClashLevel::Blocked),
+            false,
+        );
+        assert_eq!(
+            reasons(coming),
             [
                 (Some(NotOffered::Clash), None),
                 (Some(NotOffered::Clash), None)

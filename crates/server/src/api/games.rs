@@ -10,12 +10,12 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Assignment, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game, GamePlaces,
-    NotOffered, Offer, Outcome, PlaceKind, PlayerId, RequiredDuties, ScheduleReason, ScheduledGame,
-    Season, StoredDuties, StoredGame, Team, TeamNumber, check_assignment, check_drivers,
-    check_entered, check_outcome, check_team, choice_players, clashes, club_teams, duty_totals,
-    game_places, in_schedule, kept_games, offers, pick_team, players_playing_on, plays_games_on,
-    required_duties, worst_clash,
+    Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game,
+    GamePlaces, NotOffered, Offer, Outcome, PlaceKind, PlayerId, RequiredDuties, ScheduleReason,
+    ScheduledGame, Season, StoredDuties, StoredGame, Team, TeamNumber, check_assignment,
+    check_drivers, check_entered, check_outcome, check_team, choice_players, clashes, club_teams,
+    duty_totals, game_places, in_schedule, kept_games, offers, pick_team, players_playing_on,
+    plays_games_on, required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -705,7 +705,18 @@ pub async fn set_assignment(
         let places = found
             .places(&locked.stored, &locked.at_game, &duties, today)
             .ok_or(DutyError::NotAPlaceOfTheTeam)?;
-        check_assignment(&places, kind, number, player, &locked.at_game, plays, clash)?;
+        check_assignment(
+            &places,
+            kind,
+            number,
+            &locked.at_game,
+            Candidate {
+                player,
+                plays_on_date: plays,
+                clash,
+            },
+            found.past(today),
+        )?;
         // The same player again is no change: a correction after the game stays.
         if locked
             .on(kind, number)
