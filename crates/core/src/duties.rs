@@ -264,9 +264,9 @@ pub struct GamePlaces {
 }
 
 /// The duties of a game. `required` is `required_duties` of the game for `team`; `stored` its
-/// stored duties, if any; `filled` the places with a player (empty in story A); `players_on_date`
-/// the players with "plays games" on its date; `in_list` whether it is still in the game list;
-/// `past` whether its date is before today. `None`: nothing required and nothing kept.
+/// stored duties, if any; `filled` the places with a player; `players_on_date` the players with
+/// "plays games" on its date; `in_list` whether it is still in the game list; `past` whether its
+/// date is before today. `None`: nothing required and nothing kept.
 pub fn game_places(
     required: RequiredDuties,
     stored: Option<&StoredDuties>,
@@ -494,7 +494,7 @@ pub fn check_drivers(
     Ok(())
 }
 
-/// How close a clash is (step 2 works it out).
+/// How close a clash is (`clash_level`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ClashLevel {
     /// Can be chosen, with a note.
@@ -818,6 +818,162 @@ pub fn clashes(
 /// The closest clash in `clashes`, if any.
 pub fn worst_clash(clashes: &[Clash]) -> Option<ClashLevel> {
     clashes.iter().map(|clash| clash.level).max()
+}
+
+/// A player in the choice of a place at a game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChoicePlayer<'a> {
+    pub player: &'a Player,
+    /// The role "plays games" on the date of the game.
+    pub plays_on_date: bool,
+    /// On a place of the game, planned or as "Someone else".
+    pub at_game: bool,
+}
+
+/// The choice of a player for the places of a game on `date`: the players with the role "plays
+/// games" on the date (hidden players too), and the players already at the game (`at_game`), in
+/// the order of `players`.
+pub fn choice_players<'a>(
+    players: &'a [Player],
+    roles: &[PlayerRole],
+    date: NaiveDate,
+    at_game: &[Assignment],
+) -> Vec<ChoicePlayer<'a>> {
+    players
+        .iter()
+        .filter_map(|player| {
+            let plays_on_date = plays_games_on(roles, player.id, date);
+            let at_game = at_game
+                .iter()
+                .any(|assignment| assignment.players().any(|p| p == player.id));
+            (plays_on_date || at_game).then_some(ChoicePlayer {
+                player,
+                plays_on_date,
+                at_game,
+            })
+        })
+        .collect()
+}
+
+/// Why a player cannot be chosen for a place.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotOffered {
+    /// The player is on this place already (a tap would change nothing).
+    OnThisPlace,
+    /// The player has another place at the game.
+    AtGame,
+    /// No role "plays games" on the date.
+    NotInTeam,
+    /// A clash that blocks.
+    Clash,
+}
+
+impl NotOffered {
+    fn of(error: DutyError) -> Option<Self> {
+        match error {
+            DutyError::PlayerAtGame => Some(Self::AtGame),
+            DutyError::NotInTeam => Some(Self::NotInTeam),
+            DutyError::Clash => Some(Self::Clash),
+            _ => None,
+        }
+    }
+}
+
+/// What a tap on a player does at one place of the team.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Offer {
+    pub kind: DutyKind,
+    pub number: u8,
+    /// The player as the planned player; `None`: can be chosen (`check_assignment`).
+    pub assign: Option<NotOffered>,
+    /// "Someone else" on a past place with a player; `None`: can be chosen (`check_outcome`).
+    /// `None` too where no correction is possible.
+    pub correct: Option<NotOffered>,
+}
+
+/// The places of the team of a game, in the order of its page: the table and referee places that
+/// name the team, then the drivers.
+fn team_places(places: &GamePlaces) -> impl Iterator<Item = &DutyPlace> {
+    let schedule = places.schedule.iter().flat_map(|part| &part.of_team);
+    let drivers = places.drivers.iter().flat_map(|part| &part.places);
+    schedule.chain(drivers)
+}
+
+/// For each place of the team of a game: can `player` be chosen there, and if not, why. The same
+/// checks as the saves (`check_assignment`, `check_outcome`), so the choice never offers a player
+/// that a save refuses. `clash`: the closest clash of the player (`worst_clash`); `past`: the game
+/// is before today.
+pub fn offers(
+    places: &GamePlaces,
+    at_game: &[Assignment],
+    player: PlayerId,
+    plays_on_date: bool,
+    clash: Option<ClashLevel>,
+    past: bool,
+) -> Vec<Offer> {
+    team_places(places)
+        .map(|place| {
+            let (kind, number) = (place.kind, place.number);
+            let on = at_game
+                .iter()
+                .find(|assignment| (assignment.kind, assignment.number) == (kind, number));
+            let assign = if on.is_some_and(|on| on.planned == player) {
+                Some(NotOffered::OnThisPlace)
+            } else {
+                check_assignment(places, kind, number, player, at_game, plays_on_date, clash)
+                    .err()
+                    .and_then(NotOffered::of)
+            };
+            let correct = on.filter(|_| past).and_then(|on| {
+                let already = match on.outcome {
+                    Outcome::AsPlanned => on.planned == player,
+                    Outcome::DoneBy(by) => by == player,
+                    Outcome::NotDone => false,
+                };
+                if already {
+                    return Some(NotOffered::OnThisPlace);
+                }
+                check_outcome(
+                    past,
+                    Some(on),
+                    Outcome::DoneBy(player),
+                    at_game,
+                    plays_on_date,
+                )
+                .err()
+                .and_then(NotOffered::of)
+            });
+            Offer {
+                kind,
+                number,
+                assign,
+                correct,
+            }
+        })
+        .collect()
+}
+
+/// The rows of the page "Duties" of `season`: each player with the role "plays games" in the
+/// season or with a duty in it (`totals`, from `duty_totals`), also players who left and hidden
+/// players, in the order of `players`, with the totals (zero without a duty).
+pub fn duty_rows<'a>(
+    players: &'a [Player],
+    roles: &[PlayerRole],
+    season: crate::season::Season,
+    totals: &BTreeMap<PlayerId, KindTotals>,
+) -> Vec<(&'a Player, KindTotals)> {
+    players
+        .iter()
+        .filter(|player| {
+            totals.contains_key(&player.id)
+                || roles.iter().any(|role| {
+                    role.player == player.id
+                        && role.season == season
+                        && role.role == Role::PlaysGames
+                })
+        })
+        .map(|player| (player, totals.get(&player.id).copied().unwrap_or_default()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -1773,5 +1929,136 @@ mod tests {
         assert_eq!(name(3), "Bram");
         assert_eq!(name(4), "Cas");
         assert_eq!(name(5), "Cas D.");
+    }
+
+    fn plays(player: i64) -> PlayerRole {
+        use crate::players::RoleId;
+        use crate::season::Season;
+        PlayerRole {
+            id: RoleId(player),
+            player: PlayerId(player),
+            season: Season::from_start_year(2026),
+            role: Role::PlaysGames,
+            from: NaiveDate::from_ymd_opt(2026, 9, 1).expect("valid date"),
+            until: None,
+        }
+    }
+
+    #[test]
+    fn the_choice_has_the_players_of_the_date_and_those_at_the_game() {
+        let players = [
+            player(1, "Anna", None),
+            player(2, "Bram", None),
+            player(3, "Cas", None),
+        ];
+        let mut only_trains = plays(3);
+        only_trains.role = Role::OnlyTrains;
+        let roles = [plays(1), only_trains];
+        let date = NaiveDate::from_ymd_opt(2026, 10, 31).expect("valid date");
+        let mut cas = planned(DutyKind::Table, 1, ANNA);
+        cas.outcome = Outcome::DoneBy(CAS);
+        let choice = choice_players(&players, &roles, date, &[cas]);
+        let ids: Vec<(PlayerId, bool, bool)> = choice
+            .iter()
+            .map(|choice| (choice.player.id, choice.plays_on_date, choice.at_game))
+            .collect();
+        // Bram has no role; Cas only trains but did the place.
+        assert_eq!(ids, [(ANNA, true, true), (CAS, false, true)]);
+    }
+
+    #[test]
+    fn the_offers_give_the_reasons_of_the_saves() {
+        let places = game_places(
+            SCHEDULE,
+            Some(&teams(&[
+                ((PlaceKind::Table, 1), TEAM),
+                ((PlaceKind::Table, 2), TEAM),
+            ])),
+            TEAM,
+            &filled(&[(DutyKind::Table, 1)]),
+            10,
+            true,
+            true,
+        )
+        .expect("places");
+        let at_game = [planned(DutyKind::Table, 1, ANNA)];
+        let offer = |player, plays, clash| offers(&places, &at_game, player, plays, clash, true);
+        let reasons = |list: Vec<Offer>| -> Vec<(Option<NotOffered>, Option<NotOffered>)> {
+            list.iter()
+                .map(|offer| (offer.assign, offer.correct))
+                .collect()
+        };
+        // Table 1 has Anna; table 2 is open (no correction there).
+        assert_eq!(
+            reasons(offer(ANNA, true, None)),
+            [
+                (Some(NotOffered::OnThisPlace), Some(NotOffered::OnThisPlace)),
+                (Some(NotOffered::AtGame), None)
+            ]
+        );
+        assert_eq!(
+            reasons(offer(BRAM, true, None)),
+            [(None, None), (None, None)]
+        );
+        // A blocking clash blocks a planned player, never "Someone else".
+        assert_eq!(
+            reasons(offer(BRAM, true, Some(ClashLevel::Blocked))),
+            [
+                (Some(NotOffered::Clash), None),
+                (Some(NotOffered::Clash), None)
+            ]
+        );
+        assert_eq!(
+            reasons(offer(BRAM, false, None)),
+            [
+                (Some(NotOffered::NotInTeam), Some(NotOffered::NotInTeam)),
+                (Some(NotOffered::NotInTeam), None)
+            ]
+        );
+        // After "Nobody", Anna can be chosen again ("as planned"); after "Bram", Bram cannot.
+        let mut nobody = at_game;
+        nobody[0].outcome = Outcome::NotDone;
+        assert_eq!(
+            offers(&places, &nobody, ANNA, true, None, true)[0].correct,
+            None
+        );
+        let mut bram = at_game;
+        bram[0].outcome = Outcome::DoneBy(BRAM);
+        assert_eq!(
+            offers(&places, &bram, BRAM, true, None, true)[0].correct,
+            Some(NotOffered::OnThisPlace)
+        );
+        // A coming game has no corrections.
+        assert_eq!(
+            offers(&places, &at_game, BRAM, true, None, false)[0].correct,
+            None
+        );
+    }
+
+    #[test]
+    fn duty_rows_have_the_players_who_play_games_or_have_a_duty() {
+        let players = [
+            player(1, "Anna", None),
+            player(2, "Bram", None),
+            player(3, "Cas", None),
+        ];
+        let mut last_season = plays(2);
+        last_season.season = crate::season::Season::from_start_year(2025);
+        let roles = [plays(1), last_season];
+        let mut cas = KindTotals::default();
+        cas.table.done = 1;
+        let totals = BTreeMap::from([(CAS, cas)]);
+        let rows = duty_rows(
+            &players,
+            &roles,
+            crate::season::Season::from_start_year(2026),
+            &totals,
+        );
+        let rows: Vec<(PlayerId, u32)> = rows
+            .iter()
+            .map(|(player, totals)| (player.id, totals.table.done))
+            .collect();
+        // Bram played games only last season.
+        assert_eq!(rows, [(ANNA, 0), (CAS, 1)]);
     }
 }

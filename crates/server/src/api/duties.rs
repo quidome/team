@@ -5,7 +5,7 @@
 use axum::Json;
 use axum::extract::{Query, State};
 use serde::Serialize;
-use team_core::{FollowedTeam, Role, duty_totals};
+use team_core::{FollowedTeam, duty_rows, duty_totals};
 use utoipa::ToSchema;
 
 use super::format::query_season;
@@ -76,21 +76,13 @@ pub async fn get(
         let places = SeasonPlaces::new(&stored, &duties, club.number, team.number, today);
         let totals = duty_totals(&places.duties(&duties));
         // `players` is sorted by first name (`players::all`).
-        rows = duties
-            .players
-            .iter()
-            .filter(|player| {
-                totals.contains_key(&player.id)
-                    || duties
-                        .roles
-                        .iter()
-                        .any(|role| role.player == player.id && role.role == Role::PlaysGames)
-            })
-            .map(|player| DutyRowView {
+        rows = duty_rows(&duties.players, &duties.roles, season, &totals)
+            .into_iter()
+            .map(|(player, totals)| DutyRowView {
                 player: player.id.0,
                 name: duties.names.get(&player.id).cloned().unwrap_or_default(),
                 hidden: player.hidden,
-                totals: totals.get(&player.id).copied().unwrap_or_default().into(),
+                totals: totals.into(),
             })
             .collect();
     }

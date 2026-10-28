@@ -803,8 +803,6 @@ export interface components {
 		};
 		/** @description A player in the choice of a place. */
 		ChoiceView: {
-			/** @description The player already has a place at this game: not offered for another one. */
-			at_game: boolean;
 			/** @description The clashes with other games. */
 			clashes: components['schemas']['ClashView'][];
 			hidden: boolean;
@@ -812,8 +810,11 @@ export interface components {
 			id: number;
 			/** @description The name shown ("Anna", "Anna B."). */
 			name: string;
-			/** @description The player has the role "plays games" on the date: else not offered. */
-			plays_on_date: boolean;
+			/**
+			 * @description For each place of the team (in the order of the page): can the player be chosen there
+			 *     (`team_core::offers`, the checks of the saves).
+			 */
+			offers: components['schemas']['OfferView'][];
 			/** @description The duties of the player in the game's season, for each kind. */
 			totals: components['schemas']['KindTotalsView'];
 		};
@@ -1100,12 +1101,25 @@ export interface components {
 			from: string;
 			role: components['schemas']['RoleKind'];
 		};
+		/**
+		 * @description Why a player cannot be chosen for a place.
+		 * @enum {string}
+		 */
+		NotOfferedView: 'on_this_place' | 'at_game' | 'not_in_team' | 'clash';
 		/** @description A player who counts as "there" at trainings after a role started or its start moved earlier. */
 		NowThere: {
 			/** Format: int64 */
 			player: number;
 			/** @description The dates of those trainings, for example "2026-09-01", in order. */
 			trainings: string[];
+		};
+		/** @description Whether a player can be chosen for one place of the team. */
+		OfferView: {
+			assign?: null | components['schemas']['NotOfferedView'];
+			correct?: null | components['schemas']['NotOfferedView'];
+			kind: components['schemas']['DutyKindView'];
+			/** Format: int32 */
+			number: number;
 		};
 		/** @description A game of the open item "games with open places", with its open places for each kind. */
 		OpenGameView: components['schemas']['GameItemView'] & {

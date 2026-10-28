@@ -286,7 +286,7 @@
 									{#if !on || !page.past || correcting}
 										<ul class="space-y-1" aria-label="Choose a player for {name}">
 											{#each page.players as player (player.id)}
-												{@const reason = notOffered(player, on, correcting)}
+												{@const reason = notOffered(player, place, correcting)}
 												<li>
 													<button
 														type="button"

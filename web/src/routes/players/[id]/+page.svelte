@@ -253,7 +253,7 @@
 			{/if}
 		</section>
 
-		{#if !shown.has_absences}
+		{#if !shown.has_absences && !shown.has_duties}
 			<Button variant="ghost" class="text-destructive" disabled={busy} onclick={remove}>
 				Delete player
 			</Button>

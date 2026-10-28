@@ -10,11 +10,12 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Assignment, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game, GamePlaces, Outcome,
-    PlaceKind, PlayerId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties,
-    StoredGame, Team, TeamNumber, check_assignment, check_drivers, check_entered, check_outcome,
-    check_team, clashes, club_teams, duty_totals, game_places, in_schedule, kept_games, pick_team,
-    players_playing_on, plays_games_on, required_duties, worst_clash,
+    Assignment, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game, GamePlaces,
+    NotOffered, Offer, Outcome, PlaceKind, PlayerId, RequiredDuties, ScheduleReason, ScheduledGame,
+    Season, StoredDuties, StoredGame, Team, TeamNumber, check_assignment, check_drivers,
+    check_entered, check_outcome, check_team, choice_players, clashes, club_teams, duty_totals,
+    game_places, in_schedule, kept_games, offers, pick_team, players_playing_on, plays_games_on,
+    required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -59,10 +60,57 @@ pub struct ChoiceView {
     pub totals: KindTotalsView,
     /// The clashes with other games.
     pub clashes: Vec<ClashView>,
-    /// The player already has a place at this game: not offered for another one.
-    pub at_game: bool,
-    /// The player has the role "plays games" on the date: else not offered.
-    pub plays_on_date: bool,
+    /// For each place of the team (in the order of the page): can the player be chosen there
+    /// (`team_core::offers`, the checks of the saves).
+    pub offers: Vec<OfferView>,
+}
+
+/// Why a player cannot be chosen for a place.
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotOfferedView {
+    /// The player is on this place already.
+    OnThisPlace,
+    /// The player has another place at the game.
+    AtGame,
+    /// No role "plays games" on the date.
+    NotInTeam,
+    /// A clash under 1:30 on another court.
+    Clash,
+}
+
+/// Whether a player can be chosen for one place of the team.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct OfferView {
+    pub kind: DutyKindView,
+    pub number: u8,
+    /// As the planned player; `null`: can be chosen.
+    pub assign: Option<NotOfferedView>,
+    /// As "Someone else" on a past place with a player; `null`: can be chosen (or no correction
+    /// is possible there).
+    pub correct: Option<NotOfferedView>,
+}
+
+impl From<NotOffered> for NotOfferedView {
+    fn from(reason: NotOffered) -> Self {
+        match reason {
+            NotOffered::OnThisPlace => Self::OnThisPlace,
+            NotOffered::AtGame => Self::AtGame,
+            NotOffered::NotInTeam => Self::NotInTeam,
+            NotOffered::Clash => Self::Clash,
+        }
+    }
+}
+
+impl From<&Offer> for OfferView {
+    fn from(offer: &Offer) -> Self {
+        Self {
+            kind: offer.kind.into(),
+            number: offer.number,
+            assign: offer.assign.map(Into::into),
+            correct: offer.correct.map(Into::into),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -349,7 +397,7 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
     let view = places
         .as_ref()
         .map(|places| duties.view(&found.game, places));
-    let players = choice(&found, &duties, today);
+    let players = choice(&found, &duties, places.as_ref(), today);
     let past = found.past(today);
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
@@ -370,35 +418,40 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
 
 /// The choice of a player for the places of the game of `found`, with the totals of its season
 /// (`team_core::duty_totals`) and the clashes.
-fn choice(found: &Found, duties: &SeasonDuties, today: chrono::NaiveDate) -> Vec<ChoiceView> {
+fn choice(
+    found: &Found,
+    duties: &SeasonDuties,
+    places: Option<&GamePlaces>,
+    today: chrono::NaiveDate,
+) -> Vec<ChoiceView> {
     let season = found.season_places(duties, today);
     let season_duties = season.duties(duties);
     let totals = duty_totals(&season_duties);
     let at_game = duties.assignments_of(found.game.source_id);
-    let on_game = |player: PlayerId| {
-        at_game.iter().any(|assignment| {
-            assignment.planned == player || assignment.outcome == Outcome::DoneBy(player)
-        })
-    };
     // `players` is sorted by first name (`players::all`).
-    duties
-        .players
-        .iter()
-        .filter_map(|player| {
-            let plays_on_date = plays_games_on(&duties.roles, player.id, found.game.date);
-            let at_game = on_game(player.id);
-            (plays_on_date || at_game).then(|| ChoiceView {
+    choice_players(&duties.players, &duties.roles, found.game.date, at_game)
+        .into_iter()
+        .map(|choice| {
+            let player = choice.player;
+            let clashes = clashes(player.id, &found.game, &season_duties, &season.team_games);
+            let offers = places.map_or_else(Vec::new, |places| {
+                offers(
+                    places,
+                    at_game,
+                    player.id,
+                    choice.plays_on_date,
+                    worst_clash(&clashes),
+                    found.past(today),
+                )
+            });
+            ChoiceView {
                 id: player.id.0,
                 name: duties.names.get(&player.id).cloned().unwrap_or_default(),
                 hidden: player.hidden,
                 totals: totals.get(&player.id).copied().unwrap_or_default().into(),
-                clashes: clashes(player.id, &found.game, &season_duties, &season.team_games)
-                    .iter()
-                    .map(ClashView::from)
-                    .collect(),
-                at_game,
-                plays_on_date,
-            })
+                clashes: clashes.iter().map(ClashView::from).collect(),
+                offers: offers.iter().map(OfferView::from).collect(),
+            }
         })
         .collect()
 }
@@ -653,6 +706,13 @@ pub async fn set_assignment(
             .places(&locked.stored, &locked.at_game, &duties, today)
             .ok_or(DutyError::NotAPlaceOfTheTeam)?;
         check_assignment(&places, kind, number, player, &locked.at_game, plays, clash)?;
+        // The same player again is no change: a correction after the game stays.
+        if locked
+            .on(kind, number)
+            .is_some_and(|on| on.planned == player)
+        {
+            return Ok(());
+        }
         duties::set_assignment(tx, found.key(), kind, number, player, now).await?;
         Ok(())
     })

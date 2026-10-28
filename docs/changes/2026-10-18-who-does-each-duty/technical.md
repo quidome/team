@@ -192,3 +192,77 @@ Found during the build:
 - 2026-10-28, step 7: `change_between` takes `has_duties: bool` (one game); `compare`, `update_open_changes` and `list_changes` take the set. A gone past game with duties keeps its open change too ("kept while gone"), so it is not dropped because its date passed. The result line of a reading counts such a change ("1 moved"). The set includes players on places of an earlier team of the season (`duty_assignments` of the season, without a team filter), as the totals do.
 
 ## Review findings
+
+`/review build`, 2026-10-28, fresh agent. Input: mode `build`, the change folder; no other
+arguments. Read: the diff `f7ad973..HEAD` (story B, steps 1–8; working tree clean), this folder,
+the epic's `functional.md` story B, `docs/architecture.md`, decisions 0001 and 0022, `CLAUDE.md`.
+Runs: `cargo test -p team_core` (256 pass); `cargo test -p team --test games --test duties --test
+changes --test players --test migrations` (all pass); `cargo clippy --workspace --all-targets -- -D
+warnings` (clean); `team openapi` into a scratch file, identical to `web/openapi.json`.
+
+- **R1 – bug: "Delete player" is still offered for a player with duties.** The spec (errors and
+  edge cases) and step 3 say "Delete player" is not offered for a player with duties. The server
+  adds `PlayerDetail.has_duties` and refuses with `player_has_duties`, but the page of a player
+  shows the button on `!shown.has_absences` only (`web/src/routes/players/[id]/+page.svelte:256`),
+  and `web/src/lib/api/client.ts` has no text for `player_has_duties`, so a tap shows "Something
+  went wrong. Please try again.". Checked by search: `has_duties|player_has_duties` in `web/src`
+  (outside the generated `schema.d.ts`) has no match. No browser test covers it (the sibling for
+  absences is `trainings.e2e.ts:458`). Fix: hide on `has_absences || has_duties`, add the text, add
+  the browser test.
+- **R2 – logic in the wrong place (decision 0001): two product rules are in the server, one is
+  repeated in TypeScript.** (a) Who gets a row on "Duties" (role "plays games" in the season, or a
+  counted duty) is in `api/duties.rs::get`; the sibling page "Attendance" has its row rule in the
+  core (`attendance::season_overview`). (b) Who is in the choice of a game (`plays_on_date ||
+  at_game`) is in `api/games.rs::choice`. Neither is tested without a database. (c) Who can be
+  chosen is decided twice: `check_assignment` / `check_outcome` in the core, and `notOffered` in
+  `web/src/lib/duties.ts` (on this place, already at this game, not in the team, blocked, the undo
+  in "Someone else"). They agree today (checked by trace of each branch), but a change of one rule
+  must be made in two places. Checked by reading. Suggest: a core function for the rows and the
+  choice, with the reason a player cannot be chosen in `ChoiceView` (one rule, shown by the page).
+- **R3 – bug (API only): putting the same player again resets a correction.** `check_assignment`
+  returns `Ok` when the planned player is the same ("the same player again is no change"), but
+  `duties::set_assignment` then runs `ON CONFLICT … DO UPDATE SET outcome = 'as_planned', done_by =
+  NULL`. So `PUT …/assignments/table/1 {player: Anna}` on a past place with "not done (was Anna)"
+  silently turns it back into "done" by Anna. Checked by trace (`crates/core/src/duties.rs:550`,
+  `crates/server/src/duties.rs` `set_assignment`); not reachable from the page (on a past filled
+  place the list only opens through "Someone else", which uses the outcome route). Fix: skip the
+  write when nothing changes, or keep the outcome for the same player; one test.
+- **R4 – claims checked.** The race test `a_place_waits_for_a_player_put_on_it_on_another_screen`
+  can fail without the lock: traced without `FOR UPDATE` in `duties::lock`, the check reads no
+  player (the other screen's insert is not committed), the team is written, the request then waits
+  only at `touch` of `game_duties` and answers 200, not `player_on_place` (not re-run by hand).
+  The old `a_save_waits_…` test says in its comment that it cannot fail; that is honest. Step 3
+  names `tests/season.rs` for the R3 test of story A; it is in `tests/games.rs`
+  (`a_past_game_with_a_player_on_a_proposed_driver_place_stays`) and passes. The clash table of the
+  requirements is covered case by case in the core tests (checked by reading 1523–1624). The
+  deviation of step 3 (clash and role read before the lock) is stated and accepted; nothing more.
+- **R5 – siblings checked, no finding.** Every caller of `change_between` (`compare`,
+  `update_open_changes`, `list_changes`) gets the set `with_duties`, from both the reading
+  transaction and `api/changes.rs::list`, which also feeds `unseen_changes` (search:
+  `list_changes|change_between|update_open_changes|compare(` in `crates/server/src`). Logs in the
+  diff carry only the season and the game id (search: `tracing::|info!|warn!|error!` in the added
+  lines). `set_drivers` and `set_place` both read the players under the lock. The front end shows a
+  clash of a player already on a place from `players[].clashes` (as a note, never blocking).
+- **R6 – docs and comments.** Stale comments in `crates/core/src/duties.rs`: line 267 "`filled`
+  the places with a player (empty in story A)" and line 497 "(step 2 works it out)". For Close, made
+  incomplete by this diff: `docs/architecture.md:87` and `docs/product/players-and-team.md:21,23`
+  (the button is also hidden for duties — after R1), the module list in `CLAUDE.md` (no
+  `api/duties.rs`, no `duty_assignments`), and `docs/architecture.md` has nothing yet on the table
+  `duty_assignments`, the routes and the page "Duties".
+
+Verdict: not ready to close until R1 is fixed (a rule of the spec that the page breaks). R2 is a
+design debt to fix now or record as a deviation with the coordinator; R3 and R6 are small.
+
+Handled on 2026-10-28 (the coordinator chose to fix all of R2):
+- R1 fixed: "Delete player" is hidden for a player with duties; the page has the text of
+  `player_has_duties`; browser test `"Delete player" is not offered for a player with a duty`.
+- R2 fixed: the core has `choice_players` (who is in the choice), `offers` (for each place of the
+  team, whether a player can be chosen as planned or as "Someone else", and why not, from
+  `check_assignment` and `check_outcome`) and `duty_rows` (the rows of "Duties"), with core tests.
+  The choice sends `offers` instead of `at_game` and `plays_on_date`; the front end only shows
+  the reason (`notOffered` maps it to a text).
+- R3 fixed: the same planned player again writes nothing, so a correction stays; server test in
+  `a_place_after_the_game_is_corrected`.
+- R4, R5: nothing to do.
+- R6: the two comments are fixed; the documents (`docs/architecture.md`,
+  `docs/product/players-and-team.md`, the module list in `CLAUDE.md`) are for Close.
