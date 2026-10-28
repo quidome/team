@@ -360,6 +360,12 @@ pub fn not_entered(places: &GamePlaces) -> bool {
 
 /// The places of the team that count and have no player.
 pub fn open_places(places: &GamePlaces) -> usize {
+    open_by_kind(places).values().sum()
+}
+
+/// The places of the team that count and have no player, for each kind; a kind without open
+/// places is not in it.
+pub fn open_by_kind(places: &GamePlaces) -> BTreeMap<DutyKind, usize> {
     let schedule = places
         .schedule
         .iter()
@@ -370,10 +376,11 @@ pub fn open_places(places: &GamePlaces) -> usize {
         .iter()
         .filter(|part| part.counts)
         .flat_map(|part| &part.places);
-    schedule
-        .chain(drivers)
-        .filter(|place| !place.filled)
-        .count()
+    let mut open = BTreeMap::new();
+    for place in schedule.chain(drivers).filter(|place| !place.filled) {
+        *open.entry(place.kind).or_insert(0) += 1;
+    }
+    open
 }
 
 /// The game has a place of the team in a part that counts.

@@ -84,6 +84,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/duties': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['duties'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}': {
 		parameters: {
 			query?: never;
@@ -785,6 +801,34 @@ export interface components {
 			 */
 			season?: string | null;
 		};
+		/** @description A player in the choice of a place. */
+		ChoiceView: {
+			/** @description The player already has a place at this game: not offered for another one. */
+			at_game: boolean;
+			/** @description The clashes with other games. */
+			clashes: components['schemas']['ClashView'][];
+			hidden: boolean;
+			/** Format: int64 */
+			id: number;
+			/** @description The name shown ("Anna", "Anna B."). */
+			name: string;
+			/** @description The player has the role "plays games" on the date: else not offered. */
+			plays_on_date: boolean;
+			/** @description The duties of the player in the game's season, for each kind. */
+			totals: components['schemas']['KindTotalsView'];
+		};
+		/** @enum {string} */
+		ClashLevelView: 'blocked' | 'warning';
+		/**
+		 * @description A clash with another game: a duty place there ("also Table 13:00") or a game of the team
+		 *     ("plays 14:30").
+		 */
+		ClashView: {
+			duty?: null | components['schemas']['DutyKindView'];
+			level: components['schemas']['ClashLevelView'];
+			/** @description Dutch local start time of the other game ("13:00"); `null` when not known. */
+			start?: string | null;
+		};
 		ClubTeams: {
 			/** @description The current season, for example "2026-2027". */
 			season: string;
@@ -844,8 +888,33 @@ export interface components {
 			/** Format: int32 */
 			drivers?: number | null;
 		};
+		/** @description The page "Duties". */
+		DutiesOverview: {
+			current_season: string;
+			/**
+			 * @description One row for each player with the role "plays games" in the season or with a duty in it,
+			 *     also players who left and hidden players; sorted by first name.
+			 */
+			rows: components['schemas']['DutyRowView'][];
+			/** @description For example "2026-2027". */
+			season: string;
+			/**
+			 * @description The seasons to choose from, newest first: those with a chosen team, the current season and
+			 *     the chosen season.
+			 */
+			seasons: string[];
+		};
 		/** @enum {string} */
 		DutyKindView: 'drive' | 'table' | 'referee';
+		/** @description The totals of one player in the season. */
+		DutyRowView: {
+			hidden: boolean;
+			/** @description The name shown ("Anna", "Anna B."). */
+			name: string;
+			/** Format: int64 */
+			player: number;
+			totals: components['schemas']['KindTotalsView'];
+		};
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
 		/**
@@ -886,6 +955,14 @@ export interface components {
 			current_season: string;
 			/** @description The game, with its duties. */
 			game: components['schemas']['ScheduleGame'];
+			/** @description The game is before today: its places can be corrected ("Someone else", "Nobody"). */
+			past: boolean;
+			/**
+			 * @description The choice of a player for the places of the team: the players with the role "plays
+			 *     games" on the date (hidden players too), and the players already at the game; sorted by
+			 *     first name.
+			 */
+			players: components['schemas']['ChoiceView'][];
 			/** @description The season of the game, for example "2026-2027". */
 			season: string;
 			/** @description The team chosen for the game's season. */
@@ -916,6 +993,11 @@ export interface components {
 			/** Format: int32 */
 			now: number;
 			reason: components['schemas']['HoldKind'];
+		};
+		KindTotalsView: {
+			drive: components['schemas']['TotalView'];
+			referee: components['schemas']['TotalView'];
+			table: components['schemas']['TotalView'];
 		};
 		/** @description The choice of an earlier season. */
 		LastChoice: {
@@ -1025,6 +1107,12 @@ export interface components {
 			/** @description The dates of those trainings, for example "2026-09-01", in order. */
 			trainings: string[];
 		};
+		/** @description A game of the open item "games with open places", with its open places for each kind. */
+		OpenGameView: components['schemas']['GameItemView'] & {
+			drive: number;
+			referee: number;
+			table: number;
+		};
 		/** @description One open item. Dates are Dutch dates, for example "2026-10-22". */
 		OpenItemView:
 			| {
@@ -1046,6 +1134,11 @@ export interface components {
 					games: components['schemas']['GameItemView'][];
 					/** @enum {string} */
 					kind: 'schedule_not_entered';
+			  }
+			| {
+					games: components['schemas']['OpenGameView'][];
+					/** @enum {string} */
+					kind: 'open_places';
 			  }
 			| {
 					count: number;
@@ -1446,6 +1539,12 @@ export interface components {
 			end: string;
 			start: string;
 		};
+		TotalView: {
+			/** Format: int32 */
+			done: number;
+			/** Format: int32 */
+			planned: number;
+		};
 		/** @description One date: its training with the players, or nothing yet. */
 		TrainingDay: {
 			absent: number;
@@ -1744,6 +1843,43 @@ export interface operations {
 			};
 			/** @description The game list cannot be reached or is not understood */
 			502: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	duties: {
+		parameters: {
+			query?: {
+				/** @description For example "2026-2027"; the current season when left out. */
+				season?: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The duty totals of each player in the season and the seasons to choose from */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['DutiesOverview'];
+				};
+			};
+			/** @description `invalid_season` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
 				headers: {
 					[name: string]: unknown;
 				};

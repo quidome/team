@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate};
 
-use crate::duties::{GamePlaces, has_team_places, not_entered};
+use crate::duties::{DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind};
 use crate::schedule::ScheduleReason;
 use crate::season::Season;
 use crate::season_view::{Event, EventKind, SeasonEvents};
@@ -35,6 +35,11 @@ pub enum OpenItem {
     ScheduleNotEntered {
         games: Vec<i64>,
     },
+    /// Coming games with places of the team without a player (`open_places_games`), in time
+    /// order.
+    OpenPlaces {
+        games: Vec<OpenGame>,
+    },
     /// Training days before today that were never opened; `first` is the oldest.
     NotOpened {
         first: NaiveDate,
@@ -56,6 +61,13 @@ pub fn open_item_seasons(today: NaiveDate) -> Vec<Season> {
     } else {
         vec![current]
     }
+}
+
+/// A game of the open item "games with open places": its open places of the team, for each kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenGame {
+    pub id: i64,
+    pub open: BTreeMap<DutyKind, usize>,
 }
 
 /// The duty places of the games of a season, by source id (`duties::game_places`).
@@ -87,14 +99,47 @@ pub fn schedule_not_entered(
         .collect()
 }
 
+/// The coming games with places of the team that count and have no player, in time order: the
+/// table and referee places from today to 4 weeks ahead, and the driver places from today until
+/// the Sunday of next week (the window of "Next"). A game whose part does not count (out of the
+/// game list, no longer needed) is not in it; a rising driver proposal opens places by itself.
+pub fn open_places_games(
+    events: &SeasonEvents<'_>,
+    places: &PlacesOf,
+    today: NaiveDate,
+) -> Vec<OpenGame> {
+    let duty_until = today
+        .checked_add_days(Days::new(DUTY_DAYS))
+        .unwrap_or(today);
+    let drivers_until = next_until(today);
+    events
+        .coming
+        .iter()
+        .filter_map(|event| match event.kind {
+            EventKind::Game(scheduled) => Some((event.date, scheduled.game.source_id)),
+            EventKind::Training(_) => None,
+        })
+        .filter_map(|(date, id)| {
+            let mut open = open_by_kind(places.get(&id)?);
+            open.retain(|&kind, _| match kind {
+                DutyKind::Drive => date <= drivers_until,
+                DutyKind::Table | DutyKind::Referee => date <= duty_until,
+            });
+            (!open.is_empty()).then_some(OpenGame { id, open })
+        })
+        .collect()
+}
+
 /// The open items in the order of the start page: the game list, the changes not seen, the home
-/// games whose schedule is not entered (`schedule_not_entered`), the training days not opened, the trainings not checked. A
-/// kind without items gives nothing. The training items count over all `lists`, with the oldest
-/// date as `first`.
+/// games whose schedule is not entered (`schedule_not_entered`), the games with open places
+/// (`open_places_games`), the training days not opened, the trainings not checked. A kind without
+/// items gives nothing. The training items count over all `lists`, with the oldest date as
+/// `first`.
 pub fn open_items(
     reading: &ReadingState,
     unseen: u32,
     schedule_not_entered: Vec<i64>,
+    open_places: Vec<OpenGame>,
     lists: &[SeasonList<'_>],
 ) -> Vec<OpenItem> {
     let mut items = Vec::new();
@@ -111,6 +156,9 @@ pub fn open_items(
         items.push(OpenItem::ScheduleNotEntered {
             games: schedule_not_entered,
         });
+    }
+    if !open_places.is_empty() {
+        items.push(OpenItem::OpenPlaces { games: open_places });
     }
     let days: Vec<NaiveDate> = lists.iter().flat_map(not_opened).collect();
     if let Some(&first) = days.iter().min() {
@@ -164,6 +212,14 @@ pub fn last_games<'a>(events: &'a SeasonEvents<'a>, places: &PlacesOf) -> Vec<&'
         .collect()
 }
 
+/// The last day of the window of "Next": the Sunday of next week (on a Sunday: the next Sunday).
+fn next_until(today: NaiveDate) -> NaiveDate {
+    let days_left = 6 - u64::from(today.weekday().num_days_from_monday()) + 7;
+    today
+        .checked_add_days(Days::new(days_left))
+        .unwrap_or(today)
+}
+
 /// The games of the team, the home games of other club teams with places of the team, and the
 /// training rows from `today` until the Sunday of next week (on a Sunday: today and the next
 /// week). Cancelled trainings show but do not count: when the window has nothing else, the first
@@ -173,10 +229,7 @@ pub fn next_events<'a>(
     places: &PlacesOf,
     today: NaiveDate,
 ) -> Vec<&'a Event<'a>> {
-    let days_left = 6 - u64::from(today.weekday().num_days_from_monday()) + 7;
-    let until = today
-        .checked_add_days(Days::new(days_left))
-        .unwrap_or(today);
+    let until = next_until(today);
     let of_the_team = |event: &&Event<'_>| match event.kind {
         EventKind::Game(scheduled) => {
             scheduled.reason == ScheduleReason::TeamGame
@@ -302,7 +355,7 @@ mod tests {
             out_of_date_since: Some(date(2026, 10, 8)),
         };
         assert_eq!(
-            open_items(&reading, 4, Vec::new(), &[list]),
+            open_items(&reading, 4, Vec::new(), Vec::new(), &[list]),
             [
                 OpenItem::ReadingHeldBack,
                 OpenItem::OutOfDate {
@@ -325,7 +378,7 @@ mod tests {
     fn one_and_three_training_days_not_opened() {
         let one = past(vec![row(date(2026, 10, 6), None)]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), &[one]),
+            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[one]),
             [OpenItem::NotOpened {
                 first: date(2026, 10, 6),
                 count: 1
@@ -337,7 +390,13 @@ mod tests {
             row(date(2026, 9, 22), None),
         ]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), &[three]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[three]
+            ),
             [OpenItem::NotOpened {
                 first: date(2026, 9, 22),
                 count: 3
@@ -350,7 +409,13 @@ mod tests {
         let this = past(vec![row(date(2027, 7, 6), None)]);
         let before = past(vec![row(date(2027, 6, 29), None)]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), &[this, before]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[this, before]
+            ),
             [OpenItem::NotOpened {
                 first: date(2027, 6, 29),
                 count: 2
@@ -364,7 +429,7 @@ mod tests {
         checked.checked = true;
         let list = past(vec![row(date(2026, 10, 6), Some(&checked))]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), &[list]),
+            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[list]),
             []
         );
     }
@@ -375,7 +440,7 @@ mod tests {
         cancelled.cancelled = true;
         let list = past(vec![row(date(2026, 10, 6), Some(&cancelled))]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), &[list]),
+            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[list]),
             []
         );
     }
@@ -610,10 +675,103 @@ mod tests {
     fn schedule_not_entered_comes_after_the_changes_and_before_the_trainings() {
         let list = past(vec![row(date(2026, 10, 6), None)]);
         assert_eq!(
-            open_items(&ReadingState::default(), 2, vec![7, 8], &[list]),
+            open_items(&ReadingState::default(), 2, vec![7, 8], Vec::new(), &[list]),
             [
                 OpenItem::ChangesNotSeen { count: 2 },
                 OpenItem::ScheduleNotEntered { games: vec![7, 8] },
+                OpenItem::NotOpened {
+                    first: date(2026, 10, 6),
+                    count: 1
+                },
+            ]
+        );
+    }
+
+    /// The drivers of an away game of the team with `players` on its date and `filled` driver
+    /// places with a player; `in_list` as `game_places`.
+    fn driver_places(players: usize, filled: u8, in_list: bool) -> GamePlaces {
+        use crate::duties::{RequiredDuties, game_places};
+        let required = RequiredDuties {
+            schedule: false,
+            drivers: true,
+        };
+        let filled = (1..=filled)
+            .map(|number| (DutyKind::Drive, number))
+            .collect();
+        game_places(required, None, TEAM, &filled, players, in_list, false).expect("places")
+    }
+
+    fn open_game(id: i64, open: &[(DutyKind, usize)]) -> OpenGame {
+        OpenGame {
+            id,
+            open: open.iter().copied().collect(),
+        }
+    }
+
+    #[test]
+    fn open_places_cover_4_weeks_for_the_table_and_this_week_and_next_for_the_drivers() {
+        let mut gone = scheduled(3, date(2026, 10, 31), ScheduleReason::DutyGame);
+        gone.in_list = false;
+        let games = [
+            // Mon 26 Oct + 27 days: Sun 22 Nov.
+            scheduled(1, date(2026, 11, 22), ScheduleReason::DutyGame),
+            scheduled(2, date(2026, 11, 23), ScheduleReason::DutyGame),
+            gone,
+            // The Sunday of next week: Sun 8 Nov.
+            scheduled(4, date(2026, 11, 8), ScheduleReason::TeamGame),
+            scheduled(5, date(2026, 11, 9), ScheduleReason::TeamGame),
+            // Entered, but its place has no player: still open.
+            scheduled(6, date(2026, 10, 31), ScheduleReason::DutyGame),
+        ];
+        let events = coming(&games, &[]);
+        let places: PlacesOf = [
+            (1, home_places(false, true, true, true, false)),
+            (2, home_places(false, true, true, true, false)),
+            (3, home_places(false, true, true, false, false)),
+            (4, driver_places(4, 0, true)),
+            (5, driver_places(4, 0, true)),
+            (6, home_places(true, true, true, true, false)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            open_places_games(&events, &places, date(2026, 10, 26)),
+            [
+                open_game(6, &[(DutyKind::Table, 1)]),
+                open_game(4, &[(DutyKind::Drive, 2)]),
+                open_game(1, &[(DutyKind::Table, 1)]),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_rising_driver_proposal_makes_an_open_item_without_a_save() {
+        let games = [scheduled(1, date(2026, 10, 31), ScheduleReason::TeamGame)];
+        let events = coming(&games, &[]);
+        let today = date(2026, 10, 26);
+        // 3 players: 1 driver, on the place.
+        let places: PlacesOf = [(1, driver_places(3, 1, true))].into_iter().collect();
+        assert!(open_places_games(&events, &places, today).is_empty());
+        // A fourth player joins: 2 drivers, one open.
+        let places: PlacesOf = [(1, driver_places(4, 1, true))].into_iter().collect();
+        assert_eq!(
+            open_places_games(&events, &places, today),
+            [open_game(1, &[(DutyKind::Drive, 1)])]
+        );
+        // Out of the game list: not counted.
+        let places: PlacesOf = [(1, driver_places(4, 1, false))].into_iter().collect();
+        assert!(open_places_games(&events, &places, today).is_empty());
+    }
+
+    #[test]
+    fn open_places_come_after_the_schedule_and_before_the_trainings() {
+        let list = past(vec![row(date(2026, 10, 6), None)]);
+        let open = vec![open_game(9, &[(DutyKind::Table, 1)])];
+        assert_eq!(
+            open_items(&ReadingState::default(), 0, vec![7], open.clone(), &[list]),
+            [
+                OpenItem::ScheduleNotEntered { games: vec![7] },
+                OpenItem::OpenPlaces { games: open },
                 OpenItem::NotOpened {
                     first: date(2026, 10, 6),
                     count: 1

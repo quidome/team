@@ -32,6 +32,7 @@ test('the start page shows the team, the open items, "Last", "Next" and the link
 	await expect(page.getByTestId('team-links').getByRole('link')).toHaveText([
 		'Season',
 		'Attendance',
+		'Duties',
 		'Team',
 		'Players',
 		'Settings'

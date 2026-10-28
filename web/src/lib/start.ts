@@ -1,6 +1,6 @@
 // The start page (story B of start page and season): the words and the links of the open items.
 import { resolve } from '$app/paths';
-import type { OpenItemView } from '#lib/api/client.js';
+import type { OpenGame, OpenItemView } from '#lib/api/client.js';
 import { formatDay } from '#lib/schedule.js';
 
 /** "1 change not seen", "3 changes not seen". */
@@ -22,6 +22,12 @@ export function openItemText(item: OpenItemView): string {
 			return item.games.length === 1 && first
 				? `Home game ${formatDay(first.date)}: schedule not entered`
 				: `${item.games.length} home games: schedule not entered`;
+		}
+		case 'open_places': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? openGameText(first)
+				: `${item.games.length} games with open places`;
 		}
 		case 'not_opened':
 			return item.count === 1
@@ -48,10 +54,31 @@ export function openItemLink(item: OpenItemView): string | null {
 			const [first] = item.games;
 			return item.games.length === 1 && first ? gameLink(first.season, first.id) : null;
 		}
+		case 'open_places': {
+			const [first] = item.games;
+			return item.games.length === 1 && first ? gameLink(first.season, first.id) : null;
+		}
 		case 'not_opened':
 		case 'not_checked':
 			return trainingLink(item.first);
 	}
+}
+
+/** "2 drivers open", "1 table place open", "1 referee place, 2 table places open". */
+function openCount(count: number, one: string, more: string): string[] {
+	return count === 0 ? [] : [`${count} ${count === 1 ? one : more}`];
+}
+
+/** The line of one game with open places: "Away game Sat 31 Oct: 2 drivers open", "Home game Sun
+ * 1 Nov: 1 table place open". */
+function openGameText(game: OpenGame): string {
+	const where = game.drive > 0 ? 'Away game' : 'Home game';
+	const parts = [
+		...openCount(game.referee, 'referee place', 'referee places'),
+		...openCount(game.table, 'table place', 'table places'),
+		...openCount(game.drive, 'driver', 'drivers')
+	];
+	return `${where} ${formatDay(game.date)}: ${parts.join(', ')} open`;
 }
 
 /** The page of a game, opened from the start page: "Back" returns here. */

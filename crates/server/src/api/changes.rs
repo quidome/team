@@ -19,7 +19,7 @@ use crate::changes;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::{self, StoreError};
 use crate::error::AppError;
-use crate::{followed_teams, games};
+use crate::{duties, followed_teams, games};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ChangesAnswer {
@@ -190,8 +190,9 @@ pub async fn list(
         .map(|open| open.source_id)
         .zip(versions)
         .collect();
+    let with_duties = duties::with_duties(&mut *db, club, season, team).await?;
     let today = today_in_netherlands(state.clock.as_ref());
-    Ok(list_changes(open, stored, club, team, today)
+    Ok(list_changes(open, stored, club, team, today, &with_duties)
         .into_iter()
         .filter_map(|listed| {
             let version = *version_of.get(&listed.source_id)?;

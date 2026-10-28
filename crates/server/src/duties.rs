@@ -2,7 +2,7 @@
 //! `duty_assignments`, the players on the places, story B). Every write takes the row lock of its
 //! game first (`lock`): two screens wait for each other.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgExecutor};
@@ -261,6 +261,33 @@ pub async fn player_has_duties(
     .fetch_one(db)
     .await?;
     Ok(found)
+}
+
+/// The games of `club` in `season` with duties of `team`: a place that names the team, a number
+/// of drivers above 0, or a player on a place. A change to such a game stays in the list of
+/// changes also when the game is past (`team_core::change_between`).
+pub async fn with_duties(
+    db: impl PgExecutor<'_>,
+    club: ClubNumber,
+    season: Season,
+    team: TeamNumber,
+) -> Result<BTreeSet<i64>, StoreError> {
+    let ids = sqlx::query_scalar!(
+        r#"SELECT source_id AS "source_id!" FROM duty_teams
+           WHERE club_number = $1 AND season_year = $2 AND team_number = $3
+           UNION
+           SELECT source_id FROM game_duties
+           WHERE club_number = $1 AND season_year = $2 AND drivers > 0
+           UNION
+           SELECT source_id FROM duty_assignments
+           WHERE club_number = $1 AND season_year = $2"#,
+        club.0,
+        season.start_year(),
+        team.0,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(ids.into_iter().collect())
 }
 
 /// The stored duties of the games of `club` in `season`, by source id.

@@ -2,6 +2,8 @@
 //! result and the open changes. Readings take a PostgreSQL advisory lock, so two at the same
 //! time (a tap and the nightly reading) never count a change twice or lose one (decision 0005).
 
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use team_core::{
@@ -13,6 +15,7 @@ use team_core::{
 use crate::changes;
 use crate::clock::{Clock, current_season, today_in_netherlands};
 use crate::db::{self, StoreError};
+use crate::duties;
 use crate::followed_teams;
 use crate::games;
 use crate::readings::{self, FailureKind, Reading, ReadingResult};
@@ -159,12 +162,17 @@ pub async fn read(
 
     let stored = games::stored(&mut tx, club, season).await?;
     let open = changes::open_for_update(&mut tx, club, season).await?;
+    // Read in the reading's transaction, before the changes are applied.
+    let with_duties = match team {
+        Some(team) => duties::with_duties(&mut *tx, club, season, team).await?,
+        None => BTreeSet::new(),
+    };
     let today = today_in_netherlands(clock);
     let first_reading = is_first_reading(last_good.map(|reading| reading.team), team);
     let counts = if first_reading {
         None
     } else {
-        let changes = compare(&stored, &read, club, team, today);
+        let changes = compare(&stored, &read, club, team, today, &with_duties);
         log_same_numbers(&changes);
         Some(count(&changes))
     };
@@ -172,7 +180,7 @@ pub async fn read(
     // The save of another choice already removed the open changes, under the same lock.
     let updates = match team {
         Some(team) if !first_reading => {
-            update_open_changes(&open, &stored, &read, club, team, today)
+            update_open_changes(&open, &stored, &read, club, team, today, &with_duties)
         }
         _ => Vec::new(),
     };

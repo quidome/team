@@ -10,11 +10,11 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
-    FollowedTeam, Game, GamePlaces, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole,
-    Schedule, ScheduleReason, ScheduledGame, Season, SeasonList, StoredDuties, Team, TeamNumber,
-    TeamRef, Training, WeeklyTraining, display_names, game_places, kept_games, not_entered,
-    open_places, players_playing_on, plays_games_on, required_duties, schedule, season_events,
-    season_list,
+    FollowedTeam, Game, GameDuties, GamePlaces, Outcome, PlaceKind, PlacesOf, Player, PlayerId,
+    PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonList, StoredDuties,
+    StoredGame, Team, TeamNumber, TeamRef, Training, WeeklyTraining, display_names, game_places,
+    kept_games, not_entered, open_places, players_playing_on, plays_games_on, required_duties,
+    schedule, season_events, season_list,
 };
 use utoipa::ToSchema;
 
@@ -283,8 +283,9 @@ pub(crate) struct SeasonDuties {
     pub roles: Vec<PlayerRole>,
     /// The players on the places, by source id.
     pub assignments: BTreeMap<i64, Vec<Assignment>>,
-    /// The names shown of the players of the season (a role in it, or on one of its places;
-    /// `team_core::display_names`).
+    /// The players of the season: a role in it, or on one of its places.
+    pub players: Vec<Player>,
+    /// The names shown of `players` (`team_core::display_names`).
     pub names: BTreeMap<PlayerId, String>,
 }
 
@@ -335,6 +336,59 @@ impl SeasonDuties {
     }
 }
 
+/// The places of all stored games of a season, worked out once for a page or a write: the totals
+/// (`team_core::duty_totals`) and the clashes read every stored game, also a past game that left
+/// the game list (A1), so the choice of a game and the page "Duties" give the same numbers.
+pub(crate) struct SeasonPlaces<'a> {
+    places: Vec<(&'a Game, GamePlaces)>,
+    /// The games of the team in the game list.
+    pub team_games: Vec<&'a Game>,
+    today: NaiveDate,
+}
+
+impl<'a> SeasonPlaces<'a> {
+    pub fn new(
+        stored: &'a [StoredGame],
+        duties: &SeasonDuties,
+        club: ClubNumber,
+        team: TeamNumber,
+        today: NaiveDate,
+    ) -> Self {
+        let places = stored
+            .iter()
+            .filter_map(|stored| {
+                let places = duties.places_of(&stored.game, stored.in_list, club, team, today)?;
+                Some((&stored.game, places))
+            })
+            .collect();
+        let team_games = stored
+            .iter()
+            .filter(|stored| {
+                stored.in_list && (stored.game.home.team == team || stored.game.away.team == team)
+            })
+            .map(|stored| &stored.game)
+            .collect();
+        Self {
+            places,
+            team_games,
+            today,
+        }
+    }
+
+    /// The games with their places and players, as the totals and the clashes read them.
+    pub fn duties<'b>(&'b self, duties: &'b SeasonDuties) -> Vec<GameDuties<'b>> {
+        self.places
+            .iter()
+            .map(|(game, places)| GameDuties {
+                game,
+                places,
+                assignments: duties.assignments_of(game.source_id),
+                past: game.date < self.today,
+            })
+            .collect()
+    }
+}
+
 /// The stored duties, the players on the places, the roles and the names of `season` of `club`.
 pub(crate) async fn duties_of(
     state: &AppState,
@@ -371,6 +425,7 @@ async fn load_duties(
         stored,
         roles,
         assignments,
+        players,
         names,
     })
 }

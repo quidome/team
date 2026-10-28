@@ -11,10 +11,13 @@ async function expectClosed(row: Locator) {
 	await expect(row.getByRole('button', { expanded: true })).toHaveCount(0);
 }
 
-test('the start page links to attendance, the team, players and settings', async ({ page }) => {
+test('the start page links to attendance, duties, the team, players and settings', async ({
+	page
+}) => {
 	await page.goto('/');
 	const links = page.getByTestId('team-links');
 	await expect(links.getByRole('link', { name: 'Attendance' })).toBeVisible();
+	await expect(links.getByRole('link', { name: 'Duties' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Team' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Players' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Settings' })).toBeVisible();

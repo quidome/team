@@ -1,6 +1,6 @@
-// Duty places (story A of duties): the words of the places of a game, for its page, its row on
-// "Season", the start page and the list of changes.
-import type { PlacesView, ScheduleGame, TeamView } from '#lib/api/client.js';
+// Duty places (stories A and B of duties): the words of the places of a game and of their players,
+// for its page, its row on "Season", the start page and the list of changes.
+import type { Choice, DutyKind, PlacesView, ScheduleGame, TeamView } from '#lib/api/client.js';
 
 type SchedulePart = NonNullable<PlacesView['schedule']>;
 type DriverPart = NonNullable<PlacesView['drivers']>;
@@ -12,9 +12,17 @@ const kindNames: Record<Place['kind'], string> = {
 	drive: 'Drivers'
 };
 
-/** "open" for each place, or the player when it is filled (story B). */
+/** Who did the duty of a filled place: "Anna", "Bram (was Anna)", "not done (was Anna)". */
+export function playerText(player: NonNullable<Place['player']>): string {
+	if (player.outcome === 'not_done') return `not done (was ${player.name})`;
+	if (player.outcome === 'done_by' && player.done_by)
+		return `${player.done_by.name} (was ${player.name})`;
+	return player.name;
+}
+
+/** The player of each place, or "open". */
 function fills(list: Place[]): string {
-	return list.map((place) => (place.filled ? 'filled' : 'open')).join(', ');
+	return list.map((place) => (place.player ? playerText(place.player) : 'open')).join(', ');
 }
 
 /** The places of the team at a home game of the club: "Referee 1: open · Table 1, 2: open, open",
@@ -32,12 +40,14 @@ function scheduleText(part: SchedulePart): string {
 	return groups.join(' · ');
 }
 
-/** The drivers of an away game of the team: "Drivers (4, proposed): 4 open", "all filled". */
+/** The drivers of an away game of the team: "Drivers (4, proposed): Anna, 3 open", "all filled". */
 function driversText(part: DriverPart): string {
-	const filled = part.places.filter((place) => place.filled).length;
-	if (part.places.length > 0 && filled === part.places.length) return 'all filled';
+	const filled = part.places.filter((place) => place.filled);
+	if (part.places.length > 0 && filled.length === part.places.length) return 'all filled';
 	const note = part.more_than_proposed ? ', more than proposed' : part.proposed ? ', proposed' : '';
-	return `Drivers (${part.places.length}${note}): ${part.places.length - filled} open`;
+	const names = filled.flatMap((place) => (place.player ? [playerText(place.player)] : []));
+	const open = `${part.places.length - filled.length} open`;
+	return `Drivers (${part.places.length}${note}): ${[...names, open].join(', ')}`;
 }
 
 /** The places of the team in a line, for the rows of a game. */
@@ -89,4 +99,46 @@ export function rowPlacesText(view: PlacesView): string {
 	}
 	const text = placesText(view);
 	return view.not_entered ? `${text} · Schedule not entered` : text;
+}
+
+/** The name of a place of the team: "Table 1", "Driver 2". */
+export function placeName(kind: DutyKind, number: number): string {
+	return `${kind === 'drive' ? 'Driver' : kindNames[kind]} ${number}`;
+}
+
+/** The totals of a player for the kind of a place: "2 done · 1 planned". */
+export function totalText(choice: Choice, kind: DutyKind): string {
+	const total = choice.totals[kind];
+	return `${total.done} done · ${total.planned} planned`;
+}
+
+const clashKinds: Record<DutyKind, string> = {
+	drive: 'Driver',
+	table: 'Table',
+	referee: 'Referee'
+};
+
+/** A clash of a player: "also Table 13:00", "plays 14:30", "plays (time not known)". */
+export function clashText(clash: Choice['clashes'][number]): string {
+	const what = clash.duty ? `also ${clashKinds[clash.duty]}` : 'plays';
+	return clash.start ? `${what} ${clash.start}` : `${what} (time not known)`;
+}
+
+/** Why a player cannot be chosen for a place, or `null` when the player can be chosen. `on`: the
+ * player on the place. `correcting`: "Someone else" on a past game, which a clash never blocks;
+ * the planned player can be chosen again there (as planned). */
+export function notOffered(
+	choice: Choice,
+	on: Place['player'] | null | undefined,
+	correcting: boolean
+): string | null {
+	const doneBy = on?.outcome === 'done_by' ? on.done_by?.id : undefined;
+	if (correcting && choice.id === on?.id)
+		return on?.outcome === 'as_planned' ? 'on this place' : null;
+	if (choice.id === (correcting ? doneBy : on?.id)) return 'on this place';
+	if (choice.at_game) return 'already at this game';
+	if (!choice.plays_on_date) return 'Not in the team on this date';
+	if (!correcting && choice.clashes.some((clash) => clash.level === 'blocked'))
+		return 'at another game at almost the same time';
+	return null;
 }

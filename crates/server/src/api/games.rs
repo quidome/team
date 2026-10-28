@@ -10,15 +10,17 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Assignment, ClashLevel, Club, DutyError, DutyKind, Game, GameDuties, GamePlaces, Outcome,
+    Assignment, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game, GamePlaces, Outcome,
     PlaceKind, PlayerId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties,
     StoredGame, Team, TeamNumber, check_assignment, check_drivers, check_entered, check_outcome,
-    check_team, clashes, club_teams, game_places, in_schedule, kept_games, pick_team,
+    check_team, clashes, club_teams, duty_totals, game_places, in_schedule, kept_games, pick_team,
     players_playing_on, plays_games_on, required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
-use super::season::{OutcomeView, ScheduleGame, SeasonDuties, duties_of};
+use super::season::{
+    DutyKindView, OutcomeView, ScheduleGame, SeasonDuties, SeasonPlaces, duties_of,
+};
 use crate::api::clubs::TeamView;
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
@@ -38,6 +40,97 @@ pub struct GamePage {
     pub game: ScheduleGame,
     /// The pull-down list of the places: the club teams of the season, sorted by name.
     pub club_teams: Vec<TeamView>,
+    /// The game is before today: its places can be corrected ("Someone else", "Nobody").
+    pub past: bool,
+    /// The choice of a player for the places of the team: the players with the role "plays
+    /// games" on the date (hidden players too), and the players already at the game; sorted by
+    /// first name.
+    pub players: Vec<ChoiceView>,
+}
+
+/// A player in the choice of a place.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ChoiceView {
+    pub id: i64,
+    /// The name shown ("Anna", "Anna B.").
+    pub name: String,
+    pub hidden: bool,
+    /// The duties of the player in the game's season, for each kind.
+    pub totals: KindTotalsView,
+    /// The clashes with other games.
+    pub clashes: Vec<ClashView>,
+    /// The player already has a place at this game: not offered for another one.
+    pub at_game: bool,
+    /// The player has the role "plays games" on the date: else not offered.
+    pub plays_on_date: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotalView {
+    pub done: u32,
+    pub planned: u32,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct KindTotalsView {
+    pub drive: TotalView,
+    pub table: TotalView,
+    pub referee: TotalView,
+}
+
+impl From<team_core::Total> for TotalView {
+    fn from(total: team_core::Total) -> Self {
+        Self {
+            done: total.done,
+            planned: total.planned,
+        }
+    }
+}
+
+impl From<team_core::KindTotals> for KindTotalsView {
+    fn from(totals: team_core::KindTotals) -> Self {
+        Self {
+            drive: totals.drive.into(),
+            table: totals.table.into(),
+            referee: totals.referee.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ClashLevelView {
+    /// Under 1:30 apart on another court: cannot be chosen.
+    Blocked,
+    /// Under 2:00 apart on another court, or a start time not known: a note.
+    Warning,
+}
+
+/// A clash with another game: a duty place there ("also Table 13:00") or a game of the team
+/// ("plays 14:30").
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ClashView {
+    pub level: ClashLevelView,
+    /// The kind of the duty place there; `null`: the player plays that game.
+    pub duty: Option<DutyKindView>,
+    /// Dutch local start time of the other game ("13:00"); `null` when not known.
+    pub start: Option<String>,
+}
+
+impl From<&Clash> for ClashView {
+    fn from(clash: &Clash) -> Self {
+        Self {
+            level: match clash.level {
+                ClashLevel::Blocked => ClashLevelView::Blocked,
+                ClashLevel::Warning => ClashLevelView::Warning,
+            },
+            duty: match clash.what {
+                ClashWhat::Duty { kind } => Some(kind.into()),
+                ClashWhat::Plays => None,
+            },
+            start: clash.start.map(|start| start.format("%H:%M").to_string()),
+        }
+    }
 }
 
 /// The team of a place; `null`: "—".
@@ -144,48 +237,31 @@ impl Found {
         )
     }
 
-    /// The closest clash of `player` for a place at this game (`team_core::clashes`): the places
-    /// of the player at other games of the season, and the other games of the team in the list.
+    /// The closest clash of `player` for a place at this game.
     fn clash(
         &self,
         duties: &SeasonDuties,
         player: PlayerId,
         today: chrono::NaiveDate,
     ) -> Option<ClashLevel> {
-        let places: Vec<(&Game, GamePlaces)> = self
-            .stored
-            .iter()
-            .filter_map(|stored| {
-                let places = duties.places_of(
-                    &stored.game,
-                    stored.in_list,
-                    self.club.number,
-                    self.team.number,
-                    today,
-                )?;
-                Some((&stored.game, places))
-            })
-            .collect();
-        let season: Vec<GameDuties<'_>> = places
-            .iter()
-            .map(|(game, places)| GameDuties {
-                game,
-                places,
-                assignments: duties.assignments_of(game.source_id),
-                past: game.date < today,
-            })
-            .collect();
-        let team_games: Vec<&Game> = self
-            .stored
-            .iter()
-            .filter(|stored| {
-                stored.in_list
-                    && (stored.game.home.team == self.team.number
-                        || stored.game.away.team == self.team.number)
-            })
-            .map(|stored| &stored.game)
-            .collect();
-        worst_clash(&clashes(player, &self.game, &season, &team_games))
+        let season = self.season_places(duties, today);
+        worst_clash(&clashes(
+            player,
+            &self.game,
+            &season.duties(duties),
+            &season.team_games,
+        ))
+    }
+
+    /// The places of the stored games of the season, for the clashes and the totals.
+    fn season_places(&self, duties: &SeasonDuties, today: chrono::NaiveDate) -> SeasonPlaces<'_> {
+        SeasonPlaces::new(
+            &self.stored,
+            duties,
+            self.club.number,
+            self.team.number,
+            today,
+        )
     }
 }
 
@@ -273,6 +349,8 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
     let view = places
         .as_ref()
         .map(|places| duties.view(&found.game, places));
+    let players = choice(&found, &duties, today);
+    let past = found.past(today);
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
         reason: found.reason,
@@ -285,7 +363,44 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         team: TeamView::from(found.team),
         game,
         club_teams: found.club_teams.iter().map(TeamView::from).collect(),
+        past,
+        players,
     })
+}
+
+/// The choice of a player for the places of the game of `found`, with the totals of its season
+/// (`team_core::duty_totals`) and the clashes.
+fn choice(found: &Found, duties: &SeasonDuties, today: chrono::NaiveDate) -> Vec<ChoiceView> {
+    let season = found.season_places(duties, today);
+    let season_duties = season.duties(duties);
+    let totals = duty_totals(&season_duties);
+    let at_game = duties.assignments_of(found.game.source_id);
+    let on_game = |player: PlayerId| {
+        at_game.iter().any(|assignment| {
+            assignment.planned == player || assignment.outcome == Outcome::DoneBy(player)
+        })
+    };
+    // `players` is sorted by first name (`players::all`).
+    duties
+        .players
+        .iter()
+        .filter_map(|player| {
+            let plays_on_date = plays_games_on(&duties.roles, player.id, found.game.date);
+            let at_game = on_game(player.id);
+            (plays_on_date || at_game).then(|| ChoiceView {
+                id: player.id.0,
+                name: duties.names.get(&player.id).cloned().unwrap_or_default(),
+                hidden: player.hidden,
+                totals: totals.get(&player.id).copied().unwrap_or_default().into(),
+                clashes: clashes(player.id, &found.game, &season_duties, &season.team_games)
+                    .iter()
+                    .map(ClashView::from)
+                    .collect(),
+                at_game,
+                plays_on_date,
+            })
+        })
+        .collect()
 }
 
 /// One write of the duties of `found`: lock the game, check against what is stored, write;

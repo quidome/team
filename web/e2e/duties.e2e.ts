@@ -446,3 +446,228 @@ test('a change of a game with places of the team says "has duties", and a tap op
 	await expect(page).toHaveURL(/\/changes$/);
 	expect(errors).toEqual([]);
 });
+
+// Story B: the players on the places of the team.
+
+/** Writes of the API come from the tool's own origin. */
+const origin = { headers: { Origin: 'http://localhost:4100' } };
+
+/** Adds a player with the role "plays games" from the start of the season; returns the id. */
+async function addPlayer(page: Page, first: string): Promise<number> {
+	const response = await page.request.post('/api/players', {
+		...origin,
+		data: { first_name: first, last_name: null, role: { role: 'plays_games', from: '2026-09-01' } }
+	});
+	expect(response.ok(), await response.text()).toBe(true);
+	return (await response.json()).player.id;
+}
+
+/** The place of the team `name` on the page of a game. */
+const teamPlace = (page: Page, name: string) =>
+	page.getByTestId('team-place').filter({ has: page.getByRole('button', { name }) });
+
+const choicePlayer = (page: Page, name: string) =>
+	page.getByTestId('choice-player').filter({ hasText: name });
+
+test('a tap on a place of the team and a player puts the player on it; "Clear" opens it', async ({
+	page
+}) => {
+	const errors = watchConsole(page);
+	await addPlayer(page, 'Yara');
+	await addPlayer(page, 'Yusuf');
+	// The game of the first test, with Table 2 of the team.
+	const game = await findGame(page, otherHomeGame);
+	await page.goto(`/game/2026-2027/${game.id}`);
+	const table2 = teamPlace(page, 'Table 2');
+	await expect(table2.getByTestId('place-player')).toHaveText('open');
+
+	await table2.getByRole('button', { name: 'Table 2' }).click();
+	await expect(choicePlayer(page, 'Yara')).toContainText('0 done · 0 planned');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	await choicePlayer(page, 'Yara').click();
+	await expect(table2.getByTestId('place-player')).toHaveText('Yara');
+	await expect(page.getByTestId('choice')).toHaveCount(0);
+
+	// The totals in the choice count the place; Yara is on it, so not offered again.
+	await table2.getByRole('button', { name: 'Table 2' }).click();
+	await expect(choicePlayer(page, 'Yara')).toContainText('0 done · 1 planned');
+	await expect(choicePlayer(page, 'Yara')).toContainText('on this place');
+	await expect(choicePlayer(page, 'Yara')).toBeDisabled();
+
+	// After a reload the player is stored; "Season" shows the name.
+	await page.reload();
+	await expect(table2.getByTestId('place-player')).toHaveText('Yara');
+	const season = await (await page.request.get('/api/season')).json();
+	const row = season.coming.find((e: GameEvent) => e.game?.id === game.id);
+	expect(row.game.places.schedule.of_team[0].player.name).toBe('Yara');
+
+	await table2.getByRole('button', { name: 'Table 2' }).click();
+	await page.getByRole('button', { name: 'Clear' }).click();
+	await expect(table2.getByTestId('place-player')).toHaveText('open');
+	expect(errors).toEqual([]);
+});
+
+test('on a past game "Nobody" and "Someone else" correct a place', async ({ page }) => {
+	const errors = watchConsole(page);
+	const season = await (await page.request.get('/api/season')).json();
+	const event = season.past.find((e: GameEvent) => e.game?.places?.schedule);
+	expect(event, 'a past home game of the club').toBeTruthy();
+	const id = event.game.id;
+	const path = `/api/games/2026-2027/${id}`;
+	const team = (await (await page.request.get(path)).json()).team.number;
+	expect(
+		(await page.request.put(`${path}/places/table/1`, { ...origin, data: { team } })).ok()
+	).toBe(true);
+	await page.goto(`/game/2026-2027/${id}`);
+	const table1 = teamPlace(page, 'Table 1');
+	await table1.getByRole('button', { name: 'Table 1' }).click();
+	await choicePlayer(page, 'Yara').click();
+	await expect(table1.getByTestId('place-player')).toHaveText('Yara');
+
+	// A past place with a player first offers the corrections.
+	await table1.getByRole('button', { name: 'Table 1' }).click();
+	await page.getByRole('button', { name: 'Nobody' }).click();
+	await expect(table1.getByTestId('place-player')).toHaveText('not done (was Yara)');
+
+	await table1.getByRole('button', { name: 'Table 1' }).click();
+	await page.getByRole('button', { name: 'Someone else' }).click();
+	await choicePlayer(page, 'Yusuf').click();
+	await expect(table1.getByTestId('place-player')).toHaveText('Yusuf (was Yara)');
+	await table1.getByRole('button', { name: 'Table 1' }).click();
+	await page.getByRole('button', { name: 'Someone else' }).click();
+	await expect(choicePlayer(page, 'Yusuf')).toContainText('1 done · 0 planned');
+	await expect(choicePlayer(page, 'Yara')).toContainText('0 done · 0 planned');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// Clean up for the later tests.
+	await page.getByRole('button', { name: 'Clear' }).click();
+	await expect(table1.getByTestId('place-player')).toHaveText('open');
+	expect(
+		(await page.request.put(`${path}/places/table/1`, { ...origin, data: { team: null } })).ok()
+	).toBe(true);
+	expect(errors).toEqual([]);
+});
+
+test('a blocked player is shown with the reason and cannot be chosen', async ({ page }) => {
+	const game = await findGame(page, otherHomeGame);
+	await page.route(`**/api/games/2026-2027/${game.id}`, async (route) => {
+		const answer = await (await route.fetch()).json();
+		for (const player of answer.players)
+			if (player.name === 'Yara')
+				player.clashes = [{ level: 'blocked', duty: 'referee', start: '14:00' }];
+			else if (player.name === 'Yusuf')
+				player.clashes = [{ level: 'warning', duty: null, start: '15:00' }];
+		await route.fulfill({ json: answer });
+	});
+	await page.goto(`/game/2026-2027/${game.id}`);
+	await page.getByRole('button', { name: 'Table 2' }).click();
+	const yara = choicePlayer(page, 'Yara');
+	await expect(yara).toContainText('at another game at almost the same time');
+	await expect(yara).toContainText('also Referee 14:00');
+	await expect(yara).toBeDisabled();
+	const yusuf = choicePlayer(page, 'Yusuf');
+	await expect(yusuf).toContainText('plays 15:00');
+	await expect(yusuf).toBeEnabled();
+});
+
+test('a choice that fails shows "Not saved. Try again." and the stored place', async ({ page }) => {
+	const game = await findGame(page, otherHomeGame);
+	await page.route('**/api/games/*/*/assignments/**', (route) =>
+		route.fulfill({ status: 500, json: { error: 'internal' } })
+	);
+	await page.goto(`/game/2026-2027/${game.id}`);
+	const table2 = teamPlace(page, 'Table 2');
+	await table2.getByRole('button', { name: 'Table 2' }).click();
+	await choicePlayer(page, 'Yusuf').click();
+	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
+	await expect(table2.getByTestId('place-player')).toHaveText('open');
+});
+
+test('the open item "games with open places" names one game and lists more', async ({ page }) => {
+	const errors = watchConsole(page);
+	// The game of the first test has Table 2 of the team without a player.
+	const game = await findGame(page, otherHomeGame);
+	const real = (await (await page.request.get('/api/start')).json()).open_items.find(
+		(item: { kind: string }) => item.kind === 'open_places'
+	);
+	expect(real.games.map((open: { id: number }) => open.id)).toContain(game.id);
+
+	const base = { season: '2026-2027', start_time: '14:30', home: 'Home', away: 'Away' };
+	const away = { ...base, id: game.id, date: '2026-10-31', referee: 0, table: 0, drive: 2 };
+	const home = { ...base, id: game.id, date: '2026-11-01', referee: 1, table: 2, drive: 0 };
+	let games = [away];
+	await page.route('**/api/start', async (route) => {
+		const start = await (await route.fetch()).json();
+		start.open_items = [{ kind: 'open_places', games }];
+		await route.fulfill({ json: start });
+	});
+	await page.goto('/');
+	const open = page.locator('[data-testid="open-item"][data-kind="open_places"]');
+	await expect(open).toHaveText('Away game Sat 31 Oct: 2 drivers open');
+	games = [{ ...home, referee: 0, table: 1 }];
+	await page.reload();
+	await expect(open).toHaveText('Home game Sun 1 Nov: 1 table place open');
+	games = [home];
+	await page.reload();
+	await expect(open).toHaveText('Home game Sun 1 Nov: 1 referee place, 2 table places open');
+	await open.click();
+	await expect(page).toHaveURL(new RegExp(`/game/2026-2027/${game.id}\\?from=start$`));
+
+	// More games: a tap opens their list.
+	games = [away, { ...home, id: game.id + 1 }, { ...home, id: game.id + 2 }];
+	await page.goto('/');
+	await expect(open).toHaveText('3 games with open places');
+	await open.click();
+	const list = page.getByTestId('open-item-game');
+	await expect(list).toHaveCount(3);
+	await expect(list.first()).toHaveText('Sat 31 Oct · 14:30 Home – Away');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+	await list.first().click();
+	await expect(page).toHaveURL(new RegExp(`/game/2026-2027/${game.id}\\?from=start$`));
+	expect(errors).toEqual([]);
+});
+
+test('"Duties" shows the totals of each player in a season', async ({ page }) => {
+	const errors = watchConsole(page);
+	// The earlier tests cleared their players again.
+	await page.goto('/duties');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Duties · 2026-2027');
+	await expect(page.getByTestId('no-duties-yet')).toHaveText('No duties yet this season.');
+
+	// Yara on Table 2 of the game of the first test: planned.
+	const game = await findGame(page, otherHomeGame);
+	const path = `/api/games/2026-2027/${game.id}/assignments/table/2`;
+	const players = (await (await page.request.get(`/api/games/2026-2027/${game.id}`)).json())
+		.players as { id: number; name: string }[];
+	const yara = players.find((player) => player.name === 'Yara')!;
+	expect((await page.request.put(path, { ...origin, data: { player: yara.id } })).ok()).toBe(true);
+	await page.reload();
+	const row = page.getByTestId('duty-row').filter({ hasText: 'Yara' });
+	await expect(row.locator('td')).toHaveText(['0 · 0', '0 · 1', '0 · 0']);
+	await expect(page.getByTestId('duty-row').filter({ hasText: 'Yusuf' }).locator('td')).toHaveText([
+		'0 · 0',
+		'0 · 0',
+		'0 · 0'
+	]);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	// Another season, from the address; a season that cannot be read.
+	await page.goto('/duties?season=2025-2026');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Duties · 2025-2026');
+	await expect(page.getByTestId('no-duties-yet')).toBeVisible();
+
+	// The link on the start page.
+	await page.goto('/');
+	await page.getByTestId('team-links').getByRole('link', { name: 'Duties' }).click();
+	await expect(page).toHaveURL(/\/duties$/);
+	expect((await page.request.delete(path, origin)).ok()).toBe(true);
+	expect(errors).toEqual([]);
+
+	// The answer 400 of this address is expected, so the console is checked before it.
+	await page.goto('/duties?season=2026');
+	await expect(page.getByTestId('invalid-season')).toHaveText('This season cannot be read.');
+});

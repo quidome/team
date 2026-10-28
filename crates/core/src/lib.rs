@@ -34,8 +34,8 @@ pub use duties::{
     SchedulePart, SchedulePlace, StoredDuties, TeamRef, Total, check_assignment, check_drivers,
     check_entered, check_outcome, check_team, clash_level, clashes, club_teams, display_names,
     driver_proposal, duty_totals, game_places, has_team_places, highest_driver, kept_games,
-    not_entered, open_places, pick_team, players_playing_on, plays_games_on, required_duties,
-    who_did, worst_clash,
+    not_entered, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
+    required_duties, who_did, worst_clash,
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
@@ -50,8 +50,8 @@ pub use schedule::{Schedule, ScheduleReason, ScheduledGame, in_schedule, schedul
 pub use season::{Season, SeasonError};
 pub use season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use start_page::{
-    OpenItem, PlacesOf, ReadingState, last_games, last_training, next_events, open_item_seasons,
-    open_items, schedule_not_entered,
+    OpenGame, OpenItem, PlacesOf, ReadingState, last_games, last_training, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered,
 };
 pub use team_choice::{
     ChoiceState, FollowedTeam, Team, TeamChoiceError, TeamNeededReason, choice_state, choose_team,

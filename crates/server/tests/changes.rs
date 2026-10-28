@@ -554,3 +554,81 @@ async fn a_gone_game_whose_date_passed_is_hidden_with_its_change(pool: PgPool) {
     );
     assert_eq!(changes(&reader).await, Vec::<Value>::new());
 }
+
+/// A home game of Blue Drakes X12 1 on 3 October 2026: a past duty game on 12 October.
+const PAST_DUTY_GAME: i64 = 1081913;
+
+async fn ok(reader: &Reader, method: &str, path: &str, body: Option<Value>) -> Value {
+    let (status, answer) = reader.send(method, path, body).await;
+    assert_eq!(status, 200, "{method} {path}: {answer}");
+    answer
+}
+
+/// Table 1 of game `id` for the team; with `player`, a player on it too.
+async fn table_with(reader: &Reader, id: i64, player: Option<&str>) {
+    let game = format!("/api/games/2026-2027/{id}");
+    ok(
+        reader,
+        "PUT",
+        &format!("{game}/places/table/1"),
+        Some(json!({ "team": M16_1 })),
+    )
+    .await;
+    if let Some(first) = player {
+        let answer = ok(
+            reader,
+            "POST",
+            "/api/players",
+            Some(json!({ "first_name": first, "last_name": null,
+                         "role": { "role": "plays_games", "from": "2026-09-01" } })),
+        )
+        .await;
+        ok(
+            reader,
+            "PUT",
+            &format!("{game}/assignments/table/1"),
+            Some(json!({ "player": answer["player"]["id"] })),
+        )
+        .await;
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_move_of_a_past_game_with_a_player_on_a_place_is_a_change_with_duties(pool: PgPool) {
+    let reader = read_once(pool).await;
+    table_with(&reader, PAST_DUTY_GAME, Some("Anna")).await;
+    reader.answer(at(PAST_DUTY_GAME, "18:00"));
+    let body = reader.read_good().await;
+    assert_eq!(body["counts"]["moved"], 1);
+    let changes = changes(&reader).await;
+    assert_eq!(changes.len(), 1, "{changes:?}");
+    let change = &changes[0];
+    assert_eq!(change["id"], PAST_DUTY_GAME);
+    assert_eq!(
+        change["places"]["schedule"]["of_team"][0]["player"]["name"],
+        "Anna"
+    );
+
+    // "Seen" removes it; the next reading keeps nothing new.
+    seen(&reader, json!(changes)).await;
+    reader.read_good().await;
+    assert_eq!(ids(reader.pool()).await, Vec::<i64>::new());
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_change_of_a_game_with_duties_stays_after_its_date(pool: PgPool) {
+    let mut reader = read_once(pool).await;
+    table_with(&reader, DUTY_GAME, None).await;
+    reader.answer(at(DUTY_GAME, "18:00"));
+    reader.read_good().await;
+    assert_eq!(ids(reader.pool()).await, [DUTY_GAME]);
+
+    // 2 November 2026: the game of 31 October is past; a reading keeps the change until "Seen".
+    reader.harness.clock.set(utc(2026, 11, 2, 12, 0));
+    reader.log_in_again().await;
+    reader.read_good().await;
+    assert_eq!(ids(reader.pool()).await, [DUTY_GAME]);
+    let changes = changes(&reader).await;
+    assert_eq!(changes.len(), 1, "{changes:?}");
+    assert_eq!(changes[0]["id"], DUTY_GAME);
+}
