@@ -7,7 +7,7 @@ The coordinator records the duty places of each game in the tool, not in the she
 game of the club the 4 table and referee places that the referee committee gives to the club
 teams, and at each away game of the team the number of drivers. On the places of the team they
 put players, correct them after the game, and see the duty totals of each player, so the work is
-shared fairly. (The messages come in the next stories.)
+shared fairly. From them the tool makes the [messages](messages.md) to copy.
 
 ## Behaviour
 - **The page of a game** (`/game/2026-2027/<id>`) opens with a tap on a game on [Season](season.md), in "Next" or "Last" on the [start page](start-page.md), on a game of the open item "schedule not entered", or on the teams of a change in the [list of changes](list-of-changes.md). It shows the date and start time ("time not known yet" when not known), the home and away team, the hall and town, and the badge "Team" for a game of the team.
@@ -47,7 +47,7 @@ shared fairly. (The messages come in the next stories.)
 - A game that is not a game of the chosen team's schedule (or an address that cannot be read): "This game cannot be found.", with a link to "Season".
 - The table and referee places of the club's home games are entered by hand, one game at a time; the committee's sheet is not read.
 - After another team is chosen in the middle of a season, the past table and referee places of the old team still count in the totals, but the page of the game, "Season" and "Last" show only the places of the current team (an idea in `docs/ideas.md`).
-- The totals cover one season. The messages for the players and the referee committee come in the next stories of duties.
+- The totals cover one season. The message for the referee committee comes in the next story of duties.
 - A choice that is refused says why ("This player already has a place at this game.", "This player is at another game at almost the same time.", "Driver place 3 has a player. Clear it first."); a save that fails: "Not saved. Try again." and what is stored.
 
 ## Interface

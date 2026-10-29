@@ -1,14 +1,14 @@
 ---
 title: The message for the next game
 type: feature
-stage: close
+stage: done
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-29
 ---
 
 # The message for the next game
 
-Story C of the epic [Duties](../2026-10-18-duties/). The coordinator opens "Message for the next
+Story C of the epic [Duties](../../2026-10-18-duties/). The coordinator opens "Message for the next
 game" from a new part "Messages" on the start page and copies one Dutch text for the chat of the
 team and the parents: the team's next game (when, where, home or away, the drivers) and the table
 and referee places of the team in the coming week, with open places as "nog N open". The
@@ -21,3 +21,4 @@ functional spec is the epic's (`functional.md`, story C); the architecture is in
 | 2026-10-29 | design | created from story C of the epic. Readings of the spec confirmed by the coordinator (R1–R5 in `technical.md`); the text forms stay in the core code (no templates); step 1 (the clipboard) is checked with browser tests only, the phone after step 4 |
 | 2026-10-29 | implement | technical.md approved: one story of 4 steps (the clipboard with browser tests; the text in the core with exact-text tests; the route and the start page flag; the page and "Messages" on the start page); closure review build + accept |
 | 2026-10-29 | close | steps 1–4 built (`ea037d4`); build review R1–R5: R1 ("Thuis" means the club's own hall, the coordinator's choice), R2 and R3 fixed (`befc510`), R4 noted, R5 for Close; accept review: accepted with notes, A5 fixed (a test), A8 to `docs/ideas.md`, A7 open ("Copy" on the phone after the release, the coordinator's choice) |
+| 2026-10-29 | done | closed: product documents (new `messages.md`; start page, duties), architecture, `CLAUDE.md`, decision 0024, vision updated; the folder moves to `changes/done/`. A7 ("Copy" on the phone) stays in `docs/backlog.md` until after the release |
