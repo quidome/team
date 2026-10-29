@@ -606,6 +606,18 @@ mod tests {
     }
 
     #[test]
+    fn a_next_game_no_longer_in_the_game_list_gives_way_to_the_next_one_that_is() {
+        let gone = Fixture::away(1, date(2026, 10, 31), time(14, 30)).gone();
+        let next = Fixture::home(3, date(2026, 11, 7), time(11, 0));
+        assert_eq!(
+            text(&[gone, next], monday()),
+            "Volgende wedstrijd: zaterdag 7 november, 11:00\n\
+             Thuis tegen Lions M16 1\n\
+             Sporthal Bulwijk, Woerden"
+        );
+    }
+
+    #[test]
     fn the_week_part_ends_on_the_coming_sunday() {
         let monday_after =
             Fixture::duty(2, date(2026, 11, 2), time(19, 0)).of_team(PlaceKind::Table, 1);
