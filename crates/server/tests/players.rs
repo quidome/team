@@ -563,6 +563,7 @@ async fn every_new_route_needs_a_login_and_changes_need_the_origin(pool: PgPool)
         ("GET", "/api/team"),
         ("GET", "/api/attendance"),
         ("GET", "/api/duties"),
+        ("GET", "/api/messages/next-game"),
         ("GET", "/api/season"),
         ("GET", "/api/start"),
         ("GET", "/api/games/2026-2027/1"),

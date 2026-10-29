@@ -505,6 +505,13 @@ export async function loadStart(fetch: typeof globalThis.fetch): Promise<StartAn
 	return dataOf(await api.GET('/api/start', { fetch }));
 }
 
+export type Message = components['schemas']['MessageView'];
+
+/** The message for the next game (story C of duties); `text` is `null` when there is none. */
+export async function loadNextGameMessage(fetch: typeof globalThis.fetch): Promise<Message> {
+	return dataOf(await api.GET('/api/messages/next-game', { fetch }));
+}
+
 export type DutiesOverview = components['schemas']['DutiesOverview'];
 
 /** The duty totals of each player in a season (story B of duties); the current season when

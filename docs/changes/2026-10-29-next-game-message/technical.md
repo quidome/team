@@ -1,6 +1,6 @@
 # Technical spec: The message for the next game
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: [2026-10-29-next-game-message](./)
 **Date**: 2026-10-29
@@ -180,11 +180,11 @@ B are built, closed and released (`v0.5.0`, decision 0023).
 - Player names in the text come decrypted from `players.rs` (decision 0021) and are never logged.
 
 ## Progress
-- [ ] Step 1: the clipboard (spike)
-- [ ] Step 2: the text in the core
-- [ ] Step 3: the route and the start page flag
-- [ ] Step 4: the page and "Messages" on the start page
-- [ ] All checks pass
+- [x] Step 1: the clipboard (spike)
+- [x] Step 2: the text in the core
+- [x] Step 3: the route and the start page flag (`GET /api/start` median 8 ms, debug build, the test game list of the season without players)
+- [x] Step 4: the page and "Messages" on the start page
+- [x] All checks pass (`just check`; `api-types-check` passes after the commit of the new types)
 
 ## Deviations
 None from `functional.md`. Readings that the design makes exact: R1–R5 (see Requirements summary);

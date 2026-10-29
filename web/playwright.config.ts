@@ -92,6 +92,16 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// The messages read the duties the earlier tests saved; "Copy" needs the clipboard.
+			name: 'messages',
+			testMatch: 'messages.e2e.ts',
+			dependencies: ['duties'],
+			use: {
+				baseURL: 'http://localhost:4100',
+				permissions: ['clipboard-read', 'clipboard-write']
+			}
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

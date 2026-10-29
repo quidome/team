@@ -8,6 +8,7 @@ pub(crate) mod format;
 pub mod games;
 pub mod health;
 pub mod me;
+pub mod messages;
 pub mod players;
 pub mod readings;
 pub mod reasons;
@@ -44,6 +45,7 @@ use utoipa::OpenApi;
         games::clear_assignment,
         games::set_outcome,
         start::get,
+        messages::next_game,
         changes::get,
         changes::seen,
         players::list,
