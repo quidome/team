@@ -13,6 +13,8 @@ use sqlx::PgPool;
 
 /// A home game of X12 1 on Saturday 31 October 2026 at 13:00.
 const X12_31_OCT: i64 = 1_081_923;
+/// The away game of M16 1 on Saturday 7 November 2026 at 11:15.
+const AWAY_7_NOV: i64 = 1_073_159;
 
 async fn ok(reader: &Reader, method: &str, path: &str, body: Option<Value>) -> Value {
     let (status, answer) = reader.send(method, path, body).await;
@@ -37,6 +39,19 @@ where
         "the link and the message agree: {message}"
     );
     message["text"].clone()
+}
+
+async fn add_player(reader: &Reader, first: &str) -> i64 {
+    ok(
+        reader,
+        "POST",
+        "/api/players",
+        Some(json!({ "first_name": first, "last_name": null,
+                     "role": { "role": "plays_games", "from": "2026-09-01" } })),
+    )
+    .await["player"]["id"]
+        .as_i64()
+        .unwrap()
 }
 
 async fn message(reader: &Reader) -> Value {
@@ -80,16 +95,7 @@ async fn the_message_has_the_next_game_and_the_places_of_this_week(pool: PgPool)
         Some(json!({ "team": M16_1 })),
     )
     .await;
-    let player = ok(
-        &reader,
-        "POST",
-        "/api/players",
-        Some(json!({ "first_name": "Anna", "last_name": null,
-                     "role": { "role": "plays_games", "from": "2026-09-01" } })),
-    )
-    .await["player"]["id"]
-        .as_i64()
-        .unwrap();
+    let player = add_player(&reader, "Anna").await;
     ok(
         &reader,
         "PUT",
@@ -106,5 +112,38 @@ async fn the_message_has_the_next_game_and_the_places_of_this_week(pool: PgPool)
          Tafel en scheidsrechter deze week:\n\
          za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
          Tafel: Anna"
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn an_away_game_has_its_drivers(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Monday 2 November 2026: the next game of M16 1 is away on Saturday 7 November.
+    reader.harness.clock.set(utc(2026, 11, 2, 10, 0));
+    reader.log_in_again().await;
+    let game = format!("/api/games/2026-2027/{AWAY_7_NOV}");
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/drivers"),
+        Some(json!({ "drivers": 2 })),
+    )
+    .await;
+    let player = add_player(&reader, "Bram").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/assignments/drive/1"),
+        Some(json!({ "player": player })),
+    )
+    .await;
+    assert_eq!(
+        message(&reader).await,
+        "Volgende wedstrijd: zaterdag 7 november, 11:15\n\
+         Uit tegen De Dunckers M16 3\n\
+         Dudok Arena, Hilversum\n\
+         \n\
+         Rijden: Bram (nog 1 open)"
     );
 }

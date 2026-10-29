@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime};
 
+use crate::club::ClubNumber;
 use crate::duties::{Assignment, DutyKind, DutyPlace, GamePlaces};
 use crate::game::{Game, TeamNumber};
 use crate::players::PlayerId;
@@ -104,18 +105,25 @@ fn filled_and_open(
     }
 }
 
-/// The part about the team's next game, with its drivers.
+/// The part about the team's next game, with its drivers. "Thuis": a game in the club's own hall
+/// (`docs/language.md`), also with the team as the away side against another club team.
 fn next_game_part(
     next: &MessageGame<'_>,
     names: &BTreeMap<PlayerId, String>,
+    club: ClubNumber,
     team: TeamNumber,
 ) -> Vec<String> {
     let game = &next.scheduled.game;
     let time = game.start_time.map_or(TIME_NOT_KNOWN.to_owned(), clock);
-    let (side, opponent) = if game.home.team == team {
-        ("Thuis", &game.away.team_name)
+    let side = if game.home.club == club {
+        "Thuis"
     } else {
-        ("Uit", &game.home.team_name)
+        "Uit"
+    };
+    let opponent = if game.home.team == team {
+        &game.away.team_name
+    } else {
+        &game.home.team_name
     };
     let mut parts = vec![format!(
         "Volgende wedstrijd: {}, {time}\n{side} tegen {opponent}\n{}, {}",
@@ -172,12 +180,14 @@ fn week_game(game: &MessageGame<'_>, names: &BTreeMap<PlayerId, String>) -> Opti
 }
 
 /// The message for the next game. `games`: the coming games in time order; `names`:
-/// `display_names` of the season. The next game is the first game of the team still in the game
+/// `display_names` of the season; `club` and `team`: the club and the team chosen for the season.
+/// The next game is the first game of the team still in the game
 /// list (a game kept only for its duties never is); the week part has the games from today to
 /// `coming_week(today)` with table or referee places of the team that count. `None`: neither.
 pub fn next_game_message(
     games: &[MessageGame<'_>],
     names: &BTreeMap<PlayerId, String>,
+    club: ClubNumber,
     team: TeamNumber,
     today: NaiveDate,
 ) -> Option<String> {
@@ -193,7 +203,7 @@ pub fn next_game_message(
         .filter_map(|game| week_game(game, names))
         .collect();
 
-    let mut parts = next.map_or_else(Vec::new, |next| next_game_part(next, names, team));
+    let mut parts = next.map_or_else(Vec::new, |next| next_game_part(next, names, club, team));
     if !week.is_empty() {
         parts.push(format!(
             "Tafel en scheidsrechter deze week:\n{}",
@@ -208,7 +218,6 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
-    use crate::club::ClubNumber;
     use crate::duties::{
         Outcome, PlaceKind, StoredDuties, TeamRef, display_names, game_places, required_duties,
     };
@@ -401,7 +410,7 @@ mod tests {
                 assignments: &fixture.assignments,
             })
             .collect();
-        next_game_message(&games, names, TEAM, today)
+        next_game_message(&games, names, CLUB, TEAM, today)
     }
 
     fn message(fixtures: &[Fixture], today: NaiveDate) -> Option<String> {
@@ -461,6 +470,25 @@ mod tests {
             text(&[home], monday()),
             "Volgende wedstrijd: zaterdag 31 oktober, 14:30\n\
              Thuis tegen Lions M16 1\n\
+             Sporthal Bulwijk, Woerden"
+        );
+    }
+
+    #[test]
+    fn a_game_against_another_club_team_in_the_clubs_hall_is_at_home() {
+        // The team is the away side, but the game is in the club's own hall: no drivers.
+        let game = Fixture::game(
+            1,
+            date(2026, 10, 31),
+            time(14, 30),
+            side(CLUB_TEAM, "Blue Drakes M16 2", CLUB),
+            side(TEAM, "Blue Drakes M16 1", CLUB),
+            ScheduleReason::TeamGame,
+        );
+        assert_eq!(
+            text(&[game], monday()),
+            "Volgende wedstrijd: zaterdag 31 oktober, 14:30\n\
+             Thuis tegen Blue Drakes M16 2\n\
              Sporthal Bulwijk, Woerden"
         );
     }
