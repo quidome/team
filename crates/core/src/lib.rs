@@ -7,6 +7,7 @@ pub mod comparison;
 pub mod duties;
 pub mod game;
 pub mod guard;
+pub mod messages;
 pub mod nightly;
 pub mod players;
 pub mod reasons;
@@ -40,6 +41,7 @@ pub use duties::{
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
+pub use messages::{MessageGame, coming_week, next_game_message};
 pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date};
 pub use players::{
     Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,

@@ -2,7 +2,7 @@
 	The start page (story B of start page and season): what still needs the coordinator ("Open
 	items"), the last training and the last games with duty places ("Last"), and the games of the
 	team, the games with places of the team and the trainings of this week and next week ("Next"),
-	then the links. An open item of more games opens their list below it. Without a club: only the choose step; in a new season without
+	the messages to copy ("Messages", when one has something to say), then the links. An open item of more games opens their list below it. Without a club: only the choose step; in a new season without
 	a team: the choose step above the three parts. Not logged in: "Log in".
 -->
 <script lang="ts">
@@ -192,6 +192,22 @@
 				</div>
 			{/if}
 		</section>
+
+		{#if start.messages.next_game}
+			<section aria-labelledby="messages-heading" class="space-y-2" data-testid="messages">
+				<h2 id="messages-heading" class="text-lg font-semibold tracking-tight">Messages</h2>
+				<ul class="space-y-2 text-sm">
+					<li>
+						<a
+							href={resolve('/messages/next-game')}
+							class="font-medium underline underline-offset-4"
+						>
+							Message for the next game
+						</a>
+					</li>
+				</ul>
+			</section>
+		{/if}
 	{/if}
 {/snippet}
 

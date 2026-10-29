@@ -246,6 +246,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/messages/next-game': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['nextGameMessage'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/players': {
 		parameters: {
 			query?: never;
@@ -1080,6 +1096,19 @@ export interface components {
 			/** @description The roles of the season shown (last season's for "last_season"). */
 			roles: components['schemas']['RoleView'][];
 		};
+		/** @description A message to copy. */
+		MessageView: {
+			/**
+			 * @description The Dutch text; `null` when there is no message (no coming game of the team and no table
+			 *     or referee places of the team in the coming week).
+			 */
+			text?: string | null;
+		};
+		/** @description Which links the part "Messages" shows. */
+		MessagesView: {
+			/** @description "Message for the next game": the same rule as `GET /api/messages/next-game`. */
+			next_game: boolean;
+		};
 		/** @description A training that a player missed and that counts. */
 		MissedView: {
 			/** @description For example "2026-10-06". */
@@ -1493,6 +1522,8 @@ export interface components {
 			last_games: components['schemas']['EventView'][];
 			/** @description The season of `last_games`, for their pages; `null` when there are none. */
 			last_games_season?: string | null;
+			/** @description The messages that have something to say. */
+			messages: components['schemas']['MessagesView'];
 			/**
 			 * @description The games of the team, the home games of other club teams with places of the team, and
 			 *     the trainings from today until the Sunday of next week, in time order; when there are
@@ -2360,6 +2391,33 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['Me'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	nextGameMessage: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The message for the next game, or `null` when there is none */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MessageView'];
 				};
 			};
 			/** @description Not logged in */

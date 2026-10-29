@@ -771,6 +771,29 @@
         }
       }
     },
+    "/api/messages/next-game": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "nextGameMessage",
+        "responses": {
+          "200": {
+            "description": "The message for the next game, or `null` when there is none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/players": {
       "get": {
         "tags": [
@@ -3357,6 +3380,32 @@
           }
         }
       },
+      "MessageView": {
+        "type": "object",
+        "description": "A message to copy.",
+        "properties": {
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Dutch text; `null` when there is no message (no coming game of the team and no table\nor referee places of the team in the coming week)."
+          }
+        }
+      },
+      "MessagesView": {
+        "type": "object",
+        "description": "Which links the part \"Messages\" shows.",
+        "required": [
+          "next_game"
+        ],
+        "properties": {
+          "next_game": {
+            "type": "boolean",
+            "description": "\"Message for the next game\": the same rule as `GET /api/messages/next-game`."
+          }
+        }
+      },
       "MissedView": {
         "type": "object",
         "description": "A training that a player missed and that counts.",
@@ -4701,7 +4750,8 @@
         "required": [
           "open_items",
           "next",
-          "last_games"
+          "last_games",
+          "messages"
         ],
         "properties": {
           "last": {
@@ -4728,6 +4778,10 @@
               "null"
             ],
             "description": "The season of `last_games`, for their pages; `null` when there are none."
+          },
+          "messages": {
+            "$ref": "#/components/schemas/MessagesView",
+            "description": "The messages that have something to say."
           },
           "next": {
             "type": "array",
