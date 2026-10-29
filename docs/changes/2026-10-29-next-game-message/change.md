@@ -1,7 +1,7 @@
 ---
 title: The message for the next game
 type: feature
-stage: implement
+stage: close
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-29
 ---
@@ -20,3 +20,4 @@ functional spec is the epic's (`functional.md`, story C); the architecture is in
 |------|-------|------|
 | 2026-10-29 | design | created from story C of the epic. Readings of the spec confirmed by the coordinator (R1–R5 in `technical.md`); the text forms stay in the core code (no templates); step 1 (the clipboard) is checked with browser tests only, the phone after step 4 |
 | 2026-10-29 | implement | technical.md approved: one story of 4 steps (the clipboard with browser tests; the text in the core with exact-text tests; the route and the start page flag; the page and "Messages" on the start page); closure review build + accept |
+| 2026-10-29 | close | steps 1–4 built (`ea037d4`); build review R1–R5: R1 ("Thuis" means the club's own hall, the coordinator's choice), R2 and R3 fixed (`befc510`), R4 noted, R5 for Close; accept review: accepted with notes, A5 fixed (a test), A8 to `docs/ideas.md`, A7 open ("Copy" on the phone after the release, the coordinator's choice) |
