@@ -11,7 +11,7 @@ places of the team in the coming week, from a part "Messages" on the start page,
 the parents know when and where, and who drives or has table or referee duty.
 
 ## Requirements summary
-Story C of the epic [Duties](../2026-10-18-duties/) (`functional.md` approved 2026-10-25, second
+Story C of the epic [Duties](../../2026-10-18-duties/) (`functional.md` approved 2026-10-25, second
 change, changed 2026-10-27; epic `technical.md` approved 2026-10-25, second change). Stories A and
 B are built, closed and released (`v0.5.0`, decision 0023).
 
