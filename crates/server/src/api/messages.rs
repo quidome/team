@@ -29,7 +29,7 @@ pub(crate) fn next_game_text(
     places: &PlacesOf,
     today: NaiveDate,
 ) -> Option<String> {
-    let team = games.team.as_ref()?;
+    let (club, team) = (games.club.as_ref()?, games.team.as_ref()?);
     let coming: Vec<MessageGame<'_>> = games
         .schedule
         .coming
@@ -40,7 +40,13 @@ pub(crate) fn next_game_text(
             assignments: games.duties.assignments_of(scheduled.game.source_id),
         })
         .collect();
-    next_game_message(&coming, &games.duties.names, team.number, today)
+    next_game_message(
+        &coming,
+        &games.duties.names,
+        club.number,
+        team.number,
+        today,
+    )
 }
 
 #[utoipa::path(
