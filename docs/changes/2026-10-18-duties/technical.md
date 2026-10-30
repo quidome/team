@@ -3,7 +3,7 @@
 **Status**: approved
 **Size**: epic
 **Change**: [2026-10-18-duties](./)
-**Date**: 2026-10-25 (second change of that day: the duty places belong to the game and are given to club teams; it replaces the version approved earlier that day)
+**Date**: 2026-10-25 (second change of that day: the duty places belong to the game and are given to club teams; it replaces the version approved earlier that day); changed 2026-10-30 for the messages (stories C, D and E)
 
 ## Objective
 Keep the duties that each game requires (at each home game of the club: referee 1, referee 2,
@@ -64,15 +64,17 @@ From `functional.md` (approved 2026-10-25, second change; spec review notes S1�
 |---|-------|------|-------|------------|---------|---------|--------|
 | A | [Duty places](../done/2026-10-18-duty-places/) | feature | Migration 0011 rewritten: `game_duties` (`schedule_entered_at`, `drivers`) and `duty_teams`. Core `duties`: `required_duties` with all cases first (risk 2), `driver_proposal`, `game_places`, `open_places`, `check_team`, `check_drivers`; `start_page`: `ScheduleNotEntered` with its list, "Next" with home games of other club teams with places of the team, `last_games`. Store with the row lock; `club_teams`; `duties_of`. Routes: a game; a place; "Schedule entered"; drivers. The page of a game (4 pull-down lists, saved at once). The places on the rows of "Season" and of the start page; the labels "Duties"; "Back" keeps the labels. "has duties" in the list of changes (also after a swap). The findings of the first build that stay: R2, R3, R7, R8, A6. Rework of the first build (branch `duty-places-v1`, on disk). Measure the start page. | – | review build + accept | 1, with B | done |
 | B | [Who does each duty place, and the totals](../done/2026-10-18-who-does-each-duty/) | feature | Migration `duty_assignments`. Core `check_assignment` (a table or referee place only while it names the team; "Clear the player first." for `check_team`), `who_did`, `duty_totals`, `display_names`, `clashes` (the game itself is no clash); the open item `OpenPlaces` with its two windows. Routes: fill, clear, correct; the choice with totals and clashes; the totals of a season. The page "Duties" (Drive, Table, Referee) and its link. "Delete player" with duties. Measure the start page again. Decision record (the rows, the two checks, what counts). | A | review build + accept | 1, with A | done |
-| C | [The message for the next game](../done/2026-10-29-next-game-message/) | feature | Core `coming_week` (tests around 25 October 2026, the clock change) and the message ("Tafel", "nog N open" for every kind). Route, the message page with "Copy" (clipboard spike first; risk 4), the part "Messages" on the start page. | B | review build + accept | 2 | done |
-| D | The message for the referee committee | feature | Core `committee_week` and the message ("Tafel", only the places of the team). Route with a week, the page with "Copy", "Next week", "Previous week"; the button in "Messages". | B | review build + accept | 2 or 3 | not started |
+| C | [The message for the next game](../done/2026-10-29-next-game-message/) | feature | Built and closed, not released. Replaced by C2 before a release. | B | review build + accept | – | done |
+| C2 | [The message of the week](../2026-10-30-message-of-the-week/) | feature | Core `week_of`, `week_message` (replace `coming_week`, `next_game_message`), shared lines for table and referee, past places through `who_did`. `GET /api/messages/week`, the flag `messages.week`, the page `/messages/week`, the button. | C | review build + accept | when it suits the coordinator | design |
+| D | The committee message | feature | Core message with full names, on the lines of C2, for this week. `GET /api/messages/committee`, the page `/messages/committee`, the button "Committee message" whenever a team is chosen. | C2 | review build + accept | when it suits the coordinator | not started |
+| E | The duty overviews | feature | Core driving overview and table and referee overview of all coming duties, on the lines of C2. Routes, the pages `/duties/driving` and `/duties/table-referee`, two buttons on "Duties" for the current season. | C2 | review build + accept | when it suits the coordinator | not started |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
 writes its steps, routes, screens and exact tests from this spec and `functional.md`. Story A was
-built once with the earlier design (7 steps, reviewed: R1–R9, A1–A7); that code is kept on the local
-branch `duty-places-v1` and on disk, and its `/design` reworks it.
+built once with the earlier design (7 steps, reviewed: R1–R9, A1–A7); that code was reworked on `main`, and
+the branch `duty-places-v1` was deleted on 2026-10-30.
 
-**Risks.** 1. The first build is large and not on `main`: it is safe on `duty-places-v1`. 2. The
+**Risks.** 1. (Closed: story A is on `main`.) 2. The
 rules of the places change everywhere: step 1 of A makes the core rules complete, with all cases
 tested, before the screens. 3. The start page gets more games (every home game of the club in 4
 weeks): measure `GET /api/start` in A (limit about 200 ms locally). 4. The clipboard on a phone
@@ -96,7 +98,7 @@ weeks): measure `GET /api/start` in A (limit about 200 ms locally). 4. The clipb
 | The messages are made in the core, in Dutch | Rules in one place, exact-text tests | Yes, at the close of story C |
 
 ## Not in scope
-- Reading the committee's sheet into the tool; naming the tasks at the table; a departure time; attendance at games; the overview for the parents; proposing a player; message templates or other languages; duties of other kinds; totals over more than one season; a "wave" of places as a thing in the tool; a date "schedule entered until"; handling several games at once.
+- Reading the committee's sheet into the tool; naming the tasks at the table; a departure time; attendance at games; the report of what each player did; counts in the duty overviews; another week than this one in a message; proposing a player; message templates or other languages; duties of other kinds; totals over more than one season; a "wave" of places as a thing in the tool; a date "schedule entered until"; handling several games at once.
 
 ## Test plan
 - **Existing tests that change or must still pass**: the tests of the first build of story A (`tests/games.rs`, `tests/start.rs`, `tests/season.rs`, `tests/changes.rs`, core `duties` and `start_page`, `web/e2e/duties.e2e.ts`): referee and jury numbers become places with teams and "Schedule entered"; `choose.e2e.ts` (the open item with its new text); `tests/players.rs` and `tests/player_logs.rs` (new routes need a login); every browser test that checks the links (with "Duties", story B).
@@ -115,7 +117,9 @@ weeks): measure `GET /api/start` in A (limit about 200 ms locally). 4. The clipb
 - [x] Story A – duty places
 - [x] Story B – who does each duty place, and the duty totals (release 1 with A; closed 2026-10-28, decision 0023)
 - [x] Story C – the message for the next game (closed 2026-10-29, decision 0024)
-- [ ] Story D – the message for the referee committee
+- [ ] Story C2 – the message of the week
+- [ ] Story D – the committee message
+- [ ] Story E – the duty overviews
 - [ ] Epic review accept
 
 ## Deviations
