@@ -10,7 +10,7 @@ again, costs time.
 
 Three groups read what the coordinator produces:
 - **The team and the parents**: when their child plays, when they must drive or do table or referee duty, and whether the work is shared equally.
-- **The club's referee committee**: which of our players do which duty at the coming weekend's games.
+- **The club's referee committee**: which of our players do which duty at the games of this week.
 - **The coordinator**: what happened, and what must still be arranged.
 
 ## What this product is
@@ -41,7 +41,7 @@ It is not:
 - The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
 - The start page and the page "Season" run on the cluster (v0.4.0, released 25 October 2026): the start page shows the open items (problems with the game list, changes not seen, training days not opened, trainings not checked), the last training and the events of this week and next week; "Season" shows all games and trainings of a season per week, with labels that combine; the coordinator confirms with "Checked" that the attendance of a training is complete. Duties come next, again from Discover.
 - Duties, part 1, runs on the cluster (v0.5.0, released 28 October 2026): each game has its own page; the coordinator copies the referee committee's schedule into the tool (the 4 table and referee places of each home game of the club, each given to a club team, and "Schedule entered"), sets the drivers of the team's away games (proposed as one per 3 players), puts players on the places of the team and corrects them after the game; "Season" and the start page show the places and their open items, and the page "Duties" shows the duty totals of each player. A reading of the game list never changes what the coordinator stored.
-- The message for the next game is built and reviewed, not yet released (story C of duties, 29 October 2026): a link on the start page opens the Dutch text to copy (the next game, the drivers, the table and referee places of the coming week). The message for the referee committee comes next (story D).
+- The message for the next game is built and reviewed, not yet released (story C of duties, 29 October 2026): a link on the start page opens the Dutch text to copy (the next game, the drivers, the table and referee places of the coming week). It changes into the message of the week (see journey 4, 30 October 2026) before it is released; the committee message and the duty overviews come next.
 - The sheet is still in use.
 - The product is successful when the coordinator stops using the sheet.
 
@@ -53,7 +53,7 @@ see it.
 
 ## Where we are going
 First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Each step must be good
+Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews, attendance at games, and a report of what each player did. Each step must be good
 enough to replace that part of the sheet.
 
 ## Longer horizon
@@ -67,19 +67,23 @@ These stay ideas until real use shows the need.
 ## User journeys
 0. **Open the tool.** A few times a week, the coordinator opens the tool on the phone and sees the next events and the open items: what still needs the coordinator. One tap completes the record of the last training. The whole season is one tap further, for any game or training.
 1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because the club's home games have table and referee places that the club teams fill. When a game moves, the tool shows the change.
-2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows.
+2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows later (journey 7).
 3. **Set the duties of a game.** The coordinator copies the schedule of the referee committee: at each home game of the club, which club team has referee 1, referee 2, table 1 and table 2, with a pull-down list for each place, and then marks the game as ok. An away game of the team needs drivers.
-4. **The message for the next game.** Around training, the coordinator copies one message for the team about the next game: time, place, and who drives or does table or referee duty.
-5. **The message for the referee committee.** Before the weekend, the coordinator copies a message with each game, its start time, and which player (first and last name) does which duty.
-6. **The overview for the parents.** Now and then, the coordinator shares an overview of the coming games and duties, and how many duties each player has done.
+4. **The message of the week.** Before the weekend, the coordinator taps a button on the start page and copies one message for the team and the parents about this week (Monday to Sunday): each game of the team (time, place, home or away), the drivers of an away game, and which players have the team's table and referee places this week. The coordinator puts a short poll under it in the chat ("who comes?"), one for each game. Trainings are not in it: the team knows them. A week with nothing to announce has no message.
+5. **The committee message.** Before the weekend, the coordinator copies a message for the referee committee with each game of this week where the team has table or referee places, its start time, and which player (first and last name) does which duty.
+6. **The duty overviews.** After a new or changed schedule, or whenever the coordinator wants, the coordinator shares an overview of all coming duties: one for driving, one for table and referee. The overviews show who does what, not how much each player has done.
+7. **Attendance at games.** Whenever there is time, the coordinator records who was at a game, as at a training.
+8. **The report of what each player did.** The coordinator sees one table with a row for each player: trainings, games, driving, table and referee. For now it is for the coordinator; it may be shared later.
 
 ## Priorities
 1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
-2. **Attendance at training, then at games** – done every week, and the most direct reason to leave the sheet. For the coach it shows the effort each player gives to the team.
+2. **Attendance at training** – done every week, and the most direct reason to leave the sheet. For the coach it shows the effort each player gives to the team.
 3. **The start page with the open items, and the page "Season"** – the weekly look at what comes and what is open; the place where later parts show their open items.
-4. **Duties and the message for the next game** – the weekly message is the second thing done every week.
-5. **The message for the referee committee** – built on the same duties.
-6. **The overview for the parents, with duty totals** – makes the fairness visible.
+4. **Duties and the message of the week** – the weekly message is the second thing done every week.
+5. **The committee message** – built on the same duties.
+6. **The duty overviews** – show the team and the parents who does which coming duty.
+7. **Attendance at games** – recorded when there is time; needed for the report.
+8. **The report of what each player did** – makes the fairness visible, first to the coordinator.
 
 ## Principles
 - **The coordinator carries the text to the chat.** The tool only produces text to copy. It never posts.
@@ -130,3 +134,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-27 | Where we are: duty places are built and reviewed (story A of duties); players on the places and the totals come next (story B) |
 | 2026-10-28 | Who does each duty place, and the totals, closed (story B of duties, decision 0023): players on the places, corrections after the game, the page "Duties", the open item of open places; a reading never changes what the coordinator stored. Release 1 of duties (stories A and B) comes next, then the messages (C, D) |
 | 2026-10-29 | Where we are: duties part 1 is released (v0.5.0); the message for the next game is built and reviewed (story C of duties, decision 0024); the message for the referee committee comes next (story D) |
+| 2026-10-30 | Messages announce this week (Monday to Sunday): the message for the next game becomes the message of the week (journey 4, a button on the start page); the committee message covers the same week (journey 5); the overview for the parents becomes the duty overviews without totals (journey 6); new journeys 7 (attendance at games) and 8 (the report of what each player did, for the coordinator for now); words message of the week, committee message, duty overview, report |
