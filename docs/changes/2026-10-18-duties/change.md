@@ -1,7 +1,7 @@
 ---
 title: Duties
 type: feature
-stage: implement
+stage: design
 closure: review accept   # epic: each story has its own closure (review build + accept); a fresh agent checks the whole result after story D
 created: 2026-10-18
 ---
@@ -33,3 +33,4 @@ committee. An epic of four stories (see `idea.md`).
 | 2026-10-28 | implement | story B, who does each duty place and the totals, closed (`changes/done/2026-10-18-who-does-each-duty/`, decision 0023); A4 of its accept review in `docs/ideas.md`. Next: release 1 (A and B), then story C |
 | 2026-10-29 | implement | release 1 (A and B) is `v0.5.0`; story C, the message for the next game: technical.md approved (`changes/2026-10-29-next-game-message/`), 4 steps |
 | 2026-10-29 | implement | story C, the message for the next game, closed (`changes/done/2026-10-29-next-game-message/`, decision 0024); A8 of its accept review in `docs/ideas.md`, A7 ("Copy" on the phone) in `docs/backlog.md`. Next: story D, the message for the referee committee |
+| 2026-10-30 | design | back to discover and approved again, after `/vision` of 2026-10-30 (messages announce this week, Monday to Sunday): story C becomes the message of the week (built as the message for the next game, not released; the release waits), story D the committee message for this week only, new story E the duty overviews on "Duties" (without counts); spec review: C, D, E "serves – note", notes S24–S26 answered by the coordinator. technical.md of the epic must be changed for C, D and E |
