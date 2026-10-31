@@ -1,5 +1,4 @@
-//! The message for the next game holds player names; they never go to the log (story C of
-//! duties).
+//! The message of the week holds player names; they never go to the log (story C of duties).
 //!
 //! This test has its own file (its own test process): see `LogBuffer` in `common`.
 
@@ -54,13 +53,13 @@ async fn the_log_never_has_a_name_of_the_message(pool: PgPool) {
     .await;
 
     let (log, _guard) = LogBuffer::capture();
-    let message = ok(&reader, "GET", "/api/messages/next-game", None).await;
+    let message = ok(&reader, "GET", "/api/messages/week", None).await;
     ok(&reader, "GET", "/api/start", None).await;
     let text = message["text"].as_str().unwrap();
     assert!(text.contains("Tafel: Zephyrine"), "{text}");
     let log = log.text();
     assert!(
-        log.contains("/api/messages/next-game"),
+        log.contains("/api/messages/week"),
         "the request is logged: {log}"
     );
     assert!(!log.contains("Zephyrine"), "a name in the log: {log}");

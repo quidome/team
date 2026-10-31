@@ -1,6 +1,6 @@
 # Technical spec: The message of the week
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-10-30-message-of-the-week](./)
 **Date**: 2026-10-30
@@ -146,12 +146,73 @@ Story C of the epic [Duties](../2026-10-18-duties/) (`functional.md`, change of 
 - `GET /api/start` reads no new data: the past games and their places are already loaded.
 
 ## Progress
-- [ ] Step 1
-- [ ] Step 2
-- [ ] Step 3
-- [ ] All checks pass
+- [x] Step 1
+- [x] Step 2
+- [x] Step 3
+- [x] All checks pass
 
 ## Deviations
 None from `functional.md`.
 
+From this spec:
+- Steps 1 and 2 can be merged only together: step 1 removes `next_game_message`, so `crates/server` does not compile until step 2. No workaround; only the core is checked after step 1.
+- Step 1 has 21 tests, not 18: the design's cases split into more tests.
+- Step 2 changes the generated front-end types, so the front end does not pass its checks until step 3 (`client.ts` and the start page still name the old route and flag). Steps 1 to 3 belong in one commit.
+- Step 3: the browser tests fix the answers of `GET /api/start` and `GET /api/messages/week` with a route in the test. The design planned a real table place, but the test data has no game in the week of the test clock (12 to 18 October 2026), and other browser tests depend on that. The text from stored data and the agreement of button and message stay tested in `crates/server/tests/messages.rs`, with no browser. Four of the five browser tests therefore do not run the real route (R2).
+
 ## Review findings
+
+Build review, 2026-10-31. Input: the diff against `main` (all uncommitted), this folder, story C in the epic's `functional.md`, `docs/architecture.md`, decisions 0022, 0023, 0024, `CLAUDE.md`.
+
+No finding breaks a decision or a rule. The text is in the core (0001, 0024), the button and the page use one function (0022), and past places go through `who_did` (0023).
+
+- **R1. Medium: a past place with no player reads "nog N open", and alone it makes the button show.** `filled_and_open` counts open places without looking at `past` (`crates/core/src/messages.rs:110`). On Friday the message says "di 27 okt … Tafel: nog 1 open" about a game that was played, which reads as a request for help. Such a place also makes `week_message` return `Some`, so a week with nothing to announce still gets a button. This matters most while the coordinator catches up on past places (S19). The spec does not cover it: "open places as nog N open", and "a past place shows the player who did it … or niemand", which R4 settles only for "Nobody". The test `on_a_sunday_the_whole_week_is_in_it_and_not_the_next_monday` has exactly this place but asserts only the date, so the behaviour is not fixed by any test. Needs a decision by the coordinator, then a test: leave it out, "niemand", or keep it. Checked by trace, not by a run.
+  - 2026-10-31: Fixed, the coordinator chose: a past place that stayed open shows "niemand", in place order; alone it does not make a message or the button. `functional.md` (stories C and D) says so; test `a_past_place_that_stayed_open_shows_niemand`.
+- **R2. Medium: no browser test reaches the real route any more.** All five tests in `web/e2e/messages.e2e.ts` fix `GET /api/messages/week` and the flag of `GET /api/start`. The reason given under Deviations is true for four of them: the test data has no game from 12 to 18 October 2026 (checked in `games-37-2026-2027.json`: nearest dates 11 and 25 October). But that same fact means the real server already answers "no message" at the test clock. So the last test, "without a message", needs no fixed answers, and without them it would run the real route, the real flag and the real page end to end. Checked by reading the tests and a search of `web/e2e` for `messages`; the change itself was not run. The server tests do cover the text and the agreement of button and message (run, 5 passed).
+  - 2026-10-31: Fixed: the test "without a message" runs the real routes; the four tests with a message keep fixed answers (see Deviations).
+- **R3. Low: a comment the diff made false.** `crates/server/tests/message_logs.rs:1` still says "The message for the next game". Search: `next game|next-game|next_game|nextGame|coming_week` over `crates`, `web/src`, `web/e2e` and `web/openapi.json`. This was the only stale hit about the message; the hit in `crates/core/src/duties.rs:733` is about something else.
+  - 2026-10-31: Fixed: the comment names the message of the week.
+- **R4. Low: the week is filtered twice.** `week_text` drops past games before Monday (`crates/server/src/api/messages.rs`), and `week_message` filters on the same week again. Removing the server filter would change no result, so no test can fail on it. The design asked for it ("only dates in the week"). It is harmless, but it is a second place for the rule; the core alone is enough, since stories D and E call the same core. Checked by trace.
+  - 2026-10-31: Not fixed: harmless, and the design asked for the server filter; it keeps old past games out of the list.
+
+**Claims under Progress and Deviations:**
+- "All checks pass": true. `just check` ran on this tree, exit 0: 122 browser tests, 281 core tests, clippy, svelte-check, `check-sqlx`.
+- "Step 1 has 21 tests": true (count of `#[test]` in `messages.rs`, and a run).
+- The test data has no game in the week of the test clock: true (see R2).
+
+**Traced, no finding:**
+- A game today is in `schedule.coming` and `past` is false, and `check_outcome` refuses a correction before the game, so a game today always shows the planned player.
+- A coming gone or swapped game has `counts` false and gives no places and no block; a past gone game stays through `kept_games`.
+- `names` holds every player on a place, also hidden ones (`load_duties`), so "?" cannot appear from a hidden player.
+- `GET /api/start` passes the games of the current season to `week_text`, also in July and August, the same as the route.
+
+**Stale on purpose, for `/close`:** `docs/product/messages.md`, `docs/product/start-page.md`, `docs/architecture.md` (lines 16, 19, 115) and decision 0024 still describe the message for the next game. The decision table above plans this for the close.
+
+Outside this change: `.direnv/` and `.envrc` are untracked and not ignored, so a `git add -A` would pick them up.
+
+Accept review, 2026-10-31, by a fresh agent. **Verdict: accepted with notes.** No concerning deviation. A1 and A2 are small choices for the coordinator, not corrections.
+
+Input: story C and the facts of 2026-10-30 in the epic's `functional.md`, its `idea.md`, journey 4 in `docs/vision.md`, `change.md`, the diff against `main`. The view below was formed before reading Deviations. The arguments held only the mode and the change folder; nothing was ignored. There is no `idea.md` or `functional.md` in this folder: the epic's are the spec, as `change.md` says.
+
+Run on this tree: core `messages` 22 passed; `tests/messages.rs` 5 and `tests/message_logs.rs` 1 passed; `just api-types-check` and `just check-web` passed; `npx playwright test messages` with the projects it depends on, 120 passed (the 5 of `messages.e2e.ts` among them). The program was not run with a filled week in a browser (see A4).
+
+| Criterion of story C | Result | How checked |
+|---|---|---|
+| The part "Messages" below "Next", shown only with something to announce; tap, text, "Copy", "Copied" | met; A1 | diff of `+page.svelte`; browser tests (the positive case with fixed answers) |
+| Heading; a block for each game from today to Sunday, in time order; "Thuis"/"Uit", opponent, hall, town; "Rijden:" only above 0 places | met | core tests with exact text, `tests/messages.rs` run; order traced through `schedule.past` and `within_date` (a stable sort keeps time order within a date) |
+| "Tafel en scheidsrechter:" with "Scheidsrechter:" first, first names, "nog N open", no other club teams | met; A2 | core tests run |
+| Past places stay until Sunday, played games leave, who did it or "niemand", a past place that stayed open does not alone show the button | met; A3 | core tests, `tests/messages.rs` (Sunday 1 November) run |
+| "tijd nog niet bekend"; "Anna B.", "Anna V." | met | core tests run |
+| Built from what is stored at that moment | met | trace: `week_text` at each request, nothing stored |
+| Errors: "No message this week."; coming gone or swapped game left out, past game keeps what is stored; copying refused | met | browser test with the real routes; core tests; browser test |
+| Example of the spec | met, character for character | `the_example_of_the_spec` run |
+
+- **A1. Neutral drift: "Message of the week" is an underlined link, not a button.** Journey 4 and story C say "button"; `web/src/routes/+page.svelte:201` has the same text link as the links of the start page, while `Button` exists and is used on that page. It works and the tap is the same, and `technical.md` step 3 planned "the link". On a phone in the weekly routine a small link is the weaker target; the coordinator can say whether it matters. Checked: read the diff and search for `button` in `docs/vision.md`; not looked at on a phone.
+  - 2026-10-31: Fixed, the coordinator chose: a real button on the start page.
+- **A2. Neutral drift: no empty line between games in "Tafel en scheidsrechter:".** The spec shows only one game in story C, so it does not decide this. The games follow each other directly (`a_played_game_leaves_and_its_places_stay`), while the example of story D has an empty line between games and story E has one game. The two messages may differ; the choice is best made when story D reuses `duty_lines`, since the join is in `week_message`. Checked: read the code and the examples.
+  - 2026-10-31: Fixed, the coordinator chose: one empty line between the games; `functional.md` says so.
+- **A3. Neutral drift: a message made only of the past is possible.** "Messages announce what comes", but a week whose only table or referee place was filled and has passed still shows the button and a message with nothing to come, for example on a Sunday evening (`tests/messages.rs` shows this text on Sunday 1 November; a place with "Nobody" gives the same with "niemand"). The spec asks for this: places stay until Sunday, and only a place that stayed open was taken out (R1). It follows S25 and needs no change; `docs/ideas.md` line 2026-10-29 is the place for real use. The fact of 2026-10-30 "after a correction it shows the player who did it … or niemand" does not yet name a place that stayed open; story C does, so the stories are right and the fact is a line behind. Checked: code, run of the server test, read the facts.
+  - 2026-10-31: Fixed: the fact of 2026-10-30 in `functional.md` names a place that stayed open.
+- **A4. Faithful adaptation: the positive path in the browser uses fixed answers.** The reason under Deviations holds. Real text is tested through the API, the real page only with "no message". So no test shows a real text on the real page, and "Copy" on the phone is not tested. The wiring is one typed call and the page did not change beyond its name, so the risk is small; the line in `docs/backlog.md` covers the phone after the release. Checked: read `messages.e2e.ts`, run.
+- **A5. Faithful adaptation: R5, the week across 1 July.** Only the games of the current season show. No games are expected around that date; not checked against the game list of a season change.
+- **A6. Faithful adaptation: the spec was changed during the build (R1 of the build review).** "None from `functional.md`" under Deviations is true only because the coordinator's decision went into stories C and D. That is the way of working (rule 4), and the change is what a coordinator would mean: on Friday a played game does not ask for help.

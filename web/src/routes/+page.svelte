@@ -193,19 +193,12 @@
 			{/if}
 		</section>
 
-		{#if start.messages.next_game}
+		{#if start.messages.week}
 			<section aria-labelledby="messages-heading" class="space-y-2" data-testid="messages">
 				<h2 id="messages-heading" class="text-lg font-semibold tracking-tight">Messages</h2>
-				<ul class="space-y-2 text-sm">
-					<li>
-						<a
-							href={resolve('/messages/next-game')}
-							class="font-medium underline underline-offset-4"
-						>
-							Message for the next game
-						</a>
-					</li>
-				</ul>
+				<div class="flex flex-wrap gap-2">
+					<Button href={resolve('/messages/week')} variant="outline">Message of the week</Button>
+				</div>
 			</section>
 		{/if}
 	{/if}

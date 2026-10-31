@@ -129,7 +129,7 @@ pub fn app(state: AppState) -> Router {
             put(games::set_outcome),
         )
         .route("/start", get(start::get))
-        .route("/messages/next-game", get(messages::next_game))
+        .route("/messages/week", get(messages::week))
         .route("/changes", get(changes::get))
         .route("/changes/seen", post(changes::seen))
         .route("/players", get(players::list).post(players::add))

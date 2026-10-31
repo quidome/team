@@ -75,7 +75,7 @@ Facts from the coordinator (2026-10-30, with the vision of that day):
 - The table and referee lines of a message have no hall: these places are always in the club's own hall.
 - A week with only table and referee places has a message of the week with only those places. A week with neither a game of the team nor places of the team has no message of the week.
 - "Scheidsrechter" comes before "Tafel" in every message and overview. Open places of the team are written one way everywhere: the names, a comma, then "nog N open" ("Anna, Bram, nog 1 open"; "nog 2 open") (S26). A message names only the players of the team on the places of the team, and open places of the team; it never mentions places given to other club teams.
-- Before the game a message shows the planned player; after a correction it shows the player who did it ("Someone else"), or "niemand" ("Nobody").
+- Before the game a message shows the planned player; after a correction it shows the player who did it ("Someone else"), or "niemand" ("Nobody", or a past place that stayed open; coordinator, 2026-10-31).
 - The duty overviews show all coming duties of the current season, without counts. They are on the page "Duties". The counts of what each player did become a separate report later (vision journey 8).
 
 ## User stories
@@ -165,7 +165,7 @@ under it.
 - [ ] The start page has a part "Messages" below "Next" with "Message of the week" when this week (Monday to Sunday, Dutch time) has a game of the team today or later, or table or referee places of the team. Otherwise the button is not shown. A tap opens the message: Dutch text, with a "Copy" button that puts it on the clipboard and says "Copied".
 - [ ] The message starts with the week ("Week 26 oktober – 1 november"). Then each game of the team from today to Sunday, in time order (a game today stays all day): "Wedstrijd:" with the date and start time, "Thuis" (a game in the club's own hall) or "Uit", the opponent, the hall and the town; for an away game that needs drivers of the team and has more than 0 driver places, "Rijden:" with the drivers by first name and open places ("Rijden: Anna, Bram, Cas, nog 1 open"; "Rijden: nog 3 open").
 - [ ] Then "Tafel en scheidsrechter:" with each game of the week with table or referee places of the team, in time order: the short date, the start time and the two teams, then "Scheidsrechter:" and "Tafel:" with the players by first name and open places as "nog N open". A kind without a place of the team at that game has no line. Places of other club teams are not mentioned.
-- [ ] Table and referee places on days of the week that have passed stay in the message until Sunday; games of the team before today do not (S24). A past place shows the player who did it after a correction, or "niemand" for "Nobody".
+- [ ] Table and referee places on days of the week that have passed stay in the message until Sunday; games of the team before today do not (S24). A past place shows the player who did it after a correction, or "niemand" for "Nobody" and for a place that stayed open (R1 of the build review, coordinator 2026-10-31). A past place that stayed open does not alone make the button show.
 - [ ] A start time not known yet shows "tijd nog niet bekend". Two players with the same first name show the first letter of the last name ("Anna B.", "Anna V.").
 - [ ] The text is built from what is stored at that moment; the coordinator may edit it after pasting in the chat.
 
@@ -188,7 +188,7 @@ za 31 okt 16:00 Blue Drakes X12 1 – De Dunckers X12 1
 ```
 
 For a home game, and for an away game with 0 drivers, the line "Rijden" is left out. Two games of the team: two blocks "Wedstrijd:",
-with one empty line between them; the coordinator makes a poll for each. Without table or referee
+with one empty line between them; the coordinator makes a poll for each. Two games under "Tafel en scheidsrechter:" have one empty line between them. Without table or referee
 places of the team in the week, the part "Tafel en scheidsrechter:" is left out. Without a game of
 the team from today to Sunday (a free week, or after the weekend's game), the message has the week
 and that part only.
@@ -206,7 +206,7 @@ this week, **so that** the referee committee knows which player does which duty.
 - [ ] The part "Messages" on the start page has "Committee message" whenever a team is chosen for the current season, also in a week without places. It opens the message for this week, Monday to Sunday.
 - [ ] The message starts with the team and the week. Then each game of the week with table or referee places of the team, in time order: the short date, start time, home team – away team, then "Scheidsrechter:" and "Tafel:" with the players by **first and last name**; open places of the team as "nog N open" ("Eva de Vries, nog 1 open"; "nog 2 open"). A kind without a place of the team at that game has no line. Places of other club teams are not mentioned.
 - [ ] A week without places of the team: the text is the heading and "Geen tafel- of scheidsrechtersdiensten deze week.", and "Copy" still works.
-- [ ] Past days of the week stay, as in story C (the player who did it, or "niemand").
+- [ ] Past days of the week stay, as in story C (the player who did it, or "niemand", also for a place that stayed open).
 - [ ] Copying works as in story C.
 
 #### Behaviour

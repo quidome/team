@@ -246,14 +246,14 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
-	'/api/messages/next-game': {
+	'/api/messages/week': {
 		parameters: {
 			query?: never;
 			header?: never;
 			path?: never;
 			cookie?: never;
 		};
-		get: operations['nextGameMessage'];
+		get: operations['weekMessage'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -1099,15 +1099,15 @@ export interface components {
 		/** @description A message to copy. */
 		MessageView: {
 			/**
-			 * @description The Dutch text; `null` when there is no message (no coming game of the team and no table
-			 *     or referee places of the team in the coming week).
+			 * @description The Dutch text; `null` when there is no message (no game of the team from today to Sunday
+			 *     and no table or referee places of the team in this week).
 			 */
 			text?: string | null;
 		};
 		/** @description Which links the part "Messages" shows. */
 		MessagesView: {
-			/** @description "Message for the next game": the same rule as `GET /api/messages/next-game`. */
-			next_game: boolean;
+			/** @description "Message of the week": the same rule as `GET /api/messages/week`. */
+			week: boolean;
 		};
 		/** @description A training that a player missed and that counts. */
 		MissedView: {
@@ -2402,7 +2402,7 @@ export interface operations {
 			};
 		};
 	};
-	nextGameMessage: {
+	weekMessage: {
 		parameters: {
 			query?: never;
 			header?: never;
@@ -2411,7 +2411,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The message for the next game, or `null` when there is none */
+			/** @description The message of the week, or `null` when there is none */
 			200: {
 				headers: {
 					[name: string]: unknown;

@@ -45,7 +45,7 @@ use utoipa::OpenApi;
         games::clear_assignment,
         games::set_outcome,
         start::get,
-        messages::next_game,
+        messages::week,
         changes::get,
         changes::seen,
         players::list,

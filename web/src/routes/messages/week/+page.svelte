@@ -1,6 +1,6 @@
 <!--
-	The message for the next game (story C of duties): the Dutch text to copy into the chat of the
-	team, with "Copy". The text comes from the server at each visit (what is stored now). When the
+	The message of the week (story C of duties): the Dutch text to copy into the chat of the team,
+	with "Copy". The text comes from the server at each visit (what is stored now). When the
 	browser refuses the clipboard (for example a page without HTTPS), the text stays shown to
 	select by hand.
 -->
@@ -24,7 +24,7 @@
 </script>
 
 <svelte:head>
-	<title>Message for the next game · Team</title>
+	<title>Message of the week · Team</title>
 </svelte:head>
 
 {#if !data.message}
@@ -36,14 +36,12 @@
 	{@const text = data.message.text}
 	<section class="space-y-4">
 		<div class="flex items-center justify-between gap-3">
-			<h1 class="text-2xl font-semibold tracking-tight">Message for the next game</h1>
+			<h1 class="text-2xl font-semibold tracking-tight">Message of the week</h1>
 			<Button href={resolve('/')} variant="ghost">Back</Button>
 		</div>
 
 		{#if text === null || text === undefined}
-			<p class="text-sm text-muted-foreground" data-testid="no-message">
-				No message: no coming game and no duties this week.
-			</p>
+			<p class="text-sm text-muted-foreground" data-testid="no-message">No message this week.</p>
 		{:else}
 			<pre
 				class="rounded-xl border bg-card p-4 font-sans text-sm break-words whitespace-pre-wrap shadow-xs select-all"

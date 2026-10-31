@@ -507,9 +507,9 @@ export async function loadStart(fetch: typeof globalThis.fetch): Promise<StartAn
 
 export type Message = components['schemas']['MessageView'];
 
-/** The message for the next game (story C of duties); `text` is `null` when there is none. */
-export async function loadNextGameMessage(fetch: typeof globalThis.fetch): Promise<Message> {
-	return dataOf(await api.GET('/api/messages/next-game', { fetch }));
+/** The message of the week (story C of duties); `text` is `null` when there is none. */
+export async function loadWeekMessage(fetch: typeof globalThis.fetch): Promise<Message> {
+	return dataOf(await api.GET('/api/messages/week', { fetch }));
 }
 
 export type DutiesOverview = components['schemas']['DutiesOverview'];

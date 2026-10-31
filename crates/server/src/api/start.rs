@@ -16,7 +16,7 @@ use team_core::{
 use utoipa::ToSchema;
 
 use super::format::{clock_time, day};
-use super::messages::next_game_text;
+use super::messages::week_text;
 use super::season::{
     EventView, event_view, event_view_with, games_of, places_of_season, trainings_of,
 };
@@ -48,8 +48,8 @@ pub struct StartAnswer {
 /// Which links the part "Messages" shows.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MessagesView {
-    /// "Message for the next game": the same rule as `GET /api/messages/next-game`.
-    pub next_game: bool,
+    /// "Message of the week": the same rule as `GET /api/messages/week`.
+    pub week: bool,
 }
 
 /// One open item. Dates are Dutch dates, for example "2026-10-22".
@@ -245,7 +245,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         last_games_season = Some(current);
     }
     let messages = MessagesView {
-        next_game: next_game_text(&games, &places, today).is_some(),
+        week: week_text(&games, &places, today).is_some(),
     };
     let by_id: BTreeMap<i64, &Game> = games
         .schedule

@@ -771,15 +771,15 @@
         }
       }
     },
-    "/api/messages/next-game": {
+    "/api/messages/week": {
       "get": {
         "tags": [
           "messages"
         ],
-        "operationId": "nextGameMessage",
+        "operationId": "weekMessage",
         "responses": {
           "200": {
-            "description": "The message for the next game, or `null` when there is none",
+            "description": "The message of the week, or `null` when there is none",
             "content": {
               "application/json": {
                 "schema": {
@@ -3389,7 +3389,7 @@
               "string",
               "null"
             ],
-            "description": "The Dutch text; `null` when there is no message (no coming game of the team and no table\nor referee places of the team in the coming week)."
+            "description": "The Dutch text; `null` when there is no message (no game of the team from today to Sunday\nand no table or referee places of the team in this week)."
           }
         }
       },
@@ -3397,12 +3397,12 @@
         "type": "object",
         "description": "Which links the part \"Messages\" shows.",
         "required": [
-          "next_game"
+          "week"
         ],
         "properties": {
-          "next_game": {
+          "week": {
             "type": "boolean",
-            "description": "\"Message for the next game\": the same rule as `GET /api/messages/next-game`."
+            "description": "\"Message of the week\": the same rule as `GET /api/messages/week`."
           }
         }
       },

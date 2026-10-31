@@ -1,5 +1,5 @@
-//! The message for the next game through the API (story C of duties), and the link on the start
-//! page that follows the same rule.
+//! The message of the week through the API (story C of duties), and the button on the start page
+//! that follows the same rule.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -29,14 +29,14 @@ where
     F: Fn(&'static str) -> R,
     R: std::future::Future<Output = (u16, Value)>,
 {
-    let (status, message) = send("/api/messages/next-game").await;
+    let (status, message) = send("/api/messages/week").await;
     assert_eq!(status, 200, "{message}");
     let (status, start) = send("/api/start").await;
     assert_eq!(status, 200, "{start}");
     assert_eq!(
-        start["messages"]["next_game"],
+        start["messages"]["week"],
         !message["text"].is_null(),
-        "the link and the message agree: {message}"
+        "the button and the message agree: {message}"
     );
     message["text"].clone()
 }
@@ -61,7 +61,7 @@ async fn message(reader: &Reader) -> Value {
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn the_message_needs_a_login(pool: PgPool) {
     let harness = Harness::start(pool).await;
-    let response = harness.get("/api/messages/next-game", None).await;
+    let response = harness.get("/api/messages/week", None).await;
     assert_eq!(response.status(), 401);
 }
 
@@ -73,15 +73,17 @@ async fn without_a_team_there_is_no_message(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_message_has_the_next_game_and_the_places_of_this_week(pool: PgPool) {
+async fn the_message_has_the_game_and_the_places_of_this_week(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
-    // Monday 26 October 2026: the next game of M16 1 is at home on Saturday 31 October.
+    // Monday 26 October 2026: this week M16 1 plays at home on Saturday 31 October.
     reader.harness.clock.set(utc(2026, 10, 26, 10, 0));
     reader.log_in_again().await;
     assert_eq!(
         message(&reader).await,
-        "Volgende wedstrijd: zaterdag 31 oktober, 16:00\n\
+        "Week 26 oktober – 1 november\n\
+         \n\
+         Wedstrijd: zaterdag 31 oktober, 16:00\n\
          Thuis tegen BC Utrecht Cangeroes M16 2\n\
          Bulwijk, Woerden"
     );
@@ -105,21 +107,53 @@ async fn the_message_has_the_next_game_and_the_places_of_this_week(pool: PgPool)
     .await;
     assert_eq!(
         message(&reader).await,
-        "Volgende wedstrijd: zaterdag 31 oktober, 16:00\n\
+        "Week 26 oktober – 1 november\n\
+         \n\
+         Wedstrijd: zaterdag 31 oktober, 16:00\n\
          Thuis tegen BC Utrecht Cangeroes M16 2\n\
          Bulwijk, Woerden\n\
          \n\
-         Tafel en scheidsrechter deze week:\n\
+         Tafel en scheidsrechter:\n\
          za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
          Tafel: Anna"
     );
+
+    // Sunday 1 November: the game has left, the place stays, and a correction shows.
+    let bram = add_player(&reader, "Bram").await;
+    reader.harness.clock.set(utc(2026, 11, 1, 20, 0));
+    reader.log_in_again().await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/assignments/table/1/outcome"),
+        Some(json!({ "outcome": "done_by", "player": bram })),
+    )
+    .await;
+    assert_eq!(
+        message(&reader).await,
+        "Week 26 oktober – 1 november\n\
+         \n\
+         Tafel en scheidsrechter:\n\
+         za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+         Tafel: Bram"
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_week_with_nothing_to_announce_has_no_message(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Sunday 1 November: the game of M16 1 was played, and the team has no places.
+    reader.harness.clock.set(utc(2026, 11, 1, 20, 0));
+    reader.log_in_again().await;
+    assert_eq!(message(&reader).await, Value::Null);
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn an_away_game_has_its_drivers(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
-    // Monday 2 November 2026: the next game of M16 1 is away on Saturday 7 November.
+    // Monday 2 November 2026: this week M16 1 plays away on Saturday 7 November.
     reader.harness.clock.set(utc(2026, 11, 2, 10, 0));
     reader.log_in_again().await;
     let game = format!("/api/games/2026-2027/{AWAY_7_NOV}");
@@ -140,10 +174,11 @@ async fn an_away_game_has_its_drivers(pool: PgPool) {
     .await;
     assert_eq!(
         message(&reader).await,
-        "Volgende wedstrijd: zaterdag 7 november, 11:15\n\
+        "Week 2 november – 8 november\n\
+         \n\
+         Wedstrijd: zaterdag 7 november, 11:15\n\
          Uit tegen De Dunckers M16 3\n\
          Dudok Arena, Hilversum\n\
-         \n\
-         Rijden: Bram (nog 1 open)"
+         Rijden: Bram, nog 1 open"
     );
 }
