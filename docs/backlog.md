@@ -3,7 +3,6 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Small:
-- Release stories C2, D and E of duties (the message of the week, the committee message, the duty overviews) when it suits the coordinator.
 - The browser test `web/e2e/choose.e2e.ts:200` ("games that cannot be loaded after a reading do not look like a failed reading") failed once in `just check` on 2026-10-31: "No changes" did not appear within 5 seconds. It then passed 3 times alone and in the next full run. Cause not found.
 - Tap "Copy" on the page "Message of the week" (built first as "Message for the next game") on the phone after the release of story C, and note the result (accept review A7 of the message for the next game; the clipboard is checked only in the browser tests).
 - Look at the start page of v0.4.0 on the phone: its speed, and the open items after a nightly reading (epic review A8 of start page and season; released 2026-10-25, migration 0010 checked the 8 trainings before that day).
