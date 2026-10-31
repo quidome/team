@@ -1,6 +1,9 @@
 set dotenv-load := true
 
-default: check
+# Show the available recipes.
+[private]
+default:
+    @just --list
 
 # Start the local PostgreSQL container.
 db-up:
@@ -27,8 +30,9 @@ web-install:
 web-build:
     cd web && npm run build
 
-# Develop the front end: the Rust server (logged in as Developer) plus the Vite dev server with
-# live reload on http://localhost:5173. Needs `just db-up` and `just migrate`.
+# The Rust server (logged in as Developer) plus the Vite dev server with live reload on
+# http://localhost:5173. Needs `just db-up` and `just migrate`.
+[doc('Develop the front end with live reload.')]
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -53,8 +57,9 @@ fmt:
 test:
     cargo test --workspace
 
-# Run every check. GitHub runs the same recipes (decision 0010). Needs `just db-up`,
-# `just migrate` and `just web-install`.
+# GitHub runs the same recipes (decision 0010). Needs `just db-up`, `just migrate` and
+# `just web-install`.
+[doc('Run every check.')]
 check: lint-ci api-types-check check-rust check-web e2e check-sqlx
 
 # Check the GitHub workflows and the shell scripts.
@@ -72,8 +77,9 @@ check-rust:
     cargo clippy --workspace --all-targets -- -D warnings
     cargo test --workspace
 
-# The saved sqlx query data (.sqlx/) matches the queries. Runs last: sqlx-cli forces the next
-# compile of the team package, so anything after it would compile again.
+# Runs last: sqlx-cli forces the next compile of the team package, so anything after it would
+# compile again.
+[doc('Check that the saved sqlx query data (.sqlx/) matches the queries.')]
 check-sqlx:
     cargo sqlx prepare --workspace --check
 
