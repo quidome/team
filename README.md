@@ -9,11 +9,21 @@ The backend is Rust (`crates/`), the front end is Svelte (`web/`), the data is i
 
 ## Development
 
-Enter the pinned Nix development shell, start the local database, and apply the migrations:
+Enter the pinned Nix development shell. With [direnv](https://direnv.net), run `direnv allow` once:
+the shell and the settings in `.env` then load when you enter this directory. Without direnv, run
+`nix develop`.
+
+Make your settings file:
 
 ```sh
-nix develop
 cp .env.example .env
+head -c 32 /dev/urandom | base64   # put the output in .env as the value of PLAYER_NAME_KEY
+```
+
+Then install the front-end packages, start the local database, and apply the migrations:
+
+```sh
+just web-install
 just db-up
 just migrate
 ```
@@ -21,7 +31,8 @@ just migrate
 Then:
 
 ```sh
-just serve      # run the server on http://localhost:3000
+just dev        # run the server and the front end on http://localhost:5173, with no login
+just serve      # run the server on http://localhost:3000, with login (needs the OIDC values in .env)
 just check      # every check (as CI): workflow and script lint, API types, Rust fmt/clippy/tests,
                 # front-end check/lint/build, browser tests, sqlx query data
 ```
