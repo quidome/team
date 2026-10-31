@@ -1,4 +1,4 @@
-//! The messages for the coordinator to copy into the chat (story C of duties): Dutch text, made
+//! The messages for the coordinator to copy into the chat (stories C and D of duties): Dutch text, made
 //! from what is stored at the moment of the request. The tool never sends them.
 
 use std::collections::BTreeMap;
@@ -8,7 +8,7 @@ use chrono::{Datelike, Days, NaiveDate, NaiveTime};
 use crate::club::ClubNumber;
 use crate::duties::{Assignment, Counted, DutyKind, DutyPlace, GamePlaces, SchedulePart, who_did};
 use crate::game::{Game, TeamNumber};
-use crate::players::PlayerId;
+use crate::players::{Player, PlayerId};
 use crate::schedule::{ScheduleReason, ScheduledGame};
 
 /// A game of the season with its duties, as the messages read it.
@@ -64,6 +64,12 @@ pub fn week_of(date: NaiveDate) -> (NaiveDate, NaiveDate) {
 /// "31 oktober".
 fn day_and_month(date: NaiveDate) -> String {
     format!("{} {}", date.day(), MONTHS[date.month0() as usize])
+}
+
+/// "26 oktober – 1 november": the week that holds `today`.
+fn week_dates(today: NaiveDate) -> String {
+    let (monday, sunday) = week_of(today);
+    format!("{} – {}", day_and_month(monday), day_and_month(sunday))
 }
 
 /// "zaterdag 31 oktober".
@@ -201,6 +207,17 @@ fn duty_lines(
     Some(lines.join("\n"))
 }
 
+/// The games of `games` in the week that holds `today`, in date order.
+fn week_games<'g, 'a>(games: &'g [MessageGame<'a>], today: NaiveDate) -> Vec<&'g MessageGame<'a>> {
+    let (monday, sunday) = week_of(today);
+    let mut week: Vec<&MessageGame<'_>> = games
+        .iter()
+        .filter(|game| (monday..=sunday).contains(&game.scheduled.game.date))
+        .collect();
+    week.sort_by_key(|game| game.scheduled.game.date);
+    week
+}
+
 /// The message of the week that holds `today`. `games`: the games of the season, in time order
 /// within a date, the dates in any order; `names`: `display_names` of the season; `club` and
 /// `team`: the club and the team chosen for the season. A game of the team has a block from today
@@ -214,12 +231,7 @@ pub fn week_message(
     team: TeamNumber,
     today: NaiveDate,
 ) -> Option<String> {
-    let (monday, sunday) = week_of(today);
-    let mut week: Vec<&MessageGame<'_>> = games
-        .iter()
-        .filter(|game| (monday..=sunday).contains(&game.scheduled.game.date))
-        .collect();
-    week.sort_by_key(|game| game.scheduled.game.date);
+    let week = week_games(games, today);
 
     let blocks: Vec<String> = week
         .iter()
@@ -243,16 +255,51 @@ pub fn week_message(
         return None;
     }
 
-    let mut parts = vec![format!(
-        "Week {} – {}",
-        day_and_month(monday),
-        day_and_month(sunday)
-    )];
+    let mut parts = vec![format!("Week {}", week_dates(today))];
     parts.extend(blocks);
     if !duties.is_empty() {
         parts.push(format!("Tafel en scheidsrechter:\n{}", duties.join("\n\n")));
     }
     Some(parts.join("\n\n"))
+}
+
+/// First and last name of `players`; a player without a last name: the first name.
+pub fn full_names(players: &[Player]) -> BTreeMap<PlayerId, String> {
+    players
+        .iter()
+        .map(|player| {
+            let name = match &player.last_name {
+                Some(last) => format!("{} {last}", player.first_name),
+                None => player.first_name.clone(),
+            };
+            (player.id, name)
+        })
+        .collect()
+}
+
+/// The committee message of the week that holds `today`. `games`: as [`week_message`]; `names`:
+/// `full_names` of the season; `club_name` and `team_name`: "Blue Drakes" and "M16 1". It always
+/// gives a text: the table and referee places of the team that count, or that there are none.
+pub fn committee_message(
+    games: &[MessageGame<'_>],
+    names: &BTreeMap<PlayerId, String>,
+    club_name: &str,
+    team_name: &str,
+    today: NaiveDate,
+) -> String {
+    let mut parts = vec![format!(
+        "Tafel en scheidsrechters {club_name} {team_name}, week {}",
+        week_dates(today)
+    )];
+    parts.extend(
+        week_games(games, today)
+            .iter()
+            .filter_map(|game| duty_lines(game, names, today)),
+    );
+    if parts.len() == 1 {
+        parts.push("Geen tafel- of scheidsrechtersdiensten deze week.".to_owned());
+    }
+    parts.join("\n\n")
 }
 
 #[cfg(test)]
@@ -474,6 +521,36 @@ mod tests {
         week_message(&games, names, CLUB, TEAM, today)
     }
 
+    /// The committee message of `fixtures`, with `names`.
+    fn committee(
+        fixtures: &[Fixture],
+        names: &BTreeMap<PlayerId, String>,
+        today: NaiveDate,
+    ) -> String {
+        let places: Vec<Option<GamePlaces>> = fixtures.iter().map(|f| f.places(today)).collect();
+        let games: Vec<MessageGame<'_>> = fixtures
+            .iter()
+            .zip(&places)
+            .map(|(fixture, places)| MessageGame {
+                scheduled: &fixture.scheduled,
+                places: places.as_ref(),
+                assignments: &fixture.assignments,
+            })
+            .collect();
+        committee_message(&games, names, "Blue Drakes", "M16 1", today)
+    }
+
+    fn full(entries: &[(PlayerId, &str)]) -> BTreeMap<PlayerId, String> {
+        entries
+            .iter()
+            .map(|(id, name)| (*id, (*name).to_owned()))
+            .collect()
+    }
+
+    const NO_DUTIES: &str = "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\
+                             \n\
+                             Geen tafel- of scheidsrechtersdiensten deze week.";
+
     fn message(fixtures: &[Fixture], today: NaiveDate) -> Option<String> {
         message_with(fixtures, &names(), today)
     }
@@ -490,6 +567,13 @@ mod tests {
             .of_team(PlaceKind::Referee, 1)
             .player(DutyKind::Table, 1, EVA)
             .player(DutyKind::Referee, 1, GIJS)
+    }
+
+    /// A game with both table places of the team, open.
+    fn example_duty_with_two_tables() -> Fixture {
+        Fixture::duty(2, date(2026, 10, 31), time(16, 0))
+            .of_team(PlaceKind::Table, 1)
+            .of_team(PlaceKind::Table, 2)
     }
 
     #[test]
@@ -828,6 +912,136 @@ mod tests {
     fn a_game_after_this_week_is_not_in_it() {
         let later = Fixture::away(1, date(2026, 11, 7), time(12, 0));
         assert_eq!(message(&[later], monday()), None);
+    }
+
+    #[test]
+    fn the_committee_example_of_the_spec() {
+        let sunday = Fixture::game(
+            4,
+            date(2026, 11, 1),
+            time(11, 0),
+            side(CLUB_TEAM, "Blue Drakes M14 2", CLUB),
+            side(TeamNumber(902), "Lions M14 1", OTHER_CLUB),
+            ScheduleReason::DutyGame,
+        )
+        .of_team(PlaceKind::Referee, 1)
+        .of_team(PlaceKind::Table, 1)
+        .player(DutyKind::Table, 1, ANNA);
+        let saturday = Fixture::duty(2, date(2026, 10, 31), time(13, 0))
+            .of_team(PlaceKind::Referee, 1)
+            .of_team(PlaceKind::Table, 1)
+            .of_team(PlaceKind::Table, 2)
+            .player(DutyKind::Referee, 1, EVA)
+            .player(DutyKind::Table, 1, FLEUR)
+            .player(DutyKind::Table, 2, GIJS);
+        let names = full(&[
+            (ANNA, "Hugo Smit"),
+            (EVA, "Eva de Vries"),
+            (FLEUR, "Fleur Jansen"),
+            (GIJS, "Gijs Bakker"),
+        ]);
+        assert_eq!(
+            committee(&[sunday, saturday], &names, monday()),
+            "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\
+             \n\
+             za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+             Scheidsrechter: Eva de Vries\n  \
+             Tafel: Fleur Jansen, Gijs Bakker\n\
+             \n\
+             zo 1 nov 11:00 Blue Drakes M14 2 – Lions M14 1\n  \
+             Scheidsrechter: nog 1 open\n  \
+             Tafel: Hugo Smit"
+        );
+    }
+
+    #[test]
+    fn a_week_without_places_says_so_to_the_committee() {
+        let names = full(&[]);
+        assert_eq!(committee(&[], &names, monday()), NO_DUTIES);
+
+        // Places of other club teams and a game of the team without places do not count.
+        let others =
+            Fixture::duty(2, date(2026, 10, 31), time(16, 0)).of_other_team(PlaceKind::Table, 1);
+        let game = Fixture::away(1, date(2026, 10, 31), time(14, 30));
+        assert_eq!(committee(&[others, game], &names, monday()), NO_DUTIES);
+    }
+
+    #[test]
+    fn full_names_have_the_first_and_the_last_name() {
+        let player = |id, first: &str, last: Option<&str>| Player {
+            id: PlayerId(id),
+            first_name: first.to_owned(),
+            last_name: last.map(str::to_owned),
+            hidden: false,
+        };
+        let names = full_names(&[player(1, "Eva", Some("de Vries")), player(2, "Hugo", None)]);
+        assert_eq!(names[&PlayerId(1)], "Eva de Vries");
+        assert_eq!(names[&PlayerId(2)], "Hugo");
+    }
+
+    #[test]
+    fn the_committee_message_shows_open_places() {
+        let names = full(&[(EVA, "Eva de Vries")]);
+        let game = example_duty_with_two_tables().player(DutyKind::Table, 1, EVA);
+        assert!(
+            committee(&[game], &names, monday()).ends_with("\n  Tafel: Eva de Vries, nog 1 open")
+        );
+        let open = example_duty_with_two_tables();
+        assert!(committee(&[open], &names, monday()).ends_with("\n  Tafel: nog 2 open"));
+    }
+
+    #[test]
+    fn the_committee_message_shows_who_did_a_past_place() {
+        let friday = date(2026, 10, 30);
+        let tuesday = date(2026, 10, 27);
+        let names = full(&[
+            (ANNA, "Anna Bakker"),
+            (BRAM, "Bram Smit"),
+            (EVA, "Eva de Vries"),
+        ]);
+        let game = Fixture::duty(2, tuesday, time(19, 0))
+            .of_team(PlaceKind::Referee, 1)
+            .of_team(PlaceKind::Referee, 2)
+            .of_team(PlaceKind::Table, 1)
+            .player(DutyKind::Referee, 1, ANNA)
+            .outcome(Outcome::DoneBy(BRAM))
+            .player(DutyKind::Table, 1, EVA)
+            .outcome(Outcome::NotDone);
+        assert!(
+            committee(&[game], &names, friday)
+                .ends_with("\n  Scheidsrechter: Bram Smit, niemand\n  Tafel: niemand")
+        );
+
+        // A past place that stayed open, alone: the team had a place, so not "Geen ...".
+        let open = Fixture::duty(2, tuesday, time(19, 0)).of_team(PlaceKind::Table, 1);
+        assert!(committee(&[open], &names, friday).ends_with("\n  Tafel: niemand"));
+    }
+
+    #[test]
+    fn the_committee_message_follows_what_counts_and_the_week() {
+        let names = full(&[(EVA, "Eva"), (GIJS, "Gijs")]);
+        // A coming game no longer in the game list is left out.
+        assert_eq!(
+            committee(&[example_duty().gone()], &names, monday()),
+            NO_DUTIES
+        );
+        // A coming game no longer a home game of the club is left out.
+        let mut swapped = example_duty();
+        swapped.scheduled.game.home = side(TeamNumber(901), "De Dunckers X12 1", OTHER_CLUB);
+        swapped.scheduled.game.away = side(CLUB_TEAM, "Blue Drakes X12 1", CLUB);
+        swapped.scheduled.reason = ScheduleReason::Kept;
+        assert_eq!(committee(&[swapped], &names, monday()), NO_DUTIES);
+        // A past game that left the game list stays.
+        assert!(
+            committee(&[example_duty().gone()], &names, date(2026, 11, 1))
+                .contains("za 31 okt 16:00")
+        );
+        // On a Sunday the whole week is in it, and not the next Monday.
+        let earlier = Fixture::duty(2, monday(), time(19, 0)).of_team(PlaceKind::Table, 1);
+        let next = Fixture::duty(4, date(2026, 11, 2), time(19, 0)).of_team(PlaceKind::Table, 1);
+        let text = committee(&[earlier, next], &names, date(2026, 11, 1));
+        assert!(text.contains("ma 26 okt 19:00"));
+        assert!(!text.contains("ma 2 nov"));
     }
 
     #[test]

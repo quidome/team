@@ -130,6 +130,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/start", get(start::get))
         .route("/messages/week", get(messages::week))
+        .route("/messages/committee", get(messages::committee))
         .route("/changes", get(changes::get))
         .route("/changes/seen", post(changes::seen))
         .route("/players", get(players::list).post(players::add))

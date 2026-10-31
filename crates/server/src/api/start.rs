@@ -16,7 +16,7 @@ use team_core::{
 use utoipa::ToSchema;
 
 use super::format::{clock_time, day};
-use super::messages::week_text;
+use super::messages::{committee_text, week_text};
 use super::season::{
     EventView, event_view, event_view_with, games_of, places_of_season, trainings_of,
 };
@@ -41,15 +41,17 @@ pub struct StartAnswer {
     pub last_games: Vec<EventView>,
     /// The season of `last_games`, for their pages; `null` when there are none.
     pub last_games_season: Option<String>,
-    /// The messages that have something to say.
+    /// The messages the start page offers.
     pub messages: MessagesView,
 }
 
-/// Which links the part "Messages" shows.
+/// Which buttons the part "Messages" shows.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MessagesView {
     /// "Message of the week": the same rule as `GET /api/messages/week`.
     pub week: bool,
+    /// "Committee message": the same rule as `GET /api/messages/committee`.
+    pub committee: bool,
 }
 
 /// One open item. Dates are Dutch dates, for example "2026-10-22".
@@ -246,6 +248,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     }
     let messages = MessagesView {
         week: week_text(&games, &places, today).is_some(),
+        committee: committee_text(&games, &places, today).is_some(),
     };
     let by_id: BTreeMap<i64, &Game> = games
         .schedule

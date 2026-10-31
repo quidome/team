@@ -1,6 +1,6 @@
 # Technical spec: The committee message
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-10-31-committee-message](./)
 **Date**: 2026-10-31
@@ -123,12 +123,75 @@ Story D of the epic [Duties](../2026-10-18-duties/) (`functional.md`, change of 
 - Full names leave the encrypted store only in this text, as a player's name does on other pages (decision 0021); never in a log.
 
 ## Progress
-- [ ] Step 1
-- [ ] Step 2
-- [ ] Step 3
-- [ ] All checks pass
+- [x] Step 1
+- [x] Step 2
+- [x] Step 3
+- [x] All checks pass
 
 ## Deviations
 None from `functional.md`. Steps 1 to 3 go into one commit: step 2 changes the generated front-end types.
 
 ## Review findings
+Build review, 2026-10-31, by a fresh agent. The arguments held only the mode and the change folder;
+nothing was ignored. Read: the diff against `main` (committed and not), the change folder, story D
+of the epic's `functional.md`, `docs/architecture.md`, decisions 0007, 0021 and 0023 to 0025,
+`CLAUDE.md`. **No bug against the spec's intent, no broken decision. R1 to R5 are small; none blocks
+Close.**
+
+**Checked and sound:**
+- **Runs:** `cargo test --workspace` 597 passed, `cargo fmt --check`, clippy `-D warnings`, `just check-web`, `just e2e` 125 passed. `web/openapi.json` is equal to a fresh `team openapi` output (written to a temporary file, compared as JSON); `schema.d.ts` was not regenerated, because `just api-types-check` writes to the repository. Not run: `lint-ci` (no workflow or script in the diff), `check-sqlx` (no query in the diff), `just images`, `just smoke`. So "All checks pass" holds for everything the diff can touch.
+- **Trace, names:** `SeasonDuties.players` holds every player with a role in the season or on a place, also "Someone else" and hidden players (`load_duties`), and `names` is made from the same list, so the "?" of `filled_and_open` cannot show in this message.
+- **Trace, order:** `schedule.past` is newest date first, in time order within a date; the stable sort on the date in `week_games` keeps that, so games come in time order on any weekday.
+- **Trace, what counts:** a game today is coming and shows "nog N open"; `check_outcome` refuses an outcome before a game is past, so no correction of a game today is lost.
+- **Trace, access and logs:** the route is under the session of decision 0007, and is in both route lists; the text is not logged (`tests/message_logs.rs`, first and last name). `GET /api/start` does no new query, as claimed: `committee_text` uses what `games_of` already read.
+- **Search** for `messages/week` in `crates`, `web`, `docs/product`, `docs/architecture.md`, `.claude`, `CLAUDE.md`, `README.md`: no other route list missed. Search for `'messages'` in `web/e2e`: no other test relies on the part being absent.
+- **The tests can fail:** read against the code; each step 1 and step 2 test pins something the code could get wrong (the week filter, `counts`, `of_team`, full against shown names, the flag). No mutation was run.
+
+**R1 – Comments the diff made false.** (a) `crates/server/src/api/start.rs:44`: "The messages that have something to say." The committee flag is true also in a week with nothing to say; the line goes into `web/openapi.json` too. (b) `crates/core/src/messages.rs:1` still says "(story C of duties)"; its twin in `api/messages.rs` was updated. (c) The head of `web/e2e/messages.e2e.ts` still says the page of the message of the week only, and "the tests with a message fix the answers of the server", which the committee tests further down do not. Checked: read of the three places.
+  - 2026-10-31: Fixed: the comments are true again.
+
+**R2 – The empty text of the committee page has no test.** "No message: no team chosen." (R3 of the readings) appears in no test: search for `no team chosen` in `web/e2e` has no hit, while `/messages/week` has its empty text tested. The server side (`null`) is tested. The start page has no button without a team, so only an old link reaches it; the risk is a wrong prop on one page. The tests of step 3 did not ask for it. Checked: search.
+  - 2026-10-31: Fixed: a browser test with a fixed `null` answer shows the page text.
+
+**R3 – The join of club and team is in the server.** `api/messages.rs:76` makes the name of the heading (`format!("{} {}", club.name, team.name)`) and the core takes it as `team_name: &str`. Decision 0024 says the server only passes in the stored games, their places and the names, and `week_message` takes the club and the team. So R2 of the readings is not fixed by a core test: the core tests use the finished string, and only `tests/messages.rs` fixes the join. It is what `technical.md` asked for, and one line. Better for story E, which needs headings too: pass the club and the team. Checked: read, search for `club.name` in `crates`: this is the only join in Rust.
+  - 2026-10-31: Fixed: `committee_message` takes the club and the team and joins them in the core.
+
+**R4 – The handlers are the same five lines.** `week` and `committee` in `api/messages.rs` differ only in the last call, and story E adds two more. The reason `technical.md` gives for one page component (four pages with the same behaviour after story E) holds here too, and the risk is real: a future handler with another season or `today` than its flag on the start page would break "the button and the message agree" (decision 0024). No fault now. Checked: read.
+  - 2026-10-31: Fixed: the routes share `message_view`.
+
+**R5 – For Close: living documents this change makes false.** Normal for this stage, listed so that none is missed. `docs/product/messages.md` ("Now: the message of the week", the part "Messages", the server address); `docs/product/start-page.md` lines 12, 24 and 33 ("Otherwise the part is not shown"; with a team the part now always shows); `docs/product/duties.md:50` ("come in the next stories"); `docs/architecture.md` (`messages` in the core, `/messages/committee` and `MessagePage.svelte` in `web/`, the section "Messages"). Decision 0025 says a past open place alone "gives no message and no button": that is about the message of the week; the committee message differs on purpose (R1 of the readings), which only this file records. Checked: search for `messages/week` and `committee` in `docs/`.
+  - 2026-10-31: For Close.
+
+### Acceptance review
+Acceptance review, 2026-10-31, by a fresh agent. The arguments held only the mode and the change
+folder; nothing was ignored. Read: `change.md`, story D and its context in the epic's
+`functional.md` with the epic's `idea.md`, `docs/vision.md` (journey 5), `docs/product/messages.md`,
+then the diff; the **Deviations** only after that.
+
+**Verdict: accepted with notes.** What was built is what was meant: one Dutch text for the referee
+committee, with the team's table and referee places of this week and full names, from a button that
+is there in every week. No concerning deviation. Next: `/close`; A1 to A3 need no change.
+
+**Runs:** `cargo test -p team_core messages` 28 passed; `cargo test -p team --test messages --test message_logs`, the last 7 shown passed; `npm run build`, then `npx playwright test messages` 124 passed (the file with the projects it depends on), on the real server with the fake game list. Screen read in those tests only; not on a phone. `followed_teams` in the local database is empty, so no real club was tried.
+
+| Criterion of story D | Built | Checked |
+|---|---|---|
+| "Committee message" whenever a team is chosen, also a week without places; opens this week | Yes, below "Next", after "Message of the week"; without a team no button | run: browser test on the real routes, `tests/messages.rs` |
+| Team and week, then each game in time order, first and last names, "nog N open", no line for a kind without a place, no other club teams | Yes, the spec's example character for character | run: core test; trace: `schedule.past` keeps time order within a date (`crates/core/src/schedule.rs:99`), the stable sort on the date keeps it |
+| A week without places: heading and "Geen …", "Copy" works | Yes | run: browser test reads the clipboard |
+| Past days stay: who did it, or "niemand", also a place that stayed open | Yes | run: core test |
+| Copying as in story C | Yes, one shared page | run: refused clipboard tested on `/messages/week`, the same component; committee page not separately |
+| No last name: first name; a coming game gone or no longer a home game is left out | Yes | run: core tests |
+
+**Points the spec left open:**
+
+**A1 – Faithful adaptation: the open forms.** Only a past place that stayed open: the game with "niemand", not "Geen …" (reading R1, confirmed by the coordinator; it follows criterion 4, and "Geen" would be false). A start time not known: "za 31 okt, tijd nog niet bekend, …", as story C (shared `duty_lines`; read, no test for this message). Without a team: no button, and on an old link "No message: no team chosen." These serve the user. Checked: trace and run, as noted.
+  - 2026-10-31: No action needed.
+
+**A2 – Neutral drift: the heading joins the club and the short team name.** The heading is the club name plus `short_name` (`crates/core/src/team_choice.rs:83`). When the game list's team name does not start with the club name, the short name stays whole and the heading doubles it ("Blue Drakes Blue Drakes-X M16 1"); a source form "Blue Drakes - M16 1" comes out without the dash. The start page has the same join, so the coordinator would already see it, and can edit the text after pasting. Not checked on real data (no chosen team locally). Worth one look at the first real message.
+  - 2026-10-31: No action needed: look at the heading in the first real message.
+
+**A3 – Neutral drift: two limits the spec accepts or does not name.** Two players with the same full name are not told apart (reading R5): harmless for the committee. In a week across the change of season, the text says "Geen …" for the new team while the old season's places of that week are not read (`games_of` of the current season, as the documented limit of story C). The summer has no such games as far as the spec tells; not checked. Sunday evening cannot announce next week's Monday: accepted by the coordinator (S25), and the idea line in `docs/ideas.md` is still open.
+  - 2026-10-31: No action needed: the coordinator accepted these limits.
+
+**Deviations:** "None from `functional.md`" is true. The signature of `committee_message` in step 1 is changed by R3 of the build review, recorded there; not visible to the user.

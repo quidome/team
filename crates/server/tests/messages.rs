@@ -182,3 +182,77 @@ async fn an_away_game_has_its_drivers(pool: PgPool) {
          Rijden: Bram, nog 1 open"
     );
 }
+
+async fn committee(reader: &Reader) -> Value {
+    let text = ok(reader, "GET", "/api/messages/committee", None).await["text"].clone();
+    let start = ok(reader, "GET", "/api/start", None).await;
+    assert_eq!(start["messages"]["committee"], !text.is_null());
+    text
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_committee_message_needs_a_login_and_a_team(pool: PgPool) {
+    let harness = Harness::start(pool.clone()).await;
+    let response = harness.get("/api/messages/committee", None).await;
+    assert_eq!(response.status(), 401);
+
+    let coordinator = Coordinator::start(pool).await;
+    let (status, answer) = coordinator
+        .send("GET", "/api/messages/committee", None)
+        .await;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["text"], Value::Null);
+    let (_, start) = coordinator.send("GET", "/api/start", None).await;
+    assert_eq!(start["messages"]["committee"], false);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_committee_message_has_the_full_names_of_this_week(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    reader.harness.clock.set(utc(2026, 10, 26, 10, 0));
+    reader.log_in_again().await;
+    // Without places: the text says so, and the button stays.
+    assert_eq!(
+        committee(&reader).await,
+        "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\
+         \n\
+         Geen tafel- of scheidsrechtersdiensten deze week."
+    );
+
+    let game = format!("/api/games/2026-2027/{X12_31_OCT}");
+    for (kind, number) in [("table", 1), ("referee", 1)] {
+        ok(
+            &reader,
+            "PUT",
+            &format!("{game}/places/{kind}/{number}"),
+            Some(json!({ "team": M16_1 })),
+        )
+        .await;
+    }
+    let player = ok(
+        &reader,
+        "POST",
+        "/api/players",
+        Some(json!({ "first_name": "Eva", "last_name": "de Vries",
+                     "role": { "role": "plays_games", "from": "2026-09-01" } })),
+    )
+    .await["player"]["id"]
+        .as_i64()
+        .unwrap();
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/assignments/table/1"),
+        Some(json!({ "player": player })),
+    )
+    .await;
+    assert_eq!(
+        committee(&reader).await,
+        "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\
+         \n\
+         za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+         Scheidsrechter: nog 1 open\n  \
+         Tafel: Eva de Vries"
+    );
+}

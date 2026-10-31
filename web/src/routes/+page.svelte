@@ -193,11 +193,18 @@
 			{/if}
 		</section>
 
-		{#if start.messages.week}
+		{#if start.messages.week || start.messages.committee}
 			<section aria-labelledby="messages-heading" class="space-y-2" data-testid="messages">
 				<h2 id="messages-heading" class="text-lg font-semibold tracking-tight">Messages</h2>
 				<div class="flex flex-wrap gap-2">
-					<Button href={resolve('/messages/week')} variant="outline">Message of the week</Button>
+					{#if start.messages.week}
+						<Button href={resolve('/messages/week')} variant="outline">Message of the week</Button>
+					{/if}
+					{#if start.messages.committee}
+						<Button href={resolve('/messages/committee')} variant="outline">
+							Committee message
+						</Button>
+					{/if}
 				</div>
 			</section>
 		{/if}

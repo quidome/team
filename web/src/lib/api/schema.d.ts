@@ -246,6 +246,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/messages/committee': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['committeeMessage'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/messages/week': {
 		parameters: {
 			query?: never;
@@ -1099,13 +1115,16 @@ export interface components {
 		/** @description A message to copy. */
 		MessageView: {
 			/**
-			 * @description The Dutch text; `null` when there is no message (no game of the team from today to Sunday
-			 *     and no table or referee places of the team in this week).
+			 * @description The Dutch text; `null` when there is no message (no team chosen, or for the message of the
+			 *     week: no game of the team from today to Sunday and no table or referee places of the team
+			 *     in this week).
 			 */
 			text?: string | null;
 		};
-		/** @description Which links the part "Messages" shows. */
+		/** @description Which buttons the part "Messages" shows. */
 		MessagesView: {
+			/** @description "Committee message": the same rule as `GET /api/messages/committee`. */
+			committee: boolean;
 			/** @description "Message of the week": the same rule as `GET /api/messages/week`. */
 			week: boolean;
 		};
@@ -1522,7 +1541,7 @@ export interface components {
 			last_games: components['schemas']['EventView'][];
 			/** @description The season of `last_games`, for their pages; `null` when there are none. */
 			last_games_season?: string | null;
-			/** @description The messages that have something to say. */
+			/** @description The messages the start page offers. */
 			messages: components['schemas']['MessagesView'];
 			/**
 			 * @description The games of the team, the home games of other club teams with places of the team, and
@@ -2391,6 +2410,33 @@ export interface operations {
 				};
 				content: {
 					'application/json': components['schemas']['Me'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	committeeMessage: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The committee message, or `null` without a chosen team */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['MessageView'];
 				};
 			};
 			/** @description Not logged in */

@@ -771,6 +771,29 @@
         }
       }
     },
+    "/api/messages/committee": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "committeeMessage",
+        "responses": {
+          "200": {
+            "description": "The committee message, or `null` without a chosen team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/messages/week": {
       "get": {
         "tags": [
@@ -3389,17 +3412,22 @@
               "string",
               "null"
             ],
-            "description": "The Dutch text; `null` when there is no message (no game of the team from today to Sunday\nand no table or referee places of the team in this week)."
+            "description": "The Dutch text; `null` when there is no message (no team chosen, or for the message of the\nweek: no game of the team from today to Sunday and no table or referee places of the team\nin this week)."
           }
         }
       },
       "MessagesView": {
         "type": "object",
-        "description": "Which links the part \"Messages\" shows.",
+        "description": "Which buttons the part \"Messages\" shows.",
         "required": [
-          "week"
+          "week",
+          "committee"
         ],
         "properties": {
+          "committee": {
+            "type": "boolean",
+            "description": "\"Committee message\": the same rule as `GET /api/messages/committee`."
+          },
           "week": {
             "type": "boolean",
             "description": "\"Message of the week\": the same rule as `GET /api/messages/week`."
@@ -4781,7 +4809,7 @@
           },
           "messages": {
             "$ref": "#/components/schemas/MessagesView",
-            "description": "The messages that have something to say."
+            "description": "The messages the start page offers."
           },
           "next": {
             "type": "array",

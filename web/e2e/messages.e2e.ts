@@ -1,4 +1,4 @@
-// The page of the message of the week and its button (story C of duties). The server's clock is
+// The pages of the messages and their buttons (stories C and D of duties). The server's clock is
 // Monday 12 October 2026 (DEV_NOW), and the test data has no game in that week; other tests depend
 // on that. So the tests with a message fix the answers of the server here;
 // `crates/server/tests/messages.rs` tests the text from stored data, and that the button and the
@@ -18,7 +18,10 @@ async function answers(page: Page, text: string) {
 	await page.route('**/api/start', async (route) => {
 		const response = await route.fetch();
 		const answer = await response.json();
-		await route.fulfill({ response, json: { ...answer, messages: { week: true } } });
+		await route.fulfill({
+			response,
+			json: { ...answer, messages: { ...answer.messages, week: true } }
+		});
 	});
 	await page.route('**/api/messages/week', (route) => route.fulfill({ json: { text } }));
 }
@@ -70,15 +73,57 @@ test('the message page fits a phone and is accessible', async ({ page }) => {
 	await expectAccessible(page);
 });
 
-test('without a message the start page has no "Messages", and the page says so', async ({
+test('without a message of the week the start page has no button for it, and the page says so', async ({
 	page
 }) => {
 	// The real answers: the test data has nothing in this week.
 	await page.goto('/');
 	await expect(page.getByTestId('next')).toBeVisible();
-	await expect(page.getByTestId('messages')).toHaveCount(0);
+	const messages = page.getByTestId('messages');
+	await expect(messages.getByRole('link', { name: 'Committee message' })).toBeVisible();
+	await expect(messages.getByRole('link', { name: 'Message of the week' })).toHaveCount(0);
 
 	await page.goto('/messages/week');
 	await expect(page.getByTestId('no-message')).toHaveText('No message this week.');
 	await expect(page.getByTestId('copy')).toHaveCount(0);
+});
+
+// The committee message exists in every week, so these tests read the real routes. The test data
+// has no game in the week of the clock.
+const COMMITTEE = `Tafel en scheidsrechters Blue Drakes M16 1, week 12 oktober – 18 oktober
+
+Geen tafel- of scheidsrechtersdiensten deze week.`;
+
+test('the start page opens the committee message, and "Back" returns', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/');
+	await page.getByTestId('messages').getByRole('link', { name: 'Committee message' }).click();
+	await expect(page).toHaveURL(/\/messages\/committee$/);
+	await expect(page.getByRole('heading', { name: 'Committee message' })).toBeVisible();
+	await expect(page.getByTestId('message-text')).toHaveText(COMMITTEE);
+
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page.getByTestId('messages')).toBeVisible();
+	expect(errors).toEqual([]);
+});
+
+test('without a team the committee page says so', async ({ page }) => {
+	await page.route('**/api/messages/committee', (route) => route.fulfill({ json: { text: null } }));
+	await page.goto('/messages/committee');
+	await expect(page.getByTestId('no-message')).toHaveText('No message: no team chosen.');
+	await expect(page.getByTestId('copy')).toHaveCount(0);
+});
+
+test('"Copy" puts the committee message on the clipboard', async ({ page }) => {
+	await page.goto('/messages/committee');
+	await page.getByTestId('copy').click();
+	await expect(page.getByTestId('copy-state')).toHaveText('Copied');
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(COMMITTEE);
+});
+
+test('the committee message fits a phone and is accessible', async ({ page }) => {
+	await page.goto('/messages/committee');
+	await expect(page.getByTestId('message-text')).toBeVisible();
+	await expectNoHorizontalScroll(page, 390);
+	await expectAccessible(page);
 });

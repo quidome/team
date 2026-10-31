@@ -512,6 +512,11 @@ export async function loadWeekMessage(fetch: typeof globalThis.fetch): Promise<M
 	return dataOf(await api.GET('/api/messages/week', { fetch }));
 }
 
+/** The committee message (story D of duties); `text` is `null` without a chosen team. */
+export async function loadCommitteeMessage(fetch: typeof globalThis.fetch): Promise<Message> {
+	return dataOf(await api.GET('/api/messages/committee', { fetch }));
+}
+
 export type DutiesOverview = components['schemas']['DutiesOverview'];
 
 /** The duty totals of each player in a season (story B of duties); the current season when

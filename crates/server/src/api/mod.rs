@@ -46,6 +46,7 @@ use utoipa::OpenApi;
         games::set_outcome,
         start::get,
         messages::week,
+        messages::committee,
         changes::get,
         changes::seen,
         players::list,
