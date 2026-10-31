@@ -102,6 +102,10 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
     coordinator.ok("GET", "/api/duties", None).await;
     coordinator.ok("GET", "/api/messages/week", None).await;
     coordinator.ok("GET", "/api/messages/committee", None).await;
+    coordinator.ok("GET", "/api/messages/driving", None).await;
+    coordinator
+        .ok("GET", "/api/messages/table-referee", None)
+        .await;
     coordinator.ok("GET", "/api/season", None).await;
     coordinator.ok("GET", "/api/start", None).await;
     coordinator

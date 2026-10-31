@@ -41,7 +41,10 @@ pub use duties::{
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
-pub use messages::{MessageGame, committee_message, full_names, week_message, week_of};
+pub use messages::{
+    MessageGame, committee_message, driving_overview, full_names, table_referee_overview,
+    week_message, week_of,
+};
 pub use nightly::{NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date};
 pub use players::{
     Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,

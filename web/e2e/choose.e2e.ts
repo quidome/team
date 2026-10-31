@@ -18,6 +18,12 @@ test('the first visit shows only the choose step', async ({ page }) => {
 	expect(errors).toEqual([]);
 });
 
+test('without a team "Duties" still offers the overviews, and they say so', async ({ page }) => {
+	await page.goto('/duties');
+	await page.getByTestId('overviews').getByRole('link', { name: 'Driving overview' }).click();
+	await expect(page.getByTestId('no-message')).toHaveText('No overview: no team chosen.');
+});
+
 test('a search with no club says so, and the next search works', async ({ page }) => {
 	await page.goto('/');
 	await page.getByLabel('Club name').fill('zzz');

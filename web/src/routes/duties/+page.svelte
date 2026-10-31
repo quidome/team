@@ -1,7 +1,8 @@
 <!--
 	Duties (story B of duties): the table "Totals" of the chosen season (the current one by default,
 	`?season=` in the address): one row for each player with the role "plays games" in the season or
-	with a duty in it, and for Drive, Table and Referee the duties done and planned ("3 · 1").
+	with a duty in it, and for Drive, Table and Referee the duties done and planned ("3 · 1"). For the
+	current season the buttons of the duty overviews (story E).
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -62,6 +63,15 @@
 					{/each}
 				</select>
 			</label>
+		{/if}
+
+		{#if overview.season === overview.current_season}
+			<div class="flex flex-wrap gap-2" data-testid="overviews">
+				<Button href={resolve('/duties/driving')} variant="outline">Driving overview</Button>
+				<Button href={resolve('/duties/table-referee')} variant="outline">
+					Table and referee overview
+				</Button>
+			</div>
 		{/if}
 
 		<section aria-labelledby="totals-heading" class="space-y-2">

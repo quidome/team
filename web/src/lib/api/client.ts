@@ -517,6 +517,16 @@ export async function loadCommitteeMessage(fetch: typeof globalThis.fetch): Prom
 	return dataOf(await api.GET('/api/messages/committee', { fetch }));
 }
 
+/** The driving overview (story E of duties); `text` is `null` without a chosen team. */
+export async function loadDrivingOverview(fetch: typeof globalThis.fetch): Promise<Message> {
+	return dataOf(await api.GET('/api/messages/driving', { fetch }));
+}
+
+/** The table and referee overview (story E of duties); `text` is `null` without a chosen team. */
+export async function loadTableRefereeOverview(fetch: typeof globalThis.fetch): Promise<Message> {
+	return dataOf(await api.GET('/api/messages/table-referee', { fetch }));
+}
+
 export type DutiesOverview = components['schemas']['DutiesOverview'];
 
 /** The duty totals of each player in a season (story B of duties); the current season when

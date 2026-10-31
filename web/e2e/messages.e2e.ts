@@ -1,4 +1,4 @@
-// The pages of the messages and their buttons (stories C and D of duties). The server's clock is
+// The pages of the messages and their buttons (stories C, D and E of duties). The server's clock is
 // Monday 12 October 2026 (DEV_NOW), and the test data has no game in that week; other tests depend
 // on that. So the tests with a message fix the answers of the server here;
 // `crates/server/tests/messages.rs` tests the text from stored data, and that the button and the
@@ -126,4 +126,66 @@ test('the committee message fits a phone and is accessible', async ({ page }) =>
 	await expect(page.getByTestId('message-text')).toBeVisible();
 	await expectNoHorizontalScroll(page, 390);
 	await expectAccessible(page);
+});
+
+const OVERVIEWS = [
+	{
+		name: 'Driving overview',
+		path: 'driving',
+		text: `Rijden Blue Drakes M16 1
+
+za 31 okt 14:30 Uit tegen B.Z. '72 M16 1, Woerden
+  Anna, Bram, Cas, nog 1 open`
+	},
+	{
+		name: 'Table and referee overview',
+		path: 'table-referee',
+		text: `Tafel en scheidsrechter Blue Drakes M16 1
+
+Geen tafel- of scheidsrechtersdiensten gepland.`
+	}
+];
+
+async function overviewAnswer(page: Page, path: string, text: string | null) {
+	await page.route(`**/api/messages/${path}`, (route) => route.fulfill({ json: { text } }));
+}
+
+for (const { name, path, text } of OVERVIEWS) {
+	test(`"Duties" opens the ${name}, and "Back" returns`, async ({ page }) => {
+		const errors = watchConsole(page);
+		await overviewAnswer(page, path, text);
+		await page.goto('/duties');
+		await page.getByTestId('overviews').getByRole('link', { name }).click();
+		await expect(page).toHaveURL(new RegExp(`/duties/${path}$`));
+		await expect(page.getByRole('heading', { name })).toBeVisible();
+		await expect(page.getByTestId('message-text')).toHaveText(text);
+
+		await page.getByRole('link', { name: 'Back' }).click();
+		await expect(page).toHaveURL(/\/duties$/);
+		expect(errors).toEqual([]);
+	});
+
+	test(`without a team the ${name} says so`, async ({ page }) => {
+		await overviewAnswer(page, path, null);
+		await page.goto(`/duties/${path}`);
+		await expect(page.getByTestId('no-message')).toHaveText('No overview: no team chosen.');
+		await expect(page.getByTestId('copy')).toHaveCount(0);
+	});
+
+	test(`the ${name} fits a phone and is accessible`, async ({ page }) => {
+		await overviewAnswer(page, path, text);
+		await page.goto(`/duties/${path}`);
+		await expect(page.getByTestId('message-text')).toBeVisible();
+		await expectNoHorizontalScroll(page, 390);
+		await expectAccessible(page);
+	});
+}
+
+test('"Copy" puts an overview that says "Geen …" on the clipboard', async ({ page }) => {
+	const { path, text } = OVERVIEWS[1];
+	await overviewAnswer(page, path, text);
+	await page.goto(`/duties/${path}`);
+	await page.getByTestId('copy').click();
+	await expect(page.getByTestId('copy-state')).toHaveText('Copied');
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
 });

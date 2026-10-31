@@ -794,6 +794,52 @@
         }
       }
     },
+    "/api/messages/driving": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "drivingOverview",
+        "responses": {
+          "200": {
+            "description": "The driving overview, or `null` without a chosen team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
+    "/api/messages/table-referee": {
+      "get": {
+        "tags": [
+          "messages"
+        ],
+        "operationId": "tableRefereeOverview",
+        "responses": {
+          "200": {
+            "description": "The table and referee overview, or `null` without a chosen team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/messages/week": {
       "get": {
         "tags": [

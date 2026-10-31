@@ -673,6 +673,17 @@ test('"Duties" shows the totals of each player in a season', async ({ page }) =>
 	await expect(page.getByTestId('invalid-season')).toHaveText('This season cannot be read.');
 });
 
+test('"Duties" offers the duty overviews for the current season only', async ({ page }) => {
+	await page.goto('/duties');
+	const overviews = page.getByTestId('overviews');
+	await expect(overviews.getByRole('link', { name: 'Driving overview' })).toBeVisible();
+	await expect(overviews.getByRole('link', { name: 'Table and referee overview' })).toBeVisible();
+
+	await page.goto('/duties?season=2025-2026');
+	await expect(page.getByRole('heading', { name: 'Duties · 2025-2026' })).toBeVisible();
+	await expect(overviews).toHaveCount(0);
+});
+
 test('"Delete player" is not offered for a player with a duty', async ({ page }) => {
 	const errors = watchConsole(page);
 	const game = await findGame(page, otherHomeGame);

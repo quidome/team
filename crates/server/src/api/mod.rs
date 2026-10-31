@@ -47,6 +47,8 @@ use utoipa::OpenApi;
         start::get,
         messages::week,
         messages::committee,
+        messages::driving,
+        messages::table_referee,
         changes::get,
         changes::seen,
         players::list,

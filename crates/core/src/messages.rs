@@ -1,12 +1,14 @@
-//! The messages for the coordinator to copy into the chat (stories C and D of duties): Dutch text, made
-//! from what is stored at the moment of the request. The tool never sends them.
+//! The messages for the coordinator to copy into the chat (stories C, D and E of duties): Dutch
+//! text, made from what is stored at the moment of the request. The tool never sends them.
 
 use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime};
 
 use crate::club::ClubNumber;
-use crate::duties::{Assignment, Counted, DutyKind, DutyPlace, GamePlaces, SchedulePart, who_did};
+use crate::duties::{
+    Assignment, Counted, DriverPart, DutyKind, DutyPlace, GamePlaces, SchedulePart, who_did,
+};
 use crate::game::{Game, TeamNumber};
 use crate::players::{Player, PlayerId};
 use crate::schedule::{ScheduleReason, ScheduledGame};
@@ -89,6 +91,14 @@ fn clock(time: NaiveTime) -> String {
     time.format("%H:%M").to_string()
 }
 
+/// "za 31 okt 16:00", or "za 31 okt, tijd nog niet bekend,": the start of a line of one game.
+fn date_and_time(game: &Game) -> String {
+    match game.start_time {
+        Some(time) => format!("{} {}", short_date(game.date), clock(time)),
+        None => format!("{}, {TIME_NOT_KNOWN},", short_date(game.date)),
+    }
+}
+
 /// The names on `places` (in their order) and the open places: "Anna, Bram", "Eva, nog 1 open",
 /// "nog 2 open". `past`: the game is before today, so a correction shows (`who_did`), and a place
 /// that stayed open was done by nobody.
@@ -126,6 +136,32 @@ fn filled_and_open(
     }
 }
 
+/// The driver places of `game`, when they count and the number is above 0.
+fn drivers_of_team<'a>(game: &MessageGame<'a>) -> Option<&'a DriverPart> {
+    game.places
+        .and_then(|places| places.drivers.as_ref())
+        .filter(|part| part.counts && !part.places.is_empty())
+}
+
+/// The name of the other side of a game of `team`.
+fn opponent(game: &Game, team: TeamNumber) -> &str {
+    if game.home.team == team {
+        &game.away.team_name
+    } else {
+        &game.home.team_name
+    }
+}
+
+/// The drivers of a coming game and the open places.
+fn drivers_and_open(
+    part: &DriverPart,
+    assignments: &[Assignment],
+    names: &BTreeMap<PlayerId, String>,
+) -> String {
+    let places: Vec<&DutyPlace> = part.places.iter().collect();
+    filled_and_open(&places, assignments, names, false)
+}
+
 /// The block of one game of the team, with its drivers. "Thuis": a game in the club's own hall
 /// (`docs/language.md`), also with the team as the away side against another club team.
 fn game_block(
@@ -141,25 +177,15 @@ fn game_block(
     } else {
         "Uit"
     };
-    let opponent = if game.home.team == team {
-        &game.away.team_name
-    } else {
-        &game.home.team_name
-    };
     let mut lines = vec![
         format!("Wedstrijd: {}, {time}", long_date(game.date)),
-        format!("{side} tegen {opponent}"),
+        format!("{side} tegen {}", opponent(game, team)),
         format!("{}, {}", game.place.hall, game.place.town),
     ];
-    let drivers = message_game
-        .places
-        .and_then(|places| places.drivers.as_ref())
-        .filter(|part| part.counts && !part.places.is_empty());
-    if let Some(part) = drivers {
-        let places: Vec<&DutyPlace> = part.places.iter().collect();
+    if let Some(part) = drivers_of_team(message_game) {
         lines.push(format!(
             "Rijden: {}",
-            filled_and_open(&places, message_game.assignments, names, false)
+            drivers_and_open(part, message_game.assignments, names)
         ));
     }
     lines.join("\n")
@@ -180,18 +206,13 @@ fn duty_lines(
     today: NaiveDate,
 ) -> Option<String> {
     let part = places_of_team(game)?;
-    let Game {
-        date,
-        start_time,
-        home,
-        away,
-        ..
-    } = &game.scheduled.game;
-    let teams = format!("{} – {}", home.team_name, away.team_name);
-    let mut lines = vec![match start_time {
-        Some(time) => format!("{} {} {teams}", short_date(*date), clock(*time)),
-        None => format!("{}, {TIME_NOT_KNOWN}, {teams}", short_date(*date)),
-    }];
+    let scheduled = &game.scheduled.game;
+    let mut lines = vec![format!(
+        "{} {} – {}",
+        date_and_time(scheduled),
+        scheduled.home.team_name,
+        scheduled.away.team_name
+    )];
     for (kind, label) in [
         (DutyKind::Referee, "Scheidsrechter"),
         (DutyKind::Table, "Tafel"),
@@ -200,7 +221,7 @@ fn duty_lines(
         if !places.is_empty() {
             lines.push(format!(
                 "  {label}: {}",
-                filled_and_open(&places, game.assignments, names, *date < today)
+                filled_and_open(&places, game.assignments, names, scheduled.date < today)
             ));
         }
     }
@@ -300,6 +321,77 @@ pub fn committee_message(
         parts.push("Geen tafel- of scheidsrechtersdiensten deze week.".to_owned());
     }
     parts.join("\n\n")
+}
+
+/// The games of `games` from today, in time order: the order within a date stays.
+fn coming_games<'g, 'a>(
+    games: &'g [MessageGame<'a>],
+    today: NaiveDate,
+) -> Vec<&'g MessageGame<'a>> {
+    let mut coming: Vec<&MessageGame<'_>> = games
+        .iter()
+        .filter(|game| game.scheduled.game.date >= today)
+        .collect();
+    coming.sort_by_key(|game| game.scheduled.game.date);
+    coming
+}
+
+/// The heading and the games, or `nothing` without games.
+fn overview(heading: String, games: Option<String>, nothing: &str) -> String {
+    format!("{heading}\n\n{}", games.as_deref().unwrap_or(nothing))
+}
+
+/// The driving overview: the coming away games of `team` with driver places that count. `games`:
+/// as [`week_message`]; `names`: `display_names` of the season; `club_name` and `team_name`: "Blue
+/// Drakes" and "M16 1". It has no counts: those are for a report.
+pub fn driving_overview(
+    games: &[MessageGame<'_>],
+    names: &BTreeMap<PlayerId, String>,
+    team: TeamNumber,
+    club_name: &str,
+    team_name: &str,
+    today: NaiveDate,
+) -> String {
+    let lines: Vec<String> = coming_games(games, today)
+        .iter()
+        .filter_map(|game| {
+            let part = drivers_of_team(game)?;
+            let scheduled = &game.scheduled.game;
+            Some(format!(
+                "{} Uit tegen {}, {}\n  {}",
+                date_and_time(scheduled),
+                opponent(scheduled, team),
+                scheduled.place.town,
+                drivers_and_open(part, game.assignments, names)
+            ))
+        })
+        .collect();
+    overview(
+        format!("Rijden {club_name} {team_name}"),
+        (!lines.is_empty()).then(|| lines.join("\n")),
+        "Geen ritten gepland.",
+    )
+}
+
+/// The table and referee overview: the coming games with table or referee places of the team that
+/// count, with the lines of the messages. `games`, `names` and the two names: as
+/// [`driving_overview`].
+pub fn table_referee_overview(
+    games: &[MessageGame<'_>],
+    names: &BTreeMap<PlayerId, String>,
+    club_name: &str,
+    team_name: &str,
+    today: NaiveDate,
+) -> String {
+    let lines: Vec<String> = coming_games(games, today)
+        .iter()
+        .filter_map(|game| duty_lines(game, names, today))
+        .collect();
+    overview(
+        format!("Tafel en scheidsrechter {club_name} {team_name}"),
+        (!lines.is_empty()).then(|| lines.join("\n\n")),
+        "Geen tafel- of scheidsrechtersdiensten gepland.",
+    )
 }
 
 #[cfg(test)]
@@ -540,11 +632,212 @@ mod tests {
         committee_message(&games, names, "Blue Drakes", "M16 1", today)
     }
 
+    /// `make` over the games of `fixtures`, with their duties on `today`.
+    fn over(
+        fixtures: &[Fixture],
+        today: NaiveDate,
+        make: impl Fn(&[MessageGame<'_>]) -> String,
+    ) -> String {
+        let places: Vec<Option<GamePlaces>> = fixtures.iter().map(|f| f.places(today)).collect();
+        let games: Vec<MessageGame<'_>> = fixtures
+            .iter()
+            .zip(&places)
+            .map(|(fixture, places)| MessageGame {
+                scheduled: &fixture.scheduled,
+                places: places.as_ref(),
+                assignments: &fixture.assignments,
+            })
+            .collect();
+        make(&games)
+    }
+
+    fn driving(fixtures: &[Fixture], today: NaiveDate) -> String {
+        over(fixtures, today, |games| {
+            driving_overview(games, &names(), TEAM, "Blue Drakes", "M16 1", today)
+        })
+    }
+
+    fn table_referee(fixtures: &[Fixture], today: NaiveDate) -> String {
+        over(fixtures, today, |games| {
+            table_referee_overview(games, &names(), "Blue Drakes", "M16 1", today)
+        })
+    }
+
     fn full(entries: &[(PlayerId, &str)]) -> BTreeMap<PlayerId, String> {
         entries
             .iter()
             .map(|(id, name)| (*id, (*name).to_owned()))
             .collect()
+    }
+
+    const NO_DRIVES: &str = "Rijden Blue Drakes M16 1\n\nGeen ritten gepland.";
+    const NO_PLACES: &str = "Tafel en scheidsrechter Blue Drakes M16 1\n\nGeen tafel- of scheidsrechtersdiensten gepland.";
+
+    /// The second away game of the example of the spec.
+    fn away_to_lions() -> Fixture {
+        let mut fixture = Fixture::game(
+            11,
+            date(2026, 11, 14),
+            time(12, 0),
+            side(OPPONENT, "Lions M16 1", OTHER_CLUB),
+            side(TEAM, "Blue Drakes M16 1", CLUB),
+            ScheduleReason::TeamGame,
+        )
+        .drivers(3);
+        fixture.scheduled.game.place.town = "Utrecht".to_owned();
+        fixture
+    }
+
+    #[test]
+    fn the_driving_example_of_the_spec() {
+        let away = Fixture::away(10, date(2026, 10, 31), time(14, 30))
+            .drivers(4)
+            .player(DutyKind::Drive, 1, ANNA)
+            .player(DutyKind::Drive, 2, BRAM)
+            .player(DutyKind::Drive, 3, CAS);
+        assert_eq!(
+            driving(&[away, away_to_lions()], monday()),
+            "Rijden Blue Drakes M16 1\n\
+             \n\
+             za 31 okt 14:30 Uit tegen B.Z. '72 M16 1, Woerden\n  \
+             Anna, Bram, Cas, nog 1 open\n\
+             za 14 nov 12:00 Uit tegen Lions M16 1, Utrecht\n  \
+             nog 3 open"
+        );
+    }
+
+    #[test]
+    fn the_driving_overview_says_when_the_time_is_not_known() {
+        let mut away = away_to_lions();
+        away.scheduled.game.start_time = None;
+        assert_eq!(
+            driving(&[away], monday()),
+            "Rijden Blue Drakes M16 1\n\
+             \n\
+             za 14 nov, tijd nog niet bekend, Uit tegen Lions M16 1, Utrecht\n  \
+             nog 3 open"
+        );
+    }
+
+    #[test]
+    fn the_driving_overview_without_games_says_so() {
+        assert_eq!(driving(&[], monday()), NO_DRIVES);
+    }
+
+    #[test]
+    fn the_driving_overview_leaves_out_what_does_not_count() {
+        let on = date(2026, 10, 31);
+        let before_today = Fixture::away(1, date(2026, 10, 25), time(10, 0)).drivers(2);
+        let no_drivers = Fixture::away(2, on, time(10, 0)).drivers(0);
+        let gone = Fixture::away(3, on, time(11, 0)).drivers(2).gone();
+        let home_now = Fixture::home(4, on, time(12, 0)).drivers(2);
+        assert_eq!(
+            driving(&[before_today, no_drivers, gone, home_now], monday()),
+            NO_DRIVES
+        );
+    }
+
+    #[test]
+    fn a_game_today_stays_in_the_overview_with_the_planned_player() {
+        let today = date(2026, 10, 31);
+        let away = Fixture::away(10, today, time(14, 30))
+            .drivers(2)
+            .player(DutyKind::Drive, 1, ANNA)
+            .outcome(Outcome::DoneBy(BRAM));
+        assert_eq!(
+            driving(&[away], today),
+            "Rijden Blue Drakes M16 1\n\
+             \n\
+             za 31 okt 14:30 Uit tegen B.Z. '72 M16 1, Woerden\n  \
+             Anna, nog 1 open"
+        );
+    }
+
+    #[test]
+    fn the_table_and_referee_overview_has_an_empty_line_between_games() {
+        let first = Fixture::duty(1, date(2026, 10, 31), time(16, 0))
+            .of_team(PlaceKind::Table, 1)
+            .of_team(PlaceKind::Table, 2)
+            .of_team(PlaceKind::Referee, 1)
+            .player(DutyKind::Table, 1, EVA)
+            .player(DutyKind::Referee, 1, GIJS);
+        let second = Fixture::duty(2, date(2026, 12, 5), time(13, 0))
+            .of_team(PlaceKind::Table, 1)
+            .player(DutyKind::Table, 1, FLEUR);
+        assert_eq!(
+            table_referee(&[first, second], monday()),
+            "Tafel en scheidsrechter Blue Drakes M16 1\n\
+             \n\
+             za 31 okt 16:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+             Scheidsrechter: Gijs\n  \
+             Tafel: Eva, nog 1 open\n\
+             \n\
+             za 5 dec 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+             Tafel: Fleur"
+        );
+    }
+
+    #[test]
+    fn the_table_and_referee_overview_has_only_places_of_the_team() {
+        let game = Fixture::duty(1, date(2026, 10, 31), time(16, 0))
+            .of_team(PlaceKind::Referee, 1)
+            .of_other_team(PlaceKind::Table, 1);
+        assert_eq!(
+            table_referee(&[game], monday()),
+            "Tafel en scheidsrechter Blue Drakes M16 1\n\
+             \n\
+             za 31 okt 16:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+             Scheidsrechter: nog 1 open"
+        );
+    }
+
+    #[test]
+    fn the_table_and_referee_overview_without_games_says_so() {
+        let only_other_team =
+            Fixture::duty(1, date(2026, 10, 31), time(16, 0)).of_other_team(PlaceKind::Table, 1);
+        assert_eq!(table_referee(&[only_other_team], monday()), NO_PLACES);
+    }
+
+    #[test]
+    fn the_table_and_referee_overview_leaves_out_what_does_not_count() {
+        let on = date(2026, 10, 31);
+        let before_today = Fixture::duty(1, date(2026, 10, 25), time(10, 0))
+            .of_team(PlaceKind::Table, 1)
+            .player(DutyKind::Table, 1, EVA);
+        let gone = Fixture::duty(2, on, time(11, 0))
+            .of_team(PlaceKind::Table, 1)
+            .gone();
+        let mut swapped = Fixture::duty(3, on, time(12, 0)).of_team(PlaceKind::Table, 1);
+        swapped.scheduled.game.home.club = OTHER_CLUB;
+        assert_eq!(
+            table_referee(&[before_today, gone, swapped], monday()),
+            NO_PLACES
+        );
+    }
+
+    #[test]
+    fn the_overviews_sort_the_dates_and_keep_the_order_within_a_date() {
+        let on = date(2026, 10, 31);
+        // The dates in any order, the order within a date from the schedule.
+        let games = [
+            Fixture::duty(3, date(2026, 11, 7), time(9, 0)).of_team(PlaceKind::Table, 1),
+            Fixture::duty(1, on, time(9, 0)).of_team(PlaceKind::Table, 1),
+            Fixture::duty(2, on, None).of_team(PlaceKind::Table, 1),
+        ];
+        let text = table_referee(&games, monday());
+        let lines: Vec<&str> = text
+            .lines()
+            .filter(|line| line.contains(" – "))
+            .map(|line| line.split(" Blue").next().expect("a date"))
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                "za 31 okt 09:00",
+                "za 31 okt, tijd nog niet bekend,",
+                "za 7 nov 09:00"
+            ]
+        );
     }
 
     const NO_DUTIES: &str = "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\

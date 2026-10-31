@@ -1,5 +1,6 @@
 //! The message of the week through the API (story C of duties), and the button on the start page
-//! that follows the same rule.
+//! that follows the same rule. Also the committee message (story D) and the duty overviews (story
+//! E).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -7,7 +8,7 @@ mod common;
 
 use common::Harness;
 use common::api::Coordinator;
-use common::game_list::{M16_1, Reader, utc};
+use common::game_list::{M16_1, M16_2, Reader, utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -254,5 +255,111 @@ async fn the_committee_message_has_the_full_names_of_this_week(pool: PgPool) {
          za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
          Scheidsrechter: nog 1 open\n  \
          Tafel: Eva de Vries"
+    );
+}
+
+const OVERVIEWS: [&str; 2] = ["/api/messages/driving", "/api/messages/table-referee"];
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_overviews_need_a_login_and_a_team(pool: PgPool) {
+    let harness = Harness::start(pool.clone()).await;
+    for path in OVERVIEWS {
+        assert_eq!(harness.get(path, None).await.status(), 401);
+    }
+
+    let coordinator = Coordinator::start(pool).await;
+    for path in OVERVIEWS {
+        let (status, answer) = coordinator.send("GET", path, None).await;
+        assert_eq!(status, 200, "{answer}");
+        assert_eq!(answer["text"], Value::Null);
+    }
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_overviews_without_duties_say_so(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    reader.harness.clock.set(utc(2026, 10, 26, 10, 0));
+    reader.log_in_again().await;
+    // Without players the proposal is 0 drivers.
+    assert_eq!(
+        ok(&reader, "GET", OVERVIEWS[0], None).await["text"],
+        "Rijden Blue Drakes M16 1\n\nGeen ritten gepland."
+    );
+    assert_eq!(
+        ok(&reader, "GET", OVERVIEWS[1], None).await["text"],
+        "Tafel en scheidsrechter Blue Drakes M16 1\n\
+         \n\
+         Geen tafel- of scheidsrechtersdiensten gepland."
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_driving_overview_goes_past_this_week(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Monday 26 October 2026: the away game of 7 November is next week.
+    reader.harness.clock.set(utc(2026, 10, 26, 10, 0));
+    reader.log_in_again().await;
+    let game = format!("/api/games/2026-2027/{AWAY_7_NOV}");
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/drivers"),
+        Some(json!({ "drivers": 2 })),
+    )
+    .await;
+    let player = add_player(&reader, "Bram").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/assignments/drive/1"),
+        Some(json!({ "player": player })),
+    )
+    .await;
+    let text = ok(&reader, "GET", OVERVIEWS[0], None).await["text"].clone();
+    let text = text.as_str().unwrap();
+    assert!(
+        text.contains("za 7 nov 11:15 Uit tegen De Dunckers M16 3, Hilversum\n  Bram, nog 1 open"),
+        "{text}"
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_table_and_referee_overview_has_the_places_of_the_team_only(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Monday 19 October 2026: the game of 31 October is next week.
+    reader.harness.clock.set(utc(2026, 10, 19, 10, 0));
+    reader.log_in_again().await;
+    let game = format!("/api/games/2026-2027/{X12_31_OCT}");
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/places/referee/1"),
+        Some(json!({ "team": M16_1 })),
+    )
+    .await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/places/table/1"),
+        Some(json!({ "team": M16_2 })),
+    )
+    .await;
+    let player = add_player(&reader, "Gijs").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{game}/assignments/referee/1"),
+        Some(json!({ "player": player })),
+    )
+    .await;
+    assert_eq!(
+        ok(&reader, "GET", OVERVIEWS[1], None).await["text"],
+        "Tafel en scheidsrechter Blue Drakes M16 1\n\
+         \n\
+         za 31 okt 13:00 Blue Drakes X12 1 – De Dunckers X12 1\n  \
+         Scheidsrechter: Gijs"
     );
 }

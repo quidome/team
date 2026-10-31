@@ -1,13 +1,17 @@
 //! `GET /api/messages/week` and `GET /api/messages/committee`: the message of the week and the
 //! committee message (stories C and D of duties), Dutch text for the coordinator to copy into the
 //! chat. The start page shows their buttons from the same rules (`week_text`, `committee_text`,
-//! decision 0022). The texts hold player names: they never go to the log.
+//! decision 0022). `GET /api/messages/driving` and `GET /api/messages/table-referee`: the duty
+//! overviews (story E). The texts hold player names: they never go to the log.
 
 use axum::Json;
 use axum::extract::State;
 use chrono::NaiveDate;
 use serde::Serialize;
-use team_core::{MessageGame, PlacesOf, committee_message, full_names, week_message, week_of};
+use team_core::{
+    MessageGame, PlacesOf, committee_message, driving_overview, full_names, table_referee_overview,
+    week_message, week_of,
+};
 use utoipa::ToSchema;
 
 use super::season::{SeasonGames, games_of, places_of_season};
@@ -79,6 +83,33 @@ pub(crate) fn committee_text(
     ))
 }
 
+/// The driving overview of the season of `games` (the current season), with the duties of
+/// `places`; `None` without a chosen team.
+fn driving_text(games: &SeasonGames, places: &PlacesOf, today: NaiveDate) -> Option<String> {
+    let (club, team) = (games.club.as_ref()?, games.team.as_ref()?);
+    Some(driving_overview(
+        &message_games(games, places, today),
+        &games.duties.names,
+        team.number,
+        &club.name,
+        &team.name,
+        today,
+    ))
+}
+
+/// The table and referee overview of the season of `games` (the current season), with the duties
+/// of `places`; `None` without a chosen team.
+fn table_referee_text(games: &SeasonGames, places: &PlacesOf, today: NaiveDate) -> Option<String> {
+    let (club, team) = (games.club.as_ref()?, games.team.as_ref()?);
+    Some(table_referee_overview(
+        &message_games(games, places, today),
+        &games.duties.names,
+        &club.name,
+        &team.name,
+        today,
+    ))
+}
+
 /// The answer of a message route: `text` over the current season, as the start page reads it.
 async fn message_view(
     state: &AppState,
@@ -118,4 +149,30 @@ pub async fn week(State(state): State<AppState>) -> Result<Json<MessageView>, Ap
 )]
 pub async fn committee(State(state): State<AppState>) -> Result<Json<MessageView>, AppError> {
     message_view(&state, committee_text).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/messages/driving",
+    operation_id = "drivingOverview",
+    responses(
+        (status = 200, description = "The driving overview, or `null` without a chosen team", body = MessageView),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn driving(State(state): State<AppState>) -> Result<Json<MessageView>, AppError> {
+    message_view(&state, driving_text).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/messages/table-referee",
+    operation_id = "tableRefereeOverview",
+    responses(
+        (status = 200, description = "The table and referee overview, or `null` without a chosen team", body = MessageView),
+        (status = 401, description = "Not logged in"),
+    )
+)]
+pub async fn table_referee(State(state): State<AppState>) -> Result<Json<MessageView>, AppError> {
+    message_view(&state, table_referee_text).await
 }
