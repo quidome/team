@@ -1,18 +1,19 @@
 ---
 title: Duties
 type: feature
-stage: implement
+stage: done
 closure: review accept   # epic: each story has its own closure (review build + accept); a fresh agent checks the whole result after story D
 created: 2026-10-18
 ---
 
 # Duties
 
-The coordinator records the duty places of the team (drivers for its away games; its jury and
-referee places at home games of other club teams, from the club's list), the player who does
-each one, and after the game who really did it; the duty totals show that the work is shared.
-From that the tool makes the message for the next game and the message for the referee
-committee. An epic of four stories (see `idea.md`).
+The coordinator copies the schedule of the referee committee into the tool (the 4 table and
+referee places of each home game of the club, each given to a club team), sets the drivers of the
+away games of the team, and puts players on the places of the team. After the game a correction
+says who really did it; the duty totals show that the work is shared. From that the tool makes the
+message of the week, the committee message and the two duty overviews. An epic of six stories: A,
+B, C and C2 (C2 replaced C before a release), D and E (see `technical.md`).
 
 ## Log
 | Date | Stage | Note |
@@ -39,3 +40,5 @@ committee. An epic of four stories (see `idea.md`).
 | 2026-10-31 | implement | story D, the committee message, closed (`changes/done/2026-10-31-committee-message/`, decision 0026). Next: story E, the duty overviews |
 | 2026-10-31 | implement | story E, the duty overviews: technical.md approved (`changes/2026-10-31-duty-overviews/`), 3 steps |
 | 2026-10-31 | implement | story E, the duty overviews, closed (`changes/done/2026-10-31-duty-overviews/`); A1 of its accept review in `docs/ideas.md`. Next: the epic review accept |
+| 2026-10-31 | close | epic review accept: accepted with notes; A1 and A4 in `docs/ideas.md` (the coordinator keeps the behaviour), A2 and A3 need no change, A5 for Close |
+| 2026-10-31 | done | closed: the product documents and the vision updated; no decision record (decisions 0023 to 0026 hold the epic); A1 and A4 of the epic review in `docs/ideas.md`; the release of C2, D and E is a line in `docs/backlog.md`; the folder moves to `changes/done/` |

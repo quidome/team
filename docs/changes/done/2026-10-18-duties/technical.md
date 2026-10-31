@@ -1,6 +1,6 @@
 # Technical spec: Duties
 
-**Status**: approved
+**Status**: done
 **Size**: epic
 **Change**: [2026-10-18-duties](./)
 **Date**: 2026-10-25 (second change of that day: the duty places belong to the game and are given to club teams; it replaces the version approved earlier that day); changed 2026-10-30 for the messages (stories C, D and E)
@@ -62,12 +62,12 @@ From `functional.md` (approved 2026-10-25, second change; spec review notes S1�
 ## Stories
 | # | Story | Type | Scope | Depends on | Closure | Release | Status |
 |---|-------|------|-------|------------|---------|---------|--------|
-| A | [Duty places](../done/2026-10-18-duty-places/) | feature | Migration 0011 rewritten: `game_duties` (`schedule_entered_at`, `drivers`) and `duty_teams`. Core `duties`: `required_duties` with all cases first (risk 2), `driver_proposal`, `game_places`, `open_places`, `check_team`, `check_drivers`; `start_page`: `ScheduleNotEntered` with its list, "Next" with home games of other club teams with places of the team, `last_games`. Store with the row lock; `club_teams`; `duties_of`. Routes: a game; a place; "Schedule entered"; drivers. The page of a game (4 pull-down lists, saved at once). The places on the rows of "Season" and of the start page; the labels "Duties"; "Back" keeps the labels. "has duties" in the list of changes (also after a swap). The findings of the first build that stay: R2, R3, R7, R8, A6. Rework of the first build (branch `duty-places-v1`, on disk). Measure the start page. | – | review build + accept | 1, with B | done |
-| B | [Who does each duty place, and the totals](../done/2026-10-18-who-does-each-duty/) | feature | Migration `duty_assignments`. Core `check_assignment` (a table or referee place only while it names the team; "Clear the player first." for `check_team`), `who_did`, `duty_totals`, `display_names`, `clashes` (the game itself is no clash); the open item `OpenPlaces` with its two windows. Routes: fill, clear, correct; the choice with totals and clashes; the totals of a season. The page "Duties" (Drive, Table, Referee) and its link. "Delete player" with duties. Measure the start page again. Decision record (the rows, the two checks, what counts). | A | review build + accept | 1, with A | done |
-| C | [The message for the next game](../done/2026-10-29-next-game-message/) | feature | Built and closed, not released. Replaced by C2 before a release. | B | review build + accept | – | done |
-| C2 | [The message of the week](../done/2026-10-30-message-of-the-week/) | feature | Core `week_of`, `week_message` (replace `coming_week`, `next_game_message`), shared lines for table and referee, past places through `who_did`. `GET /api/messages/week`, the flag `messages.week`, the page `/messages/week`, the button. | C | review build + accept | when it suits the coordinator | done |
-| D | [The committee message](../done/2026-10-31-committee-message/) | feature | Core message with full names, on the lines of C2, for this week. `GET /api/messages/committee`, the page `/messages/committee`, the button "Committee message" whenever a team is chosen. | C2 | review build + accept | when it suits the coordinator | done |
-| E | [The duty overviews](../done/2026-10-31-duty-overviews/) | feature | Core driving overview and table and referee overview of all coming duties, on the lines of C2. Routes, the pages `/duties/driving` and `/duties/table-referee`, two buttons on "Duties" for the current season. | C2 | review build + accept | when it suits the coordinator | done |
+| A | [Duty places](../2026-10-18-duty-places/) | feature | Migration 0011 rewritten: `game_duties` (`schedule_entered_at`, `drivers`) and `duty_teams`. Core `duties`: `required_duties` with all cases first (risk 2), `driver_proposal`, `game_places`, `open_places`, `check_team`, `check_drivers`; `start_page`: `ScheduleNotEntered` with its list, "Next" with home games of other club teams with places of the team, `last_games`. Store with the row lock; `club_teams`; `duties_of`. Routes: a game; a place; "Schedule entered"; drivers. The page of a game (4 pull-down lists, saved at once). The places on the rows of "Season" and of the start page; the labels "Duties"; "Back" keeps the labels. "has duties" in the list of changes (also after a swap). The findings of the first build that stay: R2, R3, R7, R8, A6. Rework of the first build (branch `duty-places-v1`, on disk). Measure the start page. | – | review build + accept | 1, with B | done |
+| B | [Who does each duty place, and the totals](../2026-10-18-who-does-each-duty/) | feature | Migration `duty_assignments`. Core `check_assignment` (a table or referee place only while it names the team; "Clear the player first." for `check_team`), `who_did`, `duty_totals`, `display_names`, `clashes` (the game itself is no clash); the open item `OpenPlaces` with its two windows. Routes: fill, clear, correct; the choice with totals and clashes; the totals of a season. The page "Duties" (Drive, Table, Referee) and its link. "Delete player" with duties. Measure the start page again. Decision record (the rows, the two checks, what counts). | A | review build + accept | 1, with A | done |
+| C | [The message for the next game](../2026-10-29-next-game-message/) | feature | Built and closed, not released. Replaced by C2 before a release. | B | review build + accept | – | done |
+| C2 | [The message of the week](../2026-10-30-message-of-the-week/) | feature | Core `week_of`, `week_message` (replace `coming_week`, `next_game_message`), shared lines for table and referee, past places through `who_did`. `GET /api/messages/week`, the flag `messages.week`, the page `/messages/week`, the button. | C | review build + accept | when it suits the coordinator | done |
+| D | [The committee message](../2026-10-31-committee-message/) | feature | Core message with full names, on the lines of C2, for this week. `GET /api/messages/committee`, the page `/messages/committee`, the button "Committee message" whenever a team is chosen. | C2 | review build + accept | when it suits the coordinator | done |
+| E | [The duty overviews](../2026-10-31-duty-overviews/) | feature | Core driving overview and table and referee overview of all coming duties, on the lines of C2. Routes, the pages `/duties/driving` and `/duties/table-referee`, two buttons on "Duties" for the current season. | C2 | review build + accept | when it suits the coordinator | done |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
 writes its steps, routes, screens and exact tests from this spec and `functional.md`. Story A was
@@ -120,7 +120,7 @@ weeks): measure `GET /api/start` in A (limit about 200 ms locally). 4. The clipb
 - [x] Story C2 – the message of the week (closed 2026-10-31, decision 0025)
 - [x] Story D – the committee message (closed 2026-10-31, decision 0026)
 - [x] Story E – the duty overviews (closed 2026-10-31)
-- [ ] Epic review accept
+- [x] Epic review accept (2026-10-31, accepted with notes)
 
 ## Deviations
 None from `functional.md`. Readings of the spec that the design makes exact:
@@ -129,3 +129,89 @@ None from `functional.md`. Readings of the spec that the design makes exact:
 - "Last" shows the games of the last date before today with places of the team even when there is no past training (finding R2 of the first build of story A).
 
 ## Review findings
+Epic review accept, 2026-10-31, by a fresh agent (`/review accept`), of the whole result of stories
+A to E on `main` at `72e7575`. The arguments held only the mode and the change folder; nothing was
+ignored.
+
+**Verdict: accepted with notes.** The whole weekly walk works and matches the intent: after this
+epic the sheet is no longer needed for duties and the weekly messages. No difference needs a
+correction before the release; A1 is the one to look at.
+
+Read: `idea.md`, `functional.md`, `change.md`, `docs/vision.md` (journeys 3 to 6),
+`docs/product/duties.md` and `messages.md`, the core `duties`, `messages` and `start_page`, the
+routes of the season, the start page and the messages, and the start page, "Duties" and `duties.ts`
+of the front end. The view was formed before the Deviations were read. `docs/changes/done/` was not
+read, so the findings of the reviews of each story are not repeated or checked here.
+
+Checked by running:
+- Tests: `cargo test -p team_core --lib` 298 passed; `cargo test -p team --test` for `duties`,
+  `messages`, `start`, `season`, `games`, `changes` and `players` 99 passed; `npx playwright test`
+  135 passed. `just check` and the other server test files were not run.
+- The real server with the fake game list (real answers of the club) and a throw-away database,
+  since dropped: club and team chosen, the game list read, 9 players (two named Anna, one without a
+  last name), places entered, players put on them; clock on Wed 28 Oct, Sun 1 Nov and Mon 2 Nov, with
+  "Someone else" and "Nobody" on the Sunday. All four texts came out as the spec says: "Thuis" and
+  "Uit", "Rijden" only at away games, "Scheidsrechter:" before "Tafel:", "Anna B." and full names,
+  "tijd nog niet bekend", "nog N open", "niemand", the week heading, no game of the team before today,
+  places of other club teams left out, the "Geen …" texts. The totals followed the corrections and
+  matched the choice on the page of a game.
+- A walk in a Chromium browser at phone width over the same data: the start page, the page of a game
+  (past, away, with the choice), "Duties", the overviews, "Copy" with the text read back from the
+  clipboard, "Back", "Season"; no console errors. This matters because the browser tests of the
+  messages use fixed answers of the server (`web/e2e/messages.e2e.ts`). `GET /api/start`: about 7 ms
+  locally on 71 games (limit about 200 ms).
+
+| Story | Judgement | Notes |
+|---|---|---|
+| A Duty places | matches | A1, A4 |
+| B Who does it, the totals | matches | A1, A3 |
+| C The message of the week | matches | A5 |
+| D The committee message | matches | – |
+| E The duty overviews | matches | A2 |
+
+- **A1 – Neutral drift, closest to concerning: "all filled" hides the names and a correction.** The
+  - 2026-10-31: Not fixed: the coordinator keeps the behaviour; a line in `docs/ideas.md`.
+  start-page example in `functional.md` shows names on full rows ("Last": "Table 1, 2: Eva, Fleur"),
+  while story A says places with all players chosen show "all filled". The build follows the
+  criterion. So after the weekend "Last" says "all filled" without who did it, and a row where a place
+  was corrected to "Nobody" also says "all filled", because a place counts as filled while a player is
+  on it, whatever the outcome (`scheduleText` and `driversText` in `web/src/lib/duties.ts`). Story B
+  wants the planned player to stay visible; on the page of the game they do, and the totals are right.
+  The harm is small: "Last" is where the coordinator looks for what went otherwise. Checked: a run for
+  the rows with an open place ("Referee 1: Iris (was Eva) · Table 1, 2: not done (was Anna B.), open");
+  a trace of `duties.ts` for a full row with "Nobody", not run. For the coordinator: keep it, or a line
+  in `docs/ideas.md`.
+- **A2 – Faithful adaptation: the overview buttons without a chosen team.** Story E does not say what
+  - 2026-10-31: Not fixed: faithful to the spec.
+  happens without a team. The buttons show and the page says "No overview: no team chosen.", as the
+  committee message does. Checked: search for `no team chosen` in `web/src`.
+- **A3 – Faithful adaptation: players who cannot be chosen stay in the list, with the reason.** Story B
+  - 2026-10-31: Not fixed: faithful to the spec.
+  says such a player "is not offered"; the choice shows them, not tappable, with for example "already
+  at this game". That answers "why is Bram not there" without a question. Also, a number of drivers
+  below a filled place with a gap says "Driver place 3 has a player. Clear it first.", because "2
+  places are filled" would not be true of the cause. Checked: a run of the choice; search for `Clear
+  one first` in `web/src`.
+- **A4 – Neutral drift: "Last" can show a past away game where nobody was ever chosen.** Places of the
+  - 2026-10-31: Not fixed: in the same line in `docs/ideas.md` as A1.
+  team include the proposed drivers, so on Wed 28 Oct "Last" held the away game of 10 Oct, with only
+  the proposal behind it. This is the letter of the spec and costs one row; it also shows a game that
+  was forgotten. Checked: a run (`last_games` of `GET /api/start`); the text of the row by a trace.
+- **A5 – Neutral drift: `docs/product/messages.md` says too little about "Messages".** Its first
+  - 2026-10-31: For Close.
+  bullet says the part is not shown when the week has nothing to announce; with a chosen team the
+  part always shows, because of "Committee message" (as the spec says, and as a later bullet there
+  says). For `/close`. Also for `/close`: the top of `change.md` still says four stories, "jury", the
+  message for the next game and "after story D". Checked: read, and a run on Mon 2 Nov
+  (`messages.committee` true in a week without places).
+- **Not differences, for the record.** On a Sunday evening the message of the week can hold only days
+  that have passed, with "Tafel: niemand, niemand" in a text for the parents. That is what the spec
+  says (S24, S25, R1 of story C2), so it is no finding, but it sits oddly with "messages announce what
+  comes"; real use decides (the line of 2026-10-29 in `docs/ideas.md`). The other known limits are in
+  `docs/ideas.md` too (past places of an old team, 2026-10-28; a player who left and stays named on a
+  coming duty, 2026-10-31), and neither stands in the way of the weekly walk.
+- **Not checked.** "Copy" on the coordinator's own phone (in `docs/backlog.md`; only Chromium was run).
+  Real use with the committee's real schedule: the time of a walk through the home games (S20).
+  Moved, gone and swapped games were not run again: read in `game_places` and `week_message`, and
+  covered by the tests above. Deviations: "None", with three readings; all three are faithful and
+  match what ran. A1 is the only place where the build and an example of the spec differ.

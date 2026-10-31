@@ -8,7 +8,7 @@ created: 2026-10-31
 
 # The duty overviews
 
-Story E of the epic [Duties](../../2026-10-18-duties/). The coordinator opens "Driving overview" or
+Story E of the epic [Duties](../2026-10-18-duties/). The coordinator opens "Driving overview" or
 "Table and referee overview" from the page "Duties" and copies one Dutch text with all coming
 duties of that group, so the team and the parents see who does what. The functional spec is the
 epic's (`functional.md`, story E); the architecture is in the epic's `technical.md`; the rules of

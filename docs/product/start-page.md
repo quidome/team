@@ -9,7 +9,7 @@ next. Everything else of the season is one tap further, on [Season](season.md).
 ## Behaviour
 - **No club chosen:** only the choose step ([choose club and team](choose-club-and-team.md)) and the links.
 - **A new season without a team:** the choose step, then "Open items", "Last" and "Next" (with the trainings only), then the links.
-- **A team chosen**, from the top: the team header (team, season, "Change"); "Open items"; "Last"; "Next"; "Messages" (only when a message has something to say); the links "Season · Attendance · Duties · Team · Players · Settings".
+- **A team chosen**, from the top: the team header (team, season, "Change"); "Open items"; "Last"; "Next"; "Messages"; the links "Season · Attendance · Duties · Team · Players · Settings".
 - **"Open items"**: what still needs the coordinator, one row for each kind, in this order; a tap goes to the place to act:
   1. "The last reading of the game list was held back." (a held-back reading waits) and "The games may be out of date since Thu 22 Oct." (3 nights without a good reading): to the "Game list" card on "Season" ([read the game list](read-the-game-list.md)).
   2. "4 changes not seen" ("1 change not seen"): to the [list of changes](list-of-changes.md).

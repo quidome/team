@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-31
-**Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (story [the committee message](../changes/done/2026-10-31-committee-message/))
+**Change**: [2026-10-18-duties](../changes/done/2026-10-18-duties/) (story [the committee message](../changes/done/2026-10-31-committee-message/))
 
 ## Context
 Decision 0025 says that a past place that stayed open alone gives no message of the week and no

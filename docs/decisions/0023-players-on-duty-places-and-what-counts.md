@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-10-28
-**Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (stories [duty places](../changes/done/2026-10-18-duty-places/) and [who does each duty place, and the totals](../changes/done/2026-10-18-who-does-each-duty/))
+**Change**: [2026-10-18-duties](../changes/done/2026-10-18-duties/) (stories [duty places](../changes/done/2026-10-18-duty-places/) and [who does each duty place, and the totals](../changes/done/2026-10-18-who-does-each-duty/))
 
 ## Context
 The duties belong to the game: at each home game of the club the referee committee gives the 4

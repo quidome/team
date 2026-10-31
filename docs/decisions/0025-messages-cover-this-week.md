@@ -2,7 +2,7 @@
 
 **Status**: valid; 0026 adds the committee message
 **Date**: 2026-10-31
-**Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (story [the message of the week](../changes/done/2026-10-30-message-of-the-week/))
+**Change**: [2026-10-18-duties](../changes/done/2026-10-18-duties/) (story [the message of the week](../changes/done/2026-10-30-message-of-the-week/))
 
 ## Context
 Decision 0024 made the message for the next game: the team's next game, also weeks away, and the

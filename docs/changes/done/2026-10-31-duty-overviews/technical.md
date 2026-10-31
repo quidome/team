@@ -11,7 +11,7 @@ overview, with all coming duties of the current season, so the team and the pare
 what.
 
 ## Requirements summary
-From story E of `../../2026-10-18-duties/functional.md`:
+From story E of `../2026-10-18-duties/functional.md`:
 
 - "Duties" has the buttons "Driving overview" and "Table and referee overview" for the current season, not for an earlier season. Each opens a page with the text, "Copy" (as in the messages) and "Back" to "Duties".
 - The driving overview: each coming away game of the team (today and later) that needs drivers of the team and has more than 0 driver places, in time order: short date, start time, "Uit tegen" the opponent and the town, then the drivers by first name and the open places.

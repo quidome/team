@@ -2,7 +2,7 @@
 
 **Status**: valid, partly replaced by [0025](0025-messages-cover-this-week.md) (the week, the names of the functions)
 **Date**: 2026-10-29
-**Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (story [the message for the next game](../changes/done/2026-10-29-next-game-message/))
+**Change**: [2026-10-18-duties](../changes/done/2026-10-18-duties/) (story [the message for the next game](../changes/done/2026-10-29-next-game-message/))
 
 ## Context
 The coordinator writes messages by hand and copies them into the chat: before each game one for

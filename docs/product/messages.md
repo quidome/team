@@ -9,7 +9,7 @@ week, for the team and the parents, and the committee message, for the referee c
 duty overviews show all coming duties of one group, for the team and the parents.
 
 ## Behaviour
-- **Where.** The [start page](start-page.md) has a part "Messages" below "Next" with the button "Message of the week", when this week (Monday to Sunday, Dutch time) has something to announce: a game of the team today or later, or table or referee places of the team. A past place that stayed open does not count for this. Otherwise the part is not shown.
+- **Where.** The [start page](start-page.md) has a part "Messages" below "Next" whenever a team is chosen for the current season, because the button "Committee message" is always in it. The button "Message of the week" is there when this week (Monday to Sunday, Dutch time) has something to announce: a game of the team today or later, or table or referee places of the team. A past place that stayed open does not count for this.
 - **The page** (`/messages/week`) shows the text, made from what is stored at that moment, and "Copy". "Copy" puts the text on the clipboard and says "Copied". When the browser refuses, the text stays shown with "Select the text and copy it."; a tap on the text selects all of it. "Back" returns to the start page. Opened without a message (for example from an old link): "No message this week."
 - **The text**, for example:
 
