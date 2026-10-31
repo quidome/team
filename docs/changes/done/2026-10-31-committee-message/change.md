@@ -1,7 +1,7 @@
 ---
 title: The committee message
 type: feature
-stage: close
+stage: done
 closure: review build + accept   # from the epic; /design may only raise it
 created: 2026-10-31
 ---
@@ -20,3 +20,4 @@ architecture is in the epic's `technical.md`; the rules of the week are in decis
 | 2026-10-31 | design | created from story D of the epic; readings confirmed by the coordinator (a week with only a past open place shows "niemand"; the heading has the club and the team) |
 | 2026-10-31 | implement | technical.md approved: one story of 3 steps (the text in the core; the route and the start page flag; the shared page and the button); closure review build + accept |
 | 2026-10-31 | close | steps 1–3 built; build review R1–R5: R1–R4 fixed, R5 for Close; accept review: accepted with notes, A1–A3 need no change |
+| 2026-10-31 | done | closed: product documents (messages, start page, duties), architecture, decision 0026, vision updated; the folder moves to `changes/done/` |

@@ -47,7 +47,7 @@ shared fairly. From them the tool makes the [messages](messages.md) to copy.
 - A game that is not a game of the chosen team's schedule (or an address that cannot be read): "This game cannot be found.", with a link to "Season".
 - The table and referee places of the club's home games are entered by hand, one game at a time; the committee's sheet is not read.
 - After another team is chosen in the middle of a season, the past table and referee places of the old team still count in the totals, but the page of the game, "Season" and "Last" show only the places of the current team (an idea in `docs/ideas.md`).
-- The totals cover one season. The committee message and the duty overviews come in the next stories of duties.
+- The totals cover one season. The duty overviews come in the next story of duties.
 - A choice that is refused says why ("This player already has a place at this game.", "This player is at another game at almost the same time.", "Driver place 3 has a player. Clear it first."); a save that fails: "Not saved. Try again." and what is stored.
 
 ## Interface

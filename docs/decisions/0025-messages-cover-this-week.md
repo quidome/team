@@ -1,6 +1,6 @@
 # 0025 – Messages cover this week, Monday to Sunday
 
-**Status**: valid
+**Status**: valid; 0026 adds the committee message
 **Date**: 2026-10-31
 **Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (story [the message of the week](../changes/done/2026-10-30-message-of-the-week/))
 
