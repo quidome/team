@@ -1,6 +1,6 @@
 # 0024 – Messages made in the core, in Dutch, from what is stored
 
-**Status**: valid
+**Status**: valid, partly replaced by [0025](0025-messages-cover-this-week.md) (the week, the names of the functions)
 **Date**: 2026-10-29
 **Change**: [2026-10-18-duties](../changes/2026-10-18-duties/) (story [the message for the next game](../changes/done/2026-10-29-next-game-message/))
 
