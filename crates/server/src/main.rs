@@ -130,10 +130,8 @@ async fn serve() -> anyhow::Result<()> {
 
 async fn migrate() -> anyhow::Result<()> {
     let database_url = std::env::var("DATABASE_URL").context("setting DATABASE_URL is required")?;
-    let player_name_key = config::player_name_key(
-        &std::env::var("PLAYER_NAME_KEY").context("setting PLAYER_NAME_KEY is required")?,
-    )
-    .context("reading settings")?;
+    let player_name_key = config::player_name_key(std::env::var("PLAYER_NAME_KEY").ok())
+        .context("reading settings")?;
     let pool = sqlx::PgPool::connect(&database_url)
         .await
         .context("connecting to the database")?;

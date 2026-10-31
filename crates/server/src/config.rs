@@ -12,11 +12,16 @@ use crate::cipher::NameKey;
 
 const MIN_SESSION_SECRET_LEN: usize = 32;
 const DEFAULT_GAME_LIST_URL: &str = "https://db.basketball.nl";
+/// A new key cannot read a database made with another key, so this speaks of a new database only.
+const PLAYER_NAME_KEY_HINT: &str =
+    "for a new database, make a key with `head -c 32 /dev/urandom | base64`";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ConfigError {
     #[error("setting {0} is required")]
     Missing(&'static str),
+    #[error("setting PLAYER_NAME_KEY is required; {}", PLAYER_NAME_KEY_HINT)]
+    MissingPlayerNameKey,
     #[error("setting {name} is not valid: {reason}")]
     Invalid { name: &'static str, reason: String },
 }
@@ -87,7 +92,7 @@ impl Config {
             });
         }
 
-        let player_name_key = player_name_key(&required("PLAYER_NAME_KEY")?)?;
+        let player_name_key = player_name_key(lookup("PLAYER_NAME_KEY"))?;
 
         let session_ttl_seconds = match optional("SESSION_TTL_SECONDS") {
             None => 28_800,
@@ -156,10 +161,13 @@ impl Config {
 }
 
 /// Reads `PLAYER_NAME_KEY`; the error never contains the value.
-pub fn player_name_key(value: &str) -> Result<NameKey, ConfigError> {
-    NameKey::from_base64(value).map_err(|error| ConfigError::Invalid {
+pub fn player_name_key(value: Option<String>) -> Result<NameKey, ConfigError> {
+    let value = value
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(ConfigError::MissingPlayerNameKey)?;
+    NameKey::from_base64(&value).map_err(|error| ConfigError::Invalid {
         name: "PLAYER_NAME_KEY",
-        reason: error.to_string(),
+        reason: format!("{error}; {PLAYER_NAME_KEY_HINT}"),
     })
 }
 
@@ -320,13 +328,16 @@ mod tests {
 
     #[test]
     fn names_a_missing_player_name_key() {
-        let error = settings(&[("PLAYER_NAME_KEY", None)]).err();
-        assert_eq!(error, Some(ConfigError::Missing("PLAYER_NAME_KEY")));
-        assert!(
-            error.is_some_and(|error| {
-                error.to_string() == "setting PLAYER_NAME_KEY is required"
-            })
-        );
+        for value in [None, Some("  ")] {
+            let error = settings(&[("PLAYER_NAME_KEY", value)]).err();
+            assert_eq!(error, Some(ConfigError::MissingPlayerNameKey));
+            assert!(error.is_some_and(|error| {
+                error
+                    .to_string()
+                    .starts_with("setting PLAYER_NAME_KEY is required")
+                    && error.to_string().contains(PLAYER_NAME_KEY_HINT)
+            }));
+        }
     }
 
     #[test]
@@ -344,7 +355,10 @@ mod tests {
                     ..
                 })
             ));
-            assert!(error.is_some_and(|error| !error.to_string().contains(value)));
+            assert!(error.is_some_and(|error| {
+                !error.to_string().contains(value)
+                    && error.to_string().contains(PLAYER_NAME_KEY_HINT)
+            }));
         }
     }
 }
