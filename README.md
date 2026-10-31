@@ -31,8 +31,8 @@ just migrate
 Then:
 
 ```sh
-just dev        # run the server and the front end on http://localhost:5173, with no login
-just serve      # run the server on http://localhost:3000, with login (needs the OIDC values in .env)
+just dev        # run the server and the front end with live reload on http://localhost:5173
+just serve      # run the server on http://localhost:3000, with no login
 just check      # every check (as CI): workflow and script lint, API types, Rust fmt/clippy/tests,
                 # front-end check/lint/build, browser tests, sqlx query data
 ```
