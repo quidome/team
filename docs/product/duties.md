@@ -37,6 +37,7 @@ shared fairly. From them the tool makes the [messages](messages.md) to copy.
 - **"Delete player"** is not offered for a player with duties ([players and team](players-and-team.md)).
 
 ### The page "Duties"
+- For the current season the page has the buttons "Driving overview" and "Table and referee overview" ([messages](messages.md)).
 - **"Duties"** (`/duties`, a link on the [start page](start-page.md)) has the table "Totals" of a season: one row for each player with the role "plays games" in the season or with a duty in it, also players who left and hidden players, sorted by first name. The columns Drive, Table and Referee show "done · planned" ("3 · 1"). The numbers are the same as in the choice of a game of that season.
 - A season choice, as on "Attendance": the seasons with a chosen team, the current season and the chosen season (`?season=` in the address). A season without a team has no rows. Without any duty: "No duties yet this season."
 
@@ -47,11 +48,11 @@ shared fairly. From them the tool makes the [messages](messages.md) to copy.
 - A game that is not a game of the chosen team's schedule (or an address that cannot be read): "This game cannot be found.", with a link to "Season".
 - The table and referee places of the club's home games are entered by hand, one game at a time; the committee's sheet is not read.
 - After another team is chosen in the middle of a season, the past table and referee places of the old team still count in the totals, but the page of the game, "Season" and "Last" show only the places of the current team (an idea in `docs/ideas.md`).
-- The totals cover one season. The duty overviews come in the next story of duties.
+- The totals cover one season.
 - A choice that is refused says why ("This player already has a place at this game.", "This player is at another game at almost the same time.", "Driver place 3 has a player. Clear it first."); a save that fails: "Not saved. Try again." and what is stored.
 
 ## Interface
-- Screens: the page of a game, `/game/[season]/[id]` (with `?from=start` or `?from=changes` for "Back"); the page "Duties", `/duties` (with `?season=`).
+- Screens: the page of a game, `/game/[season]/[id]` (with `?from=start` or `?from=changes` for "Back"); the page "Duties", `/duties` (with `?season=`); the duty overviews, `/duties/driving` and `/duties/table-referee` ([messages](messages.md)).
 - Server addresses (all need a login):
   - `GET /api/games/{season}/{id}`: the game with its places (each place of the team with its player, the outcome and the player of "Someone else"), the season, the current season, the team, the club teams of the pull-down lists, `past`, and the choice (`players`: each with the name, hidden, the totals of the season for each kind, the clashes, and for each place of the team whether the player can be chosen as planned or as "Someone else", and why not).
   - `PUT /api/games/{season}/{id}/places/{kind}/{number}` (`referee` or `table`, 1 or 2) with `{ team }` (`null`: "—").

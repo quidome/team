@@ -37,3 +37,5 @@ committee. An epic of four stories (see `idea.md`).
 | 2026-10-30 | implement | technical.md changed and approved: stories C2 (the message of the week, `changes/2026-10-30-message-of-the-week/`, replaces the built story C before a release), D (the committee message, this week) and E (the duty overviews), each with closure review build + accept; epic closure review accept; the release is when it suits the coordinator |
 | 2026-10-31 | implement | story C2, the message of the week, closed (`changes/done/2026-10-30-message-of-the-week/`, decision 0025). Next: story D, the committee message |
 | 2026-10-31 | implement | story D, the committee message, closed (`changes/done/2026-10-31-committee-message/`, decision 0026). Next: story E, the duty overviews |
+| 2026-10-31 | implement | story E, the duty overviews: technical.md approved (`changes/2026-10-31-duty-overviews/`), 3 steps |
+| 2026-10-31 | implement | story E, the duty overviews, closed (`changes/done/2026-10-31-duty-overviews/`); A1 of its accept review in `docs/ideas.md`. Next: the epic review accept |

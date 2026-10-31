@@ -4,9 +4,9 @@ What it does **now**, for the coordinator. Updated at each /close that changes i
 
 ## Purpose
 The tool makes the messages the coordinator used to write by hand, as Dutch text to copy into the
-chat. The tool never sends them. Messages announce what comes in this week. Now: the message of
-the week, for the team and the parents, and the committee message, for the referee committee. (The
-duty overviews come in the next story of duties.)
+chat. The tool never sends them. Two messages announce what comes in this week: the message of the
+week, for the team and the parents, and the committee message, for the referee committee. The two
+duty overviews show all coming duties of one group, for the team and the parents.
 
 ## Behaviour
 - **Where.** The [start page](start-page.md) has a part "Messages" below "Next" with the button "Message of the week", when this week (Monday to Sunday, Dutch time) has something to announce: a game of the team today or later, or table or referee places of the team. A past place that stayed open does not count for this. Otherwise the part is not shown.
@@ -51,6 +51,34 @@ duty overviews come in the next story of duties.)
 
   The games and the lines follow the same rules as "Tafel en scheidsrechter:" above, with first and last names (the first name only when there is no last name). A past place that stayed open shows "niemand", also when nothing else is in the week. Without places: the heading and "Geen tafel- of scheidsrechtersdiensten deze week."
 
+- **The duty overviews** are two buttons on the page "Duties", "Driving overview" and "Table and referee overview", for the current season only; for an earlier season they are not shown. They also show without a chosen team: the page then says "No overview: no team chosen." The pages (`/duties/driving`, `/duties/table-referee`) work as the other messages, with "Copy", and "Back" to "Duties". The texts show all coming duties of the season, from today, so they grow with each new schedule. They have no counts.
+
+  ```
+  Rijden Blue Drakes M16 1
+
+  za 31 okt 14:30 Uit tegen B.Z. '72 M16 1, Woerden
+    Anna, Bram, Cas, nog 1 open
+  za 14 nov 12:00 Uit tegen Lions M16 1, Utrecht
+    nog 3 open
+  ```
+
+  ```
+  Tafel en scheidsrechter Blue Drakes M16 1
+
+  za 31 okt 16:00 Blue Drakes X12 1 – De Dunckers X12 1
+    Scheidsrechter: Gijs
+    Tafel: Eva, nog 1 open
+
+  za 5 dec 13:00 Blue Drakes X12 1 – De Dunckers X12 1
+    Tafel: Fleur
+  ```
+
+  - **The driving overview** has each coming away game of the team with more than 0 driver places, with no empty line between games. A start time not known yet: "za 14 nov, tijd nog niet bekend, Uit tegen Lions M16 1, Utrecht".
+  - **The table and referee overview** has each coming game with table or referee places of the team, with the lines of "Tafel en scheidsrechter:" above, and one empty line between games.
+  - Names are first names, as in the message of the week. Places of other club teams are never mentioned.
+  - Only places that count are in them ([duties](duties.md)). A game today stays all day, with the planned player, and an open place shows "nog N open".
+  - Without coming duties of that kind: the heading and "Geen ritten gepland." or "Geen tafel- of scheidsrechtersdiensten gepland."; "Copy" still works.
+
 ## Errors and limits
 - The messages cover the current season only: a week around 1 July shows only the games of that season.
 - Two players with the same full name are not told apart in the committee message.
@@ -60,6 +88,7 @@ duty overviews come in the next story of duties.)
 - Trainings are never in a message.
 
 ## Interface
-- Screens: `/messages/week`, `/messages/committee`.
+- Screens: `/messages/week`, `/messages/committee`, `/duties/driving`, `/duties/table-referee`.
 - Server address (needs a login): `GET /api/messages/week`: `{ "text": "…" }`, or `{ "text": null }` when there is no message. `GET /api/start` has `messages.week` from the same rule. `GET /api/messages/committee`: the same form, `null` only without a chosen team; `messages.committee` from the same rule.
-- The rules are `team_core::week_message` (with `week_of`) and `team_core::committee_message` (with `full_names`); the server calls each in one place (`api::messages::week_text`, `committee_text`). Decisions 0024, 0025 and 0026 record the choices.
+- `GET /api/messages/driving` and `GET /api/messages/table-referee` (need a login): the same form, `null` only without a chosen team.
+- The rules are `team_core::week_message` (with `week_of`), `team_core::committee_message` (with `full_names`), `team_core::driving_overview` and `team_core::table_referee_overview`; the server calls each in one place (`api::messages::week_text`, `committee_text`). Decisions 0024, 0025 and 0026 record the choices.

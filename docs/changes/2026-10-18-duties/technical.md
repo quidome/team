@@ -67,7 +67,7 @@ From `functional.md` (approved 2026-10-25, second change; spec review notes S1�
 | C | [The message for the next game](../done/2026-10-29-next-game-message/) | feature | Built and closed, not released. Replaced by C2 before a release. | B | review build + accept | – | done |
 | C2 | [The message of the week](../done/2026-10-30-message-of-the-week/) | feature | Core `week_of`, `week_message` (replace `coming_week`, `next_game_message`), shared lines for table and referee, past places through `who_did`. `GET /api/messages/week`, the flag `messages.week`, the page `/messages/week`, the button. | C | review build + accept | when it suits the coordinator | done |
 | D | [The committee message](../done/2026-10-31-committee-message/) | feature | Core message with full names, on the lines of C2, for this week. `GET /api/messages/committee`, the page `/messages/committee`, the button "Committee message" whenever a team is chosen. | C2 | review build + accept | when it suits the coordinator | done |
-| E | The duty overviews | feature | Core driving overview and table and referee overview of all coming duties, on the lines of C2. Routes, the pages `/duties/driving` and `/duties/table-referee`, two buttons on "Duties" for the current season. | C2 | review build + accept | when it suits the coordinator | not started |
+| E | [The duty overviews](../done/2026-10-31-duty-overviews/) | feature | Core driving overview and table and referee overview of all coming duties, on the lines of C2. Routes, the pages `/duties/driving` and `/duties/table-referee`, two buttons on "Duties" for the current season. | C2 | review build + accept | when it suits the coordinator | done |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
 writes its steps, routes, screens and exact tests from this spec and `functional.md`. Story A was
@@ -119,7 +119,7 @@ weeks): measure `GET /api/start` in A (limit about 200 ms locally). 4. The clipb
 - [x] Story C – the message for the next game (closed 2026-10-29, decision 0024)
 - [x] Story C2 – the message of the week (closed 2026-10-31, decision 0025)
 - [x] Story D – the committee message (closed 2026-10-31, decision 0026)
-- [ ] Story E – the duty overviews
+- [x] Story E – the duty overviews (closed 2026-10-31)
 - [ ] Epic review accept
 
 ## Deviations
