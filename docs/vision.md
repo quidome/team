@@ -34,22 +34,12 @@ It is not:
 Both values need fast capture and correct data. For example, attendance at training takes seconds, on a phone, with one hand. The stored data is the truth and must be right.
 
 ## Where we are
-- The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
-- The coordinator uses a Google Sheet as a workaround.
-- The base of the new product runs on the cluster (v0.1.0, October 2026): login through Pocket ID, a start page, and a sample schedule with example games.
-- Games from the game list runs on the cluster (v0.2.0, released 14 October 2026):
-  - the coordinator chooses the club by name and the team from the club's own teams, again at each new season; the choice of each season is kept;
-  - the tool reads the club's games on a tap and by itself every night at 03:00, keeps them for each season, and says in one line what changed; a list with far fewer games is held back until the coordinator confirms; after 3 nights without a good reading the start page says the games may be out of date;
-  - the start page shows the team's games and the club's home games (possible duty games), with a quick filter and past games on request; in a new season last season's schedule shows until the team is chosen;
-  - each change to a coming game of the team or a possible duty game stays until the coordinator marks it as seen, so drives and duties can be fixed in time.
-- Attendance at training runs on the cluster (v0.3.0, released 18 October 2026): the players of the club, the team of each season with each player's role ("plays games" or "only trains") from a date, the weekly trainings and the reasons for an absence; opening a training (or adding one), marking who is absent and why with one tap each on the phone, the next training on the start page, and the totals for each player in a season (there, absent with a valid reason, absent without one), also for an earlier season.
-- A nightly encrypted copy of the team database is kept on the home storage (since 18 October 2026, built in `gitops-lab`); a copy outside the house comes later.
-- The player names are stored encrypted (v0.3.1 and v0.3.2, released 18 October 2026): a copy of the database or a backup does not show who the players are.
-- The start page and the page "Season" run on the cluster (v0.4.0, released 25 October 2026): the start page shows the open items (problems with the game list, changes not seen, training days not opened, trainings not checked), the last training and the events of this week and next week; "Season" shows all games and trainings of a season per week, with labels that combine; the coordinator confirms with "Checked" that the attendance of a training is complete. Duties come next, again from Discover.
-- Duties, part 1, runs on the cluster (v0.5.0, released 28 October 2026): each game has its own page; the coordinator copies the referee committee's schedule into the tool (the 4 table and referee places of each home game of the club, each given to a club team, and "Schedule entered"), sets the drivers of the team's away games (proposed as one per 3 players), puts players on the places of the team and corrects them after the game; "Season" and the start page show the places and their open items, and the page "Duties" shows the duty totals of each player. A reading of the game list never changes what the coordinator stored.
-- Duties, part 2, runs on the cluster (v0.7.0, released 31 October 2026), so duties is complete: the message of the week (a button on the start page opens the Dutch text to copy about this week, Monday to Sunday: the games of the team, the drivers, the table and referee places of the team), the committee message (the table and referee places of this week with first and last names), and the duty overviews (two buttons on the page "Duties" give the Dutch text with all coming drives, or all coming table and referee places).
-- The sheet is still in use.
+- **Fair duties: reached.** The games come in from the game list, the coordinator gives the duty places to players, the duty totals show the split, and the messages and duty overviews come from the tool.
+- **Effort: halfway.** Attendance at training is recorded with the reason for each absence, with totals for each player in a season. Attendance at games is not recorded yet, and no report brings the effort and the duties of each player together (priorities 7 and 8).
+- **The sheet is still in use.**
 - The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it.
+
+What each release brought is in `docs/releases.md`; what each feature does is in `docs/product/`.
 
 ## North star
 Each week, the coordinator spends a few minutes in the tool and none in the sheet. The coordinator
@@ -111,40 +101,13 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 |------|--------|
 | 2026-10-07 | Vision created at the restart: one coordinator, three readers, games from the club's game list first |
 | 2026-10-10 | Open questions answered by the first design: Rust backend, Svelte front end, PostgreSQL, login through Pocket ID (decisions 0001–0004) |
-| 2026-10-11 | Where we are: the base of the new product runs on the cluster (v0.1.0); games from the game list come next |
-| 2026-10-11 | Where we are: choosing the club and team is built (story 2); the schedule comes next |
-| 2026-10-12 | Where we are: reading the game list on demand is built (story 3a); the schedule screen comes next |
-| 2026-10-12 | Where we are: the schedule is built (story 3b); the list of changes comes next |
-| 2026-10-13 | Where we are: the list of changes is built (story 4); the nightly reading comes next |
-| 2026-10-14 | Where we are: the nightly reading is built (story 5); the review of the whole of games from the game list comes next |
-| 2026-10-14 | Where we are: games from the game list is built and reviewed (all 5 stories); a release comes next |
-| 2026-10-14 | Where we are: games from the game list is released (v0.2.0) and runs on the cluster |
 | 2026-10-14 | Attendance: the reason for each absence matters (it shows how invested a player is); attendance at games follows attendance at training; words player, attendance and reason |
 | 2026-10-15 | Word player: a first name, and usually a last name (the last name is optional) |
 | 2026-10-16 | Words for attendance at training: player is a person (in the team through a role); new words role, hidden, weekly training and training day; training exists only when opened or added |
 | 2026-10-16 | Words team, player, club and coordinator: a team exists for one season and is the team chosen from the game list; the club has the players |
-| 2026-10-17 | Where we are: the first part of attendance at training is built (players, the team with roles, weekly trainings, reasons); trainings and attendance come next |
-| 2026-10-17 | Where we are: trainings and marking attendance are built (story B of attendance at training); the totals come next |
-| 2026-10-17 | Where we are: the totals for each player are built (story C); attendance at training is complete, its review and a release come next |
-| 2026-10-18 | Where we are: attendance at training is built and reviewed as a whole (all 3 stories); a release comes next |
-| 2026-10-18 | Where we are: attendance at training is released (v0.3.0) and runs on the cluster |
-| 2026-10-18 | Where we are: a nightly encrypted copy of the team database exists (built in `gitops-lab`); encrypted player names come next |
-| 2026-10-18 | Where we are: the player names are stored encrypted (v0.3.1, v0.3.2) |
 | 2026-10-18 | Word list: "duty place" added (one place at a game that a player of the team must fill), from `/vision duties` |
 | 2026-10-25 | The start page and the page "Season" come before duties (new priority 3, journey 0 "Open the tool"), from the design of duty places; words event, checked, open item, Season |
-| 2026-10-25 | Where we are: the page "Season" is built (story A of start page and season); checked trainings come next |
-| 2026-10-25 | Where we are: checked trainings are built (story C); the start page with the open items comes next |
-| 2026-10-25 | Where we are: the start page with the open items is built (story B); all three stories of start page and season are built, the review of the whole and a release come next |
-| 2026-10-25 | Start page and season closed after its review of the whole (decision 0022); a release comes next, then duties again from Discover |
-| 2026-10-25 | Where we are: start page and season is released (v0.4.0) and runs on the cluster; migration 0010 checked the 8 trainings before that day |
 | 2026-10-25 | Duty places are given to club teams: the coordinator copies the schedule of the referee committee (4 places at each home game of the club: referee 1 and 2, table 1 and 2, each for a club team or empty), from the review of story A of duties; word "jury" becomes "table"; words duty place, referee committee changed |
-| 2026-10-27 | Where we are: duty places are built and reviewed (story A of duties); players on the places and the totals come next (story B) |
-| 2026-10-28 | Who does each duty place, and the totals, closed (story B of duties, decision 0023): players on the places, corrections after the game, the page "Duties", the open item of open places; a reading never changes what the coordinator stored. Release 1 of duties (stories A and B) comes next, then the messages (C, D) |
-| 2026-10-29 | Where we are: duties part 1 is released (v0.5.0); the message for the next game is built and reviewed (story C of duties, decision 0024); the message for the referee committee comes next (story D) |
 | 2026-10-30 | Messages announce this week (Monday to Sunday): the message for the next game becomes the message of the week (journey 4, a button on the start page); the committee message covers the same week (journey 5); the overview for the parents becomes the duty overviews without totals (journey 6); new journeys 7 (attendance at games) and 8 (the report of what each player did, for the coordinator for now); words message of the week, committee message, duty overview, report |
-| 2026-10-31 | Where we are: the message of the week is built and reviewed (story C of duties, changed; decision 0025); the committee message comes next (story D) |
-| 2026-10-31 | Where we are: the committee message is built and reviewed (story D of duties, decision 0026); the duty overviews come next (story E) |
-| 2026-10-31 | Where we are: the duty overviews are built and reviewed (story E of duties); the review of the whole of duties comes next |
-| 2026-10-31 | Where we are: duties is complete and reviewed; a release comes next |
-| 2026-10-31 | Where we are: duties part 2 is released (v0.7.0) and runs on the cluster |
 | 2026-11-03 | Purpose made explicit: the tool shows what each player gives to the team. Core values: 1 see who makes an effort, 2 share the duties fairly and easily; fast capture and correct data are a condition for both. Success tied to these goals. The report comes before attendance at games (priorities 7 and 8 change places). Word contribution |
+| 2026-11-03 | "Where we are" describes the product compared to its purpose (fair duties reached, effort halfway, the sheet still in use); the releases move to `docs/releases.md`; the change log keeps only changes to the vision |
