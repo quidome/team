@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-11-03
-**Change**: [2026-11-03-domains-in-the-core](../changes/2026-11-03-domains-in-the-core/)
+**Change**: [2026-11-03-domains-in-the-core](../changes/done/2026-11-03-domains-in-the-core/)
 
 ## Context
 The vision now states the purpose of the tool: it shows what each player gives to the team, the
