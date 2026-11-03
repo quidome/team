@@ -10,7 +10,7 @@ use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    now_there, role_on, same_name, team,
+    now_there, role_on, same_name,
 };
 use utoipa::ToSchema;
 
@@ -597,7 +597,7 @@ pub async fn carry(
             continue;
         };
         let roles = roles_around(&mut *tx, id, season).await?;
-        let page = team(std::slice::from_ref(&player), &roles, season, today);
+        let page = team_core::team(std::slice::from_ref(&player), &roles, season, today);
         if let Some(member) = page.last_season.first() {
             check_role(season, from, None, &roles)?;
             players::insert_role(&mut *tx, id, season, member.role, from, None).await?;

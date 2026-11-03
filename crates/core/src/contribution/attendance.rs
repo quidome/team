@@ -4,10 +4,12 @@
 
 use chrono::NaiveDate;
 
-use crate::players::{Group, Player, PlayerId, PlayerRole, Role, place, role_on};
-use crate::reasons::ReasonId;
-use crate::season::Season;
-use crate::training::{Training, TrainingId, WeeklyTraining, not_opened, season_list};
+use crate::contribution::reasons::ReasonId;
+use crate::events::training::{
+    SeasonRow, Training, TrainingId, WeeklyTraining, not_opened, season_list,
+};
+use crate::shared::season::Season;
+use crate::team::players::{Group, Player, PlayerId, PlayerRole, Role, place, role_on};
 
 /// A player who was not at a training, with the reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +33,45 @@ pub enum AttendanceError {
     NotInTeam,
     #[error("the reason is hidden")]
     ReasonHidden,
+}
+
+/// The absences at `training` of players with a role on its date.
+pub fn absent_count(training: &Training, absences: &[Absence], roles: &[PlayerRole]) -> usize {
+    absences
+        .iter()
+        .filter(|absence| {
+            absence.training == training.id
+                && role_on(roles, absence.player, training.date).is_some()
+        })
+        .count()
+}
+
+/// What the list of a season shows about the attendance of a row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrainingState {
+    /// A training day without a training.
+    NotOpened,
+    AllThere,
+    /// The number of absences of players with a role on the date.
+    Absent(usize),
+    Cancelled,
+}
+
+/// The state of `row`: for a training that is not cancelled, the absences of players with a role
+/// on its date (`roles`: at least the roles of the season).
+pub fn training_state(
+    row: &SeasonRow<'_>,
+    absences: &[Absence],
+    roles: &[PlayerRole],
+) -> TrainingState {
+    match row.training {
+        None => TrainingState::NotOpened,
+        Some(training) if training.cancelled => TrainingState::Cancelled,
+        Some(training) => match absent_count(training, absences, roles) {
+            0 => TrainingState::AllThere,
+            n => TrainingState::Absent(n),
+        },
+    }
 }
 
 /// The players at `training`: those with a role on its date (also hidden players), sorted by first
@@ -223,7 +264,7 @@ pub fn season_overview<'a>(
         }
     }
 
-    let list = season_list(season, weekly, trainings, absences, roles, today);
+    let list = season_list(season, weekly, trainings, today);
     let not_opened = not_opened(&list);
     overview.not_opened = not_opened.len();
     overview.first_not_opened = not_opened.first().copied();
@@ -235,8 +276,8 @@ mod tests {
     use chrono::NaiveTime;
 
     use super::*;
-    use crate::players::RoleId;
-    use crate::season::Season;
+    use crate::shared::season::Season;
+    use crate::team::players::RoleId;
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
@@ -384,7 +425,7 @@ mod tests {
 
     fn tuesdays() -> Vec<WeeklyTraining> {
         vec![WeeklyTraining {
-            id: crate::training::WeeklyTrainingId(1),
+            id: crate::events::training::WeeklyTrainingId(1),
             season: Season::from_start_year(2026),
             weekday: chrono::Weekday::Tue,
             start: NaiveTime::from_hms_opt(19, 45, 0).expect("valid time"),
@@ -628,6 +669,50 @@ mod tests {
         assert_eq!(result.trainings, 4);
         assert_eq!(counts(&result.team), [("Avery", 4, 0, 0, 4)]);
         assert_eq!(counts(&result.left), [("Blake", 4, 0, 0, 4)]);
+    }
+
+    #[test]
+    fn an_opened_training_shows_its_absent_players_with_a_role() {
+        let mut cancelled = training(3, date(2026, 9, 22));
+        cancelled.cancelled = true;
+        let trainings = [
+            training(1, date(2026, 10, 6)),
+            training(2, date(2026, 9, 29)),
+            cancelled,
+            training(4, date(2026, 10, 13)),
+        ];
+        let roles = [
+            role(1, 1, date(2026, 9, 1), None),
+            role(2, 2, date(2026, 9, 1), None),
+        ];
+        // Player 3 has no role: its absence is kept but not counted.
+        let absences = [
+            absence(1, 1, SCHOOL),
+            absence(1, 2, SCHOOL),
+            absence(1, 3, SCHOOL),
+            absence(3, 1, SCHOOL),
+            absence(4, 2, HOLIDAY),
+        ];
+        let weekly = tuesdays();
+        let list = season_list(
+            Season::from_start_year(2026),
+            &weekly,
+            &trainings,
+            date(2026, 10, 12),
+        );
+        let status = |on| {
+            list.past
+                .iter()
+                .chain(&list.coming)
+                .find(|row| row.date == on)
+                .map(|row| training_state(row, &absences, &roles))
+        };
+        assert_eq!(status(date(2026, 10, 6)), Some(TrainingState::Absent(2)));
+        assert_eq!(status(date(2026, 9, 29)), Some(TrainingState::AllThere));
+        assert_eq!(status(date(2026, 9, 22)), Some(TrainingState::Cancelled));
+        assert_eq!(status(date(2026, 9, 15)), Some(TrainingState::NotOpened));
+        // A coming training is counted too.
+        assert_eq!(status(date(2026, 10, 13)), Some(TrainingState::Absent(1)));
     }
 
     #[test]

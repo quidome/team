@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use team_core::{
-    AttendanceError, DayStatus, PlayerId, ReasonId, Season, SeasonRow, Training, absent_count,
+    AttendanceError, PlayerId, ReasonId, Season, SeasonRow, Training, TrainingState, absent_count,
     check_checking, check_mark, check_training, day_times, players_at, proposed_times,
 };
 use utoipa::ToSchema;
@@ -139,12 +139,12 @@ fn taken(error: StoreError) -> AppError {
     }
 }
 
-pub(crate) fn row_view(row: &SeasonRow) -> TrainingRow {
-    let (status, absent) = match row.status {
-        DayStatus::NotOpened => ("not_opened", 0),
-        DayStatus::AllThere => ("all_there", 0),
-        DayStatus::Absent(n) => ("absent", n),
-        DayStatus::Cancelled => ("cancelled", 0),
+pub(crate) fn row_view(row: &SeasonRow, state: TrainingState) -> TrainingRow {
+    let (status, absent) = match state {
+        TrainingState::NotOpened => ("not_opened", 0),
+        TrainingState::AllThere => ("all_there", 0),
+        TrainingState::Absent(n) => ("absent", n),
+        TrainingState::Cancelled => ("cancelled", 0),
     };
     TrainingRow {
         date: day(row.date),

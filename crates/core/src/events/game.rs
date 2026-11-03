@@ -2,8 +2,8 @@
 
 use chrono::{NaiveDate, NaiveTime};
 
-use crate::club::ClubNumber;
-use crate::season::Season;
+use crate::events::club::ClubNumber;
+use crate::shared::season::Season;
 
 /// The source's own team number. It stays the same between seasons, so a team is always used
 /// together with its season.

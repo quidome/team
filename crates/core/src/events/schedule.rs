@@ -5,9 +5,16 @@ use std::collections::BTreeSet;
 
 use chrono::NaiveDate;
 
-use crate::club::ClubNumber;
-use crate::comparison::StoredGame;
-use crate::game::{Game, TeamNumber};
+use crate::events::club::ClubNumber;
+use crate::events::game::{Game, TeamNumber};
+
+/// A game as stored by the tool.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredGame {
+    pub game: Game,
+    /// `false`: the game is no longer in the game list.
+    pub in_list: bool,
+}
 
 /// Why a game is in the schedule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,8 +124,8 @@ pub(crate) mod tests {
     use chrono::{NaiveDate, NaiveTime};
 
     use super::*;
-    use crate::game::{Place, PlaceNumber, Side};
-    use crate::season::Season;
+    use crate::events::game::{Place, PlaceNumber, Side};
+    use crate::shared::season::Season;
 
     pub(crate) const CLUB: ClubNumber = ClubNumber(37);
     pub(crate) const OTHER_CLUB: ClubNumber = ClubNumber(99);

@@ -5,11 +5,14 @@ use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate};
 
-use crate::duties::{DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind};
-use crate::schedule::ScheduleReason;
-use crate::season::Season;
-use crate::season_view::{Event, EventKind, SeasonEvents};
-use crate::training::{DayStatus, SeasonList, SeasonRow, not_checked, not_opened};
+use crate::contribution::attendance::TrainingState;
+use crate::contribution::duties::{
+    DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind,
+};
+use crate::events::schedule::ScheduleReason;
+use crate::events::training::{SeasonList, SeasonRow, not_checked, not_opened};
+use crate::output::season_view::{Event, EventKind, SeasonEvents};
+use crate::shared::season::Season;
 
 /// The state of the game list for the open items (Dutch dates).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -93,7 +96,7 @@ pub fn schedule_not_entered(
         .filter(|event| event.date <= until)
         .filter_map(|event| match event.kind {
             EventKind::Game(scheduled) => Some(scheduled.game.source_id),
-            EventKind::Training(_) => None,
+            EventKind::Training(..) => None,
         })
         .filter(|id| places.get(id).is_some_and(not_entered))
         .collect()
@@ -117,7 +120,7 @@ pub fn open_places_games(
         .iter()
         .filter_map(|event| match event.kind {
             EventKind::Game(scheduled) => Some((event.date, scheduled.game.source_id)),
-            EventKind::Training(_) => None,
+            EventKind::Training(..) => None,
         })
         .filter_map(|(date, id)| {
             let mut open = open_by_kind(places.get(&id)?);
@@ -200,7 +203,7 @@ pub fn last_games<'a>(events: &'a SeasonEvents<'a>, places: &PlacesOf) -> Vec<&'
         .iter()
         .filter(|event| match event.kind {
             EventKind::Game(scheduled) => has_places(places, scheduled.game.source_id),
-            EventKind::Training(_) => false,
+            EventKind::Training(..) => false,
         })
         .collect();
     let Some(newest) = with_places.first().map(|event| event.date) else {
@@ -235,9 +238,10 @@ pub fn next_events<'a>(
             scheduled.reason == ScheduleReason::TeamGame
                 || has_places(places, scheduled.game.source_id)
         }
-        EventKind::Training(_) => true,
+        EventKind::Training(..) => true,
     };
-    let cancelled = |event: &&Event<'_>| matches!(event.kind, EventKind::Training(row) if row.status == DayStatus::Cancelled);
+    let cancelled =
+        |event: &&Event<'_>| matches!(event.kind, EventKind::Training(_, TrainingState::Cancelled));
     let mut within: Vec<&Event<'_>> = events
         .coming
         .iter()
@@ -262,9 +266,10 @@ mod tests {
     use chrono::NaiveTime;
 
     use super::*;
-    use crate::schedule::ScheduledGame;
-    use crate::schedule::tests::{CLUB_TEAM, OPPONENT, TEAM, game};
-    use crate::training::{Training, TrainingId};
+    use crate::contribution::attendance::training_state;
+    use crate::events::schedule::ScheduledGame;
+    use crate::events::schedule::tests::{CLUB_TEAM, OPPONENT, TEAM, game};
+    use crate::events::training::{DayStatus, Training, TrainingId};
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
@@ -296,7 +301,7 @@ mod tests {
             status: match training {
                 None => DayStatus::NotOpened,
                 Some(t) if t.cancelled => DayStatus::Cancelled,
-                Some(_) => DayStatus::AllThere,
+                Some(_) => DayStatus::Opened,
             },
         }
     }
@@ -496,7 +501,7 @@ mod tests {
             .chain(rows.iter().map(|row| Event {
                 date: row.date,
                 start: Some(row.start),
-                kind: EventKind::Training(row),
+                kind: EventKind::Training(row, training_state(row, &[], &[])),
             }))
             .collect();
         coming.sort_by_key(|event| event.date);
@@ -609,7 +614,9 @@ mod tests {
         in_list: bool,
         past: bool,
     ) -> GamePlaces {
-        use crate::duties::{PlaceKind, RequiredDuties, StoredDuties, TeamRef, game_places};
+        use crate::contribution::duties::{
+            PlaceKind, RequiredDuties, StoredDuties, TeamRef, game_places,
+        };
         let mut stored = StoredDuties {
             schedule_entered: entered,
             ..StoredDuties::default()
@@ -690,7 +697,7 @@ mod tests {
     /// The drivers of an away game of the team with `players` on its date and `filled` driver
     /// places with a player; `in_list` as `game_places`.
     fn driver_places(players: usize, filled: u8, in_list: bool) -> GamePlaces {
-        use crate::duties::{RequiredDuties, game_places};
+        use crate::contribution::duties::{RequiredDuties, game_places};
         let required = RequiredDuties {
             schedule: false,
             drivers: true,
@@ -838,7 +845,7 @@ mod tests {
             .iter()
             .filter_map(|event| match event.kind {
                 EventKind::Game(scheduled) => Some(scheduled.game.source_id),
-                EventKind::Training(_) => None,
+                EventKind::Training(..) => None,
             })
             .collect();
         // 11 Oct has no places; 10 Oct has two games with places, also the gone one.

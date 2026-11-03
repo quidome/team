@@ -5,15 +5,17 @@ use std::cmp::Ordering;
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime, Weekday};
 
-use crate::schedule::{Schedule, ScheduledGame};
-use crate::training::{SeasonList, SeasonRow};
+use crate::contribution::attendance::{Absence, TrainingState, training_state};
+use crate::events::schedule::{Schedule, ScheduledGame};
+use crate::events::training::{SeasonList, SeasonRow};
+use crate::team::players::PlayerRole;
 
 /// What an event is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventKind<'a> {
     Game(&'a ScheduledGame),
-    /// A training, or a training day that is not opened.
-    Training(&'a SeasonRow<'a>),
+    /// A training, or a training day that is not opened, with its attendance.
+    Training(&'a SeasonRow<'a>, TrainingState),
 }
 
 /// One event of the season.
@@ -39,7 +41,7 @@ impl Event<'_> {
     /// a training before a game; games by source id.
     fn within_date(&self) -> (bool, Option<NaiveTime>, u8, i64) {
         let (rank, id) = match self.kind {
-            EventKind::Training(_) => (0, 0),
+            EventKind::Training(..) => (0, 0),
             EventKind::Game(scheduled) => (1, scheduled.game.source_id),
         };
         (self.start.is_none(), self.start, rank, id)
@@ -55,9 +57,15 @@ pub struct SeasonEvents<'a> {
     pub past: Vec<Event<'a>>,
 }
 
-/// The games of `games` and the rows of `trainings` in one list. Both were split on the same
-/// today, so their parts are joined, not split again.
-pub fn season_events<'a>(games: &'a Schedule, trainings: &'a SeasonList<'a>) -> SeasonEvents<'a> {
+/// The games of `games` and the rows of `trainings` in one list, each training with the state of
+/// its attendance (`roles`: at least the roles of the season). Both were split on the same today,
+/// so their parts are joined, not split again.
+pub fn season_events<'a>(
+    games: &'a Schedule,
+    trainings: &'a SeasonList<'a>,
+    absences: &[Absence],
+    roles: &[PlayerRole],
+) -> SeasonEvents<'a> {
     let join = |scheduled: &'a [ScheduledGame], rows: &'a [SeasonRow<'a>]| -> Vec<Event<'a>> {
         scheduled
             .iter()
@@ -69,7 +77,7 @@ pub fn season_events<'a>(games: &'a Schedule, trainings: &'a SeasonList<'a>) -> 
             .chain(rows.iter().map(|row| Event {
                 date: row.date,
                 start: Some(row.start),
-                kind: EventKind::Training(row),
+                kind: EventKind::Training(row, training_state(row, absences, roles)),
             }))
             .collect()
     };
@@ -87,9 +95,9 @@ fn order(a: &Event<'_>, b: &Event<'_>) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schedule::ScheduleReason;
-    use crate::schedule::tests::{OPPONENT, TEAM, game};
-    use crate::training::DayStatus;
+    use crate::events::schedule::ScheduleReason;
+    use crate::events::schedule::tests::{OPPONENT, TEAM, game};
+    use crate::events::training::DayStatus;
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
@@ -129,7 +137,7 @@ mod tests {
             .iter()
             .map(|event| match event.kind {
                 EventKind::Game(scheduled) => Some(scheduled.game.source_id),
-                EventKind::Training(_) => None,
+                EventKind::Training(..) => None,
             })
             .collect()
     }
@@ -138,7 +146,7 @@ mod tests {
         Event {
             date: on,
             start: None,
-            kind: EventKind::Training(&training_day(on)),
+            kind: EventKind::Training(&training_day(on), TrainingState::NotOpened),
         }
         .week()
     }
@@ -155,7 +163,7 @@ mod tests {
             past: Vec::new(),
         };
         assert_eq!(
-            ids(&season_events(&games, &trainings).coming),
+            ids(&season_events(&games, &trainings, &[], &[]).coming),
             [Some(1), None]
         );
     }
@@ -172,7 +180,7 @@ mod tests {
             past: Vec::new(),
         };
         assert_eq!(
-            ids(&season_events(&games, &trainings).coming),
+            ids(&season_events(&games, &trainings, &[], &[]).coming),
             [None, Some(1)]
         );
     }
@@ -192,7 +200,7 @@ mod tests {
             past: Vec::new(),
         };
         assert_eq!(
-            ids(&season_events(&games, &trainings).coming),
+            ids(&season_events(&games, &trainings, &[], &[]).coming),
             [None, Some(3), Some(7)]
         );
     }
@@ -214,7 +222,7 @@ mod tests {
             coming: vec![training_day(date(2026, 10, 13))],
             past: vec![training_day(date(2026, 10, 6))],
         };
-        let events = season_events(&games, &trainings);
+        let events = season_events(&games, &trainings, &[], &[]);
         let dates =
             |events: &[Event<'_>]| events.iter().map(|event| event.date).collect::<Vec<_>>();
         assert_eq!(

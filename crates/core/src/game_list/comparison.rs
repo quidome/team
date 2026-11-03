@@ -5,17 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::NaiveDate;
 
-use crate::club::ClubNumber;
-use crate::game::{Game, TeamNumber};
-use crate::schedule::{ScheduleReason, in_schedule};
-
-/// A game as stored by the tool.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoredGame {
-    pub game: Game,
-    /// `false`: the game is no longer in the game list.
-    pub in_list: bool,
-}
+use crate::events::club::ClubNumber;
+use crate::events::game::{Game, TeamNumber};
+use crate::events::schedule::{ScheduleReason, StoredGame, in_schedule};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Change {
@@ -467,8 +459,8 @@ mod tests {
     use chrono::{NaiveDate, NaiveTime};
 
     use super::*;
-    use crate::game::PlaceNumber;
-    use crate::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, TEAM, game};
+    use crate::events::game::PlaceNumber;
+    use crate::events::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, TEAM, game};
 
     /// The test games are on 1 November 2026.
     const TODAY: NaiveDate = NaiveDate::from_ymd_opt(2026, 10, 13).expect("valid date");

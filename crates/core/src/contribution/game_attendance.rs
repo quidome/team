@@ -3,9 +3,9 @@
 
 use chrono::NaiveDate;
 
-use crate::duties::plays_games_on;
-use crate::players::{Player, PlayerId, PlayerRole};
-use crate::reasons::ReasonId;
+use crate::contribution::duties::plays_games_on;
+use crate::contribution::reasons::ReasonId;
+use crate::team::players::{Player, PlayerId, PlayerRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Answer {
@@ -142,8 +142,8 @@ pub fn game_count(list: &[ListRow], extra_players: u8) -> GameCount {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::players::{Role, RoleId};
-    use crate::season::Season;
+    use crate::shared::season::Season;
+    use crate::team::players::{Role, RoleId};
 
     fn date(month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(2026, month, day).expect("valid date")

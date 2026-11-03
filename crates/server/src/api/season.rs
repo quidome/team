@@ -11,10 +11,11 @@ use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
     FollowedTeam, Game, GameCount, GameDuties, GamePlaces, Outcome, PlaceKind, PlacesOf, Player,
-    PlayerId, PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonList,
-    StoredDuties, StoredGame, Team, TeamNumber, TeamRef, Training, WeeklyTraining, display_names,
-    game_list, game_places, kept_games, not_entered, open_places, players_playing_on,
-    plays_games_on, required_duties, row_count, schedule, season_events, season_list,
+    PlayerId, PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonEvents,
+    SeasonList, SeasonRow, StoredDuties, StoredGame, Team, TeamNumber, TeamRef, Training,
+    TrainingState, WeeklyTraining, display_names, game_list, game_places, kept_games, not_entered,
+    open_places, players_playing_on, plays_games_on, required_duties, row_count, schedule,
+    season_events, season_list, training_state,
 };
 use utoipa::ToSchema;
 
@@ -579,7 +580,7 @@ pub(crate) fn event_view(event: &Event) -> Result<EventView, StoreError> {
         .ok_or_else(|| StoreError::Invalid(format!("no week for {}", event.date)))?;
     let (game, training) = match event.kind {
         EventKind::Game(scheduled) => (Some(ScheduleGame::from(scheduled.clone())), None),
-        EventKind::Training(row) => (None, Some(row_view(row))),
+        EventKind::Training(row, state) => (None, Some(row_view(row, state))),
     };
     Ok(EventView {
         date: day(event.date),
@@ -621,7 +622,7 @@ pub async fn get(
     } = games;
     let trainings = trainings_of(&state, season).await?;
     let list = trainings.list(season, today);
-    let events = season_events(&schedule, &list);
+    let events = trainings.events(&schedule, &list);
 
     let seasons = seasons(&state, current, season).await?;
     Ok(Json(SeasonAnswer {
@@ -754,14 +755,18 @@ pub(crate) struct SeasonTrainings {
 impl SeasonTrainings {
     /// The training days and trainings of `season` on `today` (`team_core::season_list`).
     pub fn list(&self, season: Season, today: NaiveDate) -> SeasonList<'_> {
-        season_list(
-            season,
-            &self.weekly,
-            &self.trainings,
-            &self.absences,
-            &self.roles,
-            today,
-        )
+        season_list(season, &self.weekly, &self.trainings, today)
+    }
+
+    /// The events of `games` and `list` (from `list`), each training with its attendance
+    /// (`team_core::season_events`).
+    pub fn events<'a>(&self, games: &'a Schedule, list: &'a SeasonList<'a>) -> SeasonEvents<'a> {
+        season_events(games, list, &self.absences, &self.roles)
+    }
+
+    /// The attendance of `row`, a row of `list` (`team_core::training_state`).
+    pub fn state(&self, row: &SeasonRow<'_>) -> TrainingState {
+        training_state(row, &self.absences, &self.roles)
     }
 }
 

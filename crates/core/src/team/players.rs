@@ -3,7 +3,7 @@
 
 use chrono::NaiveDate;
 
-use crate::season::Season;
+use crate::shared::season::Season;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PlayerId(pub i64);

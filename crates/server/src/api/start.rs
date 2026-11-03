@@ -11,7 +11,6 @@ use serde::Serialize;
 use team_core::{
     DutyKind, Event, EventKind, Game, OpenItem, ReadingState, Season, last_games, last_training,
     next_events, open_item_seasons, open_items, open_places_games, schedule_not_entered,
-    season_events,
 };
 use utoipa::ToSchema;
 
@@ -22,6 +21,7 @@ use super::season::{
 };
 use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands, today_in_netherlands};
+use crate::db::StoreError;
 use crate::error::AppError;
 use crate::{reading, readings};
 
@@ -196,9 +196,9 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
 
     // The duties of the games: the rule of "Season" and of the page of a game (decision 0022).
     let places = places_of_season(&games, today);
-    let events = match lists.first() {
-        Some(list) => season_events(&games.schedule, list),
-        None => Default::default(),
+    let events = match (lists.first(), inputs.first()) {
+        (Some(list), Some(trainings)) => trainings.events(&games.schedule, list),
+        _ => Default::default(),
     };
     let items = open_items(
         &reading,
@@ -209,10 +209,17 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     );
     let last = last_training(&lists)
         .map(|row| {
+            // The trainings of the season of the row hold its absences.
+            let (_, trainings) = seasons
+                .iter()
+                .zip(&inputs)
+                .find(|(season, _)| **season == Season::of(row.date))
+                .ok_or_else(|| StoreError::Invalid(format!("no trainings for {}", row.date)))?;
+            let state = trainings.state(row);
             event_view(&Event {
                 date: row.date,
                 start: Some(row.start),
-                kind: EventKind::Training(row),
+                kind: EventKind::Training(row, state),
             })
         })
         .transpose()?;
@@ -233,7 +240,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             let earlier = games_of(&state, season, current, today).await?;
             let earlier_places = places_of_season(&earlier, today);
             let list = trainings.list(season, today);
-            let earlier_events = season_events(&earlier.schedule, &list);
+            let earlier_events = trainings.events(&earlier.schedule, &list);
             last_game_views = last_games(&earlier_events, &earlier_places)
                 .into_iter()
                 .map(|event| event_view_with(event, &earlier_places, &earlier.duties))

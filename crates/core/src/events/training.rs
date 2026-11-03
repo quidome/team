@@ -7,9 +7,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime, Weekday};
 
-use crate::attendance::Absence;
-use crate::players::{PlayerRole, role_on};
-use crate::season::Season;
+use crate::shared::season::Season;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WeeklyTrainingId(pub i64);
@@ -70,9 +68,8 @@ pub struct Training {
 pub enum DayStatus {
     /// A training day without a training.
     NotOpened,
-    AllThere,
-    /// The number of absences of players with a role on the date.
-    Absent(usize),
+    /// A training that is not cancelled. Its attendance is in `attendance::TrainingState`.
+    Opened,
     Cancelled,
 }
 
@@ -96,14 +93,11 @@ pub struct SeasonList<'a> {
 }
 
 /// The list of `season` on `today`: every training day and every training of the season, one row
-/// per date. A training wins over the training day of its date. "N absent" counts only the
-/// absences of players with a role on the date (`roles`: at least the roles of the season).
+/// per date. A training wins over the training day of its date.
 pub fn season_list<'a>(
     season: Season,
     weekly: &'a [WeeklyTraining],
     trainings: &'a [Training],
-    absences: &[Absence],
-    roles: &[PlayerRole],
     today: NaiveDate,
 ) -> SeasonList<'a> {
     let mut rows: BTreeMap<NaiveDate, SeasonRow<'a>> = BTreeMap::new();
@@ -127,10 +121,7 @@ pub fn season_list<'a>(
         let status = if training.cancelled {
             DayStatus::Cancelled
         } else {
-            match absent_count(training, absences, roles) {
-                0 => DayStatus::AllThere,
-                n => DayStatus::Absent(n),
-            }
+            DayStatus::Opened
         };
         rows.insert(
             training.date,
@@ -186,17 +177,6 @@ pub fn not_opened(list: &SeasonList<'_>) -> Vec<NaiveDate> {
         .filter(|row| row.status == DayStatus::NotOpened)
         .map(|row| row.date)
         .collect()
-}
-
-/// The absences at `training` of players with a role on its date.
-pub fn absent_count(training: &Training, absences: &[Absence], roles: &[PlayerRole]) -> usize {
-    absences
-        .iter()
-        .filter(|absence| {
-            absence.training == training.id
-                && role_on(roles, absence.player, training.date).is_some()
-        })
-        .count()
 }
 
 /// Checks "Add training" and "Change": `date` inside `season`, no other training on `date`
@@ -537,9 +517,6 @@ mod tests {
 
     // Trainings and the list of a season.
 
-    use crate::players::{PlayerId, Role, RoleId};
-    use crate::reasons::ReasonId;
-
     fn tuesdays() -> Vec<WeeklyTraining> {
         vec![weekly(1, Weekday::Tue, date(2026, 9, 1), date(2027, 5, 25))]
     }
@@ -555,29 +532,10 @@ mod tests {
         }
     }
 
-    fn role_from(player: i64, from: NaiveDate) -> PlayerRole {
-        PlayerRole {
-            id: RoleId(player),
-            player: PlayerId(player),
-            season: season(),
-            role: Role::PlaysGames,
-            from,
-            until: None,
-        }
-    }
-
-    fn absence(training: i64, player: i64) -> Absence {
-        Absence {
-            training: TrainingId(training),
-            player: PlayerId(player),
-            reason: ReasonId(1),
-        }
-    }
-
     #[test]
     fn the_list_has_coming_nearest_first_and_past_newest_first() {
         let weekly = tuesdays();
-        let list = season_list(season(), &weekly, &[], &[], &[], date(2026, 10, 12));
+        let list = season_list(season(), &weekly, &[], date(2026, 10, 12));
         assert_eq!(list.coming[0].date, date(2026, 10, 13));
         assert_eq!(list.coming[1].date, date(2026, 10, 20));
         assert_eq!(list.past[0].date, date(2026, 10, 6));
@@ -590,7 +548,7 @@ mod tests {
                 .all(|row| row.status == DayStatus::NotOpened && row.training.is_none())
         );
         // Today's training is coming until the end of the day.
-        let list = season_list(season(), &weekly, &[], &[], &[], date(2026, 10, 13));
+        let list = season_list(season(), &weekly, &[], date(2026, 10, 13));
         assert_eq!(list.coming[0].date, date(2026, 10, 13));
     }
 
@@ -651,7 +609,7 @@ mod tests {
             // Today: not yet an open item.
             training(5, date(2026, 10, 13)),
         ];
-        let list = season_list(season(), &weekly, &trainings, &[], &[], date(2026, 10, 13));
+        let list = season_list(season(), &weekly, &trainings, date(2026, 10, 13));
         assert_eq!(not_checked(&list), [date(2026, 9, 15), date(2026, 10, 6)]);
     }
 
@@ -660,7 +618,7 @@ mod tests {
         let weekly = tuesdays();
         // 29 September is opened; 13 October is today.
         let trainings = [training(1, date(2026, 9, 29))];
-        let list = season_list(season(), &weekly, &trainings, &[], &[], date(2026, 10, 13));
+        let list = season_list(season(), &weekly, &trainings, date(2026, 10, 13));
         assert_eq!(
             not_opened(&list),
             [
@@ -683,28 +641,15 @@ mod tests {
             training(2, date(2026, 9, 29)),
             cancelled,
         ];
-        let roles = [
-            role_from(1, date(2026, 9, 1)),
-            role_from(2, date(2026, 9, 1)),
-        ];
-        // Player 3 has no role: its absence is kept but not counted.
-        let absences = [absence(1, 1), absence(1, 2), absence(1, 3), absence(3, 1)];
-        let list = season_list(
-            season(),
-            &weekly,
-            &trainings,
-            &absences,
-            &roles,
-            date(2026, 10, 12),
-        );
+        let list = season_list(season(), &weekly, &trainings, date(2026, 10, 12));
         let status = |on| {
             list.past
                 .iter()
                 .find(|row| row.date == on)
                 .map(|row| row.status)
         };
-        assert_eq!(status(date(2026, 10, 6)), Some(DayStatus::Absent(2)));
-        assert_eq!(status(date(2026, 9, 29)), Some(DayStatus::AllThere));
+        assert_eq!(status(date(2026, 10, 6)), Some(DayStatus::Opened));
+        assert_eq!(status(date(2026, 9, 29)), Some(DayStatus::Opened));
         assert_eq!(status(date(2026, 9, 22)), Some(DayStatus::Cancelled));
         assert_eq!(status(date(2026, 9, 15)), Some(DayStatus::NotOpened));
     }
@@ -716,7 +661,7 @@ mod tests {
             training(1, date(2026, 10, 7)),
             training(2, date(2026, 10, 13)),
         ];
-        let list = season_list(season(), &weekly, &trainings, &[], &[], date(2026, 10, 12));
+        let list = season_list(season(), &weekly, &trainings, date(2026, 10, 12));
         let rows: Vec<(NaiveDate, bool, bool)> = list
             .past
             .iter()
@@ -736,11 +681,11 @@ mod tests {
 
     #[test]
     fn a_season_without_weekly_trainings_or_trainings_has_an_empty_list() {
-        let list = season_list(season(), &[], &[], &[], &[], date(2026, 10, 12));
+        let list = season_list(season(), &[], &[], date(2026, 10, 12));
         assert!(list.coming.is_empty() && list.past.is_empty());
         // A training of another season is not listed.
         let other = [training(1, date(2027, 7, 6))];
-        let list = season_list(season(), &[], &other, &[], &[], date(2026, 10, 12));
+        let list = season_list(season(), &[], &other, date(2026, 10, 12));
         assert!(list.coming.is_empty());
     }
 

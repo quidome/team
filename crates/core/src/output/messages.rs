@@ -5,13 +5,13 @@ use std::collections::BTreeMap;
 
 use chrono::{Datelike, Days, NaiveDate, NaiveTime};
 
-use crate::club::ClubNumber;
-use crate::duties::{
+use crate::contribution::duties::{
     Assignment, Counted, DriverPart, DutyKind, DutyPlace, GamePlaces, SchedulePart, who_did,
 };
-use crate::game::{Game, TeamNumber};
-use crate::players::{Player, PlayerId};
-use crate::schedule::{ScheduleReason, ScheduledGame};
+use crate::events::club::ClubNumber;
+use crate::events::game::{Game, TeamNumber};
+use crate::events::schedule::{ScheduleReason, ScheduledGame};
+use crate::team::players::{Player, PlayerId};
 
 /// A game of the season with its duties, as the messages read it.
 #[derive(Debug, Clone, Copy)]
@@ -399,13 +399,13 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::*;
-    use crate::duties::{
+    use crate::contribution::duties::{
         Outcome, PlaceKind, StoredDuties, TeamRef, display_names, game_places, required_duties,
     };
-    use crate::game::{Place, PlaceNumber, Side};
-    use crate::players::Player;
-    use crate::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, OTHER_CLUB, TEAM};
-    use crate::season::Season;
+    use crate::events::game::{Place, PlaceNumber, Side};
+    use crate::events::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, OTHER_CLUB, TEAM};
+    use crate::shared::season::Season;
+    use crate::team::players::Player;
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")

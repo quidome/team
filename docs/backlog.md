@@ -4,7 +4,7 @@ Open work, most important first. Changes link to their folder; small fixes are o
 
 Changes:
 - [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; next: story B, warnings in time: during the week, who comes to a coming game, with a warning for too few players and for a driver who does not come.
-- [Domains in the core](changes/2026-11-03-domains-in-the-core/) – technical, design: one folder for each domain in `crates/core` and a test of the direction (decision 0027)
+- [Domains in the core](changes/2026-11-03-domains-in-the-core/) – technical, stage close (2026-11-03): built and reviewed; one folder for each domain in `crates/core` and a test of the direction (decision 0027)
 
 Small:
 - Driver proposal: one driver for every 4 players, not 3, so 10 players give 3 drivers (coordinator, 2026-10-31; 3 for each car is ideal, 4 fit).

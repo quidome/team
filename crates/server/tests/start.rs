@@ -52,6 +52,37 @@ async fn add_tuesdays(reader: &Reader, from: &str, until: &str) {
     .await;
 }
 
+/// A player who plays games from `from`; its id.
+async fn add_player(reader: &Reader, first: &str, from: &str) -> i64 {
+    let answer = ok(
+        reader,
+        "POST",
+        "/api/players",
+        Some(json!({ "first_name": first, "role": { "role": "plays_games", "from": from } })),
+    )
+    .await;
+    answer["player"]["id"].as_i64().unwrap()
+}
+
+/// `player` is absent at the training on `date`, with the reason School.
+async fn absent_at(reader: &Reader, date: &str, player: i64) {
+    let reasons = ok(reader, "GET", "/api/reasons", None).await;
+    let school = reasons
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|reason| reason["name"] == "School")
+        .unwrap()["id"]
+        .clone();
+    ok(
+        reader,
+        "PUT",
+        &format!("/api/trainings/{date}/absences/{player}"),
+        Some(json!({ "reason": school })),
+    )
+    .await;
+}
+
 /// Moves the clock to that moment (UTC) and logs in again.
 async fn at(reader: &mut Reader, year: i32, month: u32, day: u32, hour: u32) {
     reader.harness.clock.set(utc(year, month, day, hour, 0));
@@ -184,6 +215,22 @@ async fn last_is_the_newest_past_training_also_when_checked(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn last_shows_the_absent_players_of_its_training(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    add_tuesdays(&reader, "2026-09-01", "2027-05-25").await;
+    let avery = add_player(&reader, "Avery", "2026-09-01").await;
+    add_player(&reader, "Blake", "2026-09-01").await;
+    ok(&reader, "PUT", "/api/trainings/2026-10-06/open", None).await;
+    absent_at(&reader, "2026-10-06", avery).await;
+
+    let last = start(&reader).await["last"]["training"].clone();
+    assert_eq!(
+        (&last["date"], &last["status"], &last["absent"]),
+        (&json!("2026-10-06"), &json!("absent"), &json!(1))
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn next_has_the_team_games_and_trainings_of_two_weeks(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
@@ -266,7 +313,9 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
 async fn in_july_the_open_items_and_last_cover_the_season_before(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     add_tuesdays(&reader, "2026-09-01", "2027-05-25").await;
+    let avery = add_player(&reader, "Avery", "2026-09-01").await;
     ok(&reader, "PUT", "/api/trainings/2027-05-25/open", None).await;
+    absent_at(&reader, "2027-05-25", avery).await;
 
     at(&mut reader, 2027, 7, 1, 10).await;
     let answer = start(&reader).await;
@@ -274,6 +323,9 @@ async fn in_july_the_open_items_and_last_cover_the_season_before(pool: PgPool) {
     assert_eq!(not_opened["first"], "2026-09-01");
     assert_eq!(item(&answer, "not_checked").unwrap()["first"], "2027-05-25");
     assert_eq!(answer["last"]["training"]["date"], "2027-05-25");
+    // The absences come from the season of the training, not from the current season.
+    assert_eq!(answer["last"]["training"]["status"], "absent");
+    assert_eq!(answer["last"]["training"]["absent"], 1);
 
     // From September the season before is no longer covered.
     at(&mut reader, 2027, 9, 1, 10).await;

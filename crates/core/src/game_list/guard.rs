@@ -2,7 +2,7 @@
 //! back so that games are never lost on a bad answer of the source. Also: which reading is the
 //! first one after a choice.
 
-use crate::game::TeamNumber;
+use crate::events::game::TeamNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Guard {

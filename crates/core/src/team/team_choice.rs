@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::club::Club;
-use crate::game::{Game, TeamNumber};
-use crate::season::Season;
+use crate::events::club::Club;
+use crate::events::game::{Game, TeamNumber};
+use crate::shared::season::Season;
 
 /// A team of the chosen club, with the short name to show (for example "M16 1").
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,8 +172,8 @@ mod tests {
     use chrono::{NaiveDate, NaiveTime};
 
     use super::*;
-    use crate::club::ClubNumber;
-    use crate::game::{Place, PlaceNumber, Side};
+    use crate::events::club::ClubNumber;
+    use crate::events::game::{Place, PlaceNumber, Side};
 
     const DRAKES: i64 = 37;
     const GIANTS: i64 = 21;

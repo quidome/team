@@ -11,10 +11,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::NaiveDate;
 
-use crate::club::{Club, ClubNumber};
-use crate::game::{Game, TeamNumber};
-use crate::players::{Player, PlayerId, PlayerRole, Role};
-use crate::team_choice::own_teams;
+use crate::events::club::{Club, ClubNumber};
+use crate::events::game::{Game, TeamNumber};
+use crate::team::players::{Player, PlayerId, PlayerRole, Role};
+use crate::team::team_choice::own_teams;
 
 /// A place of the referee committee at a home game of the club.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -986,7 +986,7 @@ pub fn offers(
 pub fn duty_rows<'a>(
     players: &'a [Player],
     roles: &[PlayerRole],
-    season: crate::season::Season,
+    season: crate::shared::season::Season,
     totals: &BTreeMap<PlayerId, KindTotals>,
 ) -> Vec<(&'a Player, KindTotals)> {
     players
@@ -1006,7 +1006,7 @@ pub fn duty_rows<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, TEAM, game};
+    use crate::events::schedule::tests::{CLUB, CLUB_TEAM, OPPONENT, TEAM, game};
 
     const SCHEDULE: RequiredDuties = RequiredDuties {
         schedule: true,
@@ -1117,8 +1117,8 @@ mod tests {
 
     #[test]
     fn players_playing_on_a_date_count_only_plays_games() {
-        use crate::players::{PlayerId, RoleId};
-        use crate::season::Season;
+        use crate::shared::season::Season;
+        use crate::team::players::{PlayerId, RoleId};
         let date = |m, d| NaiveDate::from_ymd_opt(2026, m, d).expect("valid date");
         let role = |id, player, role, from, until| PlayerRole {
             id: RoleId(id),
@@ -1857,7 +1857,7 @@ mod tests {
     fn at(source_id: i64, place: i64, court: Option<&str>, start: Option<(u32, u32)>) -> Game {
         let mut game = game(source_id, CLUB_TEAM, OPPONENT);
         game.date = NaiveDate::from_ymd_opt(2026, 10, 3).expect("valid date");
-        game.place.number = crate::game::PlaceNumber(place);
+        game.place.number = crate::events::game::PlaceNumber(place);
         game.place.court = court.map(str::to_owned);
         game.start_time = start.and_then(|(h, m)| chrono::NaiveTime::from_hms_opt(h, m, 0));
         game
@@ -2122,8 +2122,8 @@ mod tests {
     }
 
     fn plays(player: i64) -> PlayerRole {
-        use crate::players::RoleId;
-        use crate::season::Season;
+        use crate::shared::season::Season;
+        use crate::team::players::RoleId;
         PlayerRole {
             id: RoleId(player),
             player: PlayerId(player),
@@ -2246,7 +2246,7 @@ mod tests {
             player(3, "Cas", None),
         ];
         let mut last_season = plays(2);
-        last_season.season = crate::season::Season::from_start_year(2025);
+        last_season.season = crate::shared::season::Season::from_start_year(2025);
         let roles = [plays(1), last_season];
         let mut cas = KindTotals::default();
         cas.table.done = 1;
@@ -2254,7 +2254,7 @@ mod tests {
         let rows = duty_rows(
             &players,
             &roles,
-            crate::season::Season::from_start_year(2026),
+            crate::shared::season::Season::from_start_year(2026),
             &totals,
         );
         let rows: Vec<(PlayerId, u32)> = rows
