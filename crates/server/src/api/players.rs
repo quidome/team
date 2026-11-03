@@ -20,7 +20,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{duties, players, trainings};
+use crate::{duties, game_attendance, players, trainings};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -113,6 +113,8 @@ pub struct PlayerDetail {
     pub has_absences: bool,
     /// The player is on a duty place, or did one, so "Delete player" is not offered.
     pub has_duties: bool,
+    /// The player has an answer at a game, so "Delete player" is not offered.
+    pub has_answers: bool,
 }
 
 /// A player who counts as "there" at trainings after a role started or its start moved earlier.
@@ -271,6 +273,7 @@ async fn detail(state: &AppState, id: PlayerId) -> Result<PlayerDetail, AppError
         now_there: Vec::new(),
         has_absences: trainings::player_has_absences(&state.pool, id).await?,
         has_duties: duties::player_has_duties(&state.pool, id).await?,
+        has_answers: game_attendance::player_has_answers(&state.pool, id).await?,
     })
 }
 
@@ -411,7 +414,7 @@ pub async fn change(
     params(("id" = i64, Path, description = "The player")),
     responses(
         (status = 204, description = "Deleted, with its roles"),
-        (status = 400, description = "`player_has_absences`, `player_has_duties`"),
+        (status = 400, description = "`player_has_absences`, `player_has_duties`, `player_has_answers`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such player"),
     )
@@ -420,15 +423,20 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
-    // A player with duties or absences cannot be deleted: the foreign keys refuse it.
+    // A player with duties, answers or absences cannot be deleted: the foreign keys refuse it.
     if duties::player_has_duties(&state.pool, PlayerId(id)).await? {
         return Err(AppError::BadRequest("player_has_duties"));
     }
+    if game_attendance::player_has_answers(&state.pool, PlayerId(id)).await? {
+        return Err(AppError::BadRequest("player_has_answers"));
+    }
     let deleted = match players::delete(&state.pool, PlayerId(id)).await {
         Err(error) if error.is_foreign_key_violation() => {
-            // A duty saved since the check above, or an absence.
+            // A duty or an answer saved since the checks above, or an absence.
             let code = if duties::player_has_duties(&state.pool, PlayerId(id)).await? {
                 "player_has_duties"
+            } else if game_attendance::player_has_answers(&state.pool, PlayerId(id)).await? {
+                "player_has_answers"
             } else {
                 "player_has_absences"
             };

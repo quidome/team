@@ -111,6 +111,12 @@ start during active development.
 - The choice comes with the page of the game (`GamePage.players`, from `choice_players`, `clashes` and `offers`): one request, and the reasons a player cannot be chosen come from the checks of the saves; the front end only shows them (`notOffered` in `src/lib/duties.ts`).
 - The names come decrypted from `players::all` for the players with a role in the season or on its places (`SeasonDuties`), with `display_names`; they never go into a log.
 
+### Attendance at games (decision 0028)
+- Tables `game_attendance` (at most one row for each game: `extra_players`, `answers_for`) and `game_answers` (one row for each player who answered; no row is "no answer"). Store: `crates/server/src/game_attendance.rs`. A tap needs no lock (decision 0020).
+- Core `game_attendance`: `game_list` (the players with "plays games" on the date, in groups), `game_count` (the only count), `row_count` (when a row shows it), `check_answer`, `extra_players`. `kept_games` also keeps games with answers.
+- Routes in `api/games.rs`: `PUT` and `DELETE .../answers/{player}`, `PUT .../extra-players`, each answering `AttendanceView`; `GamePage.attendance` is `null` for a game that is not a game of the team. The rows of "Next" and "Season" get the count through `coming_view` in `api/season.rs`, from `SeasonDuties.attendance`.
+- `web/src/lib/components/GameAttendance.svelte` keeps the order of the first load and a queue for each player. It shows the count of the server when no tap is waiting.
+
 ### Messages (decision 0024)
 - `GET /api/messages/week` (`api/messages.rs`): `games_of` and `places_of_season` of the current season, as the start page, then `week_text`, which maps the past games of this week and the coming games with their places and players to `MessageGame`s and calls `team_core::week_message` with the names of `SeasonDuties`, the club and the team. `GET /api/messages/committee` is the same with `committee_text`, `full_names` of `SeasonDuties.players` and the club and team names; both routes go through `message_view`. `GET /api/start` calls the same functions with the data it has for `StartAnswer.messages`, so a button and its page cannot differ. Read only, no lock; the text holds player names and is never logged (`tests/message_logs.rs`). `GET /api/start` with it: median 8 ms (debug build, 2026-10-29, the test game list without players).
 - `GET /api/messages/driving` and `GET /api/messages/table-referee` (`driving_text`, `table_referee_text`, also through `message_view`) use the same list of games with `display_names`. The core drops the past games of this week: "today and later" is in `coming_games`, as a rule of the texts. What is in an overview follows `counts`, as the totals.
@@ -174,6 +180,7 @@ pull requests read them. GitHub does not use Nix; locally the Nix shell gives th
 - A new migration that new queries need: apply it locally with `sqlx migrate run` first (the queries are checked against the database at compile time, so `team migrate` does not compile yet), then `just prepare`.
 
 ## Known technical debt
+- The queue of taps exists twice: on the page of a training and in `GameAttendance.svelte`. Two uses were too few for a shared helper.
 - While a team is still needed, each visit to the start page reads the game list twice (club list and the club's season). A few requests a week now.
 - The nightly reading assumes one pod: with more than one replica each pod reads each night, and `Tried` is kept per pod (decision 0017). Check before raising `replicaCount`.
 - `followed_teams.season` (text) is still written for the released story 2 code; drop it in a later release (decision 0014).

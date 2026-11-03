@@ -11,6 +11,7 @@ pub mod db;
 pub mod duties;
 pub mod error;
 pub mod followed_teams;
+pub mod game_attendance;
 pub mod games;
 pub mod nightly;
 pub mod players;

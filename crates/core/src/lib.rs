@@ -6,6 +6,7 @@ pub mod club;
 pub mod comparison;
 pub mod duties;
 pub mod game;
+pub mod game_attendance;
 pub mod guard;
 pub mod messages;
 pub mod nightly;
@@ -40,6 +41,10 @@ pub use duties::{
     who_did, worst_clash,
 };
 pub use game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
+pub use game_attendance::{
+    Answer, AnswerError, GameAttendance, GameCount, ListRow, MAX_EXTRA_PLAYERS, StoredAnswer,
+    check_answer, extra_players, game_count, game_list, row_count,
+};
 pub use guard::{Guard, HoldReason, guard, guard_after_confirm, is_first_reading};
 pub use messages::{
     MessageGame, committee_message, driving_overview, full_names, table_referee_overview,

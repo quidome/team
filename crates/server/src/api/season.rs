@@ -10,22 +10,26 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
-    FollowedTeam, Game, GameDuties, GamePlaces, Outcome, PlaceKind, PlacesOf, Player, PlayerId,
-    PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonList, StoredDuties,
-    StoredGame, Team, TeamNumber, TeamRef, Training, WeeklyTraining, display_names, game_places,
-    kept_games, not_entered, open_places, players_playing_on, plays_games_on, required_duties,
-    schedule, season_events, season_list,
+    FollowedTeam, Game, GameCount, GameDuties, GamePlaces, Outcome, PlaceKind, PlacesOf, Player,
+    PlayerId, PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonList,
+    StoredDuties, StoredGame, Team, TeamNumber, TeamRef, Training, WeeklyTraining, display_names,
+    game_list, game_places, kept_games, not_entered, open_places, players_playing_on,
+    plays_games_on, required_duties, row_count, schedule, season_events, season_list,
 };
 use utoipa::ToSchema;
 
 use super::format::{day, query_season};
+use super::games::CountView;
 use super::trainings::{SeasonQuery, TrainingRow, row_view};
 use crate::api::clubs::{ClubView, TeamView};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{api, duties, followed_teams, games, players, trainings, weekly_trainings};
+use crate::game_attendance::SeasonAttendance;
+use crate::{
+    api, duties, followed_teams, game_attendance, games, players, trainings, weekly_trainings,
+};
 
 /// A game of the schedule: the team's games and the home games of other club teams.
 #[derive(Debug, Serialize, ToSchema)]
@@ -47,6 +51,9 @@ pub struct ScheduleGame {
     pub in_list: bool,
     /// The duties of the game, when it has any (`team_core::game_places`).
     pub places: Option<PlacesView>,
+    /// The count of a coming game of the team on the start page, and on "Season" with at least
+    /// one answer or extra player.
+    pub attendance: Option<CountView>,
 }
 
 /// The duties of a game, in two parts that count on their own.
@@ -271,7 +278,8 @@ pub enum ScheduleReasonView {
     Team,
     /// A home game of another club team: a possible duty game.
     Duty,
-    /// No longer in the schedule (for example home and away swapped), kept for its duties.
+    /// No longer in the schedule (for example home and away swapped), kept for its duties or
+    /// answers.
     Kept,
 }
 
@@ -287,6 +295,8 @@ pub(crate) struct SeasonDuties {
     pub players: Vec<Player>,
     /// The names shown of `players` (`team_core::display_names`).
     pub names: BTreeMap<PlayerId, String>,
+    /// The answers and extra players of the games of the season.
+    pub attendance: SeasonAttendance,
 }
 
 impl SeasonDuties {
@@ -295,9 +305,30 @@ impl SeasonDuties {
         self.assignments.get(&source_id).map_or(&[], Vec::as_slice)
     }
 
-    /// The games kept on "Season" for their duties.
+    /// The games kept on "Season" for their duties or answers.
     pub fn kept(&self) -> BTreeSet<i64> {
-        kept_games(&self.stored, &self.assignments)
+        kept_games(&self.stored, &self.assignments, &self.attendance.answered())
+    }
+
+    /// The count on the row of `scheduled`, from the list of the page of the game.
+    fn row_count(&self, scheduled: &ScheduledGame, without_answers: bool) -> Option<GameCount> {
+        let source_id = scheduled.game.source_id;
+        let answers = self
+            .attendance
+            .answers
+            .get(&source_id)
+            .map_or(&[][..], Vec::as_slice);
+        let extra = self
+            .attendance
+            .games
+            .get(&source_id)
+            .map_or(0, |game| game.extra_players);
+        row_count(
+            &game_list(&self.players, &self.roles, answers, scheduled.game.date),
+            extra,
+            scheduled.in_list,
+            without_answers,
+        )
     }
 
     /// The view of `places`, the duties of `game`, with the players on them.
@@ -421,12 +452,14 @@ async fn load_duties(
         .filter(|player| of_season.contains(&player.id))
         .collect();
     let names = display_names(&players);
+    let attendance = game_attendance::of_season(&mut *db, club, season).await?;
     Ok(SeasonDuties {
         stored,
         roles,
         assignments,
         players,
         names,
+        attendance,
     })
 }
 
@@ -454,6 +487,7 @@ impl From<ScheduledGame> for ScheduleGame {
             reason: scheduled.reason.into(),
             in_list: scheduled.in_list,
             places: None,
+            attendance: None,
         }
     }
 }
@@ -522,6 +556,23 @@ pub(crate) fn event_view_with(
     Ok(view)
 }
 
+/// A coming event with the duties of its game and, for a game of the team, its count;
+/// `without_answers`: also for a game with no answer and no extra player.
+pub(crate) fn coming_view(
+    event: &Event,
+    places: &PlacesOf,
+    duties: &SeasonDuties,
+    without_answers: bool,
+) -> Result<EventView, StoreError> {
+    let mut view = event_view_with(event, places, duties)?;
+    if let (Some(game), EventKind::Game(scheduled)) = (view.game.as_mut(), event.kind) {
+        if scheduled.reason == ScheduleReason::TeamGame {
+            game.attendance = duties.row_count(scheduled, without_answers).map(Into::into);
+        }
+    }
+    Ok(view)
+}
+
 pub(crate) fn event_view(event: &Event) -> Result<EventView, StoreError> {
     let (week, monday, sunday) = event
         .week()
@@ -586,7 +637,7 @@ pub async fn get(
         coming: events
             .coming
             .iter()
-            .map(|event| event_view_with(event, &places, &duties))
+            .map(|event| coming_view(event, &places, &duties, false))
             .collect::<Result<_, _>>()?,
         past: events
             .past

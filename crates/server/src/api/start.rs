@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 use super::format::{clock_time, day};
 use super::messages::{committee_text, week_text};
 use super::season::{
-    EventView, event_view, event_view_with, games_of, places_of_season, trainings_of,
+    EventView, coming_view, event_view, event_view_with, games_of, places_of_season, trainings_of,
 };
 use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands, today_in_netherlands};
@@ -218,7 +218,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .transpose()?;
     let next = next_events(&events, &places, today)
         .into_iter()
-        .map(|event| event_view_with(event, &places, &games.duties))
+        .map(|event| coming_view(event, &places, &games.duties, true))
         .collect::<Result<_, _>>()?;
 
     // The last games with places: the current season; in July and August, when it has none

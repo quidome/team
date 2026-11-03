@@ -6,7 +6,8 @@
 	back). The places of the team (story B): a tap opens the choice of a player, with the totals of
 	that kind and the clashes; a tap on a player saves at once; "Clear". On a past game "Someone
 	else" (the same choice, never blocked by a clash) and "Nobody". A save that fails shows "Not
-	saved. Try again." and the stored state.
+	saved. Try again." and the stored state. At the top of a game of the team: who comes
+	(`GameAttendance`, story A of attendance at games).
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -27,6 +28,7 @@
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import GameAttendance from '#lib/components/GameAttendance.svelte';
 	import {
 		clashText,
 		doerOf,
@@ -177,6 +179,16 @@
 		{/if}
 		{#if error}
 			<p class="text-sm" role="alert" data-testid="save-error">{error}</p>
+		{/if}
+
+		{#if page.attendance}
+			{#key page.game.id}
+				<GameAttendance
+					season={page.season}
+					id={String(page.game.id)}
+					attendance={page.attendance}
+				/>
+			{/key}
 		{/if}
 
 		{#if schedule}

@@ -116,6 +116,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}/answers/{player}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setAnswer'];
+		post?: never;
+		delete: operations['clearAnswer'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}/assignments/{kind}/{number}': {
 		parameters: {
 			query?: never;
@@ -157,6 +173,22 @@ export interface paths {
 		};
 		get?: never;
 		put: operations['setDrivers'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/extra-players': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setExtraPlayers'];
 		post?: never;
 		delete?: never;
 		options?: never;
@@ -755,6 +787,28 @@ export interface components {
 			name: string;
 			valid: boolean;
 		};
+		/** @description The answer of a player. */
+		AnswerInput: {
+			answer: components['schemas']['AnswerView'];
+			/** Format: int64 */
+			reason?: number | null;
+		};
+		/** @description A player on the list of a game. */
+		AnswerRow: {
+			answer?: null | components['schemas']['AnswerView'];
+			hidden: boolean;
+			/** @description The name shown ("Anna", "Anna B."). */
+			name: string;
+			/** Format: int64 */
+			player: number;
+			/**
+			 * Format: int64
+			 * @description The reason; it stays when the answer goes to "coming" and back.
+			 */
+			reason?: number | null;
+		};
+		/** @enum {string} */
+		AnswerView: 'coming' | 'not_coming';
 		/** @description The player to put on a place. */
 		AssignmentInput: {
 			/** Format: int64 */
@@ -793,6 +847,13 @@ export interface components {
 			team: components['schemas']['PlayerTotalsView'][];
 			/** @description The trainings of the season up to today that are not cancelled; 0: no trainings yet. */
 			trainings: number;
+		};
+		/** @description The answer of a tap: kept small, so a tap is quick. */
+		AttendanceView: {
+			count: components['schemas']['CountView'];
+			/** Format: int32 */
+			extra_players: number;
+			row?: null | components['schemas']['AnswerRow'];
 		};
 		CarryRequest: {
 			/**
@@ -910,6 +971,12 @@ export interface components {
 			/** @description `null` when the source has no town for the club. */
 			town?: string | null;
 		};
+		/** @description The count of a game; `coming` is the players coming plus the extra players. */
+		CountView: {
+			coming: number;
+			no_answer: number;
+			not_coming: number;
+		};
 		/** @description How many changes of each kind a reading found, only for games in the schedule. */
 		CountsView: {
 			/** Format: int32 */
@@ -1000,6 +1067,26 @@ export interface components {
 			week_first_day: string;
 			week_last_day: string;
 		};
+		/** @description The number of extra players, 0 to 10. */
+		ExtraPlayersInput: {
+			/** Format: int64 */
+			extra_players: number;
+		};
+		/** @description Who comes to a game of the team. */
+		GameAttendanceView: {
+			count: components['schemas']['CountView'];
+			/** Format: int32 */
+			extra_players: number;
+			/**
+			 * Format: int32
+			 * @description The highest number of extra players.
+			 */
+			max_extra_players: number;
+			/** @description All reasons in their order, also the hidden ones (they still show on old answers). */
+			reasons: components['schemas']['AbsenceReason'][];
+			/** @description First "no answer", then "coming", then "not coming", each sorted by first name. */
+			rows: components['schemas']['AnswerRow'][];
+		};
 		/** @description A game of an open item: enough to show it in the list below the item and to open its page. */
 		GameItemView: {
 			away: string;
@@ -1015,6 +1102,7 @@ export interface components {
 			start_time?: string | null;
 		};
 		GamePage: {
+			attendance?: null | components['schemas']['GameAttendanceView'];
 			/** @description The pull-down list of the places: the club teams of the season, sorted by name. */
 			club_teams: components['schemas']['TeamView'][];
 			current_season: string;
@@ -1296,6 +1384,8 @@ export interface components {
 			first_name: string;
 			/** @description The player has absences, so "Delete player" is not offered. */
 			has_absences: boolean;
+			/** @description The player has an answer at a game, so "Delete player" is not offered. */
+			has_answers: boolean;
 			/** @description The player is on a duty place, or did one, so "Delete player" is not offered. */
 			has_duties: boolean;
 			hidden: boolean;
@@ -1463,6 +1553,7 @@ export interface components {
 		};
 		/** @description A game of the schedule: the team's games and the home games of other club teams. */
 		ScheduleGame: {
+			attendance?: null | components['schemas']['CountView'];
 			away: string;
 			/** @description Dutch local date, for example "2026-10-31". */
 			date: string;
@@ -2029,6 +2120,106 @@ export interface operations {
 			};
 		};
 	};
+	setAnswer: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description The player */
+				player: number;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['AnswerInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the last tap wins */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AttendanceView'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list`, `reason_hidden` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season, or no such reason */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	clearAnswer: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+				/** @description The player */
+				player: number;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The player is back to "no answer"; safe to send twice */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AttendanceView'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	setAssignment: {
 		parameters: {
 			query?: never;
@@ -2215,6 +2406,56 @@ export interface operations {
 				};
 			};
 			/** @description `invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled` and `highest`) */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setExtraPlayers: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ExtraPlayersInput'];
+			};
+		};
+		responses: {
+			/** @description Saved; the last tap wins */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AttendanceView'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `out_of_range` */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -2768,7 +3009,7 @@ export interface operations {
 				};
 				content?: never;
 			};
-			/** @description `player_has_absences`, `player_has_duties` */
+			/** @description `player_has_absences`, `player_has_duties`, `player_has_answers` */
 			400: {
 				headers: {
 					[name: string]: unknown;

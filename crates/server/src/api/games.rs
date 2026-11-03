@@ -1,6 +1,6 @@
 //! `/api/games/{season}/{id}`: the page of a game and its duties (story A of duties: the places
 //! and drivers; story B: the players on them). A game is a game of the club chosen for its season,
-//! with a team, that is in the schedule or kept for its duties; also when it left the game list.
+//! with a team, that is in the schedule or kept for its duties or answers; also when it left the game list.
 //! Every write: lock the game, read, the core check, write, in one transaction; each answers the
 //! page.
 
@@ -10,15 +10,17 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError, DutyKind, Game,
-    GamePlaces, NotOffered, Offer, Outcome, PlaceKind, PlayerId, RequiredDuties, ScheduleReason,
-    ScheduledGame, Season, StoredDuties, StoredGame, Team, TeamNumber, check_assignment,
+    Answer, AnswerError, Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError,
+    DutyKind, Game, GameAttendance, GameCount, GamePlaces, ListRow, MAX_EXTRA_PLAYERS, NotOffered,
+    Offer, Outcome, PlaceKind, PlayerId, ReasonId, RequiredDuties, ScheduleReason, ScheduledGame,
+    Season, StoredDuties, StoredGame, Team, TeamNumber, check_answer, check_assignment,
     check_drivers, check_entered, check_outcome, check_team, choice_players, clashes, club_teams,
-    duty_totals, game_places, in_schedule, kept_games, offers, pick_team, players_playing_on,
-    plays_games_on, required_duties, worst_clash,
+    duty_totals, extra_players, game_count, game_list, game_places, in_schedule, kept_games,
+    offers, pick_team, players_playing_on, plays_games_on, required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
+use super::reasons::{AbsenceReason, view as reason_view};
 use super::season::{
     DutyKindView, OutcomeView, ScheduleGame, SeasonDuties, SeasonPlaces, duties_of,
 };
@@ -28,7 +30,7 @@ use crate::clock::{current_season, today_in_netherlands};
 use crate::db::StoreError;
 use crate::duties::{self, GameKey};
 use crate::error::AppError;
-use crate::{followed_teams, games, players};
+use crate::{followed_teams, game_attendance, games, players, reasons};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct GamePage {
@@ -47,6 +49,108 @@ pub struct GamePage {
     /// games" on the date (hidden players too), and the players already at the game; sorted by
     /// first name.
     pub players: Vec<ChoiceView>,
+    /// Who comes to the game; `null`: not a game of the team.
+    pub attendance: Option<GameAttendanceView>,
+}
+
+/// Who comes to a game of the team.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct GameAttendanceView {
+    /// First "no answer", then "coming", then "not coming", each sorted by first name.
+    pub rows: Vec<AnswerRow>,
+    /// All reasons in their order, also the hidden ones (they still show on old answers).
+    pub reasons: Vec<AbsenceReason>,
+    pub count: CountView,
+    pub extra_players: u8,
+    /// The highest number of extra players.
+    pub max_extra_players: u8,
+}
+
+/// The answer of a tap: kept small, so a tap is quick.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AttendanceView {
+    /// The row of the player; `null` after a save of the extra players.
+    pub row: Option<AnswerRow>,
+    pub count: CountView,
+    pub extra_players: u8,
+}
+
+/// A player on the list of a game.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AnswerRow {
+    pub player: i64,
+    /// The name shown ("Anna", "Anna B.").
+    pub name: String,
+    pub hidden: bool,
+    /// `null`: no answer.
+    pub answer: Option<AnswerView>,
+    /// The reason; it stays when the answer goes to "coming" and back.
+    pub reason: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AnswerView {
+    Coming,
+    NotComing,
+}
+
+/// The count of a game; `coming` is the players coming plus the extra players.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CountView {
+    pub coming: usize,
+    pub not_coming: usize,
+    pub no_answer: usize,
+}
+
+/// The answer of a player.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AnswerInput {
+    pub answer: AnswerView,
+    pub reason: Option<i64>,
+}
+
+/// The number of extra players, 0 to 10.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ExtraPlayersInput {
+    pub extra_players: i64,
+}
+
+impl From<Answer> for AnswerView {
+    fn from(answer: Answer) -> Self {
+        match answer {
+            Answer::Coming => Self::Coming,
+            Answer::NotComing => Self::NotComing,
+        }
+    }
+}
+
+impl From<AnswerView> for Answer {
+    fn from(answer: AnswerView) -> Self {
+        match answer {
+            AnswerView::Coming => Self::Coming,
+            AnswerView::NotComing => Self::NotComing,
+        }
+    }
+}
+
+impl From<GameCount> for CountView {
+    fn from(count: GameCount) -> Self {
+        Self {
+            coming: count.coming,
+            not_coming: count.not_coming,
+            no_answer: count.no_answer,
+        }
+    }
+}
+
+impl From<AnswerError> for AppError {
+    fn from(error: AnswerError) -> Self {
+        Self::BadRequest(match error {
+            AnswerError::NotOnList => "not_on_list",
+            AnswerError::ReasonHidden => "reason_hidden",
+        })
+    }
 }
 
 /// A player in the choice of a place.
@@ -337,7 +441,7 @@ impl Locked {
 }
 
 /// The game `id` of `season`, from the choice of that season; 404 without a team, or for a game
-/// that is not in the schedule and not kept for its duties.
+/// that is not in the schedule and not kept for its duties or answers.
 async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppError> {
     let season = season
         .parse::<Season>()
@@ -364,13 +468,18 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
         .find(|stored| stored.game.source_id == id)
         .cloned()
         .ok_or(AppError::NotFound)?;
-    let reason = in_schedule(&found.game, club.number, Some(team.number))
-        .or_else(|| {
-            kept_games(&duties, &assignments)
-                .contains(&id)
-                .then_some(ScheduleReason::Kept)
-        })
-        .ok_or(AppError::NotFound)?;
+    let reason = match in_schedule(&found.game, club.number, Some(team.number)) {
+        Some(reason) => reason,
+        None => {
+            let answered = game_attendance::of_season(&mut db, club.number, season)
+                .await?
+                .answered();
+            if !kept_games(&duties, &assignments, &answered).contains(&id) {
+                return Err(AppError::NotFound);
+            }
+            ScheduleReason::Kept
+        }
+    };
     Ok(Found {
         season,
         club,
@@ -399,6 +508,7 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         .map(|places| duties.view(&found.game, places));
     let players = choice(&found, &duties, places.as_ref(), today);
     let past = found.past(today);
+    let attendance = attendance_of(state, &found, &duties).await?;
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
         reason: found.reason,
@@ -413,7 +523,86 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         club_teams: found.club_teams.iter().map(TeamView::from).collect(),
         past,
         players,
+        attendance,
     })
+}
+
+/// The list of the game of `found` as stored now, with what is stored beside it.
+async fn stored_list(
+    state: &AppState,
+    found: &Found,
+    duties: &SeasonDuties,
+) -> Result<(Vec<ListRow>, GameAttendance), AppError> {
+    let (attendance, answers) = game_attendance::of_game(&state.pool, found.key()).await?;
+    let list = game_list(&duties.players, &duties.roles, &answers, found.game.date);
+    Ok((list, attendance))
+}
+
+fn answer_row(row: &ListRow, duties: &SeasonDuties) -> AnswerRow {
+    AnswerRow {
+        player: row.player.0,
+        name: duties.names.get(&row.player).cloned().unwrap_or_default(),
+        hidden: duties
+            .players
+            .iter()
+            .any(|player| player.id == row.player && player.hidden),
+        answer: row.answer.map(Into::into),
+        reason: row.reason.map(|reason| reason.0),
+    }
+}
+
+/// Who comes to the game of `found`; `None` for a game that is not a game of the team.
+async fn attendance_of(
+    state: &AppState,
+    found: &Found,
+    duties: &SeasonDuties,
+) -> Result<Option<GameAttendanceView>, AppError> {
+    if found.reason != ScheduleReason::TeamGame {
+        return Ok(None);
+    }
+    let (list, attendance) = stored_list(state, found, duties).await?;
+    Ok(Some(GameAttendanceView {
+        rows: list.iter().map(|row| answer_row(row, duties)).collect(),
+        reasons: reasons::all(&state.pool)
+            .await?
+            .into_iter()
+            .map(reason_view)
+            .collect(),
+        count: game_count(&list, attendance.extra_players).into(),
+        extra_players: attendance.extra_players,
+        max_extra_players: MAX_EXTRA_PLAYERS,
+    }))
+}
+
+/// The answer of a tap, with the row of `player` when the tap was on a row.
+async fn tapped(
+    state: &AppState,
+    found: &Found,
+    duties: &SeasonDuties,
+    player: Option<PlayerId>,
+) -> Result<AttendanceView, AppError> {
+    let (list, attendance) = stored_list(state, found, duties).await?;
+    Ok(AttendanceView {
+        row: player
+            .and_then(|player| list.iter().find(|row| row.player == player))
+            .map(|row| answer_row(row, duties)),
+        count: game_count(&list, attendance.extra_players).into(),
+        extra_players: attendance.extra_players,
+    })
+}
+
+/// The game of a tap: a game of the team, with what the checks need.
+async fn team_game(
+    state: &AppState,
+    season: &str,
+    id: &str,
+) -> Result<(Found, SeasonDuties), AppError> {
+    let found = find(state, season, id).await?;
+    if found.reason != ScheduleReason::TeamGame {
+        return Err(AppError::BadRequest("not_a_team_game"));
+    }
+    let duties = duties_of(state, found.club.number, found.season).await?;
+    Ok((found, duties))
 }
 
 /// The choice of a player for the places of the game of `found`, with the totals of its season
@@ -811,4 +1000,114 @@ pub async fn set_outcome(
     })
     .await?;
     Ok(Json(page(&state, found).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/answers/{player}",
+    operation_id = "setAnswer",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+        ("player" = i64, Path, description = "The player"),
+    ),
+    request_body = AnswerInput,
+    responses(
+        (status = 200, description = "Saved; the last tap wins", body = AttendanceView),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list`, `reason_hidden`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season, or no such reason"),
+    )
+)]
+pub async fn set_answer(
+    State(state): State<AppState>,
+    Path((season, id, player)): Path<(String, String, i64)>,
+    Json(input): Json<AnswerInput>,
+) -> Result<Json<AttendanceView>, AppError> {
+    let (found, duties) = team_game(&state, &season, &id).await?;
+    let player = PlayerId(player);
+    let reason = match input.reason {
+        Some(id) => {
+            let reason = reasons::all(&state.pool)
+                .await?
+                .into_iter()
+                .find(|reason| reason.id == id)
+                .ok_or(AppError::NotFound)?;
+            Some((ReasonId(reason.id), reason.hidden))
+        }
+        None => None,
+    };
+    let (_, answers) = game_attendance::of_game(&state.pool, found.key()).await?;
+    let current = answers
+        .iter()
+        .find(|answer| answer.player == player)
+        .and_then(|answer| answer.reason);
+    check_answer(player, &duties.roles, found.game.date, reason, current)?;
+    game_attendance::answer(
+        &state.pool,
+        found.key(),
+        found.game.date,
+        player,
+        input.answer.into(),
+        reason.map(|(reason, _)| reason),
+    )
+    .await?;
+    tracing::info!(season = %found.season, game = found.game.source_id, player = player.0, "answer saved");
+    Ok(Json(tapped(&state, &found, &duties, Some(player)).await?))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/games/{season}/{id}/answers/{player}",
+    operation_id = "clearAnswer",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+        ("player" = i64, Path, description = "The player"),
+    ),
+    responses(
+        (status = 200, description = "The player is back to \"no answer\"; safe to send twice", body = AttendanceView),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn clear_answer(
+    State(state): State<AppState>,
+    Path((season, id, player)): Path<(String, String, i64)>,
+) -> Result<Json<AttendanceView>, AppError> {
+    let (found, duties) = team_game(&state, &season, &id).await?;
+    let player = PlayerId(player);
+    check_answer(player, &duties.roles, found.game.date, None, None)?;
+    game_attendance::no_answer(&state.pool, found.key(), player).await?;
+    tracing::info!(season = %found.season, game = found.game.source_id, player = player.0, "answer removed");
+    Ok(Json(tapped(&state, &found, &duties, Some(player)).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/extra-players",
+    operation_id = "setExtraPlayers",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    request_body = ExtraPlayersInput,
+    responses(
+        (status = 200, description = "Saved; the last tap wins", body = AttendanceView),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`, `out_of_range`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_extra_players(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+    Json(input): Json<ExtraPlayersInput>,
+) -> Result<Json<AttendanceView>, AppError> {
+    let (found, duties) = team_game(&state, &season, &id).await?;
+    let number = extra_players(input.extra_players).ok_or(AppError::BadRequest("out_of_range"))?;
+    game_attendance::set_extra(&state.pool, found.key(), number).await?;
+    tracing::info!(season = %found.season, game = found.game.source_id, "extra players saved");
+    Ok(Json(tapped(&state, &found, &duties, None).await?))
 }

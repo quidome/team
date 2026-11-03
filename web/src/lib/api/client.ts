@@ -85,6 +85,8 @@ export function messageFor(error: unknown, status: number): string {
 			'This player has absences and cannot be deleted. Remove the player from the team, or hide the player.',
 		player_has_duties:
 			'This player has duties and cannot be deleted. Remove the player from the team, or hide the player.',
+		player_has_answers:
+			'This player has answers at games and cannot be deleted. Remove the player from the team, or hide the player.',
 		changed_meanwhile: 'This player was changed in the meantime. Use "Correct" in the history.',
 		end_before_start: 'The end time must be after the start time.',
 		last_before_first: 'The last training date must be after the first.',
@@ -168,6 +170,10 @@ export type ScheduleGame = components['schemas']['ScheduleGame'];
 
 export type PlacesView = components['schemas']['PlacesView'];
 export type GamePage = components['schemas']['GamePage'];
+export type GameAttendanceView = components['schemas']['GameAttendanceView'];
+export type AttendanceView = components['schemas']['AttendanceView'];
+export type AnswerView = components['schemas']['AnswerView'];
+export type CountView = components['schemas']['CountView'];
 export type PlaceKind = components['schemas']['PlaceKindView'];
 export type DutyKind = components['schemas']['DutyKindView'];
 export type Choice = components['schemas']['ChoiceView'];
@@ -630,4 +636,52 @@ export async function uncheckTraining(date: string): Promise<TrainingDay> {
 export async function deleteTraining(date: string): Promise<void> {
 	const result = await api.DELETE('/api/trainings/{date}', { params: { path: { date } } });
 	if (!result.response.ok) throw apiError(result.error, result.response.status);
+}
+
+/** The answer of a player at a game; the last tap wins. Fails after `TAP_TIMEOUT_MS` without an
+ * answer. */
+export async function setAnswer(
+	season: string,
+	id: string,
+	player: number,
+	answer: AnswerView,
+	reason: number | null
+): Promise<AttendanceView> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/answers/{player}', {
+			params: { path: { season, id, player } },
+			body: { answer, reason },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
+		})
+	);
+}
+
+/** Puts a player back to "no answer" (safe to send twice). Fails after `TAP_TIMEOUT_MS` without an
+ * answer. */
+export async function clearAnswer(
+	season: string,
+	id: string,
+	player: number
+): Promise<AttendanceView> {
+	return dataOf(
+		await api.DELETE('/api/games/{season}/{id}/answers/{player}', {
+			params: { path: { season, id, player } },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
+		})
+	);
+}
+
+/** The number of extra players at a game. Fails after `TAP_TIMEOUT_MS` without an answer. */
+export async function setExtraPlayers(
+	season: string,
+	id: string,
+	extra_players: number
+): Promise<AttendanceView> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/extra-players', {
+			params: { path: { season, id } },
+			body: { extra_players },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
+		})
+	);
 }

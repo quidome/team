@@ -1,7 +1,7 @@
 <!--
 	One event of "Season" and the start page: a game (as in the schedule: start time, teams, hall
 	and town, the badge "Team", crossed out when no longer in the game list; its duty places and
-	what changed for them; a tap opens it when `gameSeason` is given) or a training (start time,
+	what changed for them; the count of who comes; a tap opens it when `gameSeason` is given) or a training (start time,
 	status, "· Checked", "extra"; a tap opens it). "Cancel" shows on a training day that is not
 	opened only when `onCancel` is given.
 -->
@@ -10,6 +10,7 @@
 	import type { EventView, ScheduleGame, TrainingRow } from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { countText } from '#lib/attendance.js';
 	import { placesWarnings, rowPlacesText } from '#lib/duties.js';
 	import { gameLink } from '#lib/start.js';
 	import { formatDay } from '#lib/schedule.js';
@@ -75,6 +76,11 @@
 					<MapPin class="size-3.5 shrink-0" aria-hidden="true" />
 					<span class="truncate">{game.hall}, {game.town}</span>
 				</p>
+				{#if game.attendance && countText(game.attendance)}
+					<p class="mt-1 text-xs font-medium" data-testid="game-count">
+						{countText(game.attendance)}
+					</p>
+				{/if}
 				{#if game.places}
 					<p class="mt-1 text-xs" data-testid="game-places">{rowPlacesText(game.places)}</p>
 				{/if}

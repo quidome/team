@@ -128,6 +128,14 @@ pub fn app(state: AppState) -> Router {
             "/games/{season}/{id}/assignments/{kind}/{number}/outcome",
             put(games::set_outcome),
         )
+        .route(
+            "/games/{season}/{id}/answers/{player}",
+            put(games::set_answer).delete(games::clear_answer),
+        )
+        .route(
+            "/games/{season}/{id}/extra-players",
+            put(games::set_extra_players),
+        )
         .route("/start", get(start::get))
         .route("/messages/week", get(messages::week))
         .route("/messages/committee", get(messages::committee))

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT extra_players, answers_for FROM game_attendance\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "extra_players",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 1,
+        "name": "answers_for",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "26ab4db1c459602b122f9d126dc0b3bbfe09cafef5ff5888e03fe837f4feaf02"
+}

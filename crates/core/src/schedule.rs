@@ -16,7 +16,8 @@ pub enum ScheduleReason {
     TeamGame,
     /// A home game of another club team: a possible duty game.
     DutyGame,
-    /// No longer in the schedule (for example home and away swapped), kept for its duties.
+    /// No longer in the schedule (for example home and away swapped), kept for its duties or
+    /// answers.
     Kept,
 }
 

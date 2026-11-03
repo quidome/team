@@ -111,6 +111,27 @@ async fn the_log_never_has_a_player_name(pool: PgPool) {
     coordinator
         .send("GET", "/api/games/2026-2027/1", None)
         .await;
+    coordinator
+        .send(
+            "PUT",
+            &format!("/api/games/2026-2027/1/answers/{id}"),
+            Some(json!({ "answer": "coming", "reason": null })),
+        )
+        .await;
+    coordinator
+        .send(
+            "DELETE",
+            &format!("/api/games/2026-2027/1/answers/{id}"),
+            None,
+        )
+        .await;
+    coordinator
+        .send(
+            "PUT",
+            "/api/games/2026-2027/1/extra-players",
+            Some(json!({ "extra_players": 1 })),
+        )
+        .await;
 
     let text = log.text();
     assert!(text.contains("player added"), "{text}");

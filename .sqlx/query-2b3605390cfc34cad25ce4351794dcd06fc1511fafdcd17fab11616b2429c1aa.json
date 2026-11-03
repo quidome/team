@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_id, player_id, answer, reason_id FROM game_answers\n         WHERE club_number = $1 AND season_year = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "player_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "answer",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "reason_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "2b3605390cfc34cad25ce4351794dcd06fc1511fafdcd17fab11616b2429c1aa"
+}

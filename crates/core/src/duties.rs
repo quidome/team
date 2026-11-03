@@ -135,12 +135,13 @@ pub fn club_teams(
     teams
 }
 
-/// The games that stay on "Season" for their duties, also when they left the game list or are no
-/// longer in the schedule: a place names a team, drivers are set above 0, or a player is on a
-/// place (`assignments`, by game).
+/// The games that stay on "Season" for their duties or answers, also when they left the game list or are no
+/// longer in the schedule: a place names a team, drivers are set above 0, a player is on a place
+/// (`assignments`, by game), or a player answered (`answered`).
 pub fn kept_games(
     stored: &BTreeMap<i64, StoredDuties>,
     assignments: &BTreeMap<i64, Vec<Assignment>>,
+    answered: &BTreeSet<i64>,
 ) -> BTreeSet<i64> {
     stored
         .iter()
@@ -152,6 +153,7 @@ pub fn kept_games(
                 .filter(|(_, list)| !list.is_empty())
                 .map(|(&id, _)| id),
         )
+        .chain(answered.iter().copied())
         .collect()
 }
 
@@ -1192,7 +1194,7 @@ mod tests {
             (5, drivers(None)),
         ]);
         assert_eq!(
-            kept_games(&stored, &BTreeMap::new()),
+            kept_games(&stored, &BTreeMap::new(), &BTreeSet::new()),
             BTreeSet::from([1, 2])
         );
     }
@@ -1204,7 +1206,18 @@ mod tests {
         let stored = BTreeMap::from([(5, drivers(None))]);
         let assignments =
             BTreeMap::from([(5, vec![planned(DutyKind::Drive, 1, ANNA)]), (6, vec![])]);
-        assert_eq!(kept_games(&stored, &assignments), BTreeSet::from([5]));
+        assert_eq!(
+            kept_games(&stored, &assignments, &BTreeSet::new()),
+            BTreeSet::from([5])
+        );
+    }
+
+    #[test]
+    fn a_game_with_an_answer_is_kept() {
+        assert_eq!(
+            kept_games(&BTreeMap::new(), &BTreeMap::new(), &BTreeSet::from([7])),
+            BTreeSet::from([7])
+        );
     }
 
     #[test]

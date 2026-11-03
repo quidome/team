@@ -266,6 +266,132 @@
         }
       }
     },
+    "/api/games/{season}/{id}/answers/{player}": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setAnswer",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "player",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the last tap wins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list`, `reason_hidden`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season, or no such reason"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "clearAnswer",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "player",
+            "in": "path",
+            "description": "The player",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The player is back to \"no answer\"; safe to send twice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `not_on_list`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
     "/api/games/{season}/{id}/assignments/{kind}/{number}": {
       "put": {
         "tags": [
@@ -534,6 +660,65 @@
           },
           "400": {
             "description": "`invalid_season`, `invalid_game`, `no_drivers_needed`, `out_of_range`, `places_filled` (with `filled` and `highest`)"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/extra-players": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setExtraPlayers",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtraPlayersInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the last tap wins",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `out_of_range`"
           },
           "401": {
             "description": "Not logged in"
@@ -1064,7 +1249,7 @@
             "description": "Deleted, with its roles"
           },
           "400": {
-            "description": "`player_has_absences`, `player_has_duties`"
+            "description": "`player_has_absences`, `player_has_duties`, `player_has_answers`"
           },
           "401": {
             "description": "Not logged in"
@@ -2388,6 +2573,73 @@
           }
         }
       },
+      "AnswerInput": {
+        "type": "object",
+        "description": "The answer of a player.",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/AnswerView"
+          },
+          "reason": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AnswerRow": {
+        "type": "object",
+        "description": "A player on the list of a game.",
+        "required": [
+          "player",
+          "name",
+          "hidden"
+        ],
+        "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AnswerView",
+                "description": "`null`: no answer."
+              }
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name shown (\"Anna\", \"Anna B.\")."
+          },
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The reason; it stays when the answer goes to \"coming\" and back."
+          }
+        }
+      },
+      "AnswerView": {
+        "type": "string",
+        "enum": [
+          "coming",
+          "not_coming"
+        ]
+      },
       "AssignmentInput": {
         "type": "object",
         "description": "The player to put on a place.",
@@ -2493,6 +2745,35 @@
             "type": "integer",
             "description": "The trainings of the season up to today that are not cancelled; 0: no trainings yet.",
             "minimum": 0
+          }
+        }
+      },
+      "AttendanceView": {
+        "type": "object",
+        "description": "The answer of a tap: kept small, so a tap is quick.",
+        "required": [
+          "count",
+          "extra_players"
+        ],
+        "properties": {
+          "count": {
+            "$ref": "#/components/schemas/CountView"
+          },
+          "extra_players": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "row": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AnswerRow",
+                "description": "The row of the player; `null` after a save of the extra players."
+              }
+            ]
           }
         }
       },
@@ -2800,6 +3081,29 @@
           }
         }
       },
+      "CountView": {
+        "type": "object",
+        "description": "The count of a game; `coming` is the players coming plus the extra players.",
+        "required": [
+          "coming",
+          "not_coming",
+          "no_answer"
+        ],
+        "properties": {
+          "coming": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "no_answer": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "not_coming": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "CountsView": {
         "type": "object",
         "description": "How many changes of each kind a reading found, only for games in the schedule.",
@@ -3050,6 +3354,60 @@
           }
         }
       },
+      "ExtraPlayersInput": {
+        "type": "object",
+        "description": "The number of extra players, 0 to 10.",
+        "required": [
+          "extra_players"
+        ],
+        "properties": {
+          "extra_players": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GameAttendanceView": {
+        "type": "object",
+        "description": "Who comes to a game of the team.",
+        "required": [
+          "rows",
+          "reasons",
+          "count",
+          "extra_players",
+          "max_extra_players"
+        ],
+        "properties": {
+          "count": {
+            "$ref": "#/components/schemas/CountView"
+          },
+          "extra_players": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "max_extra_players": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The highest number of extra players.",
+            "minimum": 0
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbsenceReason"
+            },
+            "description": "All reasons in their order, also the hidden ones (they still show on old answers)."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerRow"
+            },
+            "description": "First \"no answer\", then \"coming\", then \"not coming\", each sorted by first name."
+          }
+        }
+      },
       "GameItemView": {
         "type": "object",
         "description": "A game of an open item: enough to show it in the list below the item and to open its page.",
@@ -3099,6 +3457,17 @@
           "players"
         ],
         "properties": {
+          "attendance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GameAttendanceView",
+                "description": "Who comes to the game; `null`: not a game of the team."
+              }
+            ]
+          },
           "club_teams": {
             "type": "array",
             "items": {
@@ -3971,7 +4340,8 @@
           "history",
           "now_there",
           "has_absences",
-          "has_duties"
+          "has_duties",
+          "has_answers"
         ],
         "properties": {
           "first_name": {
@@ -3980,6 +4350,10 @@
           "has_absences": {
             "type": "boolean",
             "description": "The player has absences, so \"Delete player\" is not offered."
+          },
+          "has_answers": {
+            "type": "boolean",
+            "description": "The player has an answer at a game, so \"Delete player\" is not offered."
           },
           "has_duties": {
             "type": "boolean",
@@ -4487,6 +4861,17 @@
           "in_list"
         ],
         "properties": {
+          "attendance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CountView",
+                "description": "The count of a coming game of the team on the start page, and on \"Season\" with at least\none answer or extra player."
+              }
+            ]
+          },
           "away": {
             "type": "string"
           },

@@ -87,7 +87,7 @@ export default defineConfig({
 		{
 			// Duty places change data that the tests of the start page check.
 			name: 'duties',
-			testMatch: 'duties.e2e.ts',
+			testMatch: /(duties|game-attendance)\.e2e\.ts/,
 			dependencies: ['start'],
 			use: { baseURL: 'http://localhost:4100' }
 		},

@@ -17,7 +17,7 @@ each change until the coordinator has seen it.
 - **Many new games.** 5 or more new possible duty games show as one line "N new games" that opens. New games of the team always show one by one.
 - **Seen.** "Seen" on a change marks that change. "Mark all as seen" marks every change; with another filter the button says "Mark these N as seen" and marks only what the filter shows, also the games inside a closed "N new games" line.
 - A change that a reading changed again after the page was loaded stays after "Seen", with its new values.
-- After "seen", a game that is no longer in the game list is hidden in the schedule, unless it is kept for its duties ([duties](duties.md)).
+- After "seen", a game that is no longer in the game list is hidden in the schedule, unless it is kept for its duties ([duties](duties.md)) or answers ([attendance at games](game-attendance.md)).
 - **Duties.** A change of a game where the team has places (a place that names the team, or drivers), or of a game that no longer needs a part of its duties, says "has duties" with the places of the team and their players ("has duties · Table 1, 2: Anna, open"), and what changed ("This game is no longer a home game of the club."), so the coordinator can tell the players and the committee.
 - A tap on the teams of a change opens the page of the game; "Back" there returns to the list. A game that left the schedule without duty places has no page, so its teams are no link.
 - The first reading after choosing the club and team records no changes. Choosing another club or team, or the team of a new season, removes the changes not seen yet; saving the same club and team again keeps them.

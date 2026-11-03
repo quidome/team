@@ -58,7 +58,7 @@ export function takeReturn(season: string, key: string | undefined): Return | nu
 	}
 }
 
-/** What an event is, for the labels of "What". A game kept for its duties shows with the
+/** What an event is, for the labels of "What". A game kept for its duties or answers shows with the
  * possible duty games. */
 export function whatOf(event: EventView): What {
 	if (!event.game) return 'training';
