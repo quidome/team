@@ -1,5 +1,9 @@
 # Product vision: team
 
+## Purpose
+The tool shows what each player gives to the team: the effort at training and games, and a fair
+share of the duties.
+
 ## The user's problem space
 One coordinator runs one youth team in a club. Each week the same work comes back: which games
 are there, who is at training, who drives to away games, and which players cover the table and
@@ -11,7 +15,7 @@ again, costs time.
 Three groups read what the coordinator produces:
 - **The team and the parents**: when their child plays, when they must drive or do table or referee duty, and whether the work is shared equally.
 - **The club's referee committee**: which of our players do which duty at the games of this week.
-- **The coordinator**: what happened, and what must still be arranged.
+- **The coordinator**: who makes an effort for the team, what happened, and what must still be arranged.
 
 ## What this product is
 A small tool for one coordinator. It keeps the games, attendance and duties of one team correct,
@@ -24,8 +28,10 @@ It is not:
 - a replacement for the federation's schedule. It reads that schedule.
 
 ## Core values
-1. **Capture fast, keep it correct.** For example, attendance at training takes seconds, on a phone, with one hand. The stored data is the truth and must be right.
-2. **The division of duties is visible and fair, and anyone can check it.** Parents and players can see who did what, so they trust the division.
+1. **See who makes an effort.** Attendance, with the reason for each absence, shows the coordinator who puts time into the team. It is for the coordinator; the coordinator may copy parts of it into the team chat.
+2. **Share the duties fairly and easily.** Giving the duties takes little work, and parents and players can see who did what, so they trust the division.
+
+Both values need fast capture and correct data. For example, attendance at training takes seconds, on a phone, with one hand. The stored data is the truth and must be right.
 
 ## Where we are
 - The first version (SvelteKit and TypeScript, built September 2026) is not good enough in daily use. Its history is in `docs/changes/done/2026-09-20-mvp/`.
@@ -43,17 +49,18 @@ It is not:
 - Duties, part 1, runs on the cluster (v0.5.0, released 28 October 2026): each game has its own page; the coordinator copies the referee committee's schedule into the tool (the 4 table and referee places of each home game of the club, each given to a club team, and "Schedule entered"), sets the drivers of the team's away games (proposed as one per 3 players), puts players on the places of the team and corrects them after the game; "Season" and the start page show the places and their open items, and the page "Duties" shows the duty totals of each player. A reading of the game list never changes what the coordinator stored.
 - Duties, part 2, runs on the cluster (v0.7.0, released 31 October 2026), so duties is complete: the message of the week (a button on the start page opens the Dutch text to copy about this week, Monday to Sunday: the games of the team, the drivers, the table and referee places of the team), the committee message (the table and referee places of this week with first and last names), and the duty overviews (two buttons on the page "Duties" give the Dutch text with all coming drives, or all coming table and referee places).
 - The sheet is still in use.
-- The product is successful when the coordinator stops using the sheet.
+- The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it.
 
 ## North star
-Each week, the coordinator spends a few minutes in the tool and none in the sheet. Every
+Each week, the coordinator spends a few minutes in the tool and none in the sheet. The coordinator
+knows who makes an effort for the team. Every
 message that goes to the team, the parents or the referee committee comes from the tool,
 correct the first time. No one questions whether the duties are shared fairly, because they can
 see it.
 
 ## Where we are going
 First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews, attendance at games, and a report of what each player did. Each step must be good
+Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews (built), the report of what each player did, and attendance at games. Each step must be good
 enough to replace that part of the sheet.
 
 ## Longer horizon
@@ -73,7 +80,7 @@ These stay ideas until real use shows the need.
 5. **The committee message.** Before the weekend, the coordinator copies a message for the referee committee with each game of this week where the team has table or referee places, its start time, and which player (first and last name) does which duty.
 6. **The duty overviews.** After a new or changed schedule, or whenever the coordinator wants, the coordinator shares an overview of all coming duties: one for driving, one for table and referee. The overviews show who does what, not how much each player has done.
 7. **Attendance at games.** Whenever there is time, the coordinator records who was at a game, as at a training.
-8. **The report of what each player did.** The coordinator sees one table with a row for each player: trainings, games, driving, table and referee. For now it is for the coordinator; it may be shared later.
+8. **The report of what each player did.** The coordinator sees one table with a row for each player: trainings, games, driving, table and referee. It is for the coordinator; the coordinator may copy parts of it into the team chat. It comes before attendance at games: until then it shows no games.
 
 ## Priorities
 1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
@@ -82,8 +89,8 @@ These stay ideas until real use shows the need.
 4. **Duties and the message of the week** – the weekly message is the second thing done every week.
 5. **The committee message** – built on the same duties.
 6. **The duty overviews** – show the team and the parents who does which coming duty.
-7. **Attendance at games** – recorded when there is time; needed for the report.
-8. **The report of what each player did** – makes the fairness visible, first to the coordinator.
+7. **The report of what each player did** – the place where the effort and the duties of each player come together; the main goal of the tool. First with trainings and duties.
+8. **Attendance at games** – recorded when there is time; adds the games to the report.
 
 ## Principles
 - **The coordinator carries the text to the chat.** The tool only produces text to copy. It never posts.
@@ -140,3 +147,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-31 | Where we are: the duty overviews are built and reviewed (story E of duties); the review of the whole of duties comes next |
 | 2026-10-31 | Where we are: duties is complete and reviewed; a release comes next |
 | 2026-10-31 | Where we are: duties part 2 is released (v0.7.0) and runs on the cluster |
+| 2026-11-03 | Purpose made explicit: the tool shows what each player gives to the team. Core values: 1 see who makes an effort, 2 share the duties fairly and easily; fast capture and correct data are a condition for both. Success tied to these goals. The report comes before attendance at games (priorities 7 and 8 change places). Word contribution |

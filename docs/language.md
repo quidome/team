@@ -31,6 +31,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | committee message | The message for the referee committee: which player does which table or referee place at the games of this week. | |
 | duty overview | A message with all coming duties of one group: driving, or table and referee. It shows who does what, not how much. | "Duty overview". Not "schedule", not "report". |
 | report | A table for the coordinator about what each player did, for example trainings, games and duties. | Not "overview", not "message". |
+| contribution | What a player gives to the team: the effort at training and games (attendance, with the reason for each absence), and the duties done. The tool exists to show it. | "Contribution". Not "score", not "points": the tool does not rank players. |
 | open item | Something that still needs the coordinator, shown on the start page, for example a past training that is not checked. The tool works it out; the coordinator never adds one. | "3 open items". Not "reminder" (the tool never sends one), not "to do". |
 | Season | The page with all events of the season that the tool knows. | "Season" for the page. Not "overview" (that is for a duty overview). |
 | referee committee | The club group that gives the table and referee places of the club's home games to the club teams, and wants to know which players do them. | |
