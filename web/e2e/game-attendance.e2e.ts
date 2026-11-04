@@ -108,7 +108,8 @@ test('"Extra players" changes the count and stops at 0 and 10', async ({ page })
 	await expect(page.getByTestId('extra-number')).toHaveText('10');
 	for (let number = 9; number >= 0; number -= 1) await less.click();
 	await expect(page.getByTestId('extra-number')).toHaveText('0');
-	await expect(count(page)).not.toContainText('coming ·');
+	// No players coming and no extra players: no part "N coming" ("1 not coming" may be there).
+	await expect(count(page)).not.toHaveText(/^\d+ coming/);
 	await expect(less).toBeDisabled();
 });
 
