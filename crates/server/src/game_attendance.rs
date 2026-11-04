@@ -139,6 +139,28 @@ pub async fn set_extra(
     Ok(())
 }
 
+/// "Answers checked": the answers hold for `date`, the date of the game now. One write; a second
+/// tap writes the same date.
+pub async fn answers_checked(
+    db: impl PgExecutor<'_>,
+    key: GameKey,
+    date: NaiveDate,
+) -> Result<(), StoreError> {
+    sqlx::query!(
+        "INSERT INTO game_attendance (club_number, season_year, source_id, answers_for)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (club_number, season_year, source_id)
+         DO UPDATE SET answers_for = excluded.answers_for",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        date,
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 /// What is stored for the game of `key`.
 pub async fn of_game(
     db: &PgPool,

@@ -69,6 +69,93 @@ test('the open items of the game list show their words', async ({ page }) => {
 	);
 });
 
+/** A game of an open item: the first coming game of the team, so its page opens. */
+async function teamGame(page: import('@playwright/test').Page) {
+	const season = await (await page.request.get('/api/season')).json();
+	const game = season.coming
+		.map((event: { game?: { id: number; reason: string } }) => event.game)
+		.find((game?: { reason: string }) => game?.reason === 'team');
+	return {
+		season: '2026-2027',
+		id: game.id as number,
+		date: '2026-10-31',
+		start_time: '16:00',
+		home: 'Blue Drakes M16 1',
+		away: 'BC Utrecht Cangeroes M16 2'
+	};
+}
+
+test('the warnings of one game show their words, and a tap opens the game', async ({ page }) => {
+	const errors = watchConsole(page);
+	const game = await teamGame(page);
+	await withOpenItems(page, [
+		{ kind: 'too_few_players', games: [{ ...game, coming: 5, no_answer: 3, enough: 7 }] },
+		{ kind: 'driver_not_coming', games: [{ ...game, drivers: ['Anna'] }] },
+		{ kind: 'answers_moved', games: [{ ...game, date: '2026-11-04' }] }
+	]);
+	await page.goto('/');
+	await expect(page.getByTestId('open-item')).toHaveText([
+		'Game Sat 31 Oct: 5 of 7 players, 3 no answer',
+		'Away game Sat 31 Oct: driver Anna is not coming',
+		'Game Wed 4 Nov moved: check the answers'
+	]);
+	await page.locator('[data-kind="too_few_players"]').click();
+	await expect(page).toHaveURL(new RegExp(`/game/2026-2027/${game.id}\\?from=start$`));
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/$/);
+	expect(errors).toEqual([]);
+});
+
+test('the warnings of more games or drivers have their own words, and a tap lists the games', async ({
+	page
+}) => {
+	const game = await teamGame(page);
+	const other = { ...game, id: game.id + 1, date: '2026-11-07' };
+	await withOpenItems(page, [
+		{
+			kind: 'too_few_players',
+			games: [
+				{ ...game, coming: 6, no_answer: 0, enough: 7 },
+				{ ...other, coming: 4, no_answer: 2, enough: 7 }
+			]
+		},
+		{ kind: 'driver_not_coming', games: [{ ...game, drivers: ['Anna', 'Bram'] }] },
+		{ kind: 'answers_moved', games: [game, other] }
+	]);
+	await page.goto('/');
+	await expect(page.getByTestId('open-item')).toHaveText([
+		'2 games: too few players',
+		'Away game Sat 31 Oct: 2 drivers are not coming',
+		'2 games moved: check the answers'
+	]);
+	await page.locator('[data-kind="too_few_players"]').click();
+	await expect(
+		page.locator('#open-item-too_few_players').getByTestId('open-item-game')
+	).toHaveCount(2);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+});
+
+test('one game without "no answer", and more games with a driver not coming', async ({ page }) => {
+	const game = await teamGame(page);
+	const other = { ...game, id: game.id + 1, date: '2026-11-07' };
+	await withOpenItems(page, [
+		{ kind: 'too_few_players', games: [{ ...game, coming: 5, no_answer: 0, enough: 7 }] },
+		{
+			kind: 'driver_not_coming',
+			games: [
+				{ ...game, drivers: ['Anna'] },
+				{ ...other, drivers: ['Bram'] }
+			]
+		}
+	]);
+	await page.goto('/');
+	await expect(page.getByTestId('open-item')).toHaveText([
+		'Game Sat 31 Oct: 5 of 7 players',
+		'2 games: a driver is not coming'
+	]);
+});
+
 test('a training day not opened is an open item that opens it', async ({ page }) => {
 	await page.goto('/');
 	const item = page.locator('[data-testid="open-item"][data-kind="not_opened"]');

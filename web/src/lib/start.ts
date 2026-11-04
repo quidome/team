@@ -1,6 +1,6 @@
 // The start page (story B of start page and season): the words and the links of the open items.
 import { resolve } from '$app/paths';
-import type { OpenGame, OpenItemView } from '#lib/api/client.js';
+import type { DriverGameView, OpenGame, OpenItemView, TooFewGameView } from '#lib/api/client.js';
 import { formatDay } from '#lib/schedule.js';
 
 /** "1 change not seen", "3 changes not seen". */
@@ -17,6 +17,24 @@ export function openItemText(item: OpenItemView): string {
 			return `The games may be out of date since ${formatDay(item.since)}.`;
 		case 'changes':
 			return unseenLine(item.count);
+		case 'too_few_players': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? tooFewText(first)
+				: `${item.games.length} games: too few players`;
+		}
+		case 'driver_not_coming': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? driverText(first)
+				: `${item.games.length} games: a driver is not coming`;
+		}
+		case 'answers_moved': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? `Game ${formatDay(first.date)} moved: check the answers`
+				: `${item.games.length} games moved: check the answers`;
+		}
 		case 'schedule_not_entered': {
 			const [first] = item.games;
 			return item.games.length === 1 && first
@@ -50,10 +68,10 @@ export function openItemLink(item: OpenItemView): string | null {
 			return `${resolve('/season')}#game-list`;
 		case 'changes':
 			return resolve('/changes');
-		case 'schedule_not_entered': {
-			const [first] = item.games;
-			return item.games.length === 1 && first ? gameLink(first.season, first.id) : null;
-		}
+		case 'too_few_players':
+		case 'driver_not_coming':
+		case 'answers_moved':
+		case 'schedule_not_entered':
 		case 'open_places': {
 			const [first] = item.games;
 			return item.games.length === 1 && first ? gameLink(first.season, first.id) : null;
@@ -62,6 +80,24 @@ export function openItemLink(item: OpenItemView): string | null {
 		case 'not_checked':
 			return trainingLink(item.first);
 	}
+}
+
+/** "Game Sat 31 Oct: 5 of 7 players, 3 no answer"; without "no answer": "Game Sat 31 Oct: 5 of 7
+ * players". */
+function tooFewText(game: TooFewGameView): string {
+	const open = game.no_answer > 0 ? `, ${game.no_answer} no answer` : '';
+	return `Game ${formatDay(game.date)}: ${game.coming} of ${game.enough} players${open}`;
+}
+
+/** "Away game Sat 31 Oct: driver Anna is not coming", "Away game Sat 31 Oct: 2 drivers are not
+ * coming". */
+function driverText(game: DriverGameView): string {
+	const [name] = game.drivers;
+	const who =
+		game.drivers.length === 1 && name !== undefined
+			? `driver ${name} is not coming`
+			: `${game.drivers.length} drivers are not coming`;
+	return `Away game ${formatDay(game.date)}: ${who}`;
 }
 
 /** "2 drivers open", "1 table place open", "1 referee place, 2 table places open". */

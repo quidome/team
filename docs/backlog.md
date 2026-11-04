@@ -3,9 +3,10 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; story B, [warnings in time](changes/2026-11-04-warnings-in-time/), is at stage implement (2026-11-04): too few players, a driver who does not come, and a moved game with old answers, on the start page and the page of the game.
+- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; story B, [warnings in time](changes/2026-11-04-warnings-in-time/), is at stage close (2026-11-04), built and reviewed: too few players, a driver who does not come, and a moved game with old answers, on the start page and the page of the game.
 
 Small:
+- A race test for the saves with `ON CONFLICT` of story A of attendance at games, `set_extra` and `answer` in `crates/server/src/game_attendance.rs` (pattern in `docs/architecture.md`; build review R2 of warnings in time, 2026-11-04).
 - Driver proposal: one driver for every 4 players, not 3, so 10 players give 3 drivers (coordinator, 2026-10-31; 3 for each car is ideal, 4 fit).
 - The browser test `web/e2e/choose.e2e.ts:200` ("games that cannot be loaded after a reading do not look like a failed reading") failed once in `just check` on 2026-10-31: "No changes" did not appear within 5 seconds. It then passed 3 times alone and in the next full run. Cause not found.
 - Tap "Copy" on the page "Message of the week" (built first as "Message for the next game") on the phone after the release of story C, and note the result (accept review A7 of the message for the next game; the clipboard is checked only in the browser tests).

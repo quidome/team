@@ -102,7 +102,7 @@
 								>
 									{openItemText(item)}
 								</button>
-								{#if expanded === item.kind && (item.kind === 'schedule_not_entered' || item.kind === 'open_places')}
+								{#if expanded === item.kind && 'games' in item}
 									<ul id="open-item-{item.kind}" class="mt-2 space-y-1 pl-4">
 										{#each item.games as game (game.id)}
 											<li>

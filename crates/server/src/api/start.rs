@@ -9,8 +9,9 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    DutyKind, Event, EventKind, Game, OpenItem, ReadingState, Season, last_games, last_training,
-    next_events, open_item_seasons, open_items, open_places_games, schedule_not_entered,
+    DutyKind, ENOUGH_PLAYERS, Event, EventKind, Game, GameWarnings, OpenItem, PlayerId,
+    ReadingState, ScheduleReason, Season, last_games, last_training, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered,
 };
 use utoipa::ToSchema;
 
@@ -64,6 +65,12 @@ pub enum OpenItemView {
     OutOfDate { since: String },
     /// Changes not seen yet.
     Changes { count: u32 },
+    /// Games of the team in their warning period with fewer than `enough` coming.
+    TooFewPlayers { games: Vec<TooFewGameView> },
+    /// Coming games of the team with drivers who are not coming.
+    DriverNotComing { games: Vec<DriverGameView> },
+    /// Games of the team in their warning period with answers from before a move.
+    AnswersMoved { games: Vec<GameItemView> },
     /// Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time
     /// order.
     ScheduleNotEntered { games: Vec<GameItemView> },
@@ -99,6 +106,25 @@ pub struct OpenGameView {
     pub drive: usize,
 }
 
+/// A game with too few players: the players coming (with the extra players), without an answer,
+/// and the number that is enough (7).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TooFewGameView {
+    #[serde(flatten)]
+    pub game: GameItemView,
+    pub coming: usize,
+    pub no_answer: usize,
+    pub enough: usize,
+}
+
+/// A game with drivers who are not coming: their names shown, in the order of the places.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct DriverGameView {
+    #[serde(flatten)]
+    pub game: GameItemView,
+    pub drivers: Vec<String>,
+}
+
 impl GameItemView {
     fn of(season: Season, game: &Game) -> Self {
         Self {
@@ -114,11 +140,47 @@ impl GameItemView {
 
 impl OpenItemView {
     /// The view of `item`; the games of an item come from `games` (the games of `season`).
-    fn of(item: OpenItem, season: Season, games: &BTreeMap<i64, &Game>) -> Self {
+    fn of(
+        item: OpenItem,
+        season: Season,
+        games: &BTreeMap<i64, &Game>,
+        names: &BTreeMap<PlayerId, String>,
+    ) -> Self {
+        let item_of = |id: &i64| games.get(id).map(|game| GameItemView::of(season, game));
         match item {
             OpenItem::ReadingHeldBack => Self::ReadingHeldBack,
             OpenItem::OutOfDate { since } => Self::OutOfDate { since: day(since) },
             OpenItem::ChangesNotSeen { count } => Self::Changes { count },
+            OpenItem::TooFewPlayers { games: short } => Self::TooFewPlayers {
+                games: short
+                    .iter()
+                    .filter_map(|(id, count)| {
+                        Some(TooFewGameView {
+                            game: item_of(id)?,
+                            coming: count.coming,
+                            no_answer: count.no_answer,
+                            enough: ENOUGH_PLAYERS,
+                        })
+                    })
+                    .collect(),
+            },
+            OpenItem::DriverNotComing { games: drivers } => Self::DriverNotComing {
+                games: drivers
+                    .iter()
+                    .filter_map(|(id, players)| {
+                        Some(DriverGameView {
+                            game: item_of(id)?,
+                            drivers: players
+                                .iter()
+                                .map(|player| names.get(player).cloned().unwrap_or_default())
+                                .collect(),
+                        })
+                    })
+                    .collect(),
+            },
+            OpenItem::AnswersMoved { games: moved } => Self::AnswersMoved {
+                games: moved.iter().filter_map(item_of).collect(),
+            },
             OpenItem::ScheduleNotEntered { games: ids } => Self::ScheduleNotEntered {
                 games: ids
                     .iter()
@@ -200,12 +262,27 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         (Some(list), Some(trainings)) => trainings.events(&games.schedule, list),
         _ => Default::default(),
     };
+    // The warnings of the coming games of the team: the rule of the page of a game.
+    let now = in_netherlands(clock.now());
+    let warnings: Vec<(i64, GameWarnings)> = games
+        .schedule
+        .coming
+        .iter()
+        .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame)
+        .map(|scheduled| {
+            (
+                scheduled.game.source_id,
+                games.duties.warnings(scheduled, now),
+            )
+        })
+        .collect();
     let items = open_items(
         &reading,
         games.unseen_changes,
         schedule_not_entered(&events, &places, today),
         open_places_games(&events, &places, today),
         &lists,
+        &warnings,
     );
     let last = last_training(&lists)
         .map(|row| {
@@ -266,7 +343,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     Ok(Json(StartAnswer {
         open_items: items
             .into_iter()
-            .map(|item| OpenItemView::of(item, current, &by_id))
+            .map(|item| OpenItemView::of(item, current, &by_id, &games.duties.names))
             .collect(),
         last,
         next,

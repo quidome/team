@@ -11,12 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
     Answer, AnswerError, Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError,
-    DutyKind, Game, GameAttendance, GameCount, GamePlaces, ListRow, MAX_EXTRA_PLAYERS, NotOffered,
-    Offer, Outcome, PlaceKind, PlayerId, ReasonId, RequiredDuties, ScheduleReason, ScheduledGame,
-    Season, StoredDuties, StoredGame, Team, TeamNumber, check_answer, check_assignment,
-    check_drivers, check_entered, check_outcome, check_team, choice_players, clashes, club_teams,
-    duty_totals, extra_players, game_count, game_list, game_places, in_schedule, kept_games,
-    offers, pick_team, players_playing_on, plays_games_on, required_duties, worst_clash,
+    DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GamePlaces, GameWarnings, ListRow,
+    MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome, PlaceKind, PlayerId, ReasonId, RequiredDuties,
+    ScheduleReason, ScheduledGame, Season, StoredDuties, StoredGame, Team, TeamNumber,
+    answers_moved, check_answer, check_assignment, check_drivers, check_entered, check_outcome,
+    check_team, choice_players, clashes, club_teams, duty_totals, extra_players, game_count,
+    game_list, game_places, game_warnings, in_schedule, kept_games, offers, pick_team,
+    players_playing_on, plays_games_on, required_duties, worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -26,7 +27,7 @@ use super::season::{
 };
 use crate::api::clubs::TeamView;
 use crate::app::AppState;
-use crate::clock::{current_season, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands, today_in_netherlands};
 use crate::db::StoreError;
 use crate::duties::{self, GameKey};
 use crate::error::AppError;
@@ -64,6 +65,15 @@ pub struct GameAttendanceView {
     pub extra_players: u8,
     /// The highest number of extra players.
     pub max_extra_players: u8,
+    /// "Too few players": fewer than `enough_players` coming, before the start, from 3 days
+    /// before the game and earlier once it has an answer (`team_core::game_warnings`, the rule of
+    /// the open item).
+    pub too_few: bool,
+    /// The number of players that is enough (7).
+    pub enough_players: usize,
+    /// "Answers from before the move": the answers were given for another date than the date of
+    /// the game now; until "Answers checked" (`team_core::answers_moved`).
+    pub answers_moved: bool,
 }
 
 /// The answer of a tap: kept small, so a tap is quick.
@@ -73,6 +83,11 @@ pub struct AttendanceView {
     pub row: Option<AnswerRow>,
     pub count: CountView,
     pub extra_players: u8,
+    /// As `GameAttendanceView::too_few`, after the tap.
+    pub too_few: bool,
+    pub enough_players: usize,
+    /// As `GameAttendanceView::answers_moved`, after the tap.
+    pub answers_moved: bool,
 }
 
 /// A player on the list of a game.
@@ -527,15 +542,27 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
     })
 }
 
-/// The list of the game of `found` as stored now, with what is stored beside it.
+/// The list of the game of `found` as stored now, with what is stored beside it, its warnings now
+/// (`team_core::game_warnings`, the rule of the open items), and whether its answers are from
+/// before a move (`team_core::answers_moved`, with no period).
 async fn stored_list(
     state: &AppState,
     found: &Found,
     duties: &SeasonDuties,
-) -> Result<(Vec<ListRow>, GameAttendance), AppError> {
+) -> Result<(Vec<ListRow>, GameAttendance, GameWarnings, bool), AppError> {
     let (attendance, answers) = game_attendance::of_game(&state.pool, found.key()).await?;
     let list = game_list(&duties.players, &duties.roles, &answers, found.game.date);
-    Ok((list, attendance))
+    let moved = answers_moved(&attendance, !answers.is_empty(), found.game.date);
+    let warnings = game_warnings(
+        &found.game,
+        found.in_list,
+        &list,
+        &attendance,
+        !answers.is_empty(),
+        duties.assignments_of(found.game.source_id),
+        in_netherlands(state.clock.now()),
+    );
+    Ok((list, attendance, warnings, moved))
 }
 
 fn answer_row(row: &ListRow, duties: &SeasonDuties) -> AnswerRow {
@@ -560,7 +587,7 @@ async fn attendance_of(
     if found.reason != ScheduleReason::TeamGame {
         return Ok(None);
     }
-    let (list, attendance) = stored_list(state, found, duties).await?;
+    let (list, attendance, warnings, moved) = stored_list(state, found, duties).await?;
     Ok(Some(GameAttendanceView {
         rows: list.iter().map(|row| answer_row(row, duties)).collect(),
         reasons: reasons::all(&state.pool)
@@ -571,6 +598,9 @@ async fn attendance_of(
         count: game_count(&list, attendance.extra_players).into(),
         extra_players: attendance.extra_players,
         max_extra_players: MAX_EXTRA_PLAYERS,
+        too_few: warnings.too_few_line,
+        enough_players: ENOUGH_PLAYERS,
+        answers_moved: moved,
     }))
 }
 
@@ -581,13 +611,16 @@ async fn tapped(
     duties: &SeasonDuties,
     player: Option<PlayerId>,
 ) -> Result<AttendanceView, AppError> {
-    let (list, attendance) = stored_list(state, found, duties).await?;
+    let (list, attendance, warnings, moved) = stored_list(state, found, duties).await?;
     Ok(AttendanceView {
         row: player
             .and_then(|player| list.iter().find(|row| row.player == player))
             .map(|row| answer_row(row, duties)),
         count: game_count(&list, attendance.extra_players).into(),
         extra_players: attendance.extra_players,
+        too_few: warnings.too_few_line,
+        enough_players: ENOUGH_PLAYERS,
+        answers_moved: moved,
     })
 }
 
@@ -1109,5 +1142,30 @@ pub async fn set_extra_players(
     let number = extra_players(input.extra_players).ok_or(AppError::BadRequest("out_of_range"))?;
     game_attendance::set_extra(&state.pool, found.key(), number).await?;
     tracing::info!(season = %found.season, game = found.game.source_id, "extra players saved");
+    Ok(Json(tapped(&state, &found, &duties, None).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/answers-checked",
+    operation_id = "setAnswersChecked",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "Saved: the answers hold for the date of the game now", body = AttendanceView),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_answers_checked(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<AttendanceView>, AppError> {
+    let (found, duties) = team_game(&state, &season, &id).await?;
+    game_attendance::answers_checked(&state.pool, found.key(), found.game.date).await?;
+    tracing::info!(season = %found.season, game = found.game.source_id, "answers checked");
     Ok(Json(tapped(&state, &found, &duties, None).await?))
 }

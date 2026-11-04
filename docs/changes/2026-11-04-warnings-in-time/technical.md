@@ -1,6 +1,6 @@
 # Technical spec: Warnings in time
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-11-04-warnings-in-time](./)
 **Date**: 2026-11-04
@@ -260,13 +260,15 @@ team (about 20), in memory. The API gets new kinds of open items; the front end 
 it. The open items of the start page now hold player names (only in the JSON, never in a log).
 
 ## Progress
-- [ ] Step 1
-- [ ] Step 2
-- [ ] Step 3
-- [ ] Step 4
-- [ ] All checks pass
+- [x] Step 1 (2026-11-04): `ENOUGH_PLAYERS`, `WARNING_DAYS`, `GameWarnings` (with `too_few_line`), `before_start`, `in_warning_period`, `drivers_not_coming`, `answers_moved`, `game_warnings` in `contribution/game_attendance.rs`; 9 new core tests. The case "all answering players off the list" of `answers_moved` is a comment, not a separate case: the function reads `has_answers`, not the list.
+- [x] Step 2 (2026-11-04): `OpenItem::TooFewPlayers`, `DriverNotComing`, `AnswersMoved` and their place in `open_items` (a new last input, the warnings in time order); `SeasonDuties::list_of` (shared by `row_count`) and `warnings`; `GET /api/start` with `too_few_players`, `driver_not_coming` (names) and `answers_moved`, from the coming games of the team of the current season; the texts, the list below an item and the links in `web/src/lib/start.ts` and `+page.svelte`. Tests: 2 core tests of the order; 6 server tests in `tests/start.rs` (the period of "too few" with its edges at 23:59/00:00 and the start time, extra players, the driver at once and its ends, the driver at the start time, the move with "Seen", a game that left the list); `tests/warning_logs.rs`; 3 browser tests in `start.e2e.ts`.
+- [x] Step 3 (2026-11-04): `too_few` and `enough_players` in `GameAttendanceView` and `AttendanceView`, from `game_warnings` on the list stored after the save (`stored_list` in `api/games.rs`); the line "Too few players: 6 of 7" in `GameAttendance.svelte`; "· not coming" / "· absent" at a driver place and "Not coming" in the choice of a driver on the page of a game. Tests: `too_few_on_the_page_starts_earlier_once_the_game_has_an_answer` (server); 2 browser tests in `game-attendance.e2e.ts` (the line with a replaced answer; a driver who taps "Not coming", at the place and in the choice, with the data put back). Not in a browser test: "· absent" on a past game (one condition on `past`, which the page already has).
+- [x] Step 4 (2026-11-04): `answers_moved` in `GameAttendanceView` and `AttendanceView` (no period); store `game_attendance::answers_checked` (one upsert of `answers_for`; `.sqlx/` updated); route `PUT /api/games/{season}/{id}/answers-checked` (`setAnswersChecked`), answer `AttendanceView` with `row: null`; the note "Answers from before the move to …" with "Answers checked" in `GameAttendance.svelte` (the queue of the taps, so a failure shows "Not saved. Try again."; the component gets the date of the game). Tests: 3 server tests (the note at once and after a new answer, the item, "Answers checked" with a second call; `not_a_team_game`; 401); 1 browser test (the note with a replaced answer, the tap on the real route).
+- [x] All checks pass (`just check`, 2026-11-04; `api-types-check` compares with the git index, so the generated types were staged first)
 
 ## Deviations
+- **Step 3, 2026-11-04: how the page gets the answers.** The design says the notes at a driver place and in the choice read `attendance.rows`, "which each tap keeps up to date". That is not true: a tap changes only the state inside `GameAttendance.svelte`, not the data of the page. The component now gives the page the answer shown of each player through a callback (`onanswers`), and the notes read that. No change for the coordinator; the notes still need no rule of their own.
+- **Detail not named by the spec (step 2, 2026-11-04).** The spec gives the item of a move only for one game. For more games the text is "2 games moved: check the answers", as the other items of more games, with the list below it.
 - **D1 (Q2, coordinator 2026-11-04).** The spec (story A, edge cases) says only "Answers
   checked" ends the open item "Game Wed 4 Nov moved: check the answers". Here the open item ends
   at the start time of the game, as the other two warnings; the note on the page of the game stays
@@ -321,4 +323,123 @@ this file. Not the steps of this design, and no code.
 Answers, 2026-11-04:
 - D1 (serves): kept. The gap in release 1 (a moved game after its start time has no item) is accepted; stories C and D close it.
 - Q1 (serves – note): the deviation is withdrawn. The design follows story A's criterion (`too_few_line`); Requirements, step 1 and step 3 changed. Nothing for Close.
+
+
+### Build review
+Fresh review, 2026-11-04, of the diff against `main` (committed and not), against
+`docs/architecture.md`, the valid decisions (0001, 0020, 0022, 0027, 0028) and `CLAUDE.md`.
+Runs: `cargo test -p team_core` (323 + 7 pass), `cargo test -p team --test start --test
+game_attendance --test warning_logs` (16, 17, 1 pass). Not run: the browser tests and `just check`.
+
+Checked with no finding: the domains (`contribution::game_attendance` uses `events::game` and
+`contribution::duties`; `output::start_page` uses contribution and team; all allowed by 0027,
+read of the `use` lines); one rule (the page and `GET /api/start` both call `game_warnings`, with
+`has_answers` from the stored answers in both, trace of `stored_list` and `SeasonDuties::list_of`);
+the order of the open items against the spec (read of `open_items` and its core test); the item
+games and `by_id` come from the same `games.schedule.coming`, so no item can lose its games
+(trace); a game that left the list, a kept game and a game of another team give no warning (trace:
+`in_list`, `ScheduleReason::TeamGame`); after all answers are cleared, the next first answer sets
+`answers_for` again, so no false "moved" (read of `game_attendance::answer`); the new log line has
+only season and game id (read; `tests/warning_logs.rs` covers the start page).
+
+- **R1 – "· absent" reads as the wrong player after a correction.** On a past game the suffix is
+  added after `playerText(on)`, but `notComingDriver` tests `on.id`, the planned player. With
+  "Someone else" the place shows "Bram (was Anna) · absent" and with "Nobody" "not done (was Anna)
+  · absent": it reads as if Bram, or nobody, was absent. The spec gives only "Anna · absent".
+  Either show the suffix only with `outcome === 'as_planned'`, or put it next to the planned name.
+  There is no test of "· absent" (Progress, step 3, says so). Checked: trace of
+  `web/src/routes/game/[season]/[id]/+page.svelte` (the place line) and `playerText` in
+  `web/src/lib/duties.ts`; not run.
+- **R2 – `answers_checked` has no test of a same-key insert at the same moment.** It is an
+  `INSERT … ON CONFLICT … DO UPDATE` on a row that may not exist yet. `docs/architecture.md`
+  ("A save guarded by a unique index or `ON CONFLICT` has a test that holds an insert of the same
+  key in an open transaction on another connection") asks for that test; the design's "no lock"
+  does not remove it. The upsert itself is safe in PostgreSQL, so the risk is low; the finding is
+  the broken pattern. Sibling: story A's `set_extra` and `answer` (both `ON CONFLICT` on
+  `game_attendance`) have no such test either. Checked: search `pool.begin` in
+  `crates/server/tests/` (no hit in `game_attendance.rs`; hits in `trainings.rs`, e.g.
+  `open_twice_gives_one_training`).
+- **R3 – the order check in `too_few_players_is_an_open_item_from_3_days_until_the_start` cannot
+  fail as written.** `at("too_few_players") < at("schedule_not_entered").or(Some(usize::MAX))`
+  passes whenever "schedule not entered" is absent, and nothing checks "after the changes not seen"
+  that the comment names. The order is tested for real in the core
+  (`the_warnings_come_after_the_changes_and_before_the_schedule`), so this is a weak test, not a
+  gap. Check the position of both neighbours, or drop the line. Checked: read of the test; not
+  checked whether the item "schedule not entered" is there at that moment.
+- **R4 – for Close: documents the diff made false.** `docs/architecture.md`: the `start_page`
+  part of "Domains of the core" lists the order of `open_items` without the three new items;
+  "Attendance at games" does not name `game_warnings`, `answers_moved`, `answers_checked`, the
+  route `PUT …/answers-checked`, or the new fields of `GameAttendanceView`/`AttendanceView`; the
+  module list of `api/` and `game_attendance.rs` is unchanged. Decision 0028, Consequences, says
+  the rule of `answers_for` "gets its record at the close of story B" (the Decisions table here
+  plans it too). `docs/product/game-attendance.md` and `start-page.md` (not read) will need the
+  warnings. Checked: search of `docs/architecture.md` for `open_items` and "Attendance at games";
+  read of decision 0028.
+
+Answers to the build review, 2026-11-04:
+- R1: fixed. The note of a driver is one function, `driverNote` in `web/src/lib/duties.ts`: only for the outcome "as planned", so "Bram (was Anna)" and "not done (was Anna)" get no note. The browser test of the driver replaces the page answer as a past game: "Anna · absent" with "as planned", "not done (was Anna)" without a note after "Nobody".
+- R2: fixed for this story. New test `answers_checked_waits_for_a_first_save_on_another_screen`: an insert of the same game in an open transaction on another connection; the save waits (300 ms), then answers 200, and both saves are kept. Checked by hand: without `ON CONFLICT` the test fails with 500; restored. Not fixed: the same test for `set_extra` and `answer` of story A (outside this change; a line for the backlog).
+- R3: fixed. The order check in `too_few_players_is_an_open_item_from_3_days_until_the_start` now has a change not seen (another game gets a new start time) and checks that "too few players" is after each earlier item and before each later item, with an item on both sides.
+- R4: for Close (architecture, the decision record "A mark holds for a date", `docs/product/game-attendance.md` and `start-page.md`).
+
+
+### Acceptance review
+Fresh review, 2026-11-04, of the result against the epic's story B and the move in story A
+(`../2026-10-31-attendance-at-games/functional.md`), its `idea.md`, and the requirements and
+objective above. Read: the diff against `main` (committed and not). Runs: `cargo test -p team_core`
+(323 + 7 pass); `cargo test -p team --test start --test game_attendance --test warning_logs` (17,
+17, 1 pass); `npx playwright test start game-attendance` (108 pass). Not run: the app by hand, and
+`just check`. The view below was formed from the spec and the code before the Deviations were
+weighed.
+
+| Criterion (story B unless named) | Built | Fit |
+|---|---|---|
+| "Too few" item from 00:00 3 days before until the start (no start time: end of date), Dutch time, with both texts and "2 games: too few players" with a list | `in_warning_period`, `game_warnings`, `tooFewText`; server tests at 23:59/00:00 and the start, across winter time | matches |
+| Driver "not coming" at once until the start; one, two drivers; more games with a list | `drivers_not_coming` in place order, `driverText` | matches |
+| A tap on an item for one game opens it; "Back" to the start page | `gameLink` with `?from=start` for all three; browser test | matches |
+| An item goes away by itself (7 reached, driver back, place changed, period over) | each item is recomputed from the stored state on each load; server tests for each end | matches; "game is checked" waits for story C |
+| "Anna · not coming" at the place, "Anna · absent" on a past game | `driverNote` | A2 |
+| "Not coming" in the choice; the driver stays a choice; never removed | `choice-not-coming`; no write to the places | matches |
+| Order of the open items | `open_items`; core test of all neighbours | matches ("games not checked" comes in story C) |
+| One rule of "too few" for the page and the item | both call `game_warnings` with the same list and `has_answers` (trace of `stored_list` and `SeasonDuties::list_of`) | matches |
+| No warning: left the list, not a team game, "no answer", off the list, table/referee | `in_list`, `ScheduleReason::TeamGame`, list lookup, `DutyKind::Drive` | matches |
+| Story A: "Too few players: 6 of 7" above the count, 3 days before and earlier once answered, until the start | `too_few_line`, sticky header above the count | matches |
+| Story A: the move note with "Answers checked"; "Seen" does not end it; the item from 3 days before the new date | `answers_moved`, `PUT …/answers-checked`, server test with "Seen" | A1, A3 |
+| Logs hold no names | `tests/warning_logs.rs`; the one new log line has season and game id only | matches |
+
+- **A1 – faithful adaptation: the text for more moved games.** The spec gives the move item only
+  for one game; "2 games moved: check the answers" with a list below follows the other two items.
+  Checked: read of `openItemText`; browser test of more games.
+- **A2 – faithful adaptation: "· absent" only while the planned driver did the duty.** After
+  "Someone else" or "Nobody" the note goes, so "Bram (was Anna)" is not read as Bram being absent.
+  The spec's purpose ("so the coordinator can use Someone else or Nobody") is served: the note
+  shows until the coordinator acts, then the correction speaks. Checked: read of `driverNote`;
+  browser test of the past game.
+- **A3 – neutral drift, accepted: the move item ends at the start time (D1).** The note on the
+  page stays until "Answers checked", which keeps the guard on the record. In release 1 nothing on
+  the start page points to the note of a moved game after its start time; stories C and D close
+  that. Checked: core test `the_warnings_of_a_game_follow_their_periods`; read of the page fields
+  (`answers_moved` has no period).
+- **A4 – neutral drift: the move note shows on any game of the team with moved answers**, also a
+  past game or one that left the game list, while the item follows the warning period and the game
+  list. The spec ties the note only to "the game has answers", so this is a reading, not a change.
+  Checked: read of `stored_list` (`answers_moved` without `in_list` or a period).
+- **A5 – known gaps of release 1, not deviations of this story:** an item does not end at
+  "Checked" (story C), and a cancelled game still warns (story E; Q3). Both are in "Not in
+  scope" and were accepted by the coordinator.
+- **A6 – for Close:** `docs/product/game-attendance.md` and `start-page.md` must describe the three
+  items, the line, the driver notes and "Answers checked" (also R4). Checked: not read; R4 names it.
+
+No concerning deviation found. The browser tests cannot reach a real warning period (fixed clock);
+the period itself is covered by the core and server tests, which I ran.
+
+**Verdict: accepted with notes.**
+
+Answers to the acceptance review, 2026-11-04:
+- A1: no change needed; recorded under Deviations (detail not named by the spec).
+- A2: no change needed; this is the fix of build finding R1.
+- A3: no change needed; deviation D1, accepted by the coordinator and the spec review; stories C and D close the gap.
+- A4: no change needed. The spec ties the note to "the game has answers"; a past game or a game that left the list with answers from before a move still has old answers, and the note says so until "Answers checked".
+- A5: no change needed; stories C and E, accepted for release 1.
+- A6: for Close, with R4.
 

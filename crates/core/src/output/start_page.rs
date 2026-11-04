@@ -9,10 +9,12 @@ use crate::contribution::attendance::TrainingState;
 use crate::contribution::duties::{
     DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind,
 };
+use crate::contribution::game_attendance::{GameCount, GameWarnings};
 use crate::events::schedule::ScheduleReason;
 use crate::events::training::{SeasonList, SeasonRow, not_checked, not_opened};
 use crate::output::season_view::{Event, EventKind, SeasonEvents};
 use crate::shared::season::Season;
+use crate::team::players::PlayerId;
 
 /// The state of the game list for the open items (Dutch dates).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -32,6 +34,20 @@ pub enum OpenItem {
     },
     ChangesNotSeen {
         count: u32,
+    },
+    /// Coming games of the team with too few players in their warning period, with the count, in
+    /// time order (`GameWarnings::too_few`).
+    TooFewPlayers {
+        games: Vec<(i64, GameCount)>,
+    },
+    /// Coming games of the team with drivers who are not coming, in time order.
+    DriverNotComing {
+        games: Vec<(i64, Vec<PlayerId>)>,
+    },
+    /// Coming games of the team with answers from before a move, in their warning period, in
+    /// time order.
+    AnswersMoved {
+        games: Vec<i64>,
     },
     /// Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time
     /// order (by source id).
@@ -133,17 +149,19 @@ pub fn open_places_games(
         .collect()
 }
 
-/// The open items in the order of the start page: the game list, the changes not seen, the home
-/// games whose schedule is not entered (`schedule_not_entered`), the games with open places
-/// (`open_places_games`), the training days not opened, the trainings not checked. A kind without
-/// items gives nothing. The training items count over all `lists`, with the oldest date as
-/// `first`.
+/// The open items in the order of the start page: the game list, the changes not seen, too few
+/// players, drivers not coming, answers from before a move (from `warnings`: the warnings of the
+/// coming games of the team in time order, `game_warnings`), the home games whose schedule is not
+/// entered (`schedule_not_entered`), the games with open places (`open_places_games`), the
+/// training days not opened, the trainings not checked. A kind without items gives nothing. The
+/// training items count over all `lists`, with the oldest date as `first`.
 pub fn open_items(
     reading: &ReadingState,
     unseen: u32,
     schedule_not_entered: Vec<i64>,
     open_places: Vec<OpenGame>,
     lists: &[SeasonList<'_>],
+    warnings: &[(i64, GameWarnings)],
 ) -> Vec<OpenItem> {
     let mut items = Vec::new();
     if reading.held_back {
@@ -154,6 +172,29 @@ pub fn open_items(
     }
     if unseen > 0 {
         items.push(OpenItem::ChangesNotSeen { count: unseen });
+    }
+    let too_few: Vec<(i64, GameCount)> = warnings
+        .iter()
+        .filter_map(|(id, warnings)| warnings.too_few.map(|count| (*id, count)))
+        .collect();
+    if !too_few.is_empty() {
+        items.push(OpenItem::TooFewPlayers { games: too_few });
+    }
+    let drivers: Vec<(i64, Vec<PlayerId>)> = warnings
+        .iter()
+        .filter(|(_, warnings)| !warnings.drivers_not_coming.is_empty())
+        .map(|(id, warnings)| (*id, warnings.drivers_not_coming.clone()))
+        .collect();
+    if !drivers.is_empty() {
+        items.push(OpenItem::DriverNotComing { games: drivers });
+    }
+    let moved: Vec<i64> = warnings
+        .iter()
+        .filter(|(_, warnings)| warnings.moved)
+        .map(|(id, _)| *id)
+        .collect();
+    if !moved.is_empty() {
+        items.push(OpenItem::AnswersMoved { games: moved });
     }
     if !schedule_not_entered.is_empty() {
         items.push(OpenItem::ScheduleNotEntered {
@@ -360,7 +401,7 @@ mod tests {
             out_of_date_since: Some(date(2026, 10, 8)),
         };
         assert_eq!(
-            open_items(&reading, 4, Vec::new(), Vec::new(), &[list]),
+            open_items(&reading, 4, Vec::new(), Vec::new(), &[list], &[]),
             [
                 OpenItem::ReadingHeldBack,
                 OpenItem::OutOfDate {
@@ -383,7 +424,14 @@ mod tests {
     fn one_and_three_training_days_not_opened() {
         let one = past(vec![row(date(2026, 10, 6), None)]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[one]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[one],
+                &[]
+            ),
             [OpenItem::NotOpened {
                 first: date(2026, 10, 6),
                 count: 1
@@ -400,7 +448,8 @@ mod tests {
                 0,
                 Vec::new(),
                 Vec::new(),
-                &[three]
+                &[three],
+                &[]
             ),
             [OpenItem::NotOpened {
                 first: date(2026, 9, 22),
@@ -419,7 +468,8 @@ mod tests {
                 0,
                 Vec::new(),
                 Vec::new(),
-                &[this, before]
+                &[this, before],
+                &[]
             ),
             [OpenItem::NotOpened {
                 first: date(2027, 6, 29),
@@ -434,7 +484,14 @@ mod tests {
         checked.checked = true;
         let list = past(vec![row(date(2026, 10, 6), Some(&checked))]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[list]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[list],
+                &[]
+            ),
             []
         );
     }
@@ -445,7 +502,14 @@ mod tests {
         cancelled.cancelled = true;
         let list = past(vec![row(date(2026, 10, 6), Some(&cancelled))]);
         assert_eq!(
-            open_items(&ReadingState::default(), 0, Vec::new(), Vec::new(), &[list]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[list],
+                &[]
+            ),
             []
         );
     }
@@ -682,7 +746,14 @@ mod tests {
     fn schedule_not_entered_comes_after_the_changes_and_before_the_trainings() {
         let list = past(vec![row(date(2026, 10, 6), None)]);
         assert_eq!(
-            open_items(&ReadingState::default(), 2, vec![7, 8], Vec::new(), &[list]),
+            open_items(
+                &ReadingState::default(),
+                2,
+                vec![7, 8],
+                Vec::new(),
+                &[list],
+                &[]
+            ),
             [
                 OpenItem::ChangesNotSeen { count: 2 },
                 OpenItem::ScheduleNotEntered { games: vec![7, 8] },
@@ -775,7 +846,14 @@ mod tests {
         let list = past(vec![row(date(2026, 10, 6), None)]);
         let open = vec![open_game(9, &[(DutyKind::Table, 1)])];
         assert_eq!(
-            open_items(&ReadingState::default(), 0, vec![7], open.clone(), &[list]),
+            open_items(
+                &ReadingState::default(),
+                0,
+                vec![7],
+                open.clone(),
+                &[list],
+                &[]
+            ),
             [
                 OpenItem::ScheduleNotEntered { games: vec![7] },
                 OpenItem::OpenPlaces { games: open },
@@ -851,5 +929,116 @@ mod tests {
         // 11 Oct has no places; 10 Oct has two games with places, also the gone one.
         assert_eq!(ids, [2, 4]);
         assert!(last_games(&events, &PlacesOf::new()).is_empty());
+    }
+
+    // The warnings of the games (story B of attendance at games).
+
+    fn short(coming: usize) -> GameCount {
+        GameCount {
+            coming,
+            not_coming: 0,
+            no_answer: 7 - coming,
+        }
+    }
+
+    fn warned(too_few: Option<usize>, drivers: &[i64], moved: bool) -> GameWarnings {
+        GameWarnings {
+            too_few: too_few.map(short),
+            too_few_line: too_few.is_some(),
+            drivers_not_coming: drivers.iter().copied().map(PlayerId).collect(),
+            moved,
+        }
+    }
+
+    #[test]
+    fn the_warnings_come_after_the_changes_and_before_the_schedule() {
+        let not_checked = training(1, date(2026, 10, 6));
+        let list = past(vec![
+            row(date(2026, 10, 6), Some(&not_checked)),
+            row(date(2026, 9, 29), None),
+        ]);
+        let reading = ReadingState {
+            held_back: true,
+            out_of_date_since: Some(date(2026, 10, 8)),
+        };
+        let open = vec![OpenGame {
+            id: 8,
+            open: BTreeMap::from([(DutyKind::Table, 1)]),
+        }];
+        let warnings = [(5, warned(Some(5), &[3], true))];
+        assert_eq!(
+            open_items(&reading, 4, vec![7], open.clone(), &[list], &warnings),
+            [
+                OpenItem::ReadingHeldBack,
+                OpenItem::OutOfDate {
+                    since: date(2026, 10, 8)
+                },
+                OpenItem::ChangesNotSeen { count: 4 },
+                OpenItem::TooFewPlayers {
+                    games: vec![(5, short(5))]
+                },
+                OpenItem::DriverNotComing {
+                    games: vec![(5, vec![PlayerId(3)])]
+                },
+                OpenItem::AnswersMoved { games: vec![5] },
+                OpenItem::ScheduleNotEntered { games: vec![7] },
+                OpenItem::OpenPlaces { games: open },
+                OpenItem::NotOpened {
+                    first: date(2026, 9, 29),
+                    count: 1
+                },
+                OpenItem::NotChecked {
+                    first: date(2026, 10, 6),
+                    count: 1
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn each_warning_keeps_the_order_of_its_games_and_is_left_out_without_games() {
+        let warnings = [
+            (3, warned(Some(6), &[], false)),
+            (1, warned(None, &[4, 2], false)),
+            (2, warned(Some(4), &[9], false)),
+            (4, GameWarnings::default()),
+        ];
+        assert_eq!(
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[],
+                &warnings
+            ),
+            [
+                OpenItem::TooFewPlayers {
+                    games: vec![(3, short(6)), (2, short(4))]
+                },
+                OpenItem::DriverNotComing {
+                    games: vec![(1, vec![PlayerId(4), PlayerId(2)]), (2, vec![PlayerId(9)])]
+                },
+            ]
+        );
+        // The line on the page alone is not an open item.
+        let line_only = [(
+            1,
+            GameWarnings {
+                too_few_line: true,
+                ..GameWarnings::default()
+            },
+        )];
+        assert_eq!(
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[],
+                &line_only
+            ),
+            []
+        );
     }
 }

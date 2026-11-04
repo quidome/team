@@ -23,8 +23,10 @@ pub use contribution::duties::{
     who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
-    Answer, AnswerError, GameAttendance, GameCount, ListRow, MAX_EXTRA_PLAYERS, StoredAnswer,
-    check_answer, extra_players, game_count, game_list, row_count,
+    Answer, AnswerError, ENOUGH_PLAYERS, GameAttendance, GameCount, GameWarnings, ListRow,
+    MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_moved, before_start, check_answer,
+    drivers_not_coming, extra_players, game_count, game_list, game_warnings, in_warning_period,
+    row_count,
 };
 pub use contribution::reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use events::club::{Club, ClubNumber, search_clubs};

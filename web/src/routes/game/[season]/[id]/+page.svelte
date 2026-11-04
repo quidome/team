@@ -7,7 +7,9 @@
 	that kind and the clashes; a tap on a player saves at once; "Clear". On a past game "Someone
 	else" (the same choice, never blocked by a clash) and "Nobody". A save that fails shows "Not
 	saved. Try again." and the stored state. At the top of a game of the team: who comes
-	(`GameAttendance`, story A of attendance at games).
+	(`GameAttendance`, story A of attendance at games). A driver whose answer is "not coming" shows
+	"· not coming" at the place ("· absent" after the date) and "Not coming" in the choice of a
+	driver (story B).
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -22,6 +24,7 @@
 		setOutcome,
 		setPlace,
 		setScheduleEntered,
+		type AnswerView,
 		type DutyKind,
 		type GamePage,
 		type PlaceOfTeam
@@ -32,6 +35,7 @@
 	import {
 		clashText,
 		doerOf,
+		driverNote,
 		driversNumber,
 		notOffered,
 		placeName,
@@ -95,6 +99,14 @@
 			busy = false;
 			chosen = null;
 		}
+	}
+
+	/** The answer shown of each player on the list (`GameAttendance`). */
+	let answers = $state<Record<number, AnswerView | null>>({});
+
+	/** A player on a driver place, or in its choice, whose answer is "not coming". */
+	function notComingDriver(kind: DutyKind, player: number): boolean {
+		return kind === 'drive' && answers[player] === 'not_coming';
 	}
 
 	/** The places of the team: the table and referee places that name it, then the drivers. */
@@ -186,7 +198,9 @@
 				<GameAttendance
 					season={page.season}
 					id={String(page.game.id)}
+					date={page.game.date}
 					attendance={page.attendance}
+					onanswers={(shown) => (answers = shown)}
 				/>
 			{/key}
 		{/if}
@@ -262,7 +276,9 @@
 							>
 								<span class="text-sm">{name}</span>
 								<span class="min-w-0 truncate text-sm font-medium" data-testid="place-player">
-									{on ? playerText(on) : 'open'}
+									{on
+										? playerText(on) + driverNote(on, notComingDriver(place.kind, on.id), page.past)
+										: 'open'}
 								</span>
 							</button>
 							{#if on?.not_in_team}
@@ -315,6 +331,11 @@
 														</span>
 														{#if reason}
 															<span class="block text-xs">{reason}</span>
+														{/if}
+														{#if notComingDriver(place.kind, player.id)}
+															<span class="block text-xs" data-testid="choice-not-coming"
+																>Not coming</span
+															>
 														{/if}
 														{#each player.clashes as clash (clash)}
 															<span class="block text-xs">{clashText(clash)}</span>

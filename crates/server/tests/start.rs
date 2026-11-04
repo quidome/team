@@ -6,7 +6,7 @@
 mod common;
 
 use common::Harness;
-use common::game_list::{DRAKES, M16_1, Reader, data, games_with, utc};
+use common::game_list::{DRAKES, M16_1, Reader, data, game_mut, games_with, utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -333,4 +333,265 @@ async fn in_july_the_open_items_and_last_cover_the_season_before(pool: PgPool) {
     assert_eq!(item(&answer, "not_opened"), None);
     assert_eq!(item(&answer, "not_checked"), None);
     assert_eq!(answer["last"], Value::Null);
+}
+
+// The warnings in time (story B of attendance at games).
+
+/// The away game of M16 1 on Saturday 7 November 2026 at 11:15 (Dutch time, UTC+1).
+const AWAY_7_NOV: i64 = 1_073_159;
+
+fn away_path() -> String {
+    format!("/api/games/2026-2027/{AWAY_7_NOV}")
+}
+
+/// `answer` of `player` at the away game of 7 November.
+async fn answer_at_away(reader: &Reader, player: i64, answer: &str) {
+    ok(
+        reader,
+        "PUT",
+        &format!("{}/answers/{player}", away_path()),
+        Some(json!({ "answer": answer })),
+    )
+    .await;
+}
+
+/// `count` players who play games, with the answer "coming" for the first `coming`.
+async fn team_of(reader: &Reader, count: usize, coming: usize) -> Vec<i64> {
+    let mut players = Vec::new();
+    for n in 0..count {
+        let player = add_player(reader, &format!("Player{n}"), "2026-09-01").await;
+        if n < coming {
+            answer_at_away(reader, player, "coming").await;
+        }
+        players.push(player);
+    }
+    players
+}
+
+/// The open item of `kind`, at the moment (UTC).
+async fn item_at(
+    reader: &mut Reader,
+    kind: &str,
+    (month, day, hour, minute): (u32, u32, u32, u32),
+) -> Option<Value> {
+    reader
+        .harness
+        .clock
+        .set(utc(2026, month, day, hour, minute));
+    reader.log_in_again().await;
+    item(&start(reader).await, kind).cloned()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn too_few_players_is_an_open_item_from_3_days_until_the_start(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    team_of(&reader, 7, 5).await;
+    // A change not seen (another game gets a new start time): an item before the warnings.
+    reader.answer(games_with(|games| {
+        game_mut(games, 1_073_168)["tijd"] = json!("13:00");
+    }));
+    reader.read_good().await;
+
+    // Tuesday 3 November 23:59 Dutch time: not yet.
+    assert_eq!(
+        item_at(&mut reader, "too_few_players", (11, 3, 22, 59)).await,
+        None
+    );
+    // Wednesday 4 November 00:00 Dutch time.
+    let found = item_at(&mut reader, "too_few_players", (11, 3, 23, 0))
+        .await
+        .unwrap();
+    let games = found["games"].as_array().unwrap();
+    assert_eq!(games.len(), 1, "{found}");
+    assert_eq!(
+        (
+            &games[0]["id"],
+            &games[0]["date"],
+            &games[0]["coming"],
+            &games[0]["no_answer"],
+            &games[0]["enough"]
+        ),
+        (
+            &json!(AWAY_7_NOV),
+            &json!("2026-11-07"),
+            &json!(5),
+            &json!(2),
+            &json!(7)
+        )
+    );
+    // The order: after the items of the game list and the changes, before the later items.
+    let answer = start(&reader).await;
+    let kinds = kinds(&answer);
+    let at = kinds
+        .iter()
+        .position(|kind| *kind == "too_few_players")
+        .unwrap();
+    for (n, kind) in kinds.iter().enumerate() {
+        let earlier = ["reading_held_back", "out_of_date", "changes"].contains(kind);
+        let later = [
+            "driver_not_coming",
+            "answers_moved",
+            "schedule_not_entered",
+            "open_places",
+            "not_opened",
+            "not_checked",
+        ]
+        .contains(kind);
+        assert!(!earlier || n < at, "{kinds:?}");
+        assert!(!later || n > at, "{kinds:?}");
+    }
+    assert!(
+        kinds.len() > 1,
+        "a later item is there to compare: {kinds:?}"
+    );
+    // One minute before the start, still; at the start time, no more.
+    assert!(
+        item_at(&mut reader, "too_few_players", (11, 7, 10, 14))
+            .await
+            .is_some()
+    );
+    assert_eq!(
+        item_at(&mut reader, "too_few_players", (11, 7, 10, 15)).await,
+        None
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn extra_players_count_for_the_7(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    team_of(&reader, 7, 5).await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/extra-players", away_path()),
+        Some(json!({ "extra_players": 2 })),
+    )
+    .await;
+    assert_eq!(
+        item_at(&mut reader, "too_few_players", (11, 5, 9, 0)).await,
+        None
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_driver_who_is_not_coming_is_an_open_item_at_once(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let anna = add_player(&reader, "Anna", "2026-09-01").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/drivers", away_path()),
+        Some(json!({ "drivers": 2 })),
+    )
+    .await;
+    let place = format!("{}/assignments/drive/1", away_path());
+    ok(&reader, "PUT", &place, Some(json!({ "player": anna }))).await;
+    answer_at_away(&reader, anna, "not_coming").await;
+
+    // Wednesday 28 October, 10 days before the game.
+    let found = item_at(&mut reader, "driver_not_coming", (10, 28, 9, 0))
+        .await
+        .unwrap();
+    assert_eq!(found["games"][0]["id"], AWAY_7_NOV);
+    assert_eq!(found["games"][0]["drivers"], json!(["Anna"]));
+
+    // "Coming" again: gone.
+    answer_at_away(&reader, anna, "coming").await;
+    assert_eq!(item(&start(&reader).await, "driver_not_coming"), None);
+    // "Not coming", then the place cleared: gone.
+    answer_at_away(&reader, anna, "not_coming").await;
+    assert!(item(&start(&reader).await, "driver_not_coming").is_some());
+    ok(&reader, "DELETE", &place, None).await;
+    assert_eq!(item(&start(&reader).await, "driver_not_coming"), None);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_driver_warning_ends_at_the_start_time(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let anna = add_player(&reader, "Anna", "2026-09-01").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/drivers", away_path()),
+        Some(json!({ "drivers": 1 })),
+    )
+    .await;
+    let place = format!("{}/assignments/drive/1", away_path());
+    ok(&reader, "PUT", &place, Some(json!({ "player": anna }))).await;
+    answer_at_away(&reader, anna, "not_coming").await;
+    assert!(
+        item_at(&mut reader, "driver_not_coming", (11, 7, 10, 14))
+            .await
+            .is_some()
+    );
+    assert_eq!(
+        item_at(&mut reader, "driver_not_coming", (11, 7, 10, 15)).await,
+        None
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_moved_game_is_an_open_item_from_3_days_before_its_new_date(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    team_of(&reader, 7, 7).await;
+    // The game moves from Saturday 7 to Wednesday 11 November.
+    reader.answer(games_with(|games| {
+        game_mut(games, AWAY_7_NOV)["datum"] = json!("2026-11-11 11:15:00.000");
+    }));
+    reader.read_good().await;
+
+    // Saturday 7 November 23:59 Dutch time: not yet; Sunday 8 November 00:00: the item.
+    assert_eq!(
+        item_at(&mut reader, "answers_moved", (11, 7, 22, 59)).await,
+        None
+    );
+    let found = item_at(&mut reader, "answers_moved", (11, 7, 23, 0))
+        .await
+        .unwrap();
+    assert_eq!(found["games"][0]["id"], AWAY_7_NOV);
+    assert_eq!(found["games"][0]["date"], "2026-11-11");
+
+    // "Seen" in the list of changes does not end it.
+    let (status, body) = reader.send("GET", "/api/changes", None).await;
+    assert_eq!(status, 200, "{body}");
+    let seen: Vec<Value> = body["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|change| json!({ "id": change["id"], "version": change["version"] }))
+        .collect();
+    assert!(!seen.is_empty());
+    ok(
+        &reader,
+        "POST",
+        "/api/changes/seen",
+        Some(json!({ "changes": seen })),
+    )
+    .await;
+    assert!(item(&start(&reader).await, "answers_moved").is_some());
+    // It ends at the start time (deviation D1).
+    assert_eq!(
+        item_at(&mut reader, "answers_moved", (11, 11, 10, 15)).await,
+        None
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_game_that_left_the_game_list_gives_no_warning(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    team_of(&reader, 7, 5).await;
+    reader.answer(games_with(|games| {
+        games.retain(|game| game["id"] != AWAY_7_NOV);
+    }));
+    reader.read_good().await;
+    assert_eq!(
+        item_at(&mut reader, "too_few_players", (11, 5, 9, 0)).await,
+        None
+    );
 }

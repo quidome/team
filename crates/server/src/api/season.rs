@@ -6,16 +6,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use axum::Json;
 use axum::extract::{Query, State};
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
-    FollowedTeam, Game, GameCount, GameDuties, GamePlaces, Outcome, PlaceKind, PlacesOf, Player,
-    PlayerId, PlayerRole, Schedule, ScheduleReason, ScheduledGame, Season, SeasonEvents,
-    SeasonList, SeasonRow, StoredDuties, StoredGame, Team, TeamNumber, TeamRef, Training,
-    TrainingState, WeeklyTraining, display_names, game_list, game_places, kept_games, not_entered,
-    open_places, players_playing_on, plays_games_on, required_duties, row_count, schedule,
-    season_events, season_list, training_state,
+    FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GamePlaces, GameWarnings, ListRow,
+    Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule, ScheduleReason,
+    ScheduledGame, Season, SeasonEvents, SeasonList, SeasonRow, StoredDuties, StoredGame, Team,
+    TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining, display_names, game_list,
+    game_places, game_warnings, kept_games, not_entered, open_places, players_playing_on,
+    plays_games_on, required_duties, row_count, schedule, season_events, season_list,
+    training_state,
 };
 use utoipa::ToSchema;
 
@@ -311,24 +312,48 @@ impl SeasonDuties {
         kept_games(&self.stored, &self.assignments, &self.attendance.answered())
     }
 
-    /// The count on the row of `scheduled`, from the list of the page of the game.
-    fn row_count(&self, scheduled: &ScheduledGame, without_answers: bool) -> Option<GameCount> {
+    /// The list of the page of the game `scheduled`, what is stored beside it, and whether it has
+    /// a stored answer (also of a player who is not on the list).
+    fn list_of(&self, scheduled: &ScheduledGame) -> (Vec<ListRow>, GameAttendance, bool) {
         let source_id = scheduled.game.source_id;
         let answers = self
             .attendance
             .answers
             .get(&source_id)
             .map_or(&[][..], Vec::as_slice);
-        let extra = self
+        let stored = self
             .attendance
             .games
             .get(&source_id)
-            .map_or(0, |game| game.extra_players);
+            .copied()
+            .unwrap_or_default();
+        let list = game_list(&self.players, &self.roles, answers, scheduled.game.date);
+        (list, stored, !answers.is_empty())
+    }
+
+    /// The count on the row of `scheduled`, from the list of the page of the game.
+    fn row_count(&self, scheduled: &ScheduledGame, without_answers: bool) -> Option<GameCount> {
+        let (list, stored, _) = self.list_of(scheduled);
         row_count(
-            &game_list(&self.players, &self.roles, answers, scheduled.game.date),
-            extra,
+            &list,
+            stored.extra_players,
             scheduled.in_list,
             without_answers,
+        )
+    }
+
+    /// The warnings of the game of the team `scheduled` at `now` (Dutch local time), by the rule
+    /// of the page of the game (`team_core::game_warnings`).
+    pub fn warnings(&self, scheduled: &ScheduledGame, now: NaiveDateTime) -> GameWarnings {
+        let (list, stored, has_answers) = self.list_of(scheduled);
+        game_warnings(
+            &scheduled.game,
+            scheduled.in_list,
+            &list,
+            &stored,
+            has_answers,
+            self.assignments_of(scheduled.game.source_id),
+            now,
         )
     }
 

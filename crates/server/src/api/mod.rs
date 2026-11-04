@@ -47,6 +47,7 @@ use utoipa::OpenApi;
         games::set_answer,
         games::clear_answer,
         games::set_extra_players,
+        games::set_answers_checked,
         start::get,
         messages::week,
         messages::committee,

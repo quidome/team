@@ -116,6 +116,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}/answers-checked': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setAnswersChecked'];
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}/answers/{player}': {
 		parameters: {
 			query?: never;
@@ -850,10 +866,15 @@ export interface components {
 		};
 		/** @description The answer of a tap: kept small, so a tap is quick. */
 		AttendanceView: {
+			/** @description As `GameAttendanceView::answers_moved`, after the tap. */
+			answers_moved: boolean;
 			count: components['schemas']['CountView'];
+			enough_players: number;
 			/** Format: int32 */
 			extra_players: number;
 			row?: null | components['schemas']['AnswerRow'];
+			/** @description As `GameAttendanceView::too_few`, after the tap. */
+			too_few: boolean;
 		};
 		CarryRequest: {
 			/**
@@ -1000,6 +1021,10 @@ export interface components {
 		};
 		/** @enum {string} */
 		DifferenceView: 'date' | 'start_time' | 'start_time_known' | 'place' | 'home_and_away' | 'team';
+		/** @description A game with drivers who are not coming: their names shown, in the order of the places. */
+		DriverGameView: components['schemas']['GameItemView'] & {
+			drivers: string[];
+		};
 		DriverPartView: {
 			counts: boolean;
 			/** @description The proposal dropped below the filled driver places. */
@@ -1074,7 +1099,14 @@ export interface components {
 		};
 		/** @description Who comes to a game of the team. */
 		GameAttendanceView: {
+			/**
+			 * @description "Answers from before the move": the answers were given for another date than the date of
+			 *     the game now; until "Answers checked" (`team_core::answers_moved`).
+			 */
+			answers_moved: boolean;
 			count: components['schemas']['CountView'];
+			/** @description The number of players that is enough (7). */
+			enough_players: number;
 			/** Format: int32 */
 			extra_players: number;
 			/**
@@ -1086,6 +1118,12 @@ export interface components {
 			reasons: components['schemas']['AbsenceReason'][];
 			/** @description First "no answer", then "coming", then "not coming", each sorted by first name. */
 			rows: components['schemas']['AnswerRow'][];
+			/**
+			 * @description "Too few players": fewer than `enough_players` coming, before the start, from 3 days
+			 *     before the game and earlier once it has an answer (`team_core::game_warnings`, the rule of
+			 *     the open item).
+			 */
+			too_few: boolean;
 		};
 		/** @description A game of an open item: enough to show it in the list below the item and to open its page. */
 		GameItemView: {
@@ -1311,6 +1349,21 @@ export interface components {
 					count: number;
 					/** @enum {string} */
 					kind: 'changes';
+			  }
+			| {
+					games: components['schemas']['TooFewGameView'][];
+					/** @enum {string} */
+					kind: 'too_few_players';
+			  }
+			| {
+					games: components['schemas']['DriverGameView'][];
+					/** @enum {string} */
+					kind: 'driver_not_coming';
+			  }
+			| {
+					games: components['schemas']['GameItemView'][];
+					/** @enum {string} */
+					kind: 'answers_moved';
 			  }
 			| {
 					games: components['schemas']['GameItemView'][];
@@ -1726,6 +1779,15 @@ export interface components {
 			end: string;
 			start: string;
 		};
+		/**
+		 * @description A game with too few players: the players coming (with the extra players), without an answer,
+		 *     and the number that is enough (7).
+		 */
+		TooFewGameView: components['schemas']['GameItemView'] & {
+			coming: number;
+			enough: number;
+			no_answer: number;
+		};
 		TotalView: {
 			/** Format: int32 */
 			done: number;
@@ -2098,6 +2160,52 @@ export interface operations {
 				};
 			};
 			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setAnswersChecked: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Saved: the answers hold for the date of the game now */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['AttendanceView'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game` */
 			400: {
 				headers: {
 					[name: string]: unknown;

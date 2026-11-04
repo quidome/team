@@ -183,3 +183,120 @@ test('two taps from "Next" save an answer', async ({ page }) => {
 		answer.attendance.rows.some((row: { answer?: string }) => row.answer === 'not_coming')
 	).toBe(true);
 });
+
+// The warnings in time (story B). The clock of the server is fixed, so the line "Too few players"
+// is tested with a replaced answer; the server tests test its period.
+
+/** Writes of the API come from the tool's own origin. */
+const origin = { headers: { Origin: 'http://localhost:4100' } };
+
+/** The API address of the page of a game: `/game/…` is `/api/games/…`. */
+const apiPath = (path: string) => path.replace(/^\/game\//, '/api/games/');
+
+/** The last coming away game of the team, which no other test reads. */
+async function lastAwayGame(page: Page): Promise<string> {
+	const answer = await (await page.request.get('/api/season')).json();
+	const games: (Game & { places?: { drivers?: unknown } | null })[] = answer.coming
+		.filter((event: { game?: Game }) => event.game)
+		.map((event: { game: Game }) => event.game)
+		.filter((game: Game & { places?: { drivers?: unknown } | null }) => {
+			return game.reason === 'team' && !!game.places?.drivers;
+		});
+	return `/game/2026-2027/${games[games.length - 1].id}`;
+}
+
+test('"Too few players" shows above the count', async ({ page }) => {
+	const path = await lastGame(page);
+	await page.route(`**${apiPath(path)}`, async (route) => {
+		const response = await route.fetch();
+		const game = await response.json();
+		game.attendance.too_few = true;
+		game.attendance.count = { coming: 6, not_coming: 1, no_answer: 2 };
+		await route.fulfill({ response, json: game });
+	});
+	await page.goto(path);
+	await expect(page.getByTestId('too-few')).toHaveText('Too few players: 6 of 7');
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+});
+
+test('a driver who is not coming shows it at the place and in the choice', async ({ page }) => {
+	const errors = watchConsole(page);
+	const path = await lastAwayGame(page);
+	const api = apiPath(path);
+	const listed = (await (await page.request.get(api)).json()).attendance.rows.find(
+		(row: { hidden: boolean }) => !row.hidden
+	);
+	const player: number = listed.player;
+	const name: string = listed.name;
+	expect((await page.request.put(`${api}/drivers`, { ...origin, data: { drivers: 1 } })).ok()).toBe(
+		true
+	);
+	const driver = `${api}/assignments/drive/1`;
+	expect((await page.request.put(driver, { ...origin, data: { player } })).ok()).toBe(true);
+	await page.goto(path);
+
+	const place = page.getByTestId('team-place').filter({ hasText: 'Driver 1' });
+	await expect(place.getByTestId('place-player')).toHaveText(name);
+	await rows(page)
+		.and(page.locator(`[data-player="${player}"]`))
+		.getByRole('button', { name: /^Not coming/ })
+		.click();
+	await expect(place.getByTestId('place-player')).toHaveText(`${name} · not coming`);
+	await place.getByRole('button').first().click();
+	await expect(
+		place.getByTestId('choice-player').filter({ hasText: name }).getByTestId('choice-not-coming')
+	).toHaveText('Not coming');
+
+	// After the date: "· absent", but only for the planned driver; after "Nobody" no note.
+	const asPast = async (outcome: string) => {
+		await page.unroute(`**${api}`);
+		await page.route(`**${api}`, async (route) => {
+			const response = await route.fetch();
+			const game = await response.json();
+			game.past = true;
+			const drive = game.game.places.drivers.places[0];
+			drive.player.outcome = outcome;
+			await route.fulfill({ response, json: game });
+		});
+		await page.goto(path);
+	};
+	await asPast('as_planned');
+	await expect(place.getByTestId('place-player')).toHaveText(`${name} · absent`);
+	await asPast('not_done');
+	await expect(place.getByTestId('place-player')).toHaveText(`not done (was ${name})`);
+	await page.unroute(`**${api}`);
+	await page.goto(path);
+
+	// Leave the game as it was for the other tests.
+	await rows(page)
+		.and(page.locator(`[data-player="${player}"]`))
+		.getByRole('button', { name: /^Not coming/ })
+		.click();
+	await expect(place.getByTestId('place-player')).toHaveText(name);
+	expect((await page.request.delete(driver, origin)).ok()).toBe(true);
+	expect(
+		(await page.request.put(`${api}/drivers`, { ...origin, data: { drivers: null } })).ok()
+	).toBe(true);
+	expect(errors).toEqual([]);
+});
+
+test('the note of a move goes away at "Answers checked"', async ({ page }) => {
+	const errors = watchConsole(page);
+	const path = await lastGame(page);
+	// A fixed answer of the page: answers from before a move. The tap goes to the real route,
+	// whose answer has no move.
+	await page.route(`**${apiPath(path)}`, async (route) => {
+		const response = await route.fetch();
+		const game = await response.json();
+		game.attendance.answers_moved = true;
+		await route.fulfill({ response, json: game });
+	});
+	await page.goto(path);
+	const note = page.getByTestId('answers-moved');
+	await expect(note).toContainText(/^Answers from before the move to \w{3} \d{1,2} \w{3}\./);
+	await expectAccessible(page);
+	await note.getByRole('button', { name: 'Answers checked' }).click();
+	await expect(note).toHaveCount(0);
+	expect(errors).toEqual([]);
+});

@@ -136,6 +136,10 @@ pub fn app(state: AppState) -> Router {
             "/games/{season}/{id}/extra-players",
             put(games::set_extra_players),
         )
+        .route(
+            "/games/{season}/{id}/answers-checked",
+            put(games::set_answers_checked),
+        )
         .route("/start", get(start::get))
         .route("/messages/week", get(messages::week))
         .route("/messages/committee", get(messages::committee))

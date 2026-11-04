@@ -505,6 +505,8 @@ export async function loadSeason(
 export type StartAnswer = components['schemas']['StartAnswer'];
 export type OpenItemView = components['schemas']['OpenItemView'];
 export type OpenGame = components['schemas']['OpenGameView'];
+export type TooFewGameView = components['schemas']['TooFewGameView'];
+export type DriverGameView = components['schemas']['DriverGameView'];
 
 /** The start page: the open items, the last training and the next events. */
 export async function loadStart(fetch: typeof globalThis.fetch): Promise<StartAnswer> {
@@ -681,6 +683,16 @@ export async function setExtraPlayers(
 		await api.PUT('/api/games/{season}/{id}/extra-players', {
 			params: { path: { season, id } },
 			body: { extra_players },
+			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
+		})
+	);
+}
+
+/** "Answers checked": the answers of the game hold for its date now. */
+export async function setAnswersChecked(season: string, id: string): Promise<AttendanceView> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/answers-checked', {
+			params: { path: { season, id } },
 			signal: AbortSignal.timeout(TAP_TIMEOUT_MS)
 		})
 	);

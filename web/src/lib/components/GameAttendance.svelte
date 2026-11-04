@@ -4,30 +4,48 @@
 	"Not coming"; a tap saves at once, a tap on the chosen one goes back to "no answer". A row with
 	"not coming" has the link "Reason". The rows keep the order of the first load while the page is
 	open. The taps of one player are sent one after the other; a tap that fails shows the stored
-	state again with "Not saved. Try again."
+	state again with "Not saved. Try again." Above the count, "Too few players: 6 of 7" (story B), and
+	for answers from before a move the note with "Answers checked".
+	`onanswers` gives the page the answer shown of each player, for the notes at the driver places.
 -->
 <script lang="ts">
 	import {
 		clearAnswer,
 		loadGame,
 		setAnswer,
+		setAnswersChecked,
 		setExtraPlayers,
 		type AnswerView,
 		type AttendanceView,
 		type GameAttendanceView
 	} from '#lib/api/client.js';
 	import { countText } from '#lib/attendance.js';
+	import { formatDay } from '#lib/schedule.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { untrack } from 'svelte';
 
-	let { season, id, attendance }: { season: string; id: string; attendance: GameAttendanceView } =
-		$props();
+	let {
+		season,
+		id,
+		date,
+		attendance,
+		onanswers
+	}: {
+		season: string;
+		id: string;
+		/** The date of the game now. */
+		date: string;
+		attendance: GameAttendanceView;
+		onanswers?: (answers: Record<number, AnswerView | null>) => void;
+	} = $props();
 
 	type Row = { answer: AnswerView | null; reason: number | null };
 	type Rows = Record<number, Row>;
 
 	/** The queue of the extra players; a player's queue has the id of the player. */
 	const EXTRA = 0;
+	/** The queue of "Answers checked". */
+	const CHECKED = -1;
 
 	// The first load: later answers of the server change the states, not the order.
 	const first = untrack(() => attendance);
@@ -59,6 +77,14 @@
 	let shown = $state(firstRows());
 	let extra = $state(first.extra_players);
 	let count = $state(first.count);
+	let tooFew = $state(first.too_few);
+	let moved = $state(first.answers_moved);
+
+	$effect(() => {
+		onanswers?.(
+			Object.fromEntries(Object.entries(shown).map(([player, row]) => [Number(player), row.answer]))
+		);
+	});
 
 	/** The player whose reasons are open. */
 	let picking = $state<number | null>(null);
@@ -94,7 +120,11 @@
 			try {
 				const answer = await work();
 				// The count shows when no tap is waiting.
-				if (waiting === 1) count = answer.count;
+				if (waiting === 1) {
+					count = answer.count;
+					tooFew = answer.too_few;
+					moved = answer.answers_moved;
+				}
 				done(answer, newest[key] === tap);
 			} catch {
 				if (newest[key] === tap) failed();
@@ -112,7 +142,11 @@
 		const before = taps;
 		try {
 			const page = await loadGame(fetch, season, id);
-			if (taps === before && waiting === 0 && page.attendance) count = page.attendance.count;
+			if (taps === before && waiting === 0 && page.attendance) {
+				count = page.attendance.count;
+				tooFew = page.attendance.too_few;
+				moved = page.attendance.answers_moved;
+			}
 		} catch {
 			// The page keeps what it shows.
 		}
@@ -165,6 +199,15 @@
 		);
 	}
 
+	function tapAnswersChecked() {
+		enqueue(
+			CHECKED,
+			() => setAnswersChecked(season, id),
+			(answer) => (moved = answer.answers_moved),
+			() => {}
+		);
+	}
+
 	/** The reasons close at a tap on another row. */
 	function closeReasons(event: MouseEvent) {
 		if (picking === null) return;
@@ -183,11 +226,28 @@
 	<div
 		class="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[1] -mx-4 bg-background/95 px-4 py-2 backdrop-blur"
 	>
+		{#if tooFew}
+			<p class="text-sm font-semibold" data-testid="too-few">
+				Too few players: {count.coming} of {first.enough_players}
+			</p>
+		{/if}
 		<p class="min-h-5 text-sm font-semibold" data-testid="attendance-count">{countText(count)}</p>
 		{#if notSaved}
 			<p class="text-sm" role="alert" data-testid="attendance-not-saved">Not saved. Try again.</p>
 		{/if}
 	</div>
+
+	{#if moved}
+		<div
+			class="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3"
+			data-testid="answers-moved"
+		>
+			<p class="text-sm">Answers from before the move to {formatDay(date)}.</p>
+			<Button variant="outline" disabled={(saving[CHECKED] ?? 0) > 0} onclick={tapAnswersChecked}>
+				Answers checked
+			</Button>
+		</div>
+	{/if}
 
 	{#if first.rows.length === 0}
 		<p class="text-sm text-muted-foreground" data-testid="no-list-players">

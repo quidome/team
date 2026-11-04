@@ -20,6 +20,18 @@ export function playerText(player: NonNullable<Place['player']>): string {
 	return player.name;
 }
 
+/** The note after the planned driver whose answer is "not coming": " · not coming" before the
+ * game, " · absent" after it. Nothing when another player or nobody did the duty: the note is about
+ * the planned driver. */
+export function driverNote(
+	player: NonNullable<Place['player']>,
+	notComing: boolean,
+	past: boolean
+): string {
+	if (!notComing || player.outcome !== 'as_planned') return '';
+	return past ? ' · absent' : ' · not coming';
+}
+
 /** The player who does or did the duty of a filled place: the planned player, the player of
  * "Someone else", or `null` after "Nobody". */
 export function doerOf(player: NonNullable<Place['player']>): number | null {

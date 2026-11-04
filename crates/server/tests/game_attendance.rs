@@ -4,7 +4,8 @@
 
 mod common;
 
-use common::game_list::{M16_2, Reader, game_mut, games_with};
+use common::Harness;
+use common::game_list::{DRAKES, M16_2, Reader, game_mut, games_with, utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
@@ -432,4 +433,189 @@ async fn a_game_of_another_team_has_no_count_on_a_row(pool: PgPool) {
     let id = game_of(&reader, "duty").await["id"].as_i64().unwrap();
     let season = ok(&reader, "GET", "/api/season", None).await;
     assert!(count_in(&season["coming"], id).unwrap().is_null());
+}
+
+// The warnings in time (story B of attendance at games).
+
+/// The away game of M16 1 on Saturday 7 November 2026 at 11:15 (Dutch time, UTC+1).
+const AWAY_7_NOV: i64 = 1_073_159;
+
+/// Moves the clock to that moment (UTC) and logs in again.
+async fn at(reader: &mut Reader, month: u32, day: u32, hour: u32, minute: u32) {
+    reader
+        .harness
+        .clock
+        .set(utc(2026, month, day, hour, minute));
+    reader.log_in_again().await;
+}
+
+/// The kinds of the open items of the start page.
+async fn open_kinds(reader: &Reader) -> Vec<String> {
+    ok(reader, "GET", "/api/start", None).await["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["kind"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn too_few_on_the_page_starts_earlier_once_the_game_has_an_answer(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let mut players = Vec::new();
+    for n in 0..7 {
+        players.push(add_player(&reader, &format!("Player{n}"), "plays_games", "2026-09-01").await);
+    }
+    // Monday 2 November, 5 days before: no answer, no line.
+    at(&mut reader, 11, 2, 9, 0).await;
+    let page = attendance(&reader, AWAY_7_NOV).await;
+    assert_eq!(
+        (&page["too_few"], &page["enough_players"]),
+        (&json!(false), &json!(7))
+    );
+    // The first answer: the tap gives the line, the start page has no item yet.
+    let tap = set(&reader, AWAY_7_NOV, players[0], "coming", None).await;
+    assert_eq!(
+        (&tap["too_few"], &tap["enough_players"]),
+        (&json!(true), &json!(7))
+    );
+    assert_eq!(attendance(&reader, AWAY_7_NOV).await["too_few"], true);
+    assert!(
+        !open_kinds(&reader)
+            .await
+            .contains(&"too_few_players".to_owned())
+    );
+    // In the period: both.
+    at(&mut reader, 11, 5, 9, 0).await;
+    assert_eq!(attendance(&reader, AWAY_7_NOV).await["too_few"], true);
+    assert!(
+        open_kinds(&reader)
+            .await
+            .contains(&"too_few_players".to_owned())
+    );
+    // 7 coming: neither; the tap that makes the 7 says so.
+    for &player in &players[1..6] {
+        set(&reader, AWAY_7_NOV, player, "coming", None).await;
+    }
+    let tap = set(&reader, AWAY_7_NOV, players[6], "coming", None).await;
+    assert_eq!(tap["too_few"], false);
+    assert!(
+        !open_kinds(&reader)
+            .await
+            .contains(&"too_few_players".to_owned())
+    );
+    // One player not coming, then at the start time: neither.
+    set(&reader, AWAY_7_NOV, players[6], "not_coming", None).await;
+    assert_eq!(attendance(&reader, AWAY_7_NOV).await["too_few"], true);
+    at(&mut reader, 11, 7, 10, 15).await;
+    assert_eq!(attendance(&reader, AWAY_7_NOV).await["too_few"], false);
+    assert!(
+        !open_kinds(&reader)
+            .await
+            .contains(&"too_few_players".to_owned())
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn answers_from_before_a_move_show_until_answers_checked(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let anna = add_player(&reader, "Anna", "plays_games", "2026-09-01").await;
+    let tap = set(&reader, AWAY_7_NOV, anna, "coming", None).await;
+    assert_eq!(tap["answers_moved"], false);
+    // The game moves from Saturday 7 to Wednesday 11 November.
+    reader.answer(games_with(|games| {
+        game_mut(games, AWAY_7_NOV)["datum"] = json!("2026-11-11 11:15:00.000");
+    }));
+    reader.read_good().await;
+    // On the page at once, also long before the warning period (12 October).
+    assert_eq!(attendance(&reader, AWAY_7_NOV).await["answers_moved"], true);
+    // A new answer does not confirm the old ones.
+    let bram = add_player(&reader, "Bram", "plays_games", "2026-09-01").await;
+    let tap = set(&reader, AWAY_7_NOV, bram, "coming", None).await;
+    assert_eq!(tap["answers_moved"], true);
+    at(&mut reader, 11, 9, 9, 0).await;
+    assert!(
+        open_kinds(&reader)
+            .await
+            .contains(&"answers_moved".to_owned())
+    );
+
+    // "Answers checked": the stored date is the date now, the note and the item are gone.
+    let path = format!("{}/answers-checked", game_path(AWAY_7_NOV));
+    let first = ok(&reader, "PUT", &path, None).await;
+    assert_eq!(first["answers_moved"], false);
+    assert!(first["row"].is_null());
+    assert_eq!(
+        answers_for(&reader, AWAY_7_NOV).await,
+        Some(chrono::NaiveDate::from_ymd_opt(2026, 11, 11).unwrap())
+    );
+    assert_eq!(
+        attendance(&reader, AWAY_7_NOV).await["answers_moved"],
+        false
+    );
+    assert!(
+        !open_kinds(&reader)
+            .await
+            .contains(&"answers_moved".to_owned())
+    );
+    // A second tap gives the same answer.
+    let second = ok(&reader, "PUT", &path, None).await;
+    assert_eq!(first, second);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn answers_checked_is_only_for_a_game_of_the_team(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = game_of(&reader, "duty").await["id"].as_i64().unwrap();
+    let path = format!("{}/answers-checked", game_path(id));
+    refused(&reader, "PUT", &path, None, "not_a_team_game").await;
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn answers_checked_needs_a_login(pool: PgPool) {
+    let harness = Harness::start(pool).await;
+    let request = axum::http::Request::builder()
+        .method("PUT")
+        .uri(format!("/api/games/2026-2027/{AWAY_7_NOV}/answers-checked"))
+        .header(axum::http::header::ORIGIN, common::ORIGIN)
+        .body(axum::body::Body::empty())
+        .unwrap();
+    assert_eq!(harness.send(request).await.status(), 401);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn answers_checked_waits_for_a_first_save_on_another_screen(pool: PgPool) {
+    let reader = Reader::chosen(pool.clone()).await;
+    reader.read_good().await;
+    // Another screen makes the row of the game at the same moment: not committed yet.
+    let mut other = pool.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO game_attendance (club_number, season_year, source_id, extra_players)
+         VALUES ($1, 2026, $2, 2)",
+    )
+    .bind(DRAKES)
+    .bind(AWAY_7_NOV)
+    .execute(&mut *other)
+    .await
+    .unwrap();
+    let path = format!("{}/answers-checked", game_path(AWAY_7_NOV));
+    let checked = reader.send("PUT", &path, None);
+    tokio::pin!(checked);
+    let waited = tokio::time::timeout(std::time::Duration::from_millis(300), &mut checked).await;
+    assert!(
+        waited.is_err(),
+        "the save did not wait for the other insert"
+    );
+    other.commit().await.unwrap();
+    let (status, answer) = checked.await;
+    assert_eq!(status, 200, "{answer}");
+    // Both saves are kept: the extra players of the other screen and the date of the answers.
+    assert_eq!(answer["extra_players"], 2);
+    assert_eq!(
+        answers_for(&reader, AWAY_7_NOV).await,
+        Some(chrono::NaiveDate::from_ymd_opt(2026, 11, 7).unwrap())
+    );
 }
