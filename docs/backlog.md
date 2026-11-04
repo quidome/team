@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; story B, [warnings in time](changes/2026-11-04-warnings-in-time/), is at stage close (2026-11-04), built and reviewed: too few players, a driver who does not come, and a moved game with old answers, on the start page and the page of the game.
+- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); stories A and B are done, so release 1 can be made; next: story E, not played (release 2).
 
 Small:
 - A race test for the saves with `ON CONFLICT` of story A of attendance at games, `set_extra` and `answer` in `crates/server/src/game_attendance.rs` (pattern in `docs/architecture.md`; build review R2 of warnings in time, 2026-11-04).

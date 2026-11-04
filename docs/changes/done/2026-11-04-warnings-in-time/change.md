@@ -1,7 +1,7 @@
 ---
 title: Warnings in time
 type: feature
-stage: close
+stage: done
 closure: review build + accept   # from the epic; the start page sends player names, and the warning period has edges a fresh look can test
 created: 2026-11-04
 ---
@@ -21,3 +21,4 @@ architecture of the epic is in its `technical.md`.
 | 2026-11-04 | design | spec review of the deviations: D1 serves; Q1 serves – note: Q1 was asked wrongly (story A gives the period of the line); the coordinator chose the spec, so the line shows from 3 days and earlier once the game has an answer |
 | 2026-11-04 | implement | technical.md approved: one story of 4 steps (the rules; the three open items; the page of a game: too few and drivers; a moved game); closure review build + accept; deviation D1 accepted by the spec review |
 | 2026-11-04 | close | all 4 steps built, `just check` passes; build review R1–R3 fixed, R4 for Close; accept review: accepted with notes (A1–A6 answered, A6 for Close) |
+| 2026-11-04 | done | closed: decision 0029 (a mark holds for a date), `docs/product/game-attendance.md`, `start-page.md`, `duties.md`, architecture, the epic |

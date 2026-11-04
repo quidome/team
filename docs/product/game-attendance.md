@@ -1,6 +1,6 @@
 # Attendance at games
 
-**Status**: who comes to a game is built. The warnings for too few players, "Not played" and "Checked" are not built yet.
+**Status**: who comes to a game and the warnings in time are built. "Not played" and "Checked" are not built yet.
 
 ## Purpose
 During the week before a game the coordinator keeps track of who comes, from the chat with the players and parents. The coordinator sees at once how many players there are and whom to ask.
@@ -26,6 +26,12 @@ During the week before a game the coordinator keeps track of who comes, from the
 ### Extra players
 - Below the list "Extra players" has [−] and [+], from 0 to 10, saved at each tap. The tool keeps only the number, not who they are.
 
+### Warnings
+- **Too few players.** Above the count: "Too few players: 6 of 7" when fewer than 7 come (players coming plus extra players), from 3 days before the date (00:00, Dutch time), and earlier once the game has an answer, until the start time (without a start time: the end of the date). From 3 days before, the same game is an open item on the [start page](start-page.md); both come from one rule.
+- **A driver who is not coming.** A player on a driver place whose answer is "not coming" shows "Anna · not coming" at the place; after the date "Anna · absent", only while the place is "as planned" (after "Someone else" or "Nobody" there is no note). In the choice of a driver such a player stays a choice, with the note "Not coming". The tool never removes a driver. Until the start time it is an open item on the start page, at once.
+- **Answers from before a move.** When the game moved after players answered: "Answers from before the move to Wed 11 Nov." with the button "Answers checked". Only that tap ends it; "Seen" in the [list of changes](list-of-changes.md) does not, and a new answer does not (decision 0029). From 3 days before the new date until its start time it is an open item on the start page.
+- No warnings for a game that left the game list or is no longer a game of the team; none for table and referee places, or for a driver with "no answer". A warning does not end at "Checked" or "Not played" yet (stories C and E); a cancelled game that stays in the game list still warns.
+
 ## Errors and limits
 - A tap that fails shows the stored state and "Not saved. Try again." The taps of one player are sent one after the other; the last tap wins.
 - "No players on this date." when the list is empty; "Extra players" still works.
@@ -35,5 +41,5 @@ During the week before a game the coordinator keeps track of who comes, from the
 - On a small phone a long name is cut off in its row.
 
 ## Interface
-- Server addresses (need a login): `PUT` and `DELETE /api/games/{season}/{id}/answers/{player}`, `PUT /api/games/{season}/{id}/extra-players`. The list comes with `GET /api/games/{season}/{id}` (`attendance`).
-- The rules are `team_core::game_list`, `game_count`, `row_count` and `check_answer`.
+- Server addresses (need a login): `PUT` and `DELETE /api/games/{season}/{id}/answers/{player}`, `PUT /api/games/{season}/{id}/extra-players`, `PUT /api/games/{season}/{id}/answers-checked`. The list comes with `GET /api/games/{season}/{id}` (`attendance`, with `too_few`, `enough_players` and `answers_moved`; each tap answers the same fields).
+- The rules are `team_core::game_list`, `game_count`, `row_count`, `check_answer`, and for the warnings `game_warnings` (with `in_warning_period`, `before_start`, `drivers_not_coming`, `answers_moved`, `ENOUGH_PLAYERS` 7 and `WARNING_DAYS` 3).

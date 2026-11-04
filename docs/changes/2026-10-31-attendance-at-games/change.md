@@ -21,3 +21,4 @@ game when fewer than 7 players come, and when a player on a driver place does no
 | 2026-11-01 | implement | technical.md approved: an epic of five stories in two releases (A who comes, B warnings; then E not played, C after the game, D totals), each with closure review build + accept; epic closure review accept |
 | 2026-11-01 | implement | story A, who comes to a game: technical.md approved (`changes/2026-11-01-who-comes-to-a-game/`), 4 steps |
 | 2026-11-04 | implement | story B, warnings in time: technical.md approved (`changes/2026-11-04-warnings-in-time/`), 4 steps; deviation D1: the item of a moved game ends at the start time |
+| 2026-11-04 | implement | story B, warnings in time, is done (`changes/done/2026-11-04-warnings-in-time/`): decision 0029, product documents and architecture updated; release 1 (A and B) can be made; next: story E, not played |
