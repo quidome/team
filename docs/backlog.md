@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; next: story B, warnings in time: during the week, who comes to a coming game, with a warning for too few players and for a driver who does not come.
+- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); story A is done; story B, [warnings in time](changes/2026-11-04-warnings-in-time/), is at stage implement (2026-11-04): too few players, a driver who does not come, and a moved game with old answers, on the start page and the page of the game.
 
 Small:
 - Driver proposal: one driver for every 4 players, not 3, so 10 players give 3 drivers (coordinator, 2026-10-31; 3 for each car is ideal, 4 fit).
