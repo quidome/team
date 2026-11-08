@@ -1,7 +1,7 @@
 ---
 title: After the game
 type: feature
-stage: close
+stage: done
 closure: review build + accept   # from the epic; "Checked" changes the record, and duties change from the start time
 created: 2026-11-08
 ---
@@ -22,3 +22,4 @@ Spec: story C in [functional.md](../2026-10-31-attendance-at-games/functional.md
 | 2026-11-08 | design | created from `/design story C of attendance at games`; the moment is the start time for "Checked", the words and the duties; a not played game can be checked; a moved game: the check and the settled answers have no effect (coordinator) |
 | 2026-11-08 | implement | technical.md approved: 5 steps (duties from the start time; "Checked" stored; the page; the open item and the rows; the note on the players page); deviations D1 (own lock in `game_attendance`), D2 (the start time; a not played game can be checked; a moved game), D3 (the release day in `game_check_start`); spec review of the deviations: all serve, S40 kept (rare), S41 fixed; decision record 0032 at close |
 | 2026-11-08 | close | 5 steps built; reviews build (R1–R8) and accept (A1–A6, accepted with notes); fixed R1–R4, A3, A4, the comment of R8; the rest for Close or not fixed, with reasons; `just check` passes |
+| 2026-11-08 | done | closed: product docs (game attendance, duties, start page, season, players and team, principles), architecture, decision 0032; question for `/vision`: "checked" in `language.md` says "a past training or game", but a game can be checked from its start time |

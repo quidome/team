@@ -66,8 +66,8 @@ let counts = |required: bool| !not_played && (past || (in_list && required));
 | A | [Who comes to a game](../done/2026-11-01-who-comes-to-a-game/) | feature | Migration `game_answers` and `game_attendance` (`extra_players`, `answers_for`). Core `game_list`, `game_count`. Routes for an answer, a reason and extra players. The list on the page of a game, the count on rows of "Next" and "Season". `kept_games` keeps games with answers. "Delete player" refused. | – | review build + accept | 1 | done |
 | B | [Warnings in time](../done/2026-11-04-warnings-in-time/) | feature | Core `too_few`, `in_warning_period`, `drivers_not_coming`, `answers_moved`. Three open items and their order. The line "Too few players", "Anna · not coming", the note with "Answers checked", the note in the choice of a driver. | A | review build + accept | 1 | done |
 | E | [Not played](../done/2026-11-08-not-played/) | feature | Migration `not_played_for`. `not_played` in `game_places`, the clash rule, the messages and overviews, the warnings. The button with "Undo". "· Not played" on rows. | A | review build + accept | 2 | done |
-| C | After the game | feature | Migration `checked_for`, `settled`. "Checked" and "Undo check" under the row lock, the words after the date, the closed list, the open item "not checked", "· Checked" on rows. | A, E | review build + accept | 2 | not started |
-| D | Totals on "Attendance" | feature | Games in the totals of "Attendance" (a not played game does not count: `ScheduledGame.not_played`, decision 0031), "Left the team", the texts. | C | review build + accept | 2 | not started |
+| C | [After the game](../done/2026-11-08-after-the-game/) | feature | Migration `checked_for`, `settled`. "Checked" and "Undo check" under the row lock, the words after the date, the closed list, the open item "not checked", "· Checked" on rows. | A, E | review build + accept | 2 | done |
+| D | Totals on "Attendance" | feature | Games in the totals of "Attendance" (a not played game does not count: `ScheduledGame.not_played`, decision 0031), "Left the team", the texts. Only games from the release day in `game_check_start` (decision 0032). | C | review build + accept | 2 | not started |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
 writes its steps, routes, screens and exact tests from this spec and `functional.md`.
@@ -110,7 +110,7 @@ Forward-only migrations with new tables; no data to move. Story E changes releas
 - [x] Story B – warnings in time
 - [x] Release 1
 - [x] Story E – not played
-- [ ] Story C – after the game
+- [x] Story C – after the game
 - [ ] Story D – totals on "Attendance"
 - [ ] Release 2
 - [ ] Epic review accept
