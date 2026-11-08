@@ -1,6 +1,6 @@
 # Attendance at games
 
-**Status**: who comes to a game and the warnings in time are built. "Not played" and "Checked" are not built yet.
+**Status**: who comes to a game, the warnings in time and "Not played" are built. "Checked" is not built yet.
 
 ## Purpose
 During the week before a game the coordinator keeps track of who comes, from the chat with the players and parents. The coordinator sees at once how many players there are and whom to ask.
@@ -30,7 +30,16 @@ During the week before a game the coordinator keeps track of who comes, from the
 - **Too few players.** Above the count: "Too few players: 6 of 7" when fewer than 7 come (players coming plus extra players), from 3 days before the date (00:00, Dutch time), and earlier once the game has an answer, until the start time (without a start time: the end of the date). From 3 days before, the same game is an open item on the [start page](start-page.md); both come from one rule.
 - **A driver who is not coming.** A player on a driver place whose answer is "not coming" shows "Anna · not coming" at the place; after the date "Anna · absent", only while the place is "as planned" (after "Someone else" or "Nobody" there is no note). In the choice of a driver such a player stays a choice, with the note "Not coming". The tool never removes a driver. Until the start time it is an open item on the start page, at once.
 - **Answers from before a move.** When the game moved after players answered: "Answers from before the move to Wed 11 Nov." with the button "Answers checked". Only that tap ends it; "Seen" in the [list of changes](list-of-changes.md) does not, and a new answer does not (decision 0029). From 3 days before the new date until its start time it is an open item on the start page.
-- No warnings for a game that left the game list or is no longer a game of the team; none for table and referee places, or for a driver with "no answer". A warning does not end at "Checked" or "Not played" yet (stories C and E); a cancelled game that stays in the game list still warns.
+- No warnings for a game that left the game list, is no longer a game of the team, or is "not played" (below); none for table and referee places, or for a driver with "no answer". A warning does not end at "Checked" yet (story C).
+
+### Not played
+- **Every game whose page opens** has the button "Not played" as its last button: a game of the team, a home game of another club team, a game kept for its duties or answers, coming or past, also a game that left the game list. A reading of the game list never sets or clears it.
+- **One tap** saves at once. The game then counts nothing: no duty in the totals (drive, table, referee), no open places and no "schedule not entered", no warning and no open item, no line in the messages or the duty overviews, and it blocks no player at another game ([duties](duties.md)). It will not count in the totals of "Attendance" either, once games are in them. Nothing stored is deleted.
+- **The page** shows "Not played" with "Undo" at the top. The list of who comes is closed behind "Show who comes"; opened, it works as before. Answers, extra players and duty places can still be changed ([how the tool treats what is stored](principles.md)). A driver's "· not coming" is not shown. "Undo" saves at once and makes everything count as before.
+- **"The drivers drove."** From the start time (without a start time: from the start of the game day), a not played game with driver places of the team has the switch "The drivers drove", off at first, with "No drive counts." or "The drives count." When it is on, its drives count in the duty totals as at a played game (done by the player on the place); the game is still no open item and in no overview. "Undo" keeps the switch; it has effect again only after a new "Not played".
+- **The rows** on "Season", in "Next" and in "Last" show "· Not played" after the hall and town; on a game of the team it replaces the count. A not played game stays in "Next" and "Last".
+- **A mark holds for a date** (decision 0029): the mark stores the date of the game. When the game gets another date, it is a normal game of its new date again, with its answers and duties; the mark stays stored, so a game that moves back to the marked date is "not played" again without a new tap. A new tap stores the new date.
+- Two screens: the last tap wins.
 
 ## Errors and limits
 - A tap that fails shows the stored state and "Not saved. Try again." The taps of one player are sent one after the other; the last tap wins.
@@ -42,4 +51,5 @@ During the week before a game the coordinator keeps track of who comes, from the
 
 ## Interface
 - Server addresses (need a login): `PUT` and `DELETE /api/games/{season}/{id}/answers/{player}`, `PUT /api/games/{season}/{id}/extra-players`, `PUT /api/games/{season}/{id}/answers-checked`. The list comes with `GET /api/games/{season}/{id}` (`attendance`, with `too_few`, `enough_players` and `answers_moved`; each tap answers the same fields).
-- The rules are `team_core::game_list`, `game_count`, `row_count`, `check_answer`, and for the warnings `game_warnings` (with `in_warning_period`, `before_start`, `drivers_not_coming`, `answers_moved`, `ENOUGH_PLAYERS` 7 and `WARNING_DAYS` 3).
+- "Not played": `PUT` and `DELETE /api/games/{season}/{id}/not-played` ("Not played", "Undo") and `PUT` and `DELETE /api/games/{season}/{id}/drivers-drove` (the switch), each answering the page of the game, which has `not_played`, `drivers_drove` and `started`. The rows of `GET /api/season` and `GET /api/start` have `not_played`.
+- The rules are `team_core::game_list`, `game_count`, `row_count`, `check_answer`, and for the warnings `game_warnings` (with `in_warning_period`, `before_start`, `drivers_not_coming`, `answers_moved`, `move_note`, `ENOUGH_PLAYERS` 7 and `WARNING_DAYS` 3); for "Not played" `not_played` and `started`, and what counts in `game_places` (decision 0031).

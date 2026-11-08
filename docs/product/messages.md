@@ -32,7 +32,7 @@ duty overviews show all coming duties of one group, for the team and the parents
   - **"Rijden:"**, only when the game needs drivers of the team and their number is above 0: the drivers by first name in the order of the places, then the open places ("Anna, Bram, nog 1 open"; "nog 3 open").
   - **"Tafel en scheidsrechter:"**: the games of the whole week with table or referee places of the team, also days that have passed, in time order with one empty line between games. Each with the short date, the start time (or ", tijd nog niet bekend,") and the two teams, then "Scheidsrechter:" and "Tafel:" with the players in place order and the open places. A kind without a place of the team at that game has no line. Places of other club teams are never mentioned. No hall: these places are always in the club's own hall.
   - **Past places** show the player who did it after a correction, and "niemand" for "Nobody" and for a place that stayed open.
-  - Only places that count are in it ([duties](duties.md)): a coming game that left the game list, or that is no longer a home game of the club, is not. A past game keeps what is stored.
+  - Only places that count are in it ([duties](duties.md)): a coming game that left the game list, or that is no longer a home game of the club, is not. A past game keeps what is stored. A game marked "Not played" is in no message: no block "Wedstrijd:", no drivers and no places ([attendance at games](game-attendance.md)).
   - Two players with the same first name show the first letter of the last name ("Anna B.", "Anna V."), as on the other pages.
   - Without a game of the team from today to Sunday the text has the heading and the places; without places it has no second part.
 - **The committee message** is the second button in "Messages", whenever a team is chosen for the current season, also in a week without places. The page (`/messages/committee`) works the same, with "Copy" and "Back"; without a team it says "No message: no team chosen." The text covers the same week:
@@ -76,7 +76,7 @@ duty overviews show all coming duties of one group, for the team and the parents
   - **The driving overview** has each coming away game of the team with more than 0 driver places, with no empty line between games. A start time not known yet: "za 14 nov, tijd nog niet bekend, Uit tegen Lions M16 1, Utrecht".
   - **The table and referee overview** has each coming game with table or referee places of the team, with the lines of "Tafel en scheidsrechter:" above, and one empty line between games.
   - Names are first names, as in the message of the week. Places of other club teams are never mentioned.
-  - Only places that count are in them ([duties](duties.md)). A game today stays all day, with the planned player, and an open place shows "nog N open".
+  - Only places that count are in them ([duties](duties.md)). A game today stays all day, with the planned player, and an open place shows "nog N open". A game marked "Not played" is not in them.
   - Without coming duties of that kind: the heading and "Geen ritten gepland." or "Geen tafel- of scheidsrechtersdiensten gepland."; "Copy" still works.
 
 ## Errors and limits
