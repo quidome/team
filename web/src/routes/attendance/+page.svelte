@@ -1,24 +1,31 @@
 <!--
-	Attendance (attendance at training, story C): the totals of each player in the chosen season (the
-	current one by default, `?season=` in the address), then "Left the team"; a tap on a player shows
-	the trainings it missed. Above the totals: the training days not opened. The list of trainings
-	is on "Season".
+	Attendance (attendance at training, story C; games, story D of attendance at games): the totals
+	of each player in the chosen season (the current one by default, `?season=` in the address), at
+	trainings and at checked games that were played, then "Left the team"; a tap on a player shows
+	the trainings and games it missed. Above the totals: the training days not opened, and in the
+	season of the release the line about the games. The list of trainings is on "Season".
 -->
 <script lang="ts">
 	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { PlayerTotals } from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { formatDay } from '#lib/schedule.js';
 	import { fullName } from '#lib/players.js';
-	import { countsText, notOpenedText, ofTrainings } from '#lib/trainings.js';
+	import {
+		countsText,
+		gamesFromText,
+		missedText,
+		notOpenedText,
+		ofGames,
+		ofTrainings
+	} from '#lib/trainings.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	const overview = $derived(data.overview);
 
-	// The players whose missed trainings are shown.
+	// The players whose missed trainings and games are shown.
 	let expanded = $state<number[]>([]);
 	function toggle(player: number) {
 		expanded = expanded.includes(player)
@@ -53,20 +60,32 @@
 				>
 					<span class="flex w-full items-baseline justify-between gap-3">
 						<span class="min-w-0 font-medium">{fullName(player)}</span>
-						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
-							{ofTrainings(player.trainings)}
-						</span>
+						{#if player.trainings > 0}
+							<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
+								{ofTrainings(player.trainings)}
+							</span>
+						{/if}
 					</span>
-					<span class="text-sm tabular-nums" data-testid="totals-counts">{countsText(player)}</span>
+					{#if player.trainings > 0}
+						<span class="text-sm tabular-nums" data-testid="totals-counts"
+							>{countsText(player)}</span
+						>
+					{/if}
+					{#if player.games.games > 0}
+						<span class="text-sm tabular-nums" data-testid="totals-games">
+							{ofGames(player.games.games)}: {countsText(player.games)}
+						</span>
+					{/if}
 				</button>
 				{#if shownMissed}
 					<div class="border-t px-4 py-2 text-sm" data-testid="missed">
 						{#if player.missed.length === 0}
-							<p class="text-muted-foreground">No missed trainings.</p>
+							<p class="text-muted-foreground">No missed trainings or games.</p>
 						{:else}
 							<ul class="space-y-1">
-								{#each player.missed as missed (missed.date)}
-									<li class="tabular-nums">{formatDay(missed.date)} · {missed.reason}</li>
+								<!-- Two games of the team can be on one date: the position keeps each key apart. -->
+								{#each player.missed as missed, index (index)}
+									<li class="tabular-nums">{missedText(missed)}</li>
 								{/each}
 							</ul>
 						{/if}
@@ -84,7 +103,7 @@
 	</section>
 {:else if !overview}
 	<section class="py-16 text-center">
-		<p class="text-muted-foreground">Log in to see the trainings.</p>
+		<p class="text-muted-foreground">Log in to see the attendance.</p>
 		<Button href="/auth/login" class="mt-4" data-sveltekit-reload>Log in</Button>
 	</section>
 {:else}
@@ -124,16 +143,22 @@
 			</p>
 		{/if}
 
+		{#if overview.games_from}
+			<p class="text-sm text-muted-foreground" data-testid="games-from">
+				{gamesFromText(overview.games_from)}
+			</p>
+		{/if}
+
 		<section aria-labelledby="totals-heading" class="space-y-2">
 			<h2 id="totals-heading" class="text-lg font-semibold tracking-tight">Totals</h2>
-			{#if overview.trainings === 0}
+			{#if overview.trainings === 0 && overview.games === 0}
 				<p class="text-sm text-muted-foreground" data-testid="no-trainings-yet">
-					No trainings yet this season.
+					No trainings or games yet this season.
 				</p>
 			{:else}
 				{#if overview.team.length === 0 && overview.left.length === 0}
 					<p class="text-sm text-muted-foreground" data-testid="no-player-totals">
-						No player had a role at these trainings.
+						No player had a role at these events.
 						{#if current}
 							Add players in
 							<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>.

@@ -4,6 +4,7 @@
 
 use chrono::NaiveDate;
 
+use crate::contribution::game_attendance::{Answer, CountedGame};
 use crate::contribution::reasons::ReasonId;
 use crate::events::training::{
     SeasonRow, Training, TrainingId, WeeklyTraining, not_opened, season_list,
@@ -146,11 +147,29 @@ pub fn check_mark(
     Ok(())
 }
 
-/// A training that a player missed and that counts.
+/// What a player missed: a training or a game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MissedKind {
+    Training,
+    Game,
+}
+
+/// A training or a game that a player missed and that counts; only a game can have no reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Missed {
     pub date: NaiveDate,
-    pub reason: ReasonId,
+    pub kind: MissedKind,
+    pub reason: Option<ReasonId>,
+}
+
+/// The games of one player in a season: "of N games: there · absent, valid · absent, not valid".
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GameTotals {
+    /// The games that count for this player.
+    pub games: usize,
+    pub there: usize,
+    pub absent_valid: usize,
+    pub absent_not_valid: usize,
 }
 
 /// The totals of one player in a season.
@@ -162,16 +181,21 @@ pub struct PlayerTotals<'a> {
     pub absent_not_valid: usize,
     /// "of N trainings": the trainings that count for this player.
     pub trainings: usize,
-    /// Newest first.
+    /// The checked games that were played and count for this player.
+    pub games: GameTotals,
+    /// Newest first; on one date the training before the game.
     pub missed: Vec<Missed>,
 }
 
 /// The overview of a season on the page "Attendance".
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeasonOverview<'a> {
-    /// The trainings of the season up to today that are not cancelled. 0: "No trainings yet this
-    /// season."
+    /// The trainings of the season up to today that are not cancelled. With `games` 0 too: "No
+    /// trainings or games yet this season."
     pub trainings: usize,
+    /// The games of the season that count (`counted_games`). With `trainings` 0 too: "No trainings
+    /// or games yet this season."
+    pub games: usize,
     /// A role on the day of the overview or later in the season.
     pub team: Vec<PlayerTotals<'a>>,
     /// Roles earlier in the season, none on the day of the overview or later.
@@ -188,7 +212,10 @@ pub struct SeasonOverview<'a> {
 /// A player gets a row only when at least one training counts for it; hidden players too. The
 /// groups follow the page "Team" (`place`) on today, or on the season's last day when the season
 /// is over. `roles` holds at least the roles of `season`, `weekly` its weekly trainings; `valid`
-/// is the setting of each reason (a reason not in it counts as not valid).
+/// is the setting of each reason (a reason not in it counts as not valid). `games` are the games
+/// that count (`counted_games`): a game counts for a player on its list with an answer
+/// ("coming": there; "not coming": absent, not valid without a reason); "no answer" does not
+/// count. A player gets a row when a training or a game counts for it.
 #[allow(clippy::too_many_arguments)]
 pub fn season_overview<'a>(
     season: Season,
@@ -198,6 +225,7 @@ pub fn season_overview<'a>(
     trainings: &[Training],
     absences: &[Absence],
     valid: &[(ReasonId, bool)],
+    games: &[CountedGame],
     today: NaiveDate,
 ) -> SeasonOverview<'a> {
     let counted: Vec<&Training> = trainings
@@ -213,6 +241,7 @@ pub fn season_overview<'a>(
     sorted.sort_by_cached_key(|player| player.sort_key());
     let mut overview = SeasonOverview {
         trainings: counted.len(),
+        games: games.len(),
         team: Vec::new(),
         left: Vec::new(),
         not_opened: 0,
@@ -225,6 +254,7 @@ pub fn season_overview<'a>(
             absent_valid: 0,
             absent_not_valid: 0,
             trainings: 0,
+            games: GameTotals::default(),
             missed: Vec::new(),
         };
         for training in counted
@@ -245,21 +275,52 @@ pub fn season_overview<'a>(
                     }
                     totals.missed.push(Missed {
                         date: training.date,
-                        reason: absence.reason,
+                        kind: MissedKind::Training,
+                        reason: Some(absence.reason),
                     });
                 }
             }
         }
-        if totals.trainings == 0 {
+        for game in games {
+            let Some((answer, reason)) = game
+                .list
+                .iter()
+                .find(|row| row.player == player.id)
+                .and_then(|row| row.answer.map(|answer| (answer, row.reason)))
+            else {
+                continue;
+            };
+            totals.games.games += 1;
+            match answer {
+                Answer::Coming => totals.games.there += 1,
+                Answer::NotComing => {
+                    if reason.is_some_and(is_valid) {
+                        totals.games.absent_valid += 1;
+                    } else {
+                        totals.games.absent_not_valid += 1;
+                    }
+                    totals.missed.push(Missed {
+                        date: game.date,
+                        kind: MissedKind::Game,
+                        reason,
+                    });
+                }
+            }
+        }
+        if totals.trainings == 0 && totals.games.games == 0 {
             continue;
         }
-        totals
-            .missed
-            .sort_by_key(|missed| std::cmp::Reverse(missed.date));
+        // Newest first; on one date the training before the game.
+        totals.missed.sort_by_key(|missed| {
+            (
+                std::cmp::Reverse(missed.date),
+                missed.kind == MissedKind::Game,
+            )
+        });
         match place(roles, player.id, season, day).group {
             Group::Team => overview.team.push(totals),
             Group::Left => overview.left.push(totals),
-            // No role in the season, so no training counted: not reached.
+            // No role in the season, so nothing counted: not reached.
             Group::LastSeason | Group::Other => {}
         }
     }
@@ -276,6 +337,7 @@ mod tests {
     use chrono::NaiveTime;
 
     use super::*;
+    use crate::contribution::game_attendance::{StoredAnswer, game_list};
     use crate::shared::season::Season;
     use crate::team::players::RoleId;
 
@@ -463,6 +525,7 @@ mod tests {
             trainings,
             absences,
             &reasons(true),
+            &[],
             today,
         )
     }
@@ -508,7 +571,8 @@ mod tests {
             result.team[0].missed,
             [Missed {
                 date: date(2026, 9, 15),
-                reason: ReasonId(SCHOOL)
+                kind: MissedKind::Training,
+                reason: Some(ReasonId(SCHOOL))
             }]
         );
         assert_eq!(result.trainings, 4);
@@ -582,6 +646,7 @@ mod tests {
             &trainings,
             &absences,
             &reasons(false),
+            &[],
             date(2026, 10, 13),
         );
         assert_eq!(counts(&result.team), [("Avery", 3, 0, 1, 4)]);
@@ -788,5 +853,208 @@ mod tests {
             date(2026, 10, 13),
         );
         assert_eq!(counts(&result.team), [("Avery", 3, 0, 1, 4)]);
+    }
+
+    // The games in the totals (story D of attendance at games).
+
+    fn said(player: i64, answer: Answer, reason: Option<i64>) -> StoredAnswer {
+        StoredAnswer {
+            player: PlayerId(player),
+            answer,
+            reason: reason.map(ReasonId),
+            settled: false,
+        }
+    }
+
+    /// A counted game on `on` with the list of its page (`game_list`).
+    fn game_on(
+        players: &[Player],
+        roles: &[PlayerRole],
+        on: NaiveDate,
+        answers: Vec<StoredAnswer>,
+    ) -> CountedGame {
+        CountedGame {
+            date: on,
+            list: game_list(players, roles, &answers, on),
+        }
+    }
+
+    fn with_games<'a>(
+        players: &'a [Player],
+        roles: &[PlayerRole],
+        trainings: &[Training],
+        games: &[CountedGame],
+    ) -> SeasonOverview<'a> {
+        season_overview(
+            Season::from_start_year(2026),
+            players,
+            roles,
+            &tuesdays(),
+            trainings,
+            &[],
+            &reasons(true),
+            games,
+            date(2026, 10, 13),
+        )
+    }
+
+    #[test]
+    fn each_answer_at_a_counted_game_counts_by_its_reason() {
+        let players = [
+            player(1, "Avery", false),
+            player(2, "Blake", false),
+            player(3, "Casey", false),
+            player(4, "Dana", false),
+            player(5, "Emery", false),
+        ];
+        let roles: Vec<PlayerRole> = (1..=5)
+            .map(|id| role(id, id, date(2026, 9, 1), None))
+            .collect();
+        let games = [game_on(
+            &players,
+            &roles,
+            date(2026, 10, 10),
+            vec![
+                said(1, Answer::Coming, None),
+                said(2, Answer::NotComing, Some(SCHOOL)),
+                said(3, Answer::NotComing, Some(HOLIDAY)),
+                // Without a reason, as "Checked" makes it: not valid.
+                StoredAnswer {
+                    settled: true,
+                    ..said(4, Answer::NotComing, None)
+                },
+            ],
+        )];
+        let result = with_games(&players, &roles, &[], &games);
+        let totals = |at: usize| {
+            (
+                result.team[at].player.first_name.as_str(),
+                result.team[at].games,
+            )
+        };
+        let of = |there, absent_valid, absent_not_valid| GameTotals {
+            games: 1,
+            there,
+            absent_valid,
+            absent_not_valid,
+        };
+        // Emery has no answer: no game counts, and no training either, so no row.
+        assert_eq!(
+            (0..result.team.len()).map(totals).collect::<Vec<_>>(),
+            [
+                ("Avery", of(1, 0, 0)),
+                ("Blake", of(0, 1, 0)),
+                ("Casey", of(0, 0, 1)),
+                ("Dana", of(0, 0, 1)),
+            ]
+        );
+        // A player with games and no trainings has a row.
+        assert_eq!(result.team[0].trainings, 0);
+        assert_eq!((result.trainings, result.games), (0, 1));
+        assert_eq!(
+            result.team[3].missed,
+            [Missed {
+                date: date(2026, 10, 10),
+                kind: MissedKind::Game,
+                reason: None
+            }]
+        );
+    }
+
+    #[test]
+    fn a_game_counts_only_for_a_player_on_its_list() {
+        let players = [
+            player(1, "Avery", false),
+            player(2, "Blake", false),
+            player(3, "Casey", false),
+        ];
+        let roles = [
+            // Plays games from 11 October: not on the list of 10 October.
+            role(1, 1, date(2026, 10, 11), None),
+            // Only trains.
+            PlayerRole {
+                role: Role::OnlyTrains,
+                ..role(2, 2, date(2026, 9, 1), None)
+            },
+            role(3, 3, date(2026, 9, 1), None),
+        ];
+        let games = [game_on(
+            &players,
+            &roles,
+            date(2026, 10, 10),
+            vec![
+                said(1, Answer::Coming, None),
+                said(2, Answer::Coming, None),
+                said(3, Answer::Coming, None),
+            ],
+        )];
+        let result = with_games(&players, &roles, &[], &games);
+        let names: Vec<&str> = result
+            .team
+            .iter()
+            .map(|row| row.player.first_name.as_str())
+            .collect();
+        assert_eq!(names, ["Casey"]);
+    }
+
+    #[test]
+    fn the_missed_list_has_trainings_and_games_newest_first() {
+        let players = [player(1, "Avery", false)];
+        // The role ends on 11 October: Avery is under "Left the team", with the games.
+        let roles = [role(1, 1, date(2026, 9, 1), Some(date(2026, 10, 11)))];
+        let trainings = trainings_on(&[date(2026, 9, 29), date(2026, 10, 6)]);
+        let absences = [absence(2, 1, SCHOOL)];
+        let games = [
+            game_on(
+                &players,
+                &roles,
+                date(2026, 10, 3),
+                vec![said(1, Answer::NotComing, Some(HOLIDAY))],
+            ),
+            game_on(
+                &players,
+                &roles,
+                date(2026, 10, 6),
+                vec![said(1, Answer::NotComing, None)],
+            ),
+            game_on(
+                &players,
+                &roles,
+                date(2026, 10, 10),
+                vec![said(1, Answer::Coming, None)],
+            ),
+        ];
+        let result = season_overview(
+            Season::from_start_year(2026),
+            &players,
+            &roles,
+            &tuesdays(),
+            &trainings,
+            &absences,
+            &reasons(true),
+            &games,
+            date(2026, 10, 13),
+        );
+        assert!(result.team.is_empty());
+        let left = &result.left[0];
+        assert_eq!(
+            left.games,
+            GameTotals {
+                games: 3,
+                there: 1,
+                absent_valid: 0,
+                absent_not_valid: 2
+            }
+        );
+        let missed: Vec<(NaiveDate, MissedKind)> =
+            left.missed.iter().map(|m| (m.date, m.kind)).collect();
+        assert_eq!(
+            missed,
+            [
+                (date(2026, 10, 6), MissedKind::Training),
+                (date(2026, 10, 6), MissedKind::Game),
+                (date(2026, 10, 3), MissedKind::Game),
+            ]
+        );
     }
 }

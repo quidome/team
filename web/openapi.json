@@ -3033,6 +3033,7 @@
           "current_season",
           "seasons",
           "trainings",
+          "games",
           "not_opened",
           "team",
           "left"
@@ -3047,6 +3048,18 @@
               "null"
             ],
             "description": "The oldest of them."
+          },
+          "games": {
+            "type": "integer",
+            "description": "The checked games of the team in the season that were played; with `trainings` 0 too: no\ntrainings or games yet.",
+            "minimum": 0
+          },
+          "games_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The day \"Checked\" for games was released, when it is in this season, for example\n\"2026-11-08\"; `null` in other seasons."
           },
           "left": {
             "type": "array",
@@ -3931,6 +3944,35 @@
           }
         }
       },
+      "GameTotalsView": {
+        "type": "object",
+        "description": "The games of one player in the season: \"of N games: there · absent, valid · absent, not valid\".",
+        "required": [
+          "games",
+          "there",
+          "absent_valid",
+          "absent_not_valid"
+        ],
+        "properties": {
+          "absent_not_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "absent_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "games": {
+            "type": "integer",
+            "description": "The checked games that were played and count for this player.",
+            "minimum": 0
+          },
+          "there": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "GamesState": {
         "type": "string",
         "enum": [
@@ -4277,12 +4319,20 @@
           }
         }
       },
+      "MissedKindView": {
+        "type": "string",
+        "description": "What a player missed: a training or a game.",
+        "enum": [
+          "training",
+          "game"
+        ]
+      },
       "MissedView": {
         "type": "object",
-        "description": "A training that a player missed and that counts.",
+        "description": "A training or a game that a player missed and that counts.",
         "required": [
           "date",
-          "reason",
+          "kind",
           "valid"
         ],
         "properties": {
@@ -4290,11 +4340,19 @@
             "type": "string",
             "description": "For example \"2026-10-06\"."
           },
+          "kind": {
+            "$ref": "#/components/schemas/MissedKindView"
+          },
           "reason": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name of the reason; `null`: a game without a reason."
           },
           "valid": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "The reason is valid; false without a reason."
           }
         }
       },
@@ -5074,6 +5132,7 @@
           "absent_valid",
           "absent_not_valid",
           "trainings",
+          "games",
           "missed"
         ],
         "properties": {
@@ -5087,6 +5146,10 @@
           },
           "first_name": {
             "type": "string"
+          },
+          "games": {
+            "$ref": "#/components/schemas/GameTotalsView",
+            "description": "The games that count for this player; `games` 0: the row shows no games."
           },
           "id": {
             "type": "integer",
@@ -5103,7 +5166,7 @@
             "items": {
               "$ref": "#/components/schemas/MissedView"
             },
-            "description": "Newest first."
+            "description": "Newest first; on one date the training before the game."
           },
           "there": {
             "type": "integer",

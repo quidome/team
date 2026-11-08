@@ -658,7 +658,7 @@ test.describe('the overview', () => {
 		});
 		await page.goto('/attendance');
 		await expect(page.getByTestId('no-player-totals')).toHaveText(
-			'No player had a role at these trainings. Add players in Team.'
+			'No player had a role at these events. Add players in Team.'
 		);
 		await page.unrouteAll({ behavior: 'ignoreErrors' });
 		expect(errors).toEqual([]);
@@ -667,7 +667,9 @@ test.describe('the overview', () => {
 	test('a season with no trainings yet', async ({ page }) => {
 		const errors = watchConsole(page);
 		await page.goto('/attendance?season=2025-2026');
-		await expect(page.getByTestId('no-trainings-yet')).toHaveText('No trainings yet this season.');
+		await expect(page.getByTestId('no-trainings-yet')).toHaveText(
+			'No trainings or games yet this season.'
+		);
 		await expect(page.getByTestId('not-opened')).toHaveCount(0);
 		expect(errors).toEqual([]);
 	});

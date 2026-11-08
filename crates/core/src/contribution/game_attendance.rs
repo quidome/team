@@ -85,6 +85,46 @@ pub fn to_settle(list: &[ListRow]) -> Vec<PlayerId> {
         .collect()
 }
 
+/// A game that counts on "Attendance", with its list now (`game_list`, the list of its page).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CountedGame {
+    pub date: NaiveDate,
+    pub list: Vec<ListRow>,
+}
+
+/// The games that count on "Attendance": the games of the team (also those that left the game
+/// list: they were played), checked on their date now (`checked`) and not "not played". A game
+/// kept only for its answers after another team was chosen is not a game of the team. Each with
+/// its list (`game_list` over the answers in effect, `answers_in_effect`), so "Attendance" counts
+/// the players the page of the game shows. `checks` and `answers`: what is stored for the games,
+/// by source id.
+pub fn counted_games(
+    games: &[ScheduledGame],
+    players: &[Player],
+    roles: &[PlayerRole],
+    checks: &BTreeMap<i64, GameAttendance>,
+    answers: &BTreeMap<i64, Vec<StoredAnswer>>,
+) -> Vec<CountedGame> {
+    games
+        .iter()
+        .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame && !scheduled.not_played)
+        .filter_map(|scheduled| {
+            let id = scheduled.game.source_id;
+            let date = scheduled.game.date;
+            let stored = checks.get(&id).filter(|stored| checked(stored, date))?;
+            let in_effect = answers_in_effect(
+                answers.get(&id).map_or(&[][..], Vec::as_slice),
+                stored,
+                date,
+            );
+            Some(CountedGame {
+                date,
+                list: game_list(players, roles, &in_effect, date),
+            })
+        })
+        .collect()
+}
+
 /// The checked games of the team at which `player` now has "no answer" after a change of its roles
 /// from `before` to `after`: covered by a role "plays games" after and not before, and without an
 /// answer of the player in effect (`answers_in_effect`). `checks` and `answers`: what is stored for
@@ -910,5 +950,67 @@ mod tests {
         duty.reason = ScheduleReason::DutyGame;
         let checks = BTreeMap::from([(6, checked_on(3))]);
         assert!(now_no_answer(PlayerId(1), &[], &after, &[duty], &checks, &answers).is_empty());
+    }
+
+    #[test]
+    fn only_checked_games_of_the_team_that_were_played_count() {
+        let on = |id: i64, day: u32, in_list: bool, not_played: bool| {
+            let mut game = game(id, OPPONENT, TEAM);
+            game.date = date(10, day);
+            scheduled(&game, in_list, not_played)
+        };
+        let mut duty = on(5, 10, true, false);
+        duty.reason = ScheduleReason::DutyGame;
+        let mut kept = on(6, 10, true, false);
+        kept.reason = ScheduleReason::Kept;
+        let games = [
+            on(1, 10, true, false),
+            // Left the game list after it was played: it counts.
+            on(2, 10, false, false),
+            on(3, 10, true, true),
+            // Checked on another date.
+            on(4, 11, true, false),
+            duty,
+            kept,
+            // Not checked.
+            on(7, 10, true, false),
+        ];
+        let checked_on = |day: u32| GameAttendance {
+            extra_players: 3,
+            answers_for: None,
+            checked_for: Some(date(10, day)),
+        };
+        let checks: BTreeMap<i64, GameAttendance> =
+            (1..=6).map(|id| (id, checked_on(10))).collect();
+        let settled = StoredAnswer {
+            settled: true,
+            ..answer(9, Answer::NotComing)
+        };
+        let answers = BTreeMap::from([(1, vec![answer(8, Answer::Coming), settled])]);
+        let players = [player(8, "Anna"), player(9, "Bram")];
+        let roles = [plays(8), plays(9)];
+        let counted = counted_games(&games, &players, &roles, &checks, &answers);
+        let row = |id: i64, answer: Option<Answer>| ListRow {
+            player: PlayerId(id),
+            answer,
+            reason: None,
+        };
+        // The list of the page: the settled answer counts while the check holds.
+        assert_eq!(
+            counted,
+            [
+                CountedGame {
+                    date: date(10, 10),
+                    list: vec![
+                        row(8, Some(Answer::Coming)),
+                        row(9, Some(Answer::NotComing))
+                    ]
+                },
+                CountedGame {
+                    date: date(10, 10),
+                    list: vec![row(8, None), row(9, None)]
+                },
+            ]
+        );
     }
 }

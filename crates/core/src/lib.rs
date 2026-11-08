@@ -9,8 +9,9 @@ pub mod shared;
 pub mod team;
 
 pub use contribution::attendance::{
-    Absence, AtTraining, AttendanceError, Missed, PlayerTotals, SeasonOverview, TrainingState,
-    absent_count, check_mark, now_there, players_at, season_overview, training_state,
+    Absence, AtTraining, AttendanceError, GameTotals, Missed, MissedKind, PlayerTotals,
+    SeasonOverview, TrainingState, absent_count, check_mark, now_there, players_at,
+    season_overview, training_state,
 };
 pub use contribution::duties::{
     Assignment, Candidate, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted, DriverPart,
@@ -23,11 +24,11 @@ pub use contribution::duties::{
     required_duties, team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
-    Answer, AnswerError, CheckError, ENOUGH_PLAYERS, GameAttendance, GameCount, GameWarnings,
-    ListRow, MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_in_effect, answers_moved,
-    before_start, check_answer, check_game_checking, checked, drivers_not_coming, extra_players,
-    game_count, game_list, game_warnings, in_warning_period, move_note, now_no_answer, row_count,
-    to_settle,
+    Answer, AnswerError, CheckError, CountedGame, ENOUGH_PLAYERS, GameAttendance, GameCount,
+    GameWarnings, ListRow, MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_in_effect,
+    answers_moved, before_start, check_answer, check_game_checking, checked, counted_games,
+    drivers_not_coming, extra_players, game_count, game_list, game_warnings, in_warning_period,
+    move_note, now_no_answer, row_count, to_settle,
 };
 pub use contribution::reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use events::club::{Club, ClubNumber, search_clubs};

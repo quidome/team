@@ -106,3 +106,62 @@ test('a checked game fits a phone and is accessible', async ({ page }) => {
 		await page.request.delete(checkedApi, origin);
 	}
 });
+
+test('"Attendance" counts a checked game and lists it as missed', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.request.put(checkedApi, origin);
+	try {
+		await page.setViewportSize({ width: 320, height: 700 });
+		await page.goto('/attendance');
+		await expect(page.getByTestId('games-from')).toHaveText(
+			'Games count once they are checked. The start page asks for games from Mon 12 Oct.'
+		);
+		// A player who had no answer: "Checked" made the player absent, without a reason.
+		const row = page
+			.getByTestId('player-totals')
+			.filter({
+				has: page.getByText(/^of 1 game: 0 there · 0 absent, valid · 1 absent, not valid$/)
+			})
+			.first();
+		await row.getByRole('button').click();
+		await expect(row.getByTestId('missed')).toContainText('Game Sat 10 Oct · without a reason');
+		await expectNoHorizontalScroll(page, 320);
+		await expectAccessible(page);
+	} finally {
+		await page.request.delete(checkedApi, origin);
+	}
+	await page.reload();
+	await expect(page.getByTestId('totals-games')).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
+test('a player who missed two games on one date sees both', async ({ page }) => {
+	const errors = watchConsole(page);
+	// Two games of the team on one date: the answer is replaced.
+	await page.route('**/api/attendance*', async (route) => {
+		const overview = await (await route.fetch()).json();
+		const game = { date: '2026-10-10', kind: 'game' };
+		const row = {
+			id: 1,
+			first_name: 'Avery',
+			last_name: null,
+			there: 0,
+			absent_valid: 0,
+			absent_not_valid: 0,
+			trainings: 0,
+			games: { games: 2, there: 0, absent_valid: 1, absent_not_valid: 1 },
+			missed: [
+				{ ...game, reason: null, valid: false },
+				{ ...game, reason: 'Ill', valid: true }
+			]
+		};
+		await route.fulfill({ json: { ...overview, games: 2, team: [row], left: [] } });
+	});
+	await page.goto('/attendance');
+	await page.getByTestId('player-totals').getByRole('button').click();
+	await expect(page.getByTestId('missed').getByRole('listitem')).toHaveText([
+		'Game Sat 10 Oct · without a reason',
+		'Game Sat 10 Oct · Ill'
+	]);
+	expect(errors).toEqual([]);
+});

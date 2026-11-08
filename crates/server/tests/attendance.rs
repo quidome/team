@@ -145,8 +145,8 @@ async fn the_overview_of_the_current_season(pool: PgPool) {
     assert_eq!(
         overview["team"][0]["missed"],
         json!([
-            { "date": "2026-09-22", "reason": "Ill", "valid": true },
-            { "date": "2026-09-15", "reason": "School", "valid": false },
+            { "date": "2026-09-22", "kind": "training", "reason": "Ill", "valid": true },
+            { "date": "2026-09-15", "kind": "training", "reason": "School", "valid": false },
         ])
     );
     // Tue 29 Sep and Tue 6 Oct were never opened.

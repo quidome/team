@@ -896,6 +896,16 @@ export interface components {
 			current_season: string;
 			/** @description The oldest of them. */
 			first_not_opened?: string | null;
+			/**
+			 * @description The checked games of the team in the season that were played; with `trainings` 0 too: no
+			 *     trainings or games yet.
+			 */
+			games: number;
+			/**
+			 * @description The day "Checked" for games was released, when it is in this season, for example
+			 *     "2026-11-08"; `null` in other seasons.
+			 */
+			games_from?: string | null;
 			/** @description "Left the team": roles earlier in the season, none today or later. */
 			left: components['schemas']['PlayerTotalsView'][];
 			/** @description Training days before today without a training. */
@@ -1233,6 +1243,14 @@ export interface components {
 			/** @description The team chosen for the game's season. */
 			team: components['schemas']['TeamView'];
 		};
+		/** @description The games of one player in the season: "of N games: there · absent, valid · absent, not valid". */
+		GameTotalsView: {
+			absent_not_valid: number;
+			absent_valid: number;
+			/** @description The checked games that were played and count for this player. */
+			games: number;
+			there: number;
+		};
 		/** @enum {string} */
 		GamesState: 'shown' | 'team_needed' | 'none';
 		/** @description A role in a player's history. */
@@ -1360,11 +1378,19 @@ export interface components {
 			/** @description "Message of the week": the same rule as `GET /api/messages/week`. */
 			week: boolean;
 		};
-		/** @description A training that a player missed and that counts. */
+		/**
+		 * @description What a player missed: a training or a game.
+		 * @enum {string}
+		 */
+		MissedKindView: 'training' | 'game';
+		/** @description A training or a game that a player missed and that counts. */
 		MissedView: {
 			/** @description For example "2026-10-06". */
 			date: string;
-			reason: string;
+			kind: components['schemas']['MissedKindView'];
+			/** @description The name of the reason; `null`: a game without a reason. */
+			reason?: string | null;
+			/** @description The reason is valid; false without a reason. */
 			valid: boolean;
 		};
 		NewPlayer: {
@@ -1598,10 +1624,12 @@ export interface components {
 			absent_not_valid: number;
 			absent_valid: number;
 			first_name: string;
+			/** @description The games that count for this player; `games` 0: the row shows no games. */
+			games: components['schemas']['GameTotalsView'];
 			/** Format: int64 */
 			id: number;
 			last_name?: string | null;
-			/** @description Newest first. */
+			/** @description Newest first; on one date the training before the game. */
 			missed: components['schemas']['MissedView'][];
 			there: number;
 			/** @description "of N trainings": the trainings that count for this player. */

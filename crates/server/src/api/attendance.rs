@@ -5,25 +5,60 @@
 use axum::Json;
 use axum::extract::{Query, State};
 use serde::Serialize;
-use team_core::{PlayerTotals, ReasonId, season_overview};
+use team_core::{
+    GameTotals, MissedKind, PlayerTotals, ReasonId, ScheduledGame, Season, counted_games,
+    season_overview,
+};
 use utoipa::ToSchema;
 
 use super::format::{day, query_season};
-use super::season::{SeasonTrainings, trainings_of};
+use super::season::{SeasonTrainings, games_of, trainings_of};
 use super::trainings::SeasonQuery;
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::error::AppError;
 use crate::reasons::StoredReason;
-use crate::{players, reasons, trainings};
+use crate::{game_attendance, players, reasons, trainings};
 
-/// A training that a player missed and that counts.
+/// What a player missed: a training or a game.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MissedKindView {
+    Training,
+    Game,
+}
+
+/// A training or a game that a player missed and that counts.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MissedView {
     /// For example "2026-10-06".
     pub date: String,
-    pub reason: String,
+    pub kind: MissedKindView,
+    /// The name of the reason; `null`: a game without a reason.
+    pub reason: Option<String>,
+    /// The reason is valid; false without a reason.
     pub valid: bool,
+}
+
+/// The games of one player in the season: "of N games: there · absent, valid · absent, not valid".
+#[derive(Debug, Serialize, ToSchema)]
+pub struct GameTotalsView {
+    /// The checked games that were played and count for this player.
+    pub games: usize,
+    pub there: usize,
+    pub absent_valid: usize,
+    pub absent_not_valid: usize,
+}
+
+impl From<GameTotals> for GameTotalsView {
+    fn from(totals: GameTotals) -> Self {
+        Self {
+            games: totals.games,
+            there: totals.there,
+            absent_valid: totals.absent_valid,
+            absent_not_valid: totals.absent_not_valid,
+        }
+    }
 }
 
 /// The totals of one player in the season.
@@ -37,7 +72,9 @@ pub struct PlayerTotalsView {
     pub absent_not_valid: usize,
     /// "of N trainings": the trainings that count for this player.
     pub trainings: usize,
-    /// Newest first.
+    /// The games that count for this player; `games` 0: the row shows no games.
+    pub games: GameTotalsView,
+    /// Newest first; on one date the training before the game.
     pub missed: Vec<MissedView>,
 }
 
@@ -52,6 +89,12 @@ pub struct AttendanceOverview {
     pub seasons: Vec<String>,
     /// The trainings of the season up to today that are not cancelled; 0: no trainings yet.
     pub trainings: usize,
+    /// The checked games of the team in the season that were played; with `trainings` 0 too: no
+    /// trainings or games yet.
+    pub games: usize,
+    /// The day "Checked" for games was released, when it is in this season, for example
+    /// "2026-11-08"; `null` in other seasons.
+    pub games_from: Option<String>,
     /// Training days before today without a training.
     pub not_opened: usize,
     /// The oldest of them.
@@ -71,14 +114,23 @@ fn totals_view(totals: &PlayerTotals, reasons: &[StoredReason]) -> PlayerTotalsV
         absent_valid: totals.absent_valid,
         absent_not_valid: totals.absent_not_valid,
         trainings: totals.trainings,
+        games: totals.games.into(),
         missed: totals
             .missed
             .iter()
             .map(|missed| {
-                let reason = reasons.iter().find(|reason| reason.id == missed.reason.0);
+                let reason = missed
+                    .reason
+                    .and_then(|id| reasons.iter().find(|reason| reason.id == id.0));
                 MissedView {
                     date: day(missed.date),
-                    reason: reason.map(|reason| reason.name.clone()).unwrap_or_default(),
+                    kind: match missed.kind {
+                        MissedKind::Training => MissedKindView::Training,
+                        MissedKind::Game => MissedKindView::Game,
+                    },
+                    reason: missed
+                        .reason
+                        .map(|_| reason.map(|reason| reason.name.clone()).unwrap_or_default()),
                     valid: reason.is_some_and(|reason| reason.valid),
                 }
             })
@@ -116,8 +168,26 @@ pub async fn get(
         .iter()
         .map(|reason| (ReasonId(reason.id), reason.valid))
         .collect();
+    // The checked games of the team that were played: the rules of the page of a game.
+    let games = games_of(&state, season, current, today).await?;
+    let all: Vec<ScheduledGame> = games
+        .schedule
+        .past
+        .iter()
+        .chain(&games.schedule.coming)
+        .cloned()
+        .collect();
+    let attendance = &games.duties.attendance;
+    let counted = counted_games(
+        &all,
+        &games.duties.players,
+        &games.duties.roles,
+        &attendance.games,
+        &attendance.answers,
+    );
+    let release = game_attendance::check_start(&state.pool).await?;
     let overview = season_overview(
-        season, &players, &roles, &weekly, &stored, &absences, &valid, today,
+        season, &players, &roles, &weekly, &stored, &absences, &valid, &counted, today,
     );
 
     let mut seasons = trainings::seasons(&state.pool).await?;
@@ -131,6 +201,8 @@ pub async fn get(
         current_season: current.to_string(),
         seasons: seasons.iter().map(ToString::to_string).collect(),
         trainings: overview.trainings,
+        games: overview.games,
+        games_from: (Season::of(release) == season).then(|| day(release)),
         not_opened: overview.not_opened,
         first_not_opened: overview.first_not_opened.map(day),
         team: overview
