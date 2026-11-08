@@ -53,7 +53,7 @@ export function missedText(missed: PlayerTotals['missed'][number]): string {
 	return `Game ${formatDay(missed.date)} · ${missed.reason ?? 'without a reason'}`;
 }
 
-/** "Games count once they are checked. The start page asks for games from Sun 8 Nov." */
+/** "Games count once they are checked. The start page asks for games from Wed 4 Nov." */
 export function gamesFromText(date: string): string {
 	return `Games count once they are checked. The start page asks for games from ${formatDay(date)}.`;
 }

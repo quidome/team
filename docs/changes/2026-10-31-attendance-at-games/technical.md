@@ -15,7 +15,7 @@ From `functional.md` (approved, three spec reviews, S1–S39 answered):
 - **A – Who comes**: on the page of a game of the team, the players with the role "plays games" on the date, in three states ("coming", "not coming" with an optional reason, "no answer"), two buttons on each row, a tap saves at once, a second tap goes back to "no answer". Groups: "No answer", "Coming", "Not coming"; rows do not move while the page stays open. A link "Reason" opens the reasons. The count stays in view. "Extra players" 0 to 10. The count on rows of "Next", and of "Season" with at least one answer.
 - **B – Warnings**: fewer than 7 (coming plus extra) is an open item from 3 days before the date until the start time; a driver who is not coming is an open item at once; a moved game with answers is an open item from 3 days before the new date until "Answers checked". Order: game list, changes not seen, too few, driver not coming, moved, schedule not entered, open places, training days not opened, trainings not checked, games not checked.
 - **E – Not played**: a button on each game of the team and each other game with places of the team, coming or past, with "Undo". Duties and attendance stop counting; nothing stored changes. It holds only for the date on which it was tapped.
-- **C – After the game**: "Checked" from the start time (without a start time: the day after), which makes each "no answer" absent; "Undo check" brings back only those. Words "There" and "Absent" after the date. Open item "not checked" from the release day, in the seasons of the trainings. It also holds only for its date.
+- **C – After the game**: "Checked" from the start time (without a start time: from the start of the game day), which makes each "no answer" absent; "Undo check" brings back only those. Words "There" and "Absent" from the start time. Open item "not checked" from the release day, in the seasons of the trainings. It also holds only for its date.
 - **D – Totals**: games on "Attendance": only checked games that were played; no reason counts as not valid; extra players never count.
 
 Stricter readings of the spec:
@@ -66,7 +66,7 @@ let counts = |required: bool| !not_played && (past || (in_list && required));
 | A | [Who comes to a game](../done/2026-11-01-who-comes-to-a-game/) | feature | Migration `game_answers` and `game_attendance` (`extra_players`, `answers_for`). Core `game_list`, `game_count`. Routes for an answer, a reason and extra players. The list on the page of a game, the count on rows of "Next" and "Season". `kept_games` keeps games with answers. "Delete player" refused. | – | review build + accept | 1 | done |
 | B | [Warnings in time](../done/2026-11-04-warnings-in-time/) | feature | Core `too_few`, `in_warning_period`, `drivers_not_coming`, `answers_moved`. Three open items and their order. The line "Too few players", "Anna · not coming", the note with "Answers checked", the note in the choice of a driver. | A | review build + accept | 1 | done |
 | E | [Not played](../done/2026-11-08-not-played/) | feature | Migration `not_played_for`. `not_played` in `game_places`, the clash rule, the messages and overviews, the warnings. The button with "Undo". "· Not played" on rows. | A | review build + accept | 2 | done |
-| C | [After the game](../done/2026-11-08-after-the-game/) | feature | Migration `checked_for`, `settled`. "Checked" and "Undo check" under the row lock, the words after the date, the closed list, the open item "not checked", "· Checked" on rows. | A, E | review build + accept | 2 | done |
+| C | [After the game](../done/2026-11-08-after-the-game/) | feature | Migration `checked_for`, `settled`. "Checked" and "Undo check" under the row lock, the words from the start time, the closed list, the open item "not checked", "· Checked" on rows. | A, E | review build + accept | 2 | done |
 | D | [Totals on "Attendance"](../done/2026-11-08-totals-on-attendance/) | feature | Games in the totals of "Attendance" (a not played game does not count: `ScheduledGame.not_played`, decision 0031), "Left the team", the texts. Every checked game that was played counts; the line about the release reads `game_check_start` (decision 0032). | C | review build + accept | 2 | done |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
@@ -116,6 +116,63 @@ Forward-only migrations with new tables; no data to move. Story E changes releas
 - [ ] Epic review accept
 
 ## Deviations
-None from `functional.md`. The stricter readings are in the requirements summary.
+From `functional.md`, each a choice of the coordinator; the stricter readings are in the
+requirements summary.
+
+- **Story C** (2026-11-08, also written in `functional.md`): the moment is the start time for "Checked", the words "There" and "Absent", and the duties; a not played game can be checked. See the deviations of [after the game](../done/2026-11-08-after-the-game/).
+- **Story D** (2026-11-08, not written in `functional.md`): every checked game that was played counts, also one from before the release day; so "Attendance" does not say that "the games start at the release", but "Games count once they are checked. The start page asks for games from Wed 4 Nov." (in the season of the release day). See [totals on "Attendance"](../done/2026-11-08-totals-on-attendance/).
+- **The release day** of the open item "not checked" is 4 November 2026, the day of release 1 (migration 0016), not the day release 2 runs: the coordinator entered answers from release 1 on (acceptance review A3).
 
 ## Review findings
+### Acceptance review of the epic
+Fresh review, 2026-11-08. Mode `accept`. The arguments had no other text. I read `change.md`,
+`idea.md`, `functional.md` (stories A to E and the three spec reviews), this file, `docs/vision.md`,
+`docs/language.md`, `docs/product/game-attendance.md` and `principles.md`, and decision 0032 (only
+the part about the release day). I read the code of the result (`git diff fc2d042 HEAD`: the core
+rules in `contribution/game_attendance.rs` and `output/start_page.rs`, `api/games.rs`,
+`api/start.rs`, `api/season.rs`, `api/attendance.rs`, migrations 0013 to 0015,
+`GameAttendance.svelte`, the page of a game, "Attendance", `web/src/lib/start.ts`,
+`attendance.ts` and `trainings.ts`). I did not read the story folders in `changes/done/`. I formed
+my view before reading **Deviations**, which says "None".
+
+Runs: `cargo test -p team_core` (353 passed); `cargo test -p team --test` with `game_attendance`,
+`checked`, `not_played`, `attendance_games` and `start` (65 passed); `npm run build`, then
+`npx playwright test game-attendance checked not-played start` (160 passed, at phone width). I
+did not open the running program by hand.
+
+**Verdict: accepted with notes.** Each story does what the coordinator meant. The list, the two
+taps, the count that stays in view, the warnings from one rule, "Not played" that changes only
+what counts, and "Checked" that settles "no answer" and undoes only what it settled all match the
+spec and its review answers. A1 is a small gap in story B. Fix it before release 2 as a small fix;
+it needs no new discovery. A2 to A6 are notes.
+
+| Criterion or open point | Built as meant? | Kind |
+|---|---|---|
+| A: list, states, taps, groups, rows that do not move, "Reason", the count in view, "Extra players", the count in "Next" and on "Season" | yes | – |
+| A: a move keeps the answers, with the note and "Answers checked" | yes; the open item ends at the start time, which the spec left open | faithful adaptation |
+| B: too few, driver not coming, moved; their order; one rule | yes, except a checked game without a start time | A1 |
+| B: "Anna · not coming" / "· absent" at the place | yes; only while the place is "as planned" | faithful adaptation |
+| C: words, "Checked" from the start time, settle, "Undo check", a check for one date, the open item, Someone else and Nobody from the start | yes | – |
+| C: "from the day of the release" | the release day of "Checked" (release 2), not of the list (v0.8.0) | A3 |
+| D: games in "Totals", no reason is not valid, missed games, the texts | yes; every checked game counts, also from before the release | A2 |
+| E: "Not played" on every game page, counts nothing, clashes, "The drivers drove", one date, "Undo" | yes | – |
+
+#### Findings
+- **A1. A checked game without a start time still warns all of its game day.** Story B: an item is for a game "that is not checked", and it "goes away by itself when ... the game is checked". For a game without a start time, "Checked" opens at the start of the game day (`started` in `events/game.rs`, used by `check_game_checking`). The warnings, however, last until the end of that date (`start_of` in `contribution/game_attendance.rs`). `game_warnings` does not take the check into account, and `api/start.rs` computes warnings for every coming game of the team, and a game of today is coming (test `a_game_today_is_coming_and_a_game_yesterday_is_past`). So on that day, after "Checked", the start page can still show "Game Sat 31 Oct: 5 of 7 players" or "driver Anna is not coming". The line "Too few players" also comes back after "Show the list". This only happens for a game without a start time. The overlap came from the coordinator's choice of 2026-11-08 ("Checked" from the start of the game day), which story B did not follow. The fix is likely one condition in `game_warnings` (no warnings when `checked(attendance, date)`), with a test. Kind: **concerning deviation**, small. Checked: a trace of `game_warnings`, `before_start`, `start_of`, `started` and `api/start.rs`; a search for `start_time` in `crates/server/tests/checked.rs` found no test for this case; not run.
+- **A2. Story D counts every checked game, also from before the release, and "Attendance" says something else than the spec.** Functional.md, story D: "'Attendance' says that the games start at the release"; story A: "the totals start at the release". The build counts every checked game that was played (`counted_games`, with no date limit). "Attendance" says "Games count once they are checked. The start page asks for games from …" (`gamesFromText`). This follows the coordinator's choice in the log of `change.md` (2026-11-08), and it serves journey 2 better: an older game the coordinator checks by hand is not lost. But functional.md never got this change, unlike the dated choices in stories C and E, and **Deviations** above says "None". Kind: **faithful adaptation**. The record should say so. Checked: a read of `functional.md`, the `change.md` log, `counted_games` and `web/src/lib/trainings.ts`.
+- **A3. Games between release 1 and release 2 are "before the release".** `game_check_start` gets the date on which migration 0015 runs, which is the day of release 2. Since v0.8.0 (2026-11-04) the coordinator has entered answers in the tool, for example for the games of 7 and 8 November. Those games never become an open item "not checked", their list opens closed, and they count on "Attendance" only when the coordinator checks them by hand. The spec says "from the day of the release on" without saying which release. It was written when A, B and C were planned for one release. Kind: **neutral drift**. After release 2 the coordinator may want to check those few games by hand. Checked: migration `0015_game_checks.sql`, `games_not_checked`, `docs/releases.md`; the number of such games is not counted.
+- **A4. "Checked" is the last button on the page.** On a past game that is not checked, the open item "Game … not checked" opens a page where the list is open. Below it come the table and referee places, the players on the places and the drivers form, and only then "Checked". Story C asks for "one tap", and the spec does not say where the button goes. So this is one tap after a scroll, on a phone. Kind: **neutral drift**; a point to watch in real use (Learn). Checked: a read of `web/src/routes/game/[season]/[id]/+page.svelte`; not tried on a phone.
+- **A5. This file's requirements summary is out of date for story C.** It says "Checked" "without a start time: the day after" and the words "after the date". Functional.md (coordinator, 2026-11-08) and the build use the start of the game day and the start time. This change document becomes history at Close, so it does no harm. Kind: **neutral drift**. Checked: a read of both documents and of `started`.
+- **A6. The vision still speaks of attendance at games as future work.** Journey 8 says the report "comes before attendance at games: until then it shows no games". "Where we are going" lists attendance at games among the next steps, and "Where we are" ends with "(priorities 7 and 8)" after the report. This is for the Vision stage, not for Close. Kind: **neutral drift**. Checked: a read of `docs/vision.md`.
+
+- A1, 2026-11-08: fixed: `game_warnings` gives no warning for a game checked on its date; core test `a_checked_game_without_a_start_time_gives_no_warning_on_its_day`.
+- A2, 2026-11-08: fixed: written under Deviations.
+- A3, 2026-11-08: fixed: migration `0016_game_check_start_from_release_1` sets the release day to 4 November 2026; `tests/checked.rs` checks the date.
+- A4, 2026-11-08: not fixed: to watch in real use.
+- A5, 2026-11-08: fixed: the requirements summary and the row of story C say "from the start time".
+- A6, 2026-11-08: not fixed here: for `/vision`, with the word "checked" in `language.md`.
+
+Faithful adaptations that need no action: the reasons also close at a tap on "Coming" or "Not
+coming"; a hidden reason stays offered on a row that already has it; a game with only extra
+players is not kept after it left the game list; a not played game shows no note of a move or of
+a driver who is not coming. Each follows the intent of the criterion it fills in.

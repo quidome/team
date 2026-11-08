@@ -359,8 +359,13 @@ fn row_checked(events: &Value, id: i64) -> Option<bool> {
 async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: PgPool) {
     let reader = Reader::chosen(pool.clone()).await;
     reader.read_good().await;
-    // The migration starts the open item on the day it runs: after the test clock.
+    // The release day is 4 November 2026 (migration 0016): after the test clock.
     assert_eq!(not_checked_item(&reader).await, None);
+    let from: chrono::NaiveDate = sqlx::query_scalar("SELECT from_date FROM game_check_start")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(from.to_string(), "2026-11-04");
 
     set_check_start(&pool, "2026-10-10").await;
     assert_eq!(not_checked_item(&reader).await, Some((AWAY_10_OCT, 1)));

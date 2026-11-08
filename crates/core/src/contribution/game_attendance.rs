@@ -351,8 +351,10 @@ pub fn move_note(
 }
 
 /// All warnings of a game of the team `scheduled` at `now` (Dutch local time), from its `list` and
-/// the players on its places; none for a game that is not in the game list or is "not played". The
-/// page of the game and the open items both use it (decision 0022).
+/// the players on its places; none for a game that is not in the game list, is "not played", or is
+/// checked (a game without a start time can be checked from the start of its day, while its
+/// warnings would run until the end of it). The page of the game and the open items both use it
+/// (decision 0022).
 pub fn game_warnings(
     scheduled: &ScheduledGame,
     list: &[ListRow],
@@ -362,7 +364,11 @@ pub fn game_warnings(
     now: NaiveDateTime,
 ) -> GameWarnings {
     let game = &scheduled.game;
-    if !scheduled.in_list || scheduled.not_played || !before_start(game, now) {
+    if !scheduled.in_list
+        || scheduled.not_played
+        || checked(attendance, game.date)
+        || !before_start(game, now)
+    {
         return GameWarnings::default();
     }
     let count = game_count(list, attendance.extra_players);
@@ -1012,5 +1018,34 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn a_checked_game_without_a_start_time_gives_no_warning_on_its_day() {
+        let game = saturday(None);
+        let list = list_of(3, 4);
+        let now = at(10, 31, 10, 0);
+        let mut attendance = GameAttendance {
+            extra_players: 0,
+            answers_for: Some(game.date),
+            checked_for: None,
+        };
+        let warned = |attendance: &GameAttendance| {
+            game_warnings(
+                &scheduled(&game, true, false),
+                &list,
+                attendance,
+                true,
+                &[],
+                now,
+            )
+        };
+        // Not checked: too few players until the end of the date.
+        assert!(warned(&attendance).too_few.is_some());
+        attendance.checked_for = Some(game.date);
+        assert_eq!(warned(&attendance), GameWarnings::default());
+        // A check of another date has no effect.
+        attendance.checked_for = Some(date(10, 30));
+        assert!(warned(&attendance).too_few.is_some());
     }
 }
