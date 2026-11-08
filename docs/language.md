@@ -19,7 +19,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | weekly training | A day of the week with a start and an end time, from a date until a date, on which the team trains. It suggests a training day on each of its days. | Not "schedule" (that is for the games), not "training day". |
 | training day | A date on which a weekly training suggests a training. It becomes a training only when the coordinator opens it. | Only for a date, never for a day of the week. |
 | attendance | Whether a player was at a training or a game, and if not, the reason. Before a game: whether the player comes, does not come, or has not answered. | "Coming", "not coming", "no answer". |
-| checked | A past training or game whose attendance the coordinator confirmed. Until then it is an open item. Only attendance is checked; duties are not. | "Checked". Not "done" (that is for duties), not "closed". |
+| checked | A training or game whose attendance the coordinator confirmed: a game from its start time. Until then, a training or game before today is an open item. Only attendance is checked; duties are not. | "Checked". Not "done" (that is for duties), not "closed". |
 | extra player | Someone who plays in one game of the team but is not on its list: a player of another team, or a player who only trains. The tool keeps only their number at the game, not who they are. | "2 extra players". Not "guest". |
 | not played | A game that did not, or will not, take place. Its duties and attendance stay stored but do not count. | "Not played". Not "cancelled" (that is for a training). |
 | reason | Why a player was not at a training or a game. A reason is valid (for example school) or not valid. | Not "excuse". |

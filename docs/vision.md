@@ -50,7 +50,7 @@ see it.
 
 ## Where we are going
 First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews (built), the report of what each player did, and attendance at games. Each step must be good
+Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews and attendance at games (built), then the report of what each player did. Each step must be good
 enough to replace that part of the sheet.
 
 ## Longer horizon
@@ -64,13 +64,13 @@ These stay ideas until real use shows the need.
 ## User journeys
 0. **Open the tool.** A few times a week, the coordinator opens the tool on the phone and sees the next events and the open items: what still needs the coordinator. One tap completes the record of the last training. The whole season is one tap further, for any game or training.
 1. **Games come in.** The coordinator gets all games of the club from the federation's game list. This includes the games of other club teams, because the club's home games have table and referee places that the club teams fill. When a game moves, the tool shows the change.
-2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team. Attendance at games follows later (journey 7).
+2. **Attendance at training.** During training, the coordinator opens the tool on the phone and taps who is there and who is not, with the reason for each absence. Afterwards the coach sees how much effort each player gives to the team.
 3. **Set the duties of a game.** The coordinator copies the schedule of the referee committee: at each home game of the club, which club team has referee 1, referee 2, table 1 and table 2, with a pull-down list for each place, and then marks the game as ok. An away game of the team needs drivers.
 4. **The message of the week.** Before the weekend, the coordinator taps a button on the start page and copies one message for the team and the parents about this week (Monday to Sunday): each game of the team (time, place, home or away), the drivers of an away game, and which players have the team's table and referee places this week. The coordinator puts a short poll under it in the chat ("who comes?"), one for each game. Trainings are not in it: the team knows them. A week with nothing to announce has no message.
 5. **The committee message.** Before the weekend, the coordinator copies a message for the referee committee with each game of this week where the team has table or referee places, its start time, and which player (first and last name) does which duty.
 6. **The duty overviews.** After a new or changed schedule, or whenever the coordinator wants, the coordinator shares an overview of all coming duties: one for driving, one for table and referee. The overviews show who does what, not how much each player has done.
-7. **Attendance at games.** After the coordinator announces the week, players say in the chat that they come or not. During the week the coordinator opens the tool and updates who comes to the coming game, who does not, and who has not answered. From 3 days before the game the start page warns when fewer than 7 players come, so extra players can be found from other teams; when a player who must drive does not come, it warns at once. After the game the coordinator confirms who was there.
-8. **The report of what each player did.** The coordinator sees one table with a row for each player: trainings, games, driving, table and referee. It is for the coordinator; the coordinator may copy parts of it into the team chat. It comes before attendance at games: until then it shows no games.
+7. **Attendance at games.** After the coordinator announces the week, players say in the chat that they come or not. During the week the coordinator opens the tool and updates who comes to the coming game, who does not, and who has not answered. From 3 days before the game the start page warns when fewer than 7 players come, so extra players can be found from other teams; when a player who must drive does not come, it warns at once. From the start of the game the coordinator records who was there, and confirms it with "Checked".
+8. **The report of what each player did.** The coordinator sees one table with a row for each player: trainings, games, driving, table and referee. It is for the coordinator; the coordinator may copy parts of it into the team chat. It shows trainings, games and duties.
 
 ## Priorities
 1. **Games from the club's game list** – everything else depends on games, and the coordinator does not want to type them.
@@ -79,8 +79,8 @@ These stay ideas until real use shows the need.
 4. **Duties and the message of the week** – the weekly message is the second thing done every week.
 5. **The committee message** – built on the same duties.
 6. **The duty overviews** – show the team and the parents who does which coming duty.
-7. **The report of what each player did** – the place where the effort and the duties of each player come together; the main goal of the tool. First with trainings and duties.
-8. **Attendance at games** – shows during the week if there are enough players; adds the games to the report.
+7. **The report of what each player did** – the place where the effort and the duties of each player come together; the main goal of the tool. With trainings, games and duties.
+8. **Attendance at games** (built) – shows during the week if there are enough players; adds the games to the report.
 
 ## Principles
 - **The coordinator carries the text to the chat.** The tool only produces text to copy. It never posts.
@@ -114,3 +114,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-11-03 | Purpose made explicit: the tool shows what each player gives to the team. Core values: 1 see who makes an effort, 2 share the duties fairly and easily; fast capture and correct data are a condition for both. Success tied to these goals. The report comes before attendance at games (priorities 7 and 8 change places). Word contribution |
 | 2026-11-03 | "Where we are" describes the product compared to its purpose (fair duties reached, effort halfway, the sheet still in use); the releases move to `docs/releases.md`; the change log keeps only changes to the vision |
 | 2026-11-08 | "Where we are": attendance at games counts in the totals of a season; effort stays halfway until the report |
+| 2026-11-08 | Attendance at games is built: "Where we are going", journeys 2, 7 and 8 and the priorities say so; the report of what each player did is the next step, with trainings, games and duties. Word checked: a game can be checked from its start time |
