@@ -143,7 +143,9 @@ driven, and the only way out is "Nobody" on each place. A game that left the gam
 
 #### Acceptance criteria
 - [ ] The page of each game of the team, coming or past, and of each other game with places of the team, has the button "Not played", below "Checked" when that is there. A game that left the game list has it too, while its page can be reached.
-- [ ] One tap: the duties of the game stop counting in the duty totals (drive, table, referee), the attendance stops counting in the totals on "Attendance", the game gives no warning and is not an open item, and it leaves the messages and duty overviews. The places, players and answers stay stored.
+- [ ] One tap: the duties of the game stop counting in the duty totals (drive, table, referee; a drive still counts when "The drivers drove" is on), the attendance stops counting in the totals on "Attendance", the game gives no warning and is not an open item, and it leaves the messages and duty overviews. The places, players and answers stay stored.
+- [ ] From its start time (without a start time: from the start of the game day), a not played game with driver places of the team shows the switch "The drivers drove", off at first. When it is on, the driver places count as at a played game (from the start time): done by the player on the place, with "Someone else" and "Nobody". When it is off, no drive of that game counts. The table and referee places and the attendance never count. "Undo" keeps the switch stored; it has effect again only after a new "Not played". (Coordinator, 2026-11-08: the drivers may have driven to an away game that was then not played.)
+- [ ] Answers, extra players and duty places can still be changed on a not played game; the mark changes only what counts.
 - [ ] The page shows "Not played" with "Undo" at the top, and the list is closed behind a tap. "Undo" saves at once and makes everything count again as before.
 - [ ] On "Season", in "Next" and in "Last" the row shows "· Not played".
 - [ ] A not played game does not block a player in the clash rule of another game.

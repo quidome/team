@@ -3,9 +3,11 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); stories A and B are done, so release 1 can be made; next: story E, not played (release 2).
+- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); stories A and B are done and released as release 1 (v0.8.0, 2026-11-04); story E, not played (release 2), is in implement: [Not played](changes/2026-11-08-not-played/), 4 steps.
 
 Small:
+- Move the read of `player_roles` in `crates/server/src/trainings.rs` (`seasons`) to `players.rs`, so each domain owns its tables (design of not played, 2026-11-08; decision 0030 at its close).
+- A test that checks that the SQL of each table is only in the store module of its domain, like `crates/core/tests/domains.rs` for the core (design of not played, 2026-11-08).
 - A race test for the saves with `ON CONFLICT` of story A of attendance at games, `set_extra` and `answer` in `crates/server/src/game_attendance.rs` (pattern in `docs/architecture.md`; build review R2 of warnings in time, 2026-11-04).
 - Driver proposal: one driver for every 4 players, not 3, so 10 players give 3 drivers (coordinator, 2026-10-31; 3 for each car is ideal, 4 fit).
 - The browser test `web/e2e/choose.e2e.ts:200` ("games that cannot be loaded after a reading do not look like a failed reading") failed once in `just check` on 2026-10-31: "No changes" did not appear within 5 seconds. It then passed 3 times alone and in the next full run. Cause not found.
