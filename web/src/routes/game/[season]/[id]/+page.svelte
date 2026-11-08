@@ -9,7 +9,9 @@
 	saved. Try again." and the stored state. At the top of a game of the team: who comes
 	(`GameAttendance`, story A of attendance at games). A driver whose answer is "not coming" shows
 	"· not coming" at the place ("· absent" after the date) and "Not coming" in the choice of a
-	driver (story B).
+	driver (story B). "Not played" as the last button; a not played game shows "Not played" with
+	"Undo" at the top, the list of who comes closed behind a tap, and from the start time, with
+	driver places, the switch "The drivers drove" (story E).
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -21,6 +23,8 @@
 		loadGame,
 		setAssignment,
 		setDrivers,
+		setDriversDrove,
+		setNotPlayed,
 		setOutcome,
 		setPlace,
 		setScheduleEntered,
@@ -64,6 +68,9 @@
 	/** The place of the team whose choice is open; `correcting`: "Someone else". */
 	let chosen = $state<{ kind: DutyKind; number: number; correcting: boolean } | null>(null);
 
+	/** The list of who comes is open on a not played game ("Show who comes"). */
+	let listShown = $state(false);
+
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let notSaved = $state(false);
@@ -104,9 +111,10 @@
 	/** The answer shown of each player on the list (`GameAttendance`). */
 	let answers = $state<Record<number, AnswerView | null>>({});
 
-	/** A player on a driver place, or in its choice, whose answer is "not coming". */
+	/** A player on a driver place, or in its choice, whose answer is "not coming"; never on a not
+	 * played game, which warns about nothing (story E). */
 	function notComingDriver(kind: DutyKind, player: number): boolean {
-		return kind === 'drive' && answers[player] === 'not_coming';
+		return !game?.not_played && kind === 'drive' && answers[player] === 'not_coming';
 	}
 
 	/** The places of the team: the table and referee places that name it, then the drivers. */
@@ -182,6 +190,41 @@
 			<Button href={backOf(page.season)} variant="ghost">Back</Button>
 		</div>
 
+		{#if page.not_played}
+			<div
+				class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted p-4"
+				data-testid="not-played"
+			>
+				<p class="font-medium" role="status">Not played</p>
+				<Button
+					variant="outline"
+					disabled={busy}
+					onclick={() => {
+						listShown = false;
+						save(page, (id) => setNotPlayed(page.season, id, false));
+					}}
+				>
+					Undo
+				</Button>
+			</div>
+			{#if page.started && (driverPart?.places.length ?? 0) > 0}
+				<div class="flex flex-wrap items-center gap-3" data-testid="drivers-drove">
+					<Button
+						variant={page.drivers_drove ? 'default' : 'outline'}
+						aria-pressed={page.drivers_drove}
+						disabled={busy}
+						onclick={() =>
+							save(page, (id) => setDriversDrove(page.season, id, !page.drivers_drove))}
+					>
+						The drivers drove
+					</Button>
+					<p class="text-sm text-muted-foreground">
+						{page.drivers_drove ? 'The drives count.' : 'No drive counts.'}
+					</p>
+				</div>
+			{/if}
+		{/if}
+
 		{#each placesWarnings(page.game) as warning (warning)}
 			<p class="text-sm" role="status" data-testid="places-warning">{warning}</p>
 		{/each}
@@ -193,7 +236,11 @@
 			<p class="text-sm" role="alert" data-testid="save-error">{error}</p>
 		{/if}
 
-		{#if page.attendance}
+		{#if page.attendance && page.not_played && !listShown}
+			<Button variant="outline" onclick={() => (listShown = true)} data-testid="show-list">
+				Show who comes
+			</Button>
+		{:else if page.attendance}
 			{#key page.game.id}
 				<GameAttendance
 					season={page.season}
@@ -404,6 +451,19 @@
 					{/if}
 				</div>
 			</form>
+		{/if}
+
+		{#if !page.not_played}
+			<div>
+				<Button
+					variant="outline"
+					disabled={busy}
+					onclick={() => save(page, (id) => setNotPlayed(page.season, id, true))}
+					data-testid="mark-not-played"
+				>
+					Not played
+				</Button>
+			</div>
 		{/if}
 	</section>
 {/if}

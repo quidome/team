@@ -1,5 +1,6 @@
-//! The stored games of each club and season, and their places (tables `games` and `places`).
-//! A reading changes only the games of its own club and season.
+//! The stored games of each club and season, their places, and the mark "Not played" (tables
+//! `games`, `places` and `games_not_played`; events owns them, so only this module reads or
+//! writes them). A reading changes only the games of its own club and season, and never the mark.
 
 use std::collections::BTreeMap;
 
@@ -9,8 +10,16 @@ use team_core::{ClubNumber, Game, Place, PlaceNumber, Season, Side, StoredGame, 
 
 use crate::db::StoreError;
 
-/// The stored games of `club` and `season`, also the ones no longer in the game list, sorted by
-/// source id.
+/// The key of a game (events owns it; duties and attendance hang on it): club, season and the source's game id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GameKey {
+    pub club: ClubNumber,
+    pub season: Season,
+    pub source_id: i64,
+}
+
+/// The stored games of `club` and `season`, also the ones no longer in the game list, with their
+/// mark "Not played", sorted by source id.
 pub async fn stored(
     db: &mut PgConnection,
     club: ClubNumber,
@@ -18,13 +27,16 @@ pub async fn stored(
 ) -> Result<Vec<StoredGame>, StoreError> {
     let rows = sqlx::query_as!(
         Row,
-        "SELECT g.source_id, g.game_number, g.date, g.start_time,
+        r#"SELECT g.source_id, g.game_number, g.date, g.start_time,
                 g.home_team_number, g.home_team_name, g.home_club_number,
                 g.away_team_number, g.away_team_name, g.away_club_number,
-                g.place_number, p.hall, p.town, g.court, g.competition, g.in_list
+                g.place_number, p.hall, p.town, g.court, g.competition, g.in_list,
+                n.not_played_for AS "not_played_for?"
          FROM games g JOIN places p ON p.number = g.place_number
+         LEFT JOIN games_not_played n ON n.club_number = g.club_number
+             AND n.season_year = g.season_year AND n.source_id = g.source_id
          WHERE g.club_number = $1 AND g.season_year = $2
-         ORDER BY g.source_id",
+         ORDER BY g.source_id"#,
         club.0,
         season.start_year(),
     )
@@ -118,6 +130,38 @@ pub async fn write(
     Ok(())
 }
 
+/// Marks the game `key` "Not played" for its date now; a mark that is there gets that date. The
+/// last tap wins.
+pub async fn set_not_played(db: &mut PgConnection, key: GameKey) -> Result<(), StoreError> {
+    sqlx::query!(
+        "INSERT INTO games_not_played (club_number, season_year, source_id, not_played_for)
+         SELECT club_number, season_year, source_id, date FROM games
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3
+         ON CONFLICT (club_number, season_year, source_id)
+         DO UPDATE SET not_played_for = EXCLUDED.not_played_for",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// "Undo" of "Not played": removes the mark of the game `key`, if any.
+pub async fn unset_not_played(db: &mut PgConnection, key: GameKey) -> Result<(), StoreError> {
+    sqlx::query!(
+        "DELETE FROM games_not_played
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 struct Row {
     source_id: i64,
     game_number: String,
@@ -135,6 +179,7 @@ struct Row {
     court: Option<String>,
     competition: String,
     in_list: bool,
+    not_played_for: Option<NaiveDate>,
 }
 
 impl Row {
@@ -165,6 +210,7 @@ impl Row {
                 competition: self.competition,
             },
             in_list: self.in_list,
+            not_played_for: self.not_played_for,
         }
     }
 }

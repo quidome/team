@@ -196,6 +196,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}/drivers-drove': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setDriversDrove'];
+		post?: never;
+		delete: operations['unsetDriversDrove'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}/extra-players': {
 		parameters: {
 			query?: never;
@@ -207,6 +223,22 @@ export interface paths {
 		put: operations['setExtraPlayers'];
 		post?: never;
 		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/api/games/{season}/{id}/not-played': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setNotPlayed'];
+		post?: never;
+		delete: operations['unsetNotPlayed'];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -1144,8 +1176,12 @@ export interface components {
 			/** @description The pull-down list of the places: the club teams of the season, sorted by name. */
 			club_teams: components['schemas']['TeamView'][];
 			current_season: string;
+			/** @description The switch "The drivers drove": the drives of a not played game count from its start time. */
+			drivers_drove: boolean;
 			/** @description The game, with its duties. */
 			game: components['schemas']['ScheduleGame'];
+			/** @description "Not played" on its date now: its duties and attendance do not count. */
+			not_played: boolean;
 			/** @description The game is before today: its places can be corrected ("Someone else", "Nobody"). */
 			past: boolean;
 			/**
@@ -1156,6 +1192,11 @@ export interface components {
 			players: components['schemas']['ChoiceView'][];
 			/** @description The season of the game, for example "2026-2027". */
 			season: string;
+			/**
+			 * @description The start time has passed (without a start time: the game day has begun; Dutch time): the
+			 *     page shows the switch "The drivers drove" on a not played game with driver places.
+			 */
+			started: boolean;
 			/** @description The team chosen for the game's season. */
 			team: components['schemas']['TeamView'];
 		};
@@ -1623,6 +1664,8 @@ export interface components {
 			 *     while it keeps duties.
 			 */
 			in_list: boolean;
+			/** @description "Not played" on its date now (`team_core::not_played`): shown as "· Not played". */
+			not_played: boolean;
 			places?: null | components['schemas']['PlacesView'];
 			reason: components['schemas']['ScheduleReasonView'];
 			/** @description Dutch local start time, for example "13:00"; `null` when it is not known yet. */
@@ -2536,6 +2579,98 @@ export interface operations {
 			};
 		};
 	};
+	setDriversDrove: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description "The drivers drove" on; the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	unsetDriversDrove: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description "The drivers drove" off; the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
 	setExtraPlayers: {
 		parameters: {
 			query?: never;
@@ -2564,6 +2699,98 @@ export interface operations {
 				};
 			};
 			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `out_of_range` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setNotPlayed: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Not played on its date now; the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	unsetNotPlayed: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description "Undo": the game counts again; the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game` */
 			400: {
 				headers: {
 					[name: string]: unknown;

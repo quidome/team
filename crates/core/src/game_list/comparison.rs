@@ -64,6 +64,7 @@ pub fn compare(
         let now = StoredGame {
             game: after.clone(),
             in_list: true,
+            not_played_for: None,
         };
         let duties = with_duties.contains(&after.source_id);
         if let Some(change) = change_between(before, &now, club, team, today, duties) {
@@ -79,6 +80,7 @@ pub fn compare(
         let now = StoredGame {
             game: stored.game.clone(),
             in_list: false,
+            not_played_for: None,
         };
         let duties = with_duties.contains(&stored.game.source_id);
         if let Some(change) = change_between(Some(stored), &now, club, team, today, duties) {
@@ -185,6 +187,7 @@ pub fn update_open_changes(
             let game = StoredGame {
                 game: stored.game.clone(),
                 in_list: false,
+                not_played_for: None,
             };
             (stored.game.source_id, game)
         })
@@ -193,6 +196,7 @@ pub fn update_open_changes(
         let now = StoredGame {
             game: game.clone(),
             in_list: true,
+            not_played_for: None,
         };
         after.insert(game.source_id, now);
     }
@@ -471,6 +475,7 @@ mod tests {
             .map(|game| StoredGame {
                 game: game.clone(),
                 in_list: true,
+                not_played_for: None,
             })
             .collect()
     }
@@ -586,6 +591,7 @@ mod tests {
         let gone = [StoredGame {
             game: team_game(),
             in_list: false,
+            not_played_for: None,
         }];
         assert_eq!(kinds(&gone, &[team_game()]), [(1, Change::CameBack)]);
         assert_eq!(kinds(&gone, &[]), []);
@@ -596,6 +602,7 @@ mod tests {
         let gone = [StoredGame {
             game: team_game(),
             in_list: false,
+            not_played_for: None,
         }];
         let mut moved = team_game();
         moved.start_time = time(11);
@@ -607,6 +614,7 @@ mod tests {
         let gone = [StoredGame {
             game: game(1, CLUB_TEAM, OPPONENT),
             in_list: false,
+            not_played_for: None,
         }];
         assert_eq!(kinds(&gone, &[game(1, OPPONENT, CLUB_TEAM)]), []);
     }
@@ -686,34 +694,42 @@ mod tests {
             StoredGame {
                 game: game(1, CLUB_TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(2, TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: not_known,
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(4, TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(5, TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(6, OPPONENT, CLUB_TEAM),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(7, CLUB_TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(8, TEAM, OPPONENT),
                 in_list: false,
+                not_played_for: None,
             },
         ];
         let read = [
@@ -755,18 +771,22 @@ mod tests {
             StoredGame {
                 game: team_game(),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(2, OPPONENT, CLUB_TEAM),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(3, TEAM, OPPONENT),
                 in_list: false,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(4, TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
         ];
         let read = [game(4, TEAM, OPPONENT)];
@@ -822,6 +842,7 @@ mod tests {
         let gone = [StoredGame {
             game: game(1, OPPONENT, CLUB_TEAM),
             in_list: false,
+            not_played_for: None,
         }];
         assert_eq!(
             kinds(&gone, &[game(1, CLUB_TEAM, OPPONENT)]),
@@ -871,6 +892,7 @@ mod tests {
             last_seen: last_seen.map(|game| StoredGame {
                 game,
                 in_list: true,
+                not_played_for: None,
             }),
         }
     }
@@ -894,6 +916,7 @@ mod tests {
                 last_seen: Some(Box::new(StoredGame {
                     game: at(10),
                     in_list: true,
+                    not_played_for: None,
                 })),
             }]
         );
@@ -934,6 +957,7 @@ mod tests {
         let gone = StoredGame {
             game: at(10),
             in_list: false,
+            not_played_for: None,
         };
         assert_eq!(
             list_changes(
@@ -956,6 +980,7 @@ mod tests {
         let gone = StoredGame {
             game: at(10),
             in_list: false,
+            not_played_for: None,
         };
         assert_eq!(
             updates(&open, &[gone], &[at(10)]),
@@ -983,6 +1008,7 @@ mod tests {
         let gone = StoredGame {
             game: inside.clone(),
             in_list: false,
+            not_played_for: None,
         };
         assert_eq!(
             updates(&open, &[gone], &[inside.clone()]),
@@ -1014,6 +1040,7 @@ mod tests {
         let gone_yesterday = StoredGame {
             game: on(at(10), day(12)),
             in_list: false,
+            not_played_for: None,
         };
         assert_eq!(
             updates(&open, &[gone_yesterday], &[]),
@@ -1139,6 +1166,7 @@ mod tests {
                 last_seen: Some(Box::new(StoredGame {
                     game: on(team_game(), day(20)),
                     in_list: true,
+                    not_played_for: None,
                 })),
             }]
         );
@@ -1149,6 +1177,7 @@ mod tests {
         let seen_gone = StoredGame {
             game: team_game(),
             in_list: false,
+            not_played_for: None,
         };
         assert_eq!(
             updates(&[], &[seen_gone.clone()], &[team_game()]),
@@ -1162,7 +1191,8 @@ mod tests {
                 Some(&seen_gone),
                 &StoredGame {
                     game: team_game(),
-                    in_list: true
+                    in_list: true,
+                    not_played_for: None,
                 },
                 CLUB,
                 Some(TEAM),
@@ -1179,6 +1209,7 @@ mod tests {
             last_seen: Some(StoredGame {
                 game,
                 in_list: true,
+                not_played_for: None,
             }),
         }
     }
@@ -1194,10 +1225,12 @@ mod tests {
             StoredGame {
                 game: game(1, OPPONENT, CLUB_TEAM),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(2, TEAM, OPPONENT),
                 in_list: false,
+                not_played_for: None,
             },
         ];
         let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
@@ -1266,6 +1299,7 @@ mod tests {
         let stored = [StoredGame {
             game: game(1, CLUB_TEAM, OPPONENT),
             in_list: true,
+            not_played_for: None,
         }];
         let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
         assert_eq!(listed[0].change, changed(&[Difference::Team]));
@@ -1276,6 +1310,7 @@ mod tests {
         let stored = [StoredGame {
             game: game(2, TEAM, OPPONENT),
             in_list: true,
+            not_played_for: None,
         }];
         let listed = list_changes(open, &stored, CLUB, TEAM, TODAY, &BTreeSet::new());
         assert_eq!(listed[0].reason, ScheduleReason::TeamGame);

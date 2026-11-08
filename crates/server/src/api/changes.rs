@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 use crate::api::season::{PlacesView, ScheduleReasonView, duties_of};
 use crate::app::AppState;
 use crate::changes;
-use crate::clock::{current_season, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands, today_in_netherlands};
 use crate::db::{self, StoreError};
 use crate::error::AppError;
 use crate::{duties, followed_teams, games};
@@ -234,11 +234,11 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<ChangesAnswer>, A
     drop(db);
     // "has duties": the duties of each game, from the same rule as "Season" (decision 0022).
     let duties = duties_of(&state, club, season).await?;
-    let today = today_in_netherlands(state.clock.as_ref());
+    let now = in_netherlands(state.clock.now());
     for change in &mut changes {
         if let Some(game) = stored.iter().find(|game| game.game.source_id == change.id) {
             change.places = duties
-                .places_of(&game.game, game.in_list, club, team, today)
+                .places_of(&game.game, game.in_list, game.not_played(), club, team, now)
                 .map(|places| duties.view(&game.game, &places));
         }
     }

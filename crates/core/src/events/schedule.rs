@@ -14,6 +14,22 @@ pub struct StoredGame {
     pub game: Game,
     /// `false`: the game is no longer in the game list.
     pub in_list: bool,
+    /// The date of the game when the coordinator marked it "Not played"; `None`: no mark. A
+    /// reading of the game list never sets or clears it.
+    pub not_played_for: Option<NaiveDate>,
+}
+
+impl StoredGame {
+    /// The game is not played on its date now ([`not_played`]).
+    pub fn not_played(&self) -> bool {
+        not_played(&self.game, self.not_played_for)
+    }
+}
+
+/// `game` is not played: it has the mark "Not played" for its date now. A mark for another date
+/// (the game moved) has no effect, and the game is a normal game of its new date (decision 0029).
+pub fn not_played(game: &Game, not_played_for: Option<NaiveDate>) -> bool {
+    not_played_for == Some(game.date)
 }
 
 /// Why a game is in the schedule.
@@ -52,6 +68,9 @@ pub struct ScheduledGame {
     pub reason: ScheduleReason,
     /// `false`: the game is no longer in the game list (shown crossed out).
     pub in_list: bool,
+    /// The game is not played on its date now ([`not_played`]): its duties and attendance do not
+    /// count.
+    pub not_played: bool,
 }
 
 /// The schedule of one team, split on today's date.
@@ -77,7 +96,9 @@ pub fn schedule(
     kept: &BTreeSet<i64>,
 ) -> Schedule {
     let mut schedule = Schedule::default();
-    for StoredGame { game, in_list } in stored {
+    for stored in stored {
+        let not_played = stored.not_played();
+        let StoredGame { game, in_list, .. } = stored;
         let keep = kept.contains(&game.source_id);
         if !in_list && !open.contains(&game.source_id) && !keep {
             continue;
@@ -91,6 +112,7 @@ pub fn schedule(
             game,
             reason,
             in_list,
+            not_played,
         };
         if scheduled.game.date >= today {
             schedule.coming.push(scheduled);
@@ -224,6 +246,7 @@ pub(crate) mod tests {
         StoredGame {
             game,
             in_list: true,
+            not_played_for: None,
         }
     }
 
@@ -235,19 +258,58 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_mark_holds_only_for_the_date_of_the_game_now() {
+        let mut marked = stored(1, 7, Some((13, 0)));
+        assert!(!marked.not_played(), "no mark");
+        marked.not_played_for = Some(day(7));
+        assert!(marked.not_played(), "the mark for its date");
+        marked.game.date = day(14);
+        assert!(!marked.not_played(), "moved: a normal game of its new date");
+    }
+
+    #[test]
+    fn the_schedule_carries_the_mark_of_each_game() {
+        let mut marked = stored(1, 7, Some((13, 0)));
+        marked.not_played_for = Some(day(7));
+        let mut moved = stored(2, 14, Some((13, 0)));
+        moved.not_played_for = Some(day(7));
+        let mut gone = stored(3, 7, Some((15, 0)));
+        gone.in_list = false;
+        gone.not_played_for = Some(day(7));
+        let kept = BTreeSet::from([3]);
+        let schedule = schedule(
+            vec![marked, moved, gone, stored(4, 7, Some((17, 0)))],
+            CLUB,
+            TEAM,
+            day(1),
+            &BTreeSet::new(),
+            &kept,
+        );
+        let marks: Vec<(i64, bool)> = schedule
+            .coming
+            .iter()
+            .map(|scheduled| (scheduled.game.source_id, scheduled.not_played))
+            .collect();
+        assert_eq!(marks, [(1, true), (3, true), (4, false), (2, false)]);
+    }
+
+    #[test]
     fn the_schedule_has_no_away_games_of_other_club_teams() {
         let games = vec![
             StoredGame {
                 game: game(1, CLUB_TEAM, OPPONENT),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(2, OPPONENT, CLUB_TEAM),
                 in_list: true,
+                not_played_for: None,
             },
             StoredGame {
                 game: game(3, OPPONENT, TEAM),
                 in_list: true,
+                not_played_for: None,
             },
         ];
         let schedule = schedule(
@@ -389,10 +451,12 @@ pub(crate) mod tests {
         let swapped = StoredGame {
             game: game(1, OPPONENT, CLUB_TEAM),
             in_list: true,
+            not_played_for: None,
         };
         let outside = StoredGame {
             game: game(2, OPPONENT, CLUB_TEAM),
             in_list: true,
+            not_played_for: None,
         };
         let schedule = schedule(
             vec![swapped, outside],

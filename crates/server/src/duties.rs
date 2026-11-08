@@ -12,14 +12,7 @@ use team_core::{
 };
 
 use crate::db::StoreError;
-
-/// The key of a game: club, season and the source's game id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GameKey {
-    pub club: ClubNumber,
-    pub season: Season,
-    pub source_id: i64,
-}
+use crate::games::GameKey;
 
 fn kind_text(kind: PlaceKind) -> &'static str {
     match kind {
@@ -61,6 +54,7 @@ struct DutiesRow {
     source_id: i64,
     entered: bool,
     drivers: Option<i16>,
+    drivers_drove: bool,
 }
 
 struct TeamRow {
@@ -76,6 +70,7 @@ fn duties_of(row: &DutiesRow) -> Result<StoredDuties, StoreError> {
         schedule_entered: row.entered,
         drivers: row.drivers.map(small).transpose()?,
         teams: BTreeMap::new(),
+        drivers_drove: row.drivers_drove,
     })
 }
 
@@ -298,7 +293,7 @@ pub async fn for_season(
 ) -> Result<BTreeMap<i64, StoredDuties>, StoreError> {
     let rows = sqlx::query_as!(
         DutiesRow,
-        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers
+        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove
            FROM game_duties WHERE club_number = $1 AND season_year = $2"#,
         club.0,
         season.start_year(),
@@ -351,7 +346,7 @@ pub async fn lock(
     .await?;
     let row = sqlx::query_as!(
         DutiesRow,
-        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers
+        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove
            FROM game_duties WHERE club_number = $1 AND season_year = $2 AND source_id = $3
            FOR UPDATE"#,
         key.club.0,
@@ -475,6 +470,27 @@ pub async fn set_drivers(
         key.season.start_year(),
         key.source_id,
         drivers.map(i16::from),
+        now,
+    )
+    .execute(tx)
+    .await?;
+    Ok(())
+}
+
+/// The switch "The drivers drove" of a not played game; the game must be locked.
+pub async fn set_drivers_drove(
+    tx: &mut PgConnection,
+    key: GameKey,
+    on: bool,
+    now: DateTime<Utc>,
+) -> Result<(), StoreError> {
+    sqlx::query!(
+        "UPDATE game_duties SET drivers_drove = $4, saved_at = $5
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        on,
         now,
     )
     .execute(tx)

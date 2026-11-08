@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO games_not_played (club_number, season_year, source_id, not_played_for)\n         SELECT club_number, season_year, source_id, date FROM games\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3\n         ON CONFLICT (club_number, season_year, source_id)\n         DO UPDATE SET not_played_for = EXCLUDED.not_played_for",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c2056f95c773bbea435a144c60085b32a15acdb5b5ab8b0f8a14c2093e7bcad"
+}

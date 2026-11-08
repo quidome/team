@@ -102,6 +102,13 @@ export default defineConfig({
 			}
 		},
 		{
+			// "Not played" marks games that the earlier tests read: it runs last.
+			name: 'not-played',
+			testMatch: 'not-played.e2e.ts',
+			dependencies: ['messages'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

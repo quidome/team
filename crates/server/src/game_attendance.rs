@@ -8,7 +8,7 @@ use sqlx::{PgConnection, PgExecutor, PgPool};
 use team_core::{Answer, ClubNumber, GameAttendance, PlayerId, ReasonId, Season, StoredAnswer};
 
 use crate::db::StoreError;
-use crate::duties::GameKey;
+use crate::games::GameKey;
 
 fn answer_text(answer: Answer) -> &'static str {
     match answer {

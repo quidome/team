@@ -10,13 +10,13 @@ use chrono::{NaiveDate, NaiveDateTime};
 use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
-    FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GamePlaces, GameWarnings, ListRow,
-    Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule, ScheduleReason,
-    ScheduledGame, Season, SeasonEvents, SeasonList, SeasonRow, StoredDuties, StoredGame, Team,
-    TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining, display_names, game_list,
-    game_places, game_warnings, kept_games, not_entered, open_places, players_playing_on,
-    plays_games_on, required_duties, row_count, schedule, season_events, season_list,
-    training_state,
+    FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
+    GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
+    ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, SeasonRow, StoredDuties,
+    StoredGame, Team, TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining, display_names,
+    game_list, game_places, game_warnings, kept_games, not_entered, open_places,
+    players_playing_on, plays_games_on, required_duties, row_count, schedule, season_events,
+    season_list, started, team_games, training_state,
 };
 use utoipa::ToSchema;
 
@@ -25,7 +25,7 @@ use super::games::CountView;
 use super::trainings::{SeasonQuery, TrainingRow, row_view};
 use crate::api::clubs::{ClubView, TeamView};
 use crate::app::AppState;
-use crate::clock::{current_season, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
 use crate::game_attendance::SeasonAttendance;
@@ -51,6 +51,8 @@ pub struct ScheduleGame {
     /// False: the game is no longer in the game list; it shows until its change is seen, or
     /// while it keeps duties.
     pub in_list: bool,
+    /// "Not played" on its date now (`team_core::not_played`): shown as "· Not played".
+    pub not_played: bool,
     /// The duties of the game, when it has any (`team_core::game_places`).
     pub places: Option<PlacesView>,
     /// The count of a coming game of the team on the start page, and on "Season" with at least
@@ -347,8 +349,7 @@ impl SeasonDuties {
     pub fn warnings(&self, scheduled: &ScheduledGame, now: NaiveDateTime) -> GameWarnings {
         let (list, stored, has_answers) = self.list_of(scheduled);
         game_warnings(
-            &scheduled.game,
-            scheduled.in_list,
+            scheduled,
             &list,
             &stored,
             has_answers,
@@ -367,15 +368,16 @@ impl SeasonDuties {
         .view(places)
     }
 
-    /// The duties of `game` for `team` of `club` (decision 0022: the only rule is
-    /// `team_core::game_places`).
+    /// The duties of `game` for `team` of `club` at `now` (Dutch local time); `not_played`: the
+    /// game is "not played" (decision 0022: the only rule is `team_core::game_places`).
     pub fn places_of(
         &self,
         game: &Game,
         in_list: bool,
+        not_played: bool,
         club: ClubNumber,
         team: TeamNumber,
-        today: NaiveDate,
+        now: NaiveDateTime,
     ) -> Option<GamePlaces> {
         game_places(
             required_duties(game, club, team),
@@ -387,8 +389,12 @@ impl SeasonDuties {
                 .map(|assignment| (assignment.kind, assignment.number))
                 .collect(),
             players_playing_on(&self.roles, game.date),
-            in_list,
-            game.date < today,
+            GameMoment {
+                in_list,
+                past: game.date < now.date(),
+                started: started(game, now),
+                not_played,
+            },
         )
     }
 }
@@ -398,7 +404,7 @@ impl SeasonDuties {
 /// the game list (A1), so the choice of a game and the page "Duties" give the same numbers.
 pub(crate) struct SeasonPlaces<'a> {
     places: Vec<(&'a Game, GamePlaces)>,
-    /// The games of the team in the game list.
+    /// The games of the team that can block a player (`team_core::team_games`).
     pub team_games: Vec<&'a Game>,
     today: NaiveDate,
 }
@@ -409,26 +415,26 @@ impl<'a> SeasonPlaces<'a> {
         duties: &SeasonDuties,
         club: ClubNumber,
         team: TeamNumber,
-        today: NaiveDate,
+        now: NaiveDateTime,
     ) -> Self {
         let places = stored
             .iter()
             .filter_map(|stored| {
-                let places = duties.places_of(&stored.game, stored.in_list, club, team, today)?;
+                let places = duties.places_of(
+                    &stored.game,
+                    stored.in_list,
+                    stored.not_played(),
+                    club,
+                    team,
+                    now,
+                )?;
                 Some((&stored.game, places))
             })
             .collect();
-        let team_games = stored
-            .iter()
-            .filter(|stored| {
-                stored.in_list && (stored.game.home.team == team || stored.game.away.team == team)
-            })
-            .map(|stored| &stored.game)
-            .collect();
         Self {
             places,
-            team_games,
-            today,
+            team_games: team_games(stored, team),
+            today: now.date(),
         }
     }
 
@@ -512,6 +518,7 @@ impl From<ScheduledGame> for ScheduleGame {
             town: game.place.town,
             reason: scheduled.reason.into(),
             in_list: scheduled.in_list,
+            not_played: scheduled.not_played,
             places: None,
             attendance: None,
         }
@@ -634,9 +641,10 @@ pub async fn get(
 ) -> Result<Json<SeasonAnswer>, AppError> {
     let season = query_season(query.season, state.clock.as_ref())?;
     let current = current_season(state.clock.as_ref());
-    let today = today_in_netherlands(state.clock.as_ref());
+    let now = in_netherlands(state.clock.now());
+    let today = now.date();
     let games = games_of(&state, season, current, today).await?;
-    let places = places_of_season(&games, today);
+    let places = places_of_season(&games, now);
     let SeasonGames {
         state: games_state,
         club,
@@ -688,7 +696,7 @@ pub(crate) struct SeasonGames {
 
 /// The duties of the games of `games` (the schedule of a season), by source id; empty without a
 /// team.
-pub(crate) fn places_of_season(games: &SeasonGames, today: NaiveDate) -> PlacesOf {
+pub(crate) fn places_of_season(games: &SeasonGames, now: NaiveDateTime) -> PlacesOf {
     let (Some(club), Some(team)) = (&games.club, &games.team) else {
         return PlacesOf::new();
     };
@@ -701,9 +709,10 @@ pub(crate) fn places_of_season(games: &SeasonGames, today: NaiveDate) -> PlacesO
             let places = games.duties.places_of(
                 &scheduled.game,
                 scheduled.in_list,
+                scheduled.not_played,
                 club.number,
                 team.number,
-                today,
+                now,
             )?;
             Some((scheduled.game.source_id, places))
         })

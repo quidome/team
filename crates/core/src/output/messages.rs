@@ -242,7 +242,8 @@ fn week_games<'g, 'a>(games: &'g [MessageGame<'a>], today: NaiveDate) -> Vec<&'g
 /// The message of the week that holds `today`. `games`: the games of the season, in time order
 /// within a date, the dates in any order; `names`: `display_names` of the season; `club` and
 /// `team`: the club and the team chosen for the season. A game of the team has a block from today
-/// to Sunday, while it is in the game list; the table and referee places of the team that count
+/// to Sunday, while it is in the game list and not "not played"; the table and referee places of the
+/// team that count
 /// are in it for the whole week. `None`: no such game, and no such places of today or later or
 /// with a player: a past place that stayed open announces nothing.
 pub fn week_message(
@@ -259,6 +260,7 @@ pub fn week_message(
         .filter(|game| {
             game.scheduled.reason == ScheduleReason::TeamGame
                 && game.scheduled.in_list
+                && !game.scheduled.not_played
                 && game.scheduled.game.date >= today
         })
         .map(|game| game_block(game, names, club, team))
@@ -396,6 +398,7 @@ pub fn table_referee_overview(
 
 #[cfg(test)]
 mod tests {
+    use crate::contribution::duties::GameMoment;
     use std::collections::BTreeSet;
 
     use super::*;
@@ -485,6 +488,7 @@ mod tests {
                     },
                     reason,
                     in_list: true,
+                    not_played: false,
                 },
                 stored: StoredDuties::default(),
                 assignments: Vec::new(),
@@ -576,6 +580,11 @@ mod tests {
             self
         }
 
+        fn not_played(mut self) -> Self {
+            self.scheduled.not_played = true;
+            self
+        }
+
         fn places(&self, today: NaiveDate) -> Option<GamePlaces> {
             let game = &self.scheduled.game;
             let filled: BTreeSet<(DutyKind, u8)> = self
@@ -589,8 +598,10 @@ mod tests {
                 TEAM,
                 &filled,
                 9,
-                self.scheduled.in_list,
-                game.date < today,
+                GameMoment {
+                    not_played: self.scheduled.not_played,
+                    ..GameMoment::played(self.scheduled.in_list, game.date < today)
+                },
             )
         }
     }
@@ -1352,5 +1363,56 @@ mod tests {
             .player(DutyKind::Drive, 2, PlayerId(2));
         let text = message_with(&[away], &names, monday()).expect("a message");
         assert!(text.ends_with("Rijden: Anna B., Anna V."));
+    }
+
+    #[test]
+    fn a_not_played_game_is_in_no_message() {
+        // Saturday 14 November 2026: an away game with a driver and a duty game with a table
+        // place of the team, both not played; the messages are made on Monday 9 November.
+        let today = date(2026, 11, 9);
+        let saturday = date(2026, 11, 14);
+        let time = NaiveTime::from_hms_opt(13, 0, 0);
+        let fixtures = [
+            Fixture::away(11, saturday, time)
+                .drivers(1)
+                .player(DutyKind::Drive, 1, ANNA)
+                .not_played(),
+            Fixture::duty(12, saturday, time)
+                .of_team(PlaceKind::Table, 1)
+                .player(DutyKind::Table, 1, BRAM)
+                .not_played(),
+        ];
+        assert_eq!(message_with(&fixtures, &names(), today), None);
+        assert_eq!(
+            committee(&fixtures, &names(), today),
+            "Tafel en scheidsrechters Blue Drakes M16 1, week 9 november – 15 november\n\n\
+             Geen tafel- of scheidsrechtersdiensten deze week."
+        );
+        assert_eq!(driving(&fixtures, today), NO_DRIVES);
+        assert_eq!(table_referee(&fixtures, today), NO_PLACES);
+        // Played, each is in the messages.
+        let played = [
+            Fixture::away(11, saturday, time)
+                .drivers(1)
+                .player(DutyKind::Drive, 1, ANNA),
+            Fixture::duty(12, saturday, time)
+                .of_team(PlaceKind::Table, 1)
+                .player(DutyKind::Table, 1, BRAM),
+        ];
+        let week = message_with(&played, &names(), today).expect("a message");
+        assert!(
+            week.contains("Rijden: Anna") && week.contains("Tafel: Bram"),
+            "{week}"
+        );
+        assert_ne!(driving(&played, today), NO_DRIVES);
+        assert_ne!(table_referee(&played, today), NO_PLACES);
+    }
+
+    #[test]
+    fn a_not_played_home_game_of_the_team_has_no_block() {
+        let today = date(2026, 11, 9);
+        let home = Fixture::home(13, date(2026, 11, 14), NaiveTime::from_hms_opt(13, 0, 0));
+        assert!(message_with(std::slice::from_ref(&home), &names(), today).is_some());
+        assert_eq!(message_with(&[home.not_played()], &names(), today), None);
     }
 }

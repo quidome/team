@@ -1,7 +1,8 @@
 <!--
 	One event of "Season" and the start page: a game (as in the schedule: start time, teams, hall
 	and town, the badge "Team", crossed out when no longer in the game list; its duty places and
-	what changed for them; the count of who comes; a tap opens it when `gameSeason` is given) or a training (start time,
+	what changed for them; the count of who comes, or "· Not played" instead; a tap opens it when
+	`gameSeason` is given) or a training (start time,
 	status, "· Checked", "extra"; a tap opens it). "Cancel" shows on a training day that is not
 	opened only when `onCancel` is given.
 -->
@@ -75,8 +76,13 @@
 				<p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
 					<MapPin class="size-3.5 shrink-0" aria-hidden="true" />
 					<span class="truncate">{game.hall}, {game.town}</span>
+					{#if game.not_played}
+						<span class="shrink-0 font-medium text-foreground" data-testid="game-not-played"
+							>· Not played</span
+						>
+					{/if}
 				</p>
-				{#if game.attendance && countText(game.attendance)}
+				{#if !game.not_played && game.attendance && countText(game.attendance)}
 					<p class="mt-1 text-xs font-medium" data-testid="game-count">
 						{countText(game.attendance)}
 					</p>

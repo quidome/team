@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM games_not_played\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f92538ecae5bd30bd652d4ab739872d22faadc5d132c66fe2a254a4213d3f7e0"
+}

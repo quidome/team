@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT g.source_id, g.game_number, g.date, g.start_time,\n                g.home_team_number, g.home_team_name, g.home_club_number,\n                g.away_team_number, g.away_team_name, g.away_club_number,\n                g.place_number, p.hall, p.town, g.court, g.competition, g.in_list\n         FROM games g JOIN places p ON p.number = g.place_number\n         WHERE g.club_number = $1 AND g.season_year = $2\n         ORDER BY g.source_id",
+  "query": "SELECT g.source_id, g.game_number, g.date, g.start_time,\n                g.home_team_number, g.home_team_name, g.home_club_number,\n                g.away_team_number, g.away_team_name, g.away_club_number,\n                g.place_number, p.hall, p.town, g.court, g.competition, g.in_list,\n                n.not_played_for AS \"not_played_for?\"\n         FROM games g JOIN places p ON p.number = g.place_number\n         LEFT JOIN games_not_played n ON n.club_number = g.club_number\n             AND n.season_year = g.season_year AND n.source_id = g.source_id\n         WHERE g.club_number = $1 AND g.season_year = $2\n         ORDER BY g.source_id",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,11 @@
         "ordinal": 15,
         "name": "in_list",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 16,
+        "name": "not_played_for?",
+        "type_info": "Date"
       }
     ],
     "parameters": {
@@ -106,8 +111,9 @@
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "f6729624677035bf1ac8941889969c8512196671d62ee25478563f208a2912bd"
+  "hash": "33b3db30fa24f4b39a8fee1b5b75b18a4570c0e70f559befc35601769dc9d2ff"
 }

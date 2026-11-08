@@ -166,6 +166,7 @@ async fn on_12_october_2026_the_schedule_of_m16_1_has_23_coming_and_14_past_game
         .map(|game| StoredGame {
             game,
             in_list: true,
+            not_played_for: None,
         })
         .collect();
     let today = NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();

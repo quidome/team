@@ -7,6 +7,7 @@ use chrono::{Days, NaiveDate, NaiveDateTime, NaiveTime};
 use crate::contribution::duties::{Assignment, DutyKind, plays_games_on};
 use crate::contribution::reasons::ReasonId;
 use crate::events::game::Game;
+use crate::events::schedule::ScheduledGame;
 use crate::team::players::{Player, PlayerId, PlayerRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,19 +215,29 @@ pub fn answers_moved(attendance: &GameAttendance, has_answers: bool, date: Naive
     has_answers && attendance.answers_for.is_some_and(|given| given != date)
 }
 
-/// All warnings of a game of the team at `now` (Dutch local time), from its `list` and the
-/// players on its places; none for a game that is not in the game list. The page of the game and
-/// the open items both use it (decision 0022).
+/// The note "Answers from before the move to …" on the page of the game `scheduled`: its answers
+/// are from before a move (`answers_moved`, with no period), and it is not "not played".
+pub fn move_note(
+    scheduled: &ScheduledGame,
+    attendance: &GameAttendance,
+    has_answers: bool,
+) -> bool {
+    !scheduled.not_played && answers_moved(attendance, has_answers, scheduled.game.date)
+}
+
+/// All warnings of a game of the team `scheduled` at `now` (Dutch local time), from its `list` and
+/// the players on its places; none for a game that is not in the game list or is "not played". The
+/// page of the game and the open items both use it (decision 0022).
 pub fn game_warnings(
-    game: &Game,
-    in_list: bool,
+    scheduled: &ScheduledGame,
     list: &[ListRow],
     attendance: &GameAttendance,
     has_answers: bool,
     assignments: &[Assignment],
     now: NaiveDateTime,
 ) -> GameWarnings {
-    if !in_list || !before_start(game, now) {
+    let game = &scheduled.game;
+    if !scheduled.in_list || scheduled.not_played || !before_start(game, now) {
         return GameWarnings::default();
     }
     let count = game_count(list, attendance.extra_players);
@@ -243,6 +254,7 @@ pub fn game_warnings(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::events::schedule::ScheduleReason;
     use crate::shared::season::Season;
     use crate::team::players::{Role, RoleId};
 
@@ -513,7 +525,23 @@ mod tests {
             answers_for: Some(game.date),
         };
         let has_answers = list.iter().any(|row| row.answer.is_some());
-        game_warnings(game, true, list, &attendance, has_answers, &[], now)
+        game_warnings(
+            &scheduled(game, true, false),
+            list,
+            &attendance,
+            has_answers,
+            &[],
+            now,
+        )
+    }
+
+    fn scheduled(game: &Game, in_list: bool, not_played: bool) -> ScheduledGame {
+        ScheduledGame {
+            game: game.clone(),
+            reason: ScheduleReason::TeamGame,
+            in_list,
+            not_played,
+        }
     }
 
     #[test]
@@ -631,7 +659,17 @@ mod tests {
         let list = [row(1, Some(Answer::NotComing))];
         let places = [place(DutyKind::Drive, 1, 1)];
         let moved = answered_for(date(10, 24));
-        let of = |in_list, now| game_warnings(&game, in_list, &list, &moved, true, &places, now);
+        let of_game = |in_list, not_played, now| {
+            game_warnings(
+                &scheduled(&game, in_list, not_played),
+                &list,
+                &moved,
+                true,
+                &places,
+                now,
+            )
+        };
+        let of = |in_list, now| of_game(in_list, false, now);
         // 10 days before: only the driver (and the line, as the game has an answer).
         let early = of(true, at(10, 21, 9, 0));
         assert_eq!(early.drivers_not_coming, [PlayerId(1)]);
@@ -645,5 +683,14 @@ mod tests {
         assert_eq!(of(true, at(10, 31, 14, 30)), GameWarnings::default());
         // A game that is not in the game list: none.
         assert_eq!(of(false, at(10, 31, 9, 0)), GameWarnings::default());
+        // A not played game, in the period with too few players and a driver not coming: none.
+        assert_eq!(
+            of_game(true, true, at(10, 31, 9, 0)),
+            GameWarnings::default()
+        );
+        assert_eq!(
+            of_game(true, true, at(10, 21, 9, 0)),
+            GameWarnings::default()
+        );
     }
 }

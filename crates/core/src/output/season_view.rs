@@ -116,6 +116,7 @@ mod tests {
             game,
             reason: ScheduleReason::TeamGame,
             in_list: true,
+            not_played: false,
         }
     }
 

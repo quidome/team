@@ -1,6 +1,6 @@
 # Technical spec: Not played
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-11-08-not-played](./)
 **Date**: 2026-11-08
@@ -237,11 +237,11 @@ domains and one transaction through the functions of two domains are allowed.
 - One `LEFT JOIN` more in `games::stored`; the seasons have a few hundred games.
 
 ## Progress
-- [ ] Step 1: the mark is stored
-- [ ] Step 2: duties stop counting
-- [ ] Step 3: warnings, open items and messages
-- [ ] Step 4: the page and the rows
-- [ ] All checks pass
+- [x] Step 1: the mark is stored
+- [x] Step 2: duties stop counting
+- [x] Step 3: warnings, open items and messages
+- [x] Step 4: the page and the rows
+- [x] All checks pass
 
 ## Deviations
 - **D1** (from the epic `technical.md`): the mark is in its own table `games_not_played` of events,
@@ -255,6 +255,26 @@ domains and one transaction through the functions of two domains are allowed.
   and a club team that stopped playing leaves home games that ask for places
   (`docs/ideas.md`, 2026-11-01) (coordinator, 2026-11-08).
 - Stricter readings: none.
+- Implement, step 1: `GameKey` moved from `crates/server/src/duties.rs` to `crates/server/src/games.rs`
+  (events owns the key of a game; duties and attendance import it), because `games.rs` must not use
+  duties. The game as last seen in the list of changes (`changes.rs`) never holds the mark. The
+  server tests of the mark are in their own files, `tests/not_played.rs` and
+  `tests/not_played_logs.rs`.
+- Implement, step 2: `game_places` takes one `GameMoment { in_list, past, started, not_played }`
+  instead of separate inputs, because the function already had the 7 inputs that clippy allows.
+  The server functions that call it (`SeasonDuties::places_of`, `SeasonPlaces::new`,
+  `places_of_season`, the page of a game) take the Dutch local time (`now`) instead of `today`,
+  for `started`.
+- Implement, step 3: `game_warnings` takes the game in the schedule (`ScheduledGame`, with
+  `in_list` and `not_played`) instead of the game and `in_list`, for the same reason (7 inputs).
+  The page of a game builds a `ScheduledGame` for it.
+- Implement, step 4: the page answer has one more field, `started` (the start time has passed, in
+  Dutch time), so the page shows the switch without guessing the time in the browser. The browser
+  tests are in their own file and project, `web/e2e/not-played.e2e.ts` (project `not-played`,
+  after `messages`), because a mark changes games that the other tests read. The test data has no
+  game of the team in the window of "Next" (12 to 25 October), so the row test uses "Last" on the
+  start page; "Next", "Last" and "Season" use one row component (`EventRow.svelte`), and "Season"
+  is tested too.
 
 ### Spec review of the deviations
 Fresh review, 2026-11-08, mode `spec` with `deviations`. Arguments held nothing else to ignore.
@@ -303,6 +323,160 @@ game of the team shows "· Not played" instead of the count, but says nothing of
 row of the same game on "Season", which story A shows once the game has an answer. Story E names
 only "· Not played" for both. Worth one line in step 4, so the two rows agree. Checked: read of the
 requirements summary against story A ("The row of a coming game …") and story E.
+  - 2026-11-08: Fixed: on "Season" too a not played game of the team shows "· Not played" instead of the count (coordinator).
 
 ## Review findings
-  - 2026-11-08: Fixed: on "Season" too a not played game of the team shows "· Not played" instead of the count (coordinator).
+
+### Acceptance review
+Fresh review, 2026-11-08, mode `accept`. The arguments held nothing else to ignore. Read:
+`~/.claude/skills/product-workflow/SKILL.md`, `docs/language.md`, `change.md`, story E with the
+context, the interface and the warnings of `../2026-10-31-attendance-at-games/functional.md`, that
+epic's `idea.md`, `change.md` and story table, this file (objective, requirements, steps; the
+deviations only after forming a view), and the diff against `main` (committed and not). Not read:
+`docs/changes/done/`. Runs: `cargo test -p team_core` (333 + 7 pass); `cargo test -p team --test
+not_played --test not_played_logs` (9 + 1 pass, against the local database). Not run: the browser
+tests (`web/e2e/not-played.e2e.ts` was read, not run), and the app itself.
+
+**Verdict: accepted with notes.** The coordinator gets what story E asks for: one tap, nothing
+deleted, the duties and the warnings stop, "Undo" brings everything back, and the switch keeps
+the drives of parents who did drive. Two criteria rest on stories that are not built yet (A5, A6);
+one narrow window does not match the words of the spec (A1).
+
+| # | Criterion or open point | Built | Sort |
+|---|---|---|---|
+| A1 | "is not an open item" and "it leaves the messages and duty overviews" | On the game day, after the start time, with "The drivers drove" on, the driver part counts again (`drivers.counts = started && drivers_drove`). `open_by_kind` and `drivers_of_team` read `counts`, and `open_places_games` and `driving_overview` take games from today on. So until midnight such a game is back in the driving overview, and an empty driver place on it gives the open item of open places. A played game on its day behaves the same, so this is "as at a played game", but the spec says a not played game is in no overview and is no open item. Checked: trace of `game_places`, `open_by_kind` and `open_places_games` (`start_page.rs`), `drivers_of_team` and `coming_games` (`messages.rs`); not reproduced by a run. | neutral drift – small: the switch is about what counts in the totals, so the open items and the overviews could read "counts and not not played" instead of `counts` |
+| A2 | The button on each game whose page opens, coming or past, also a gone game | `not_played` in `api/games.rs` works on every game `find` gives; the button shows whenever the game is not marked. Broader than the criterion (games of the team and games with places of the team). Checked: read; test `any_game_whose_page_opens_can_be_marked` passes. | faithful adaptation (D3, with the coordinator) |
+| A3 | One tap: duties stop counting, the drive only with the switch; no warning; leaves the messages; places, players and answers stay | `game_places` with `GameMoment`, `game_warnings` returns nothing for a not played game, the page clears `answers_moved`, `week_message` leaves out the block, the other messages follow `counts`; the mark is its own row, nothing else is written. Checked: read, and the core and server tests named above pass. | as meant |
+| A4 | The switch from the start time, off at first, with "Someone else" and "Nobody"; "Undo" keeps it | `drivers_drove` in `game_duties` (default false), the page shows it from `started` when the game has driver places; "Undo" deletes only the mark. Whether "Someone else" and "Nobody" are offered on the game day itself, after the start time, is not checked (they follow the rule of a played game). Checked: read; `a_not_played_game_counts_its_drives_only_with_the_switch` passes. | faithful adaptation (D2, N1 fixed with the coordinator) |
+| A5 | "the attendance stops counting in the totals on Attendance" | There are no game totals yet (story D). The mark is on `ScheduledGame` and `StoredGame`, so story D can read it, but the story table in the epic `technical.md` does not name "not played" in the scope of D. Checked: read of the epic story table. | open for story D: add "a not played game counts no attendance" to its design, so the criterion is not lost |
+| A6 | "cannot be checked; a checked game can become not played; Undo returns it to checked" | Not built: "Checked" is story C. The epic log already says to ask the first part again in the design of story C. Checked: read of the epic `change.md`. | open for story C (as planned) |
+| A7 | Answers, extra players and places can still be changed | No write refuses a not played game; the list is behind "Show who comes" and then works as before. Checked: read of `api/games.rs` and the page; the browser test asserts an answer change while not played (read, not run). | as meant |
+| A8 | "Not played" with "Undo" at the top, the list closed behind a tap | As asked; the button is the last button, as there is no "Checked" yet. Checked: read of `+page.svelte`. | as meant |
+| A9 | "· Not played" on "Season", "Next" and "Last" | One row component; on a game of the team it replaces the count. The browser test covers "Season" and "Last", not "Next" (no game in its window in the test data). Checked: read of `EventRow.svelte` and the browser test. | as meant |
+| A10 | No block in the clash rule | `team_games` leaves out a not played game, and its duty places do not count, so they block nothing; with the switch on and started, its drive counts and can block, as at a played game. Checked: read; `a_not_played_game_blocks_no_player` passes. | as meant |
+| A11 | A reading never sets or clears the mark; the list of changes keeps a gone game | The mark is in `games_not_played`, which `games::write` does not touch; the last-seen game never holds a mark. Checked: read; `a_reading_never_sets_or_clears_the_mark` passes. | as meant |
+| A12 | The mark holds only for the date on which it was tapped | `not_played_for == Some(game.date)`. The row stays when the game moves, so a game moved back to the marked date is "not played" again without a tap. That follows the words ("holds for the date") and decision 0029; whether the coordinator expects it is not checked. | faithful adaptation – worth one line in the product docs at close |
+| A13 | Errors: "Not saved. Try again." and the stored state; the last tap wins | The page uses the shared `save`; the server write is one statement. Checked: read; `the_last_tap_wins` passes; the browser test of a failed tap was read, not run. | as meant |
+
+Next: A1 can be a small fix in this story or a line in `docs/backlog.md` (the coordinator decides);
+A5 belongs in the design of story D; A6 stays with story C.
+
+- A1: 2026-11-08: Fixed with R2 (coordinator): the switch makes the drives count in the duty totals
+  only (`DriverPart::drove`); a not played game never counts for open items, overviews or clashes.
+- A5: 2026-11-08: Not fixed in this story (no game totals yet): one line goes into the scope of story
+  D in the epic at close.
+- A6: 2026-11-08: Not fixed: stays with story C, as agreed; the epic log names the two criteria.
+- A9: 2026-11-08: Kept: "Next" is not tested in the browser (no game of the team in its window in
+  the test data); the server test `a_not_played_game_warns_about_nothing_and_is_in_no_message`
+  checks `not_played` in "Next", and the row component is the same.
+- A12: 2026-11-08: Kept: as the spec and decision 0029 say; written into the product documents at
+  close.
+
+### Build review
+Fresh review, 2026-11-08, mode `build`. The arguments held nothing else to ignore. Read:
+`~/.claude/skills/product-workflow/SKILL.md`, `docs/language.md`, `CLAUDE.md`, `AGENTS.md`,
+`docs/architecture.md`, the list of decision records (0001, 0022, 0027, 0029 for their rules),
+`change.md`, this file, and the diff against `main` (committed and not: core, server, migration
+`0014`, `.sqlx/`, web, tests). Not read: `docs/changes/done/`. Runs: `cargo test -p team_core`
+(333 + 7 pass, with `tests/domains.rs`); `cargo test -p team --test not_played --test
+not_played_logs --test games --test duties --test start --test messages` (all pass);
+`cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all --check` (clean); a
+small program in the session scratchpad that calls `team_core` (R1, R2). Not run: `just check`,
+the browser tests, `check-sqlx`. The acceptance review above was written while this review ran;
+it was read only after R1–R8 were formed.
+
+Checked and fine: the domain map (search `use crate::` in the changed core files: contribution
+uses events (`StoredGame`, `ScheduledGame`), output tests use contribution; all allowed; the
+domains test passes); each table is read and written only by its store module (search
+`games_not_played` in `crates/`: only `games.rs`; `drivers_drove` only in `duties.rs`); `GameKey`
+moved to `games.rs` without a use of duties from events; no `unwrap`/`expect` outside tests
+(clippy clean); the logs of the new routes hold no name (`not_played_logs.rs`).
+
+- **R1 (bug, against the spec and the code's own comments). Without a start time, "started" begins
+  only the next day.** `started` is `!before_start(game, now)` (`api/season.rs` `places_of`,
+  `api/games.rs` `Found::places` and `page`), and `before_start` uses `start_of`, which is the
+  *end* of the date for a game without a start time (`game_attendance.rs:165`, made for the
+  warnings). The spec (N1 fix) and the comments on `GameMoment::started`, `GamePage.started` and
+  `web/openapi.json` say "without a start time: the game day has begun". So on such a game the
+  switch is hidden on the game day and its drives do not count until midnight: the case N1 was
+  fixed for. Run: `before_start` of a game without a start time at 20:00 on its date gives `true`.
+  No test covers a game without a start time. Fix: a `started` rule in the core with the start of
+  the day for a missing time, used by both places, and a core test.
+  - 2026-11-08: Fixed: a rule of its own, `team_core::started` (events): the start time has
+    passed, or without a start time the date has begun; used for `GameMoment::started` and
+    `GamePage::started`. Tests: `a_game_starts_at_its_start_time_or_else_when_its_date_begins`
+    (core) and `a_game_without_a_start_time_has_started_when_its_day_begins` (server).
+
+- **R2 (bug, same as A1, now reproduced). On the game day after the start time, with the switch
+  on, a not played game is an open item again and is back in the driving overview.** Run:
+  `game_places` with `not_played`, `started`, `drivers_drove`, 2 empty driver places gives
+  `drivers.counts = true` and `open_by_kind = {Drive: 2}`; `open_places_games` (drives until the
+  Sunday of next week, today included), the Season row ("Open places"), `driving_overview`
+  (`coming_games`: today and later) and the clash rule all read `counts`. The spec: a not played
+  game is no open item and leaves both duty overviews; the switch is about what the drives count.
+  Twin: `drivers_count` for a not played game ignores `in_use`, so a gone or swapped game counts on
+  its day where a played one does not (harmless after midnight, as `past` makes it in use). Fix
+  options: `counts` only for the totals (`place_counts`) and "open/shown" for the rest with
+  `!not_played`, or `open_by_kind` and `drivers_of_team` also test `not_played`; a core test of
+  each reader on the game day.
+  - 2026-11-08: Fixed: the driver part of a not played game never `counts` (open items, messages,
+    clashes); the new `DriverPart::drove` (in use, started, switch on) makes its drives count in
+    `duty_totals` only, so a not played game that left the game list counts nothing on its day, as
+    a played one. Tests: the core test of the drives (game day, gone game) and the server test
+    `a_not_played_game_keeps_its_places_but_asks_for_no_driver` (game day after the start time,
+    switch on: no open item, not in the driving overview).
+
+- **R3 (bug, front end). "· not coming" at the driver places of a not played game depends on the
+  visit.** The page keeps `answers` from `GameAttendance` (`onanswers`); while not played the list
+  is not mounted. Opened fresh, a not played game shows no "· not coming" at its driver places;
+  after a tap on "Not played" from a normal page, or after "Show who comes", the notes are there
+  (and "Not coming" in the choice of a driver). Story E: no "driver not coming" warning. Checked:
+  trace of `+page.svelte` (`answers`, `notComingDriver`, `driverNote`); not run in a browser.
+  Fix: no note while `page.not_played`, and a browser test.
+  - 2026-11-08: Fixed: `notComingDriver` on the page is false on a not played game. Browser test:
+    `a not played game shows no note of a driver who is not coming` (after the tap, after "Show who
+    comes" and after a reload).
+
+- **R4 (tests that cannot fail).** `a_not_played_game_blocks_no_player_and_still_shows_its_places`
+  (`tests/not_played.rs`): it asserts that no "open places" item names the 7 November game, but at
+  the test clock (12 October) driver places count as open only until 25 October
+  (`next_until`), so the assertion holds with or without the mark; and the name says "blocks no
+  player", which the test does not check (no clash is asserted through the API; only the core test
+  `a_not_played_game_blocks_no_player` does). Checked: trace of `open_places_games` and the test
+  clock in `tests/common/game_list.rs`. Fix: a game in the window (or move the clock) with a check
+  before the mark, and a clash check through the choice of a player, or rename the test.
+  - 2026-11-08: Fixed: renamed to `a_not_played_game_keeps_its_places_but_asks_for_no_driver`; the
+    clock is on 5 November, so the open item of the driver places is there before the mark and gone
+    after it. The clash is tested in the core (`a_not_played_game_blocks_no_player`).
+
+- **R5 (project rule, `docs/architecture.md` "Tests").** `games::set_not_played` is a save guarded
+  by `ON CONFLICT`; the rule asks for a test that holds an insert of the same key in an open
+  transaction on another connection. There is none (search `not-played\|games_not_played` in
+  `crates/server/tests/`: only the two new files, no concurrent test). The switch goes through the
+  shared `write` (row lock), whose wait is tested for another duty save
+  (`a_save_waits_for_a_save_of_the_same_game_on_another_screen`), so it follows the pattern.
+  - 2026-11-08: Fixed: `not_played_waits_for_a_mark_of_the_same_game_on_another_screen`; without
+    the `ON CONFLICT` it fails with a 500 (checked).
+
+- **R6 (a rule outside the core, decision 0001).** `stored_list` in `api/games.rs` decides
+  `moved = !found.not_played && answers_moved(…)`: "a not played game shows no move" is a product
+  rule, and it is made in the server beside `game_warnings`, which already has the same rule in
+  the core. Fix: let `answers_moved` (or a core function for the page) take the not played state.
+  Checked: read.
+  - 2026-11-08: Fixed: `team_core::move_note(scheduled, attendance, has_answers)`; `stored_list`
+    uses it.
+
+- **R7 (test coupling, browser).** In `web/e2e/not-played.e2e.ts` the test of "Last" sets 1 driver
+  on the 10 October game and never clears it; the next test (the switch) needs those driver places
+  to see the switch, and the file header says each test undoes its mark. A run of the switch test
+  alone (`-g`) would then find no switch (by the trace; not run). Checked: read.
+  - 2026-11-08: Fixed: the switch test sets its own driver.
+
+- **R8 (docs made false, for Close).** `docs/architecture.md`: the `game_places` line ("each
+  counting on its own: past, or in the game list and still required") and `has_team_places` (now
+  `in_use`), the `game_duties` columns (no `drivers_drove`), the tables of events (no
+  `games_not_played`), `GET /api/games` routes, the Playwright project order (no `not-played`
+  after `messages`), and `GameKey` now in `games.rs`. In this file, the heading "Review findings"
+  holds a stray line (the fix note of the spec review's "Seen outside the deviations"), and the
+  progress line "All checks pass" is still open: `just check` was not run by this review either.
+  - 2026-11-08: "All checks pass" is ticked after `just check`; `docs/architecture.md` at close.

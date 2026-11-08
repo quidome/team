@@ -697,3 +697,31 @@ export async function setAnswersChecked(season: string, id: string): Promise<Att
 		})
 	);
 }
+
+/** "Not played" (`notPlayed`) or "Undo" on the game `id` (story E of attendance at games). */
+export async function setNotPlayed(
+	season: string,
+	id: string,
+	notPlayed: boolean
+): Promise<GamePage> {
+	const params = { path: { season, id } };
+	return dataOf(
+		notPlayed
+			? await api.PUT('/api/games/{season}/{id}/not-played', { params })
+			: await api.DELETE('/api/games/{season}/{id}/not-played', { params })
+	);
+}
+
+/** The switch "The drivers drove" of the game `id`. */
+export async function setDriversDrove(
+	season: string,
+	id: string,
+	drove: boolean
+): Promise<GamePage> {
+	const params = { path: { season, id } };
+	return dataOf(
+		drove
+			? await api.PUT('/api/games/{season}/{id}/drivers-drove', { params })
+			: await api.DELETE('/api/games/{season}/{id}/drivers-drove', { params })
+	);
+}

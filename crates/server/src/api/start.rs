@@ -21,7 +21,7 @@ use super::season::{
     EventView, coming_view, event_view, event_view_with, games_of, places_of_season, trainings_of,
 };
 use crate::app::AppState;
-use crate::clock::{current_season, in_netherlands, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
 use crate::{reading, readings};
@@ -225,7 +225,8 @@ impl OpenItemView {
 )]
 pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, AppError> {
     let clock = state.clock.as_ref();
-    let today = today_in_netherlands(clock);
+    let now = in_netherlands(clock.now());
+    let today = now.date();
     let current = current_season(clock);
 
     // The game list: the same rule as the "Game list" card. Without any club there is no reading.
@@ -257,13 +258,12 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .collect();
 
     // The duties of the games: the rule of "Season" and of the page of a game (decision 0022).
-    let places = places_of_season(&games, today);
+    let places = places_of_season(&games, now);
     let events = match (lists.first(), inputs.first()) {
         (Some(list), Some(trainings)) => trainings.events(&games.schedule, list),
         _ => Default::default(),
     };
     // The warnings of the coming games of the team: the rule of the page of a game.
-    let now = in_netherlands(clock.now());
     let warnings: Vec<(i64, GameWarnings)> = games
         .schedule
         .coming
@@ -315,7 +315,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     if last_game_views.is_empty() {
         for (&season, trainings) in seasons.iter().zip(&inputs).skip(1) {
             let earlier = games_of(&state, season, current, today).await?;
-            let earlier_places = places_of_season(&earlier, today);
+            let earlier_places = places_of_season(&earlier, now);
             let list = trainings.list(season, today);
             let earlier_events = trainings.events(&earlier.schedule, &list);
             last_game_views = last_games(&earlier_events, &earlier_places)

@@ -719,6 +719,102 @@
         }
       }
     },
+    "/api/games/{season}/{id}/drivers-drove": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setDriversDrove",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"The drivers drove\" on; the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "unsetDriversDrove",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"The drivers drove\" off; the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
     "/api/games/{season}/{id}/extra-players": {
       "put": {
         "tags": [
@@ -768,6 +864,102 @@
           },
           "400": {
             "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `out_of_range`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/not-played": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setNotPlayed",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not played on its date now; the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "unsetNotPlayed",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"Undo\": the game counts again; the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`"
           },
           "401": {
             "description": "Not logged in"
@@ -3556,7 +3748,10 @@
           "game",
           "club_teams",
           "past",
-          "players"
+          "players",
+          "not_played",
+          "drivers_drove",
+          "started"
         ],
         "properties": {
           "attendance": {
@@ -3580,9 +3775,17 @@
           "current_season": {
             "type": "string"
           },
+          "drivers_drove": {
+            "type": "boolean",
+            "description": "The switch \"The drivers drove\": the drives of a not played game count from its start time."
+          },
           "game": {
             "$ref": "#/components/schemas/ScheduleGame",
             "description": "The game, with its duties."
+          },
+          "not_played": {
+            "type": "boolean",
+            "description": "\"Not played\" on its date now: its duties and attendance do not count."
           },
           "past": {
             "type": "boolean",
@@ -3598,6 +3801,10 @@
           "season": {
             "type": "string",
             "description": "The season of the game, for example \"2026-2027\"."
+          },
+          "started": {
+            "type": "boolean",
+            "description": "The start time has passed (without a start time: the game day has begun; Dutch time): the\npage shows the switch \"The drivers drove\" on a not played game with driver places."
           },
           "team": {
             "$ref": "#/components/schemas/TeamView",
@@ -5026,7 +5233,8 @@
           "hall",
           "town",
           "reason",
-          "in_list"
+          "in_list",
+          "not_played"
         ],
         "properties": {
           "attendance": {
@@ -5062,6 +5270,10 @@
           "in_list": {
             "type": "boolean",
             "description": "False: the game is no longer in the game list; it shows until its change is seen, or\nwhile it keeps duties."
+          },
+          "not_played": {
+            "type": "boolean",
+            "description": "\"Not played\" on its date now (`team_core::not_played`): shown as \"· Not played\"."
           },
           "places": {
             "oneOf": [

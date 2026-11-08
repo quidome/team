@@ -13,6 +13,7 @@ use chrono::NaiveDate;
 
 use crate::events::club::{Club, ClubNumber};
 use crate::events::game::{Game, TeamNumber};
+use crate::events::schedule::StoredGame;
 use crate::team::players::{Player, PlayerId, PlayerRole, Role};
 use crate::team::team_choice::own_teams;
 
@@ -73,6 +74,8 @@ pub struct StoredDuties {
     pub drivers: Option<u8>,
     /// The places that name a team; an empty place is not in it.
     pub teams: BTreeMap<(PlaceKind, u8), TeamRef>,
+    /// The switch "The drivers drove": the drives of a not played game count from its start time.
+    pub drivers_drove: bool,
 }
 
 /// The 4 places of a home game of the club, in the order shown.
@@ -238,8 +241,11 @@ pub struct SchedulePart {
     pub of_team: Vec<DutyPlace>,
     /// False: the game is no longer a home game of the club; the places stay until cleared.
     pub required: bool,
-    /// The places count: the game is past, or in the game list and still requires them.
+    /// The places count: as `in_use`, and the game is not "not played".
     pub counts: bool,
+    /// The places would count if the game were played: it is past, or in the game list and still
+    /// requires them. The game then shows with places of the team (`has_team_places`).
+    pub in_use: bool,
 }
 
 /// The drivers of a game.
@@ -253,7 +259,40 @@ pub struct DriverPart {
     pub more_than_proposed: bool,
     /// False: the game no longer needs drivers of the team; a set number stays until cleared.
     pub required: bool,
+    /// The drivers count: as `in_use`, and the game is not "not played". For the open items, the
+    /// messages and the clashes.
     pub counts: bool,
+    /// The drivers would count if the game were played (as `SchedulePart::in_use`).
+    pub in_use: bool,
+    /// A not played game whose drivers drove: in use, started, and "The drivers drove" on. Its
+    /// drives count in the duty totals only (story E).
+    pub drove: bool,
+}
+
+/// Where a game stands now, for what its duties count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GameMoment {
+    /// Still in the game list.
+    pub in_list: bool,
+    /// Its date is before today (Dutch date).
+    pub past: bool,
+    /// Its start time has passed (without a start time: its date has begun; Dutch time).
+    pub started: bool,
+    /// Marked "Not played" for its date now (`not_played`).
+    pub not_played: bool,
+}
+
+#[cfg(test)]
+impl GameMoment {
+    /// A game that is not marked "Not played"; started when past.
+    pub(crate) fn played(in_list: bool, past: bool) -> Self {
+        Self {
+            in_list,
+            past,
+            started: past,
+            not_played: false,
+        }
+    }
 }
 
 /// The duties of one game, in two parts that count on their own.
@@ -267,20 +306,22 @@ pub struct GamePlaces {
 
 /// The duties of a game. `required` is `required_duties` of the game for `team`; `stored` its
 /// stored duties, if any; `filled` the places with a player; `players_on_date` the players with
-/// "plays games" on its date; `in_list` whether it is still in the game list; `past` whether its
-/// date is before today. `None`: nothing required and nothing kept.
+/// "plays games" on its date; `moment` where the game stands now. A part is in use when the game
+/// is past, or in the game list and requires it; it counts when in use and the game is not "not
+/// played". The drivers of a not played game "drove" from its start time with "The drivers drove":
+/// they count in the duty totals only (story E of attendance at games). `None`: nothing required
+/// and nothing kept.
 pub fn game_places(
     required: RequiredDuties,
     stored: Option<&StoredDuties>,
     team: TeamNumber,
     filled: &BTreeSet<(DutyKind, u8)>,
     players_on_date: usize,
-    in_list: bool,
-    past: bool,
+    moment: GameMoment,
 ) -> Option<GamePlaces> {
     let empty = StoredDuties::default();
     let stored = stored.unwrap_or(&empty);
-    let counts = |required: bool| past || (in_list && required);
+    let in_use = |required: bool| moment.past || (moment.in_list && required);
 
     let schedule = (required.schedule || !stored.teams.is_empty()).then(|| {
         let places: Vec<SchedulePlace> = SCHEDULE_PLACES
@@ -308,7 +349,8 @@ pub fn game_places(
             entered: stored.schedule_entered,
             of_team,
             required: required.schedule,
-            counts: counts(required.schedule),
+            counts: !moment.not_played && in_use(required.schedule),
+            in_use: in_use(required.schedule),
         }
     });
 
@@ -335,7 +377,12 @@ pub fn game_places(
             proposed,
             more_than_proposed: proposed && full > proposal,
             required: required.drivers,
-            counts: counts(required.drivers),
+            counts: !moment.not_played && in_use(required.drivers),
+            in_use: in_use(required.drivers),
+            drove: moment.not_played
+                && moment.started
+                && stored.drivers_drove
+                && in_use(required.drivers),
         }
     });
 
@@ -385,16 +432,31 @@ pub fn open_by_kind(places: &GamePlaces) -> BTreeMap<DutyKind, usize> {
     open
 }
 
-/// The game has a place of the team in a part that counts.
+/// The game has a place of the team in a part that is in use, also when the game is "not
+/// played": it then still shows with its places.
 pub fn has_team_places(places: &GamePlaces) -> bool {
     places
         .schedule
         .as_ref()
-        .is_some_and(|part| part.counts && !part.of_team.is_empty())
+        .is_some_and(|part| part.in_use && !part.of_team.is_empty())
         || places
             .drivers
             .as_ref()
-            .is_some_and(|part| part.counts && !part.places.is_empty())
+            .is_some_and(|part| part.in_use && !part.places.is_empty())
+}
+
+/// The games of `team` in `stored` that can block a player in the clash rule: in the game list,
+/// the team plays, and not "not played".
+pub fn team_games(stored: &[StoredGame], team: TeamNumber) -> Vec<&Game> {
+    stored
+        .iter()
+        .filter(|stored| {
+            stored.in_list
+                && !stored.not_played()
+                && (stored.game.home.team == team || stored.game.away.team == team)
+        })
+        .map(|stored| &stored.game)
+        .collect()
 }
 
 /// Why a save of duties is refused.
@@ -634,6 +696,17 @@ fn place_counts(duties: &GameDuties<'_>, assignment: &Assignment) -> bool {
         && (duties.past || is_place_of_the_team(duties.places, assignment.kind, assignment.number))
 }
 
+/// The place of `assignment` is a driver place of a not played game whose drivers drove: it
+/// counts in the duty totals only.
+fn drove(duties: &GameDuties<'_>, assignment: &Assignment) -> bool {
+    assignment.kind == DutyKind::Drive
+        && duties
+            .places
+            .drivers
+            .as_ref()
+            .is_some_and(|part| part.drove)
+}
+
 /// The duties of one kind of a player: done before today, planned from today.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Total {
@@ -673,7 +746,7 @@ pub fn duty_totals(games: &[GameDuties<'_>]) -> BTreeMap<PlayerId, KindTotals> {
     let mut totals: BTreeMap<PlayerId, KindTotals> = BTreeMap::new();
     for duties in games {
         for assignment in duties.assignments {
-            if !place_counts(duties, assignment) {
+            if !place_counts(duties, assignment) && !drove(duties, assignment) {
                 continue;
             }
             let (player, done) = match who_did(assignment, duties.past) {
@@ -1222,7 +1295,15 @@ mod tests {
 
     #[test]
     fn a_home_game_not_entered_has_four_empty_places() {
-        let places = game_places(SCHEDULE, None, TEAM, &none(), 10, true, false).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            None,
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         let order: Vec<(PlaceKind, u8)> = part.places.iter().map(|p| (p.kind, p.number)).collect();
         assert_eq!(order, SCHEDULE_PLACES);
@@ -1240,8 +1321,15 @@ mod tests {
             schedule_entered: true,
             ..StoredDuties::default()
         };
-        let places =
-            game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, true, false).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         assert!(!not_entered(&places));
         assert_eq!(open_places(&places), 0);
     }
@@ -1252,8 +1340,15 @@ mod tests {
             ((PlaceKind::Referee, 1), CLUB_TEAM),
             ((PlaceKind::Table, 2), CLUB_TEAM),
         ]);
-        let places =
-            game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, true, false).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         assert_eq!(part.places[0].team, Some(team(CLUB_TEAM)));
         assert!(part.of_team.is_empty());
@@ -1268,8 +1363,15 @@ mod tests {
             ((PlaceKind::Referee, 2), CLUB_TEAM),
             ((PlaceKind::Table, 1), TEAM),
         ]);
-        let places =
-            game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, true, false).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         assert_eq!(
             of(&part.of_team),
@@ -1283,22 +1385,43 @@ mod tests {
         assert!(has_team_places(&places));
         // A player on table 1 (story B).
         let filled = BTreeSet::from([(DutyKind::Table, 1)]);
-        let places =
-            game_places(SCHEDULE, Some(&stored), TEAM, &filled, 10, true, false).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &filled,
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         assert_eq!(open_places(&places), 2);
     }
 
     #[test]
     fn a_coming_game_that_is_gone_does_not_count_and_a_past_one_does() {
         let stored = teams(&[((PlaceKind::Referee, 1), TEAM)]);
-        let coming =
-            game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, false, false).expect("places");
+        let coming = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(false, false),
+        )
+        .expect("places");
         assert!(!coming.schedule.as_ref().expect("schedule").counts);
         assert_eq!(open_places(&coming), 0);
         assert!(!not_entered(&coming));
         assert!(!has_team_places(&coming));
-        let past =
-            game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, false, true).expect("places");
+        let past = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(false, true),
+        )
+        .expect("places");
         assert!(past.schedule.as_ref().expect("schedule").counts);
         assert!(has_team_places(&past));
     }
@@ -1308,8 +1431,15 @@ mod tests {
         // A table place of the team was saved; home and away swapped and it is now an away game of
         // the team at another club.
         let stored = teams(&[((PlaceKind::Table, 1), TEAM)]);
-        let places =
-            game_places(DRIVERS, Some(&stored), TEAM, &none(), 4, true, false).expect("places");
+        let places = game_places(
+            DRIVERS,
+            Some(&stored),
+            TEAM,
+            &none(),
+            4,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         assert!(!part.required && !part.counts);
         assert_eq!(of(&part.of_team), [(DutyKind::Table, 1)]);
@@ -1324,8 +1454,15 @@ mod tests {
     fn another_team_chosen_keeps_the_places_of_the_old_team() {
         // TEAM had table 1 and 2; NEW_TEAM is chosen now.
         let stored = teams(&[((PlaceKind::Table, 1), TEAM), ((PlaceKind::Table, 2), TEAM)]);
-        let places = game_places(SCHEDULE, Some(&stored), NEW_TEAM, &none(), 10, true, false)
-            .expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            NEW_TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         assert!(part.of_team.is_empty());
         assert_eq!(part.places[2].team, Some(team(TEAM)));
@@ -1335,7 +1472,14 @@ mod tests {
     #[test]
     fn a_game_with_nothing_required_or_kept_has_no_places() {
         assert_eq!(
-            game_places(NOTHING, None, TEAM, &none(), 10, true, false),
+            game_places(
+                NOTHING,
+                None,
+                TEAM,
+                &none(),
+                10,
+                GameMoment::played(true, false)
+            ),
             None
         );
         let stored = StoredDuties {
@@ -1344,14 +1488,29 @@ mod tests {
             ..StoredDuties::default()
         };
         assert_eq!(
-            game_places(NOTHING, Some(&stored), TEAM, &none(), 10, true, false),
+            game_places(
+                NOTHING,
+                Some(&stored),
+                TEAM,
+                &none(),
+                10,
+                GameMoment::played(true, false)
+            ),
             None
         );
     }
 
     #[test]
     fn drivers_follow_the_proposal_until_a_number_is_set() {
-        let proposed = game_places(DRIVERS, None, TEAM, &none(), 10, true, false).expect("places");
+        let proposed = game_places(
+            DRIVERS,
+            None,
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = proposed.drivers.as_ref().expect("drivers");
         assert!(part.proposed);
         assert_eq!((part.places.len(), part.proposal), (4, 4));
@@ -1363,15 +1522,22 @@ mod tests {
             TEAM,
             &none(),
             10,
-            true,
-            false,
+            GameMoment::played(true, false),
         )
         .expect("places");
         let part = set.drivers.as_ref().expect("drivers");
         assert!(!part.proposed);
         assert_eq!(part.places.len(), 2);
 
-        let no_players = game_places(DRIVERS, None, TEAM, &none(), 0, true, false).expect("places");
+        let no_players = game_places(
+            DRIVERS,
+            None,
+            TEAM,
+            &none(),
+            0,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         assert!(no_players.drivers.expect("drivers").places.is_empty());
     }
 
@@ -1383,7 +1549,15 @@ mod tests {
             (DutyKind::Drive, 2),
             (DutyKind::Drive, 3),
         ]);
-        let places = game_places(DRIVERS, None, TEAM, &filled, 6, true, false).expect("places");
+        let places = game_places(
+            DRIVERS,
+            None,
+            TEAM,
+            &filled,
+            6,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = places.drivers.as_ref().expect("drivers");
         assert_eq!(part.places.len(), 3);
         assert!(part.more_than_proposed);
@@ -1396,8 +1570,7 @@ mod tests {
             TEAM,
             &none(),
             6,
-            true,
-            false,
+            GameMoment::played(true, false),
         )
         .expect("places");
         assert!(!set.drivers.expect("drivers").more_than_proposed);
@@ -1411,8 +1584,7 @@ mod tests {
             TEAM,
             &none(),
             9,
-            true,
-            false,
+            GameMoment::played(true, false),
         )
         .expect("places");
         let part = places.drivers.as_ref().expect("drivers");
@@ -1426,8 +1598,7 @@ mod tests {
             TEAM,
             &none(),
             9,
-            true,
-            true,
+            GameMoment::played(true, true),
         )
         .expect("places");
         assert!(past.drivers.expect("drivers").counts);
@@ -1534,13 +1705,29 @@ mod tests {
     fn driver_places_with_players_stay_when_no_drivers_are_needed() {
         // An away game with proposed drivers and two players on them; home and away swapped.
         let two = filled(&[(DutyKind::Drive, 1), (DutyKind::Drive, 2)]);
-        let coming = game_places(SCHEDULE, None, TEAM, &two, 10, true, false).expect("places");
+        let coming = game_places(
+            SCHEDULE,
+            None,
+            TEAM,
+            &two,
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         let part = coming.drivers.as_ref().expect("drivers");
         assert!(!part.required && !part.counts);
         assert_eq!(part.places.len(), 2);
         assert!(part.places.iter().all(|place| place.filled));
         // Past, they count as stored (A1).
-        let past = game_places(SCHEDULE, None, TEAM, &two, 10, true, true).expect("places");
+        let past = game_places(
+            SCHEDULE,
+            None,
+            TEAM,
+            &two,
+            10,
+            GameMoment::played(true, true),
+        )
+        .expect("places");
         assert!(past.drivers.expect("drivers").counts);
     }
 
@@ -1550,14 +1737,28 @@ mod tests {
         // nobody cleared it, the date passed.
         let stored = teams(&[((PlaceKind::Table, 1), TEAM)]);
         let anna = filled(&[(DutyKind::Table, 1)]);
-        let places =
-            game_places(DRIVERS, Some(&stored), TEAM, &anna, 4, true, true).expect("places");
+        let places = game_places(
+            DRIVERS,
+            Some(&stored),
+            TEAM,
+            &anna,
+            4,
+            GameMoment::played(true, true),
+        )
+        .expect("places");
         let part = places.schedule.as_ref().expect("schedule");
         assert!(!part.required && part.counts);
         assert!(has_team_places(&places));
         // Coming, the same place does not count.
-        let coming =
-            game_places(DRIVERS, Some(&stored), TEAM, &anna, 4, true, false).expect("places");
+        let coming = game_places(
+            DRIVERS,
+            Some(&stored),
+            TEAM,
+            &anna,
+            4,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
         assert!(!coming.schedule.expect("schedule").counts);
     }
 
@@ -1566,7 +1767,15 @@ mod tests {
             ((PlaceKind::Table, 1), TEAM),
             ((PlaceKind::Table, 2), team_on_table_2),
         ]);
-        game_places(SCHEDULE, Some(&stored), TEAM, &none(), 10, true, false).expect("places")
+        game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places")
     }
 
     #[test]
@@ -1624,8 +1833,7 @@ mod tests {
             TEAM,
             &none(),
             9,
-            true,
-            false,
+            GameMoment::played(true, false),
         )
         .expect("places");
         assert_eq!(
@@ -1924,8 +2132,15 @@ mod tests {
     fn table_one(players: &[Assignment], past: bool) -> (GamePlaces, Vec<Assignment>, bool) {
         let stored = teams(&[((PlaceKind::Table, 1), TEAM), ((PlaceKind::Table, 2), TEAM)]);
         let filled: BTreeSet<(DutyKind, u8)> = players.iter().map(|a| (a.kind, a.number)).collect();
-        let places =
-            game_places(SCHEDULE, Some(&stored), TEAM, &filled, 10, true, past).expect("places");
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &filled,
+            10,
+            GameMoment::played(true, past),
+        )
+        .expect("places");
         (places, players.to_vec(), past)
     }
 
@@ -2041,8 +2256,15 @@ mod tests {
         let anna = [planned(DutyKind::Table, 1, ANNA)];
         let filled = BTreeSet::from([(DutyKind::Table, 1)]);
         for (required, in_list) in [(SCHEDULE, false), (DRIVERS, true)] {
-            let places = game_places(required, Some(&stored), TEAM, &filled, 10, in_list, false)
-                .expect("places");
+            let places = game_places(
+                required,
+                Some(&stored),
+                TEAM,
+                &filled,
+                10,
+                GameMoment::played(in_list, false),
+            )
+            .expect("places");
             let games = [GameDuties {
                 game: &one,
                 places: &places,
@@ -2065,8 +2287,15 @@ mod tests {
             (DRIVERS, true, TEAM),
             (SCHEDULE, true, NEW_TEAM),
         ] {
-            let places = game_places(required, Some(&stored), team, &filled, 10, in_list, true)
-                .expect("places");
+            let places = game_places(
+                required,
+                Some(&stored),
+                team,
+                &filled,
+                10,
+                GameMoment::played(in_list, true),
+            )
+            .expect("places");
             let games = [GameDuties {
                 game: &one,
                 places: &places,
@@ -2084,7 +2313,15 @@ mod tests {
         // Past drivers of the old team after another team was chosen.
         let drive = [planned(DutyKind::Drive, 1, BRAM)];
         let filled = BTreeSet::from([(DutyKind::Drive, 1)]);
-        let places = game_places(NOTHING, None, NEW_TEAM, &filled, 10, true, true).expect("places");
+        let places = game_places(
+            NOTHING,
+            None,
+            NEW_TEAM,
+            &filled,
+            10,
+            GameMoment::played(true, true),
+        )
+        .expect("places");
         let games = [GameDuties {
             game: &one,
             places: &places,
@@ -2167,8 +2404,7 @@ mod tests {
             TEAM,
             &filled(&[(DutyKind::Table, 1)]),
             10,
-            true,
-            true,
+            GameMoment::played(true, true),
         )
         .expect("places");
         let at_game = [planned(DutyKind::Table, 1, ANNA)];
@@ -2263,5 +2499,228 @@ mod tests {
             .collect();
         // Bram played games only last season.
         assert_eq!(rows, [(ANNA, 0), (CAS, 1)]);
+    }
+
+    /// A game marked "Not played"; `started`: its start time has passed.
+    fn not_played(past: bool, started: bool) -> GameMoment {
+        GameMoment {
+            in_list: true,
+            past,
+            started,
+            not_played: true,
+        }
+    }
+
+    /// The 2 table places of the team and 2 driver places, with `players` on them.
+    fn table_and_drivers(drove: bool) -> StoredDuties {
+        StoredDuties {
+            drivers: Some(2),
+            drivers_drove: drove,
+            ..teams(&[((PlaceKind::Table, 1), TEAM), ((PlaceKind::Table, 2), TEAM)])
+        }
+    }
+
+    const BOTH: RequiredDuties = RequiredDuties {
+        schedule: true,
+        drivers: true,
+    };
+
+    #[test]
+    fn a_not_played_game_still_shows_with_its_places_but_nothing_counts() {
+        let stored = table_and_drivers(false);
+        let places = game_places(
+            BOTH,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            not_played(false, false),
+        )
+        .expect("places");
+        let schedule = places.schedule.as_ref().expect("schedule");
+        let drivers = places.drivers.as_ref().expect("drivers");
+        assert!(schedule.in_use && !schedule.counts);
+        assert!(drivers.in_use && !drivers.counts);
+        assert!(has_team_places(&places), "it stays in Next and Last");
+        assert_eq!(open_places(&places), 0);
+        assert!(!not_entered(&places));
+        // The same game, played: everything counts.
+        let played = game_places(
+            BOTH,
+            Some(&stored),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
+        assert!(played.schedule.expect("schedule").counts);
+        assert!(played.drivers.expect("drivers").counts);
+    }
+
+    #[test]
+    fn the_drives_of_a_not_played_game_count_only_from_its_start_time_with_the_switch() {
+        // (table and referee count, drivers count, drivers drove)
+        let parts = |drove: bool, moment: GameMoment| {
+            let places = game_places(
+                BOTH,
+                Some(&table_and_drivers(drove)),
+                TEAM,
+                &none(),
+                10,
+                moment,
+            )
+            .expect("places");
+            let drivers = places.drivers.expect("drivers");
+            (
+                places.schedule.expect("schedule").counts,
+                drivers.counts,
+                drivers.drove,
+            )
+        };
+        assert_eq!(parts(false, not_played(true, true)), (false, false, false));
+        assert_eq!(parts(true, not_played(true, true)), (false, false, true));
+        // The game day, after the start time: the drives count, but the game is still in no
+        // open item, overview or clash (`counts` stays false).
+        assert_eq!(parts(true, not_played(false, true)), (false, false, true));
+        // Before the start time the switch has no effect.
+        assert_eq!(parts(true, not_played(false, false)), (false, false, false));
+        // A not played game that left the game list, on its day: as a played one, nothing.
+        let gone = GameMoment {
+            in_list: false,
+            ..not_played(false, true)
+        };
+        assert_eq!(parts(true, gone), (false, false, false));
+        // Without the mark the switch changes nothing.
+        assert_eq!(
+            parts(true, GameMoment::played(true, true)),
+            parts(false, GameMoment::played(true, true))
+        );
+    }
+
+    #[test]
+    fn totals_leave_out_a_not_played_game_except_the_drives_with_the_switch() {
+        let one = game(1, CLUB_TEAM, OPPONENT);
+        let list = [
+            planned(DutyKind::Table, 1, ANNA),
+            planned(DutyKind::Drive, 1, BRAM),
+        ];
+        let filled = filled(&[(DutyKind::Table, 1), (DutyKind::Drive, 1)]);
+        let totals = |drove: bool, moment: GameMoment| {
+            let places = game_places(
+                BOTH,
+                Some(&table_and_drivers(drove)),
+                TEAM,
+                &filled,
+                10,
+                moment,
+            )
+            .expect("places");
+            duty_totals(&[GameDuties {
+                game: &one,
+                places: &places,
+                assignments: &list,
+                past: true,
+            }])
+        };
+        assert!(totals(false, not_played(true, true)).is_empty());
+        let drove = totals(true, not_played(true, true));
+        assert_eq!(drove.get(&ANNA), None);
+        assert_eq!(
+            drove
+                .get(&BRAM)
+                .copied()
+                .unwrap_or_default()
+                .of(DutyKind::Drive),
+            Total {
+                done: 1,
+                planned: 0
+            }
+        );
+        // "Undo": the totals are as before the mark.
+        let played = totals(true, GameMoment::played(true, true));
+        assert_eq!(played, totals(false, GameMoment::played(true, true)));
+        assert_eq!(
+            played
+                .get(&ANNA)
+                .copied()
+                .unwrap_or_default()
+                .of(DutyKind::Table),
+            Total {
+                done: 1,
+                planned: 0
+            }
+        );
+    }
+
+    #[test]
+    fn a_not_played_game_blocks_no_player() {
+        // A game of the team, where Anna is chosen for a place.
+        let mut this = at(1, BULWIJK, Some("Veld 1"), Some((13, 0)));
+        this.home.team = TEAM;
+        let duty_game = at(2, BULWIJK, Some("Veld 2"), Some((13, 30)));
+        let plays = at(3, OTHER_HALL, Some("Veld 1"), Some((13, 30)));
+        // Anna has a table place at the not played duty game.
+        let stored = teams(&[((PlaceKind::Table, 1), TEAM)]);
+        let list = [planned(DutyKind::Table, 1, ANNA)];
+        let places = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &filled(&[(DutyKind::Table, 1)]),
+            10,
+            not_played(false, false),
+        )
+        .expect("places");
+        let season = [GameDuties {
+            game: &duty_game,
+            places: &places,
+            assignments: &list,
+            past: false,
+        }];
+        // The team plays the not played game 3: `team_games` leaves it out.
+        let mut team_game = plays.clone();
+        team_game.home.team = TEAM;
+        let stored_games = [
+            StoredGame {
+                game: team_game.clone(),
+                in_list: true,
+                not_played_for: Some(team_game.date),
+            },
+            StoredGame {
+                game: this.clone(),
+                in_list: true,
+                not_played_for: None,
+            },
+        ];
+        let team_list = team_games(&stored_games, TEAM);
+        assert_eq!(
+            team_list
+                .iter()
+                .map(|game| game.source_id)
+                .collect::<Vec<_>>(),
+            [1]
+        );
+        assert_eq!(clashes(ANNA, &this, &season, &team_list), []);
+        // Played, both block.
+        let played = game_places(
+            SCHEDULE,
+            Some(&stored),
+            TEAM,
+            &filled(&[(DutyKind::Table, 1)]),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
+        let season = [GameDuties {
+            game: &duty_game,
+            places: &played,
+            assignments: &list,
+            past: false,
+        }];
+        assert_eq!(
+            worst_clash(&clashes(ANNA, &this, &season, &[&team_game, &this])),
+            Some(ClashLevel::Blocked)
+        );
     }
 }

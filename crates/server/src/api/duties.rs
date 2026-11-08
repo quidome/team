@@ -13,7 +13,7 @@ use super::games::KindTotalsView;
 use super::season::{SeasonPlaces, duties_of};
 use super::trainings::SeasonQuery;
 use crate::app::AppState;
-use crate::clock::{current_season, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
 use crate::{followed_teams, games};
@@ -59,7 +59,7 @@ pub async fn get(
 ) -> Result<Json<DutiesOverview>, AppError> {
     let season = query_season(query.season, state.clock.as_ref())?;
     let current = current_season(state.clock.as_ref());
-    let today = today_in_netherlands(state.clock.as_ref());
+    let now = in_netherlands(state.clock.now());
 
     let mut rows = Vec::new();
     if let Some(FollowedTeam {
@@ -73,7 +73,7 @@ pub async fn get(
             games::stored(&mut db, club.number, season).await?
         };
         let duties = duties_of(&state, club.number, season).await?;
-        let places = SeasonPlaces::new(&stored, &duties, club.number, team.number, today);
+        let places = SeasonPlaces::new(&stored, &duties, club.number, team.number, now);
         let totals = duty_totals(&places.duties(&duties));
         // `players` is sorted by first name (`players::all`).
         rows = duty_rows(&duties.players, &duties.roles, season, &totals)

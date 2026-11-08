@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 
 use super::season::{SeasonGames, games_of, places_of_season};
 use crate::app::AppState;
-use crate::clock::{current_season, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands};
 use crate::error::AppError;
 
 /// A message to copy.
@@ -116,10 +116,11 @@ async fn message_view(
     text: fn(&SeasonGames, &PlacesOf, NaiveDate) -> Option<String>,
 ) -> Result<Json<MessageView>, AppError> {
     let clock = state.clock.as_ref();
-    let today = today_in_netherlands(clock);
+    let now = in_netherlands(clock.now());
+    let today = now.date();
     let current = current_season(clock);
     let games = games_of(state, current, current, today).await?;
-    let places = places_of_season(&games, today);
+    let places = places_of_season(&games, now);
     Ok(Json(MessageView {
         text: text(&games, &places, today),
     }))

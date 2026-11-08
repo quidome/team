@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
     Answer, AnswerError, Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError,
-    DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GamePlaces, GameWarnings, ListRow,
-    MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome, PlaceKind, PlayerId, ReasonId, RequiredDuties,
-    ScheduleReason, ScheduledGame, Season, StoredDuties, StoredGame, Team, TeamNumber,
-    answers_moved, check_answer, check_assignment, check_drivers, check_entered, check_outcome,
+    DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GameMoment, GamePlaces,
+    GameWarnings, ListRow, MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome, PlaceKind, PlayerId,
+    ReasonId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties, StoredGame,
+    Team, TeamNumber, check_answer, check_assignment, check_drivers, check_entered, check_outcome,
     check_team, choice_players, clashes, club_teams, duty_totals, extra_players, game_count,
-    game_list, game_places, game_warnings, in_schedule, kept_games, offers, pick_team,
-    players_playing_on, plays_games_on, required_duties, worst_clash,
+    game_list, game_places, game_warnings, in_schedule, kept_games, move_note, offers, pick_team,
+    players_playing_on, plays_games_on, required_duties, started, worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -27,10 +27,11 @@ use super::season::{
 };
 use crate::api::clubs::TeamView;
 use crate::app::AppState;
-use crate::clock::{current_season, in_netherlands, today_in_netherlands};
+use crate::clock::{current_season, in_netherlands};
 use crate::db::StoreError;
-use crate::duties::{self, GameKey};
+use crate::duties;
 use crate::error::AppError;
+use crate::games::GameKey;
 use crate::{followed_teams, game_attendance, games, players, reasons};
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -52,6 +53,13 @@ pub struct GamePage {
     pub players: Vec<ChoiceView>,
     /// Who comes to the game; `null`: not a game of the team.
     pub attendance: Option<GameAttendanceView>,
+    /// "Not played" on its date now: its duties and attendance do not count.
+    pub not_played: bool,
+    /// The switch "The drivers drove": the drives of a not played game count from its start time.
+    pub drivers_drove: bool,
+    /// The start time has passed (without a start time: the game day has begun; Dutch time): the
+    /// page shows the switch "The drivers drove" on a not played game with driver places.
+    pub started: bool,
 }
 
 /// Who comes to a game of the team.
@@ -357,6 +365,8 @@ struct Found {
     team: Team,
     game: Game,
     in_list: bool,
+    /// Not played on its date now (`team_core::not_played`).
+    not_played: bool,
     reason: ScheduleReason,
     /// The pull-down list of the places.
     club_teams: Vec<team_core::TeamRef>,
@@ -388,7 +398,7 @@ impl Found {
         stored: &StoredDuties,
         at_game: &[Assignment],
         duties: &SeasonDuties,
-        today: chrono::NaiveDate,
+        local: chrono::NaiveDateTime,
     ) -> Option<GamePlaces> {
         game_places(
             self.required(),
@@ -399,8 +409,12 @@ impl Found {
                 .map(|assignment| (assignment.kind, assignment.number))
                 .collect(),
             players_playing_on(&duties.roles, self.game.date),
-            self.in_list,
-            self.past(today),
+            GameMoment {
+                in_list: self.in_list,
+                past: self.past(local.date()),
+                started: started(&self.game, local),
+                not_played: self.not_played,
+            },
         )
     }
 
@@ -409,9 +423,9 @@ impl Found {
         &self,
         duties: &SeasonDuties,
         player: PlayerId,
-        today: chrono::NaiveDate,
+        local: chrono::NaiveDateTime,
     ) -> Option<ClashLevel> {
-        let season = self.season_places(duties, today);
+        let season = self.season_places(duties, local);
         worst_clash(&clashes(
             player,
             &self.game,
@@ -421,13 +435,17 @@ impl Found {
     }
 
     /// The places of the stored games of the season, for the clashes and the totals.
-    fn season_places(&self, duties: &SeasonDuties, today: chrono::NaiveDate) -> SeasonPlaces<'_> {
+    fn season_places(
+        &self,
+        duties: &SeasonDuties,
+        local: chrono::NaiveDateTime,
+    ) -> SeasonPlaces<'_> {
         SeasonPlaces::new(
             &self.stored,
             duties,
             self.club.number,
             self.team.number,
-            today,
+            local,
         )
     }
 }
@@ -499,6 +517,7 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
         season,
         club,
         team,
+        not_played: found.not_played(),
         game: found.game,
         in_list: found.in_list,
         reason,
@@ -509,25 +528,33 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
 
 /// The page of `found`, with the duties as stored now.
 async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
-    let today = today_in_netherlands(state.clock.as_ref());
+    let local = in_netherlands(state.clock.now());
+    let today = local.date();
     let duties = duties_of(state, found.club.number, found.season).await?;
     let places = duties.places_of(
         &found.game,
         found.in_list,
+        found.not_played,
         found.club.number,
         found.team.number,
-        today,
+        local,
     );
     let view = places
         .as_ref()
         .map(|places| duties.view(&found.game, places));
-    let players = choice(&found, &duties, places.as_ref(), today);
+    let players = choice(&found, &duties, places.as_ref(), local);
+    let started = started(&found.game, local);
+    let drivers_drove = duties
+        .stored
+        .get(&found.game.source_id)
+        .is_some_and(|stored| stored.drivers_drove);
     let past = found.past(today);
     let attendance = attendance_of(state, &found, &duties).await?;
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
         reason: found.reason,
         in_list: found.in_list,
+        not_played: found.not_played,
     });
     game.places = view;
     Ok(GamePage {
@@ -539,6 +566,9 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         past,
         players,
         attendance,
+        not_played: found.not_played,
+        drivers_drove,
+        started,
     })
 }
 
@@ -552,10 +582,15 @@ async fn stored_list(
 ) -> Result<(Vec<ListRow>, GameAttendance, GameWarnings, bool), AppError> {
     let (attendance, answers) = game_attendance::of_game(&state.pool, found.key()).await?;
     let list = game_list(&duties.players, &duties.roles, &answers, found.game.date);
-    let moved = answers_moved(&attendance, !answers.is_empty(), found.game.date);
+    let scheduled = ScheduledGame {
+        game: found.game.clone(),
+        reason: found.reason,
+        in_list: found.in_list,
+        not_played: found.not_played,
+    };
+    let moved = move_note(&scheduled, &attendance, !answers.is_empty());
     let warnings = game_warnings(
-        &found.game,
-        found.in_list,
+        &scheduled,
         &list,
         &attendance,
         !answers.is_empty(),
@@ -644,9 +679,10 @@ fn choice(
     found: &Found,
     duties: &SeasonDuties,
     places: Option<&GamePlaces>,
-    today: chrono::NaiveDate,
+    local: chrono::NaiveDateTime,
 ) -> Vec<ChoiceView> {
-    let season = found.season_places(duties, today);
+    let today = local.date();
+    let season = found.season_places(duties, local);
     let season_duties = season.duties(duties);
     let totals = duty_totals(&season_duties);
     let at_game = duties.assignments_of(found.game.source_id);
@@ -918,14 +954,15 @@ pub async fn set_assignment(
     let (kind, number) = duty_place(&kind, &number)?;
     let found = find(&state, &season, &id).await?;
     let player = player(&state, input.player).await?;
-    let today = today_in_netherlands(state.clock.as_ref());
+    let local = in_netherlands(state.clock.now());
+    let today = local.date();
     let duties = duties_of(&state, found.club.number, found.season).await?;
     let plays = plays_games_on(&duties.roles, player, found.game.date);
-    let clash = found.clash(&duties, player, today);
+    let clash = found.clash(&duties, player, local);
     let now = state.clock.now();
     write(&state, &found, async |tx, locked| {
         let places = found
-            .places(&locked.stored, &locked.at_game, &duties, today)
+            .places(&locked.stored, &locked.at_game, &duties, local)
             .ok_or(DutyError::NotAPlaceOfTheTeam)?;
         check_assignment(
             &places,
@@ -1016,7 +1053,8 @@ pub async fn set_outcome(
         (OutcomeView::DoneBy, Some(id)) => Outcome::DoneBy(player(&state, id).await?),
         _ => return Err(AppError::BadRequest("invalid_outcome")),
     };
-    let today = today_in_netherlands(state.clock.as_ref());
+    let local = in_netherlands(state.clock.now());
+    let today = local.date();
     let plays = match new {
         Outcome::DoneBy(player) => {
             let duties = duties_of(&state, found.club.number, found.season).await?;
@@ -1168,4 +1206,130 @@ pub async fn set_answers_checked(
     game_attendance::answers_checked(&state.pool, found.key(), found.game.date).await?;
     tracing::info!(season = %found.season, game = found.game.source_id, "answers checked");
     Ok(Json(tapped(&state, &found, &duties, None).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/not-played",
+    operation_id = "setNotPlayed",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "Not played on its date now; the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_not_played(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    not_played(state, season, id, true).await
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/games/{season}/{id}/not-played",
+    operation_id = "unsetNotPlayed",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "\"Undo\": the game counts again; the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn unset_not_played(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    not_played(state, season, id, false).await
+}
+
+/// "Not played" (`on`) or "Undo" on any game whose page opens (story E, D3). One write, no lock:
+/// the last tap wins. The page is read again after the write, with the new mark.
+async fn not_played(
+    state: AppState,
+    season: String,
+    id: String,
+    on: bool,
+) -> Result<Json<GamePage>, AppError> {
+    let found = find(&state, &season, &id).await?;
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
+    if on {
+        games::set_not_played(&mut db, found.key()).await?;
+    } else {
+        games::unset_not_played(&mut db, found.key()).await?;
+    }
+    drop(db);
+    let found = find(&state, &season, &id).await?;
+    Ok(Json(page(&state, found).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/drivers-drove",
+    operation_id = "setDriversDrove",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "\"The drivers drove\" on; the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_drivers_drove(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    drivers_drove(state, season, id, true).await
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/games/{season}/{id}/drivers-drove",
+    operation_id = "unsetDriversDrove",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "\"The drivers drove\" off; the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn unset_drivers_drove(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    drivers_drove(state, season, id, false).await
+}
+
+/// The switch "The drivers drove" (`on`), under the row lock of the game. Accepted on any game
+/// whose page opens: it has effect only on a not played game from its start time (story E).
+async fn drivers_drove(
+    state: AppState,
+    season: String,
+    id: String,
+    on: bool,
+) -> Result<Json<GamePage>, AppError> {
+    let found = find(&state, &season, &id).await?;
+    let now = state.clock.now();
+    write(&state, &found, async |tx, _| {
+        duties::set_drivers_drove(tx, found.key(), on, now).await?;
+        Ok(())
+    })
+    .await?;
+    Ok(Json(page(&state, found).await?))
 }

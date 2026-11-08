@@ -1,6 +1,6 @@
 //! A game as the tool understands it. Dates and start times are Dutch local time.
 
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
 use crate::events::club::ClubNumber;
 use crate::shared::season::Season;
@@ -47,6 +47,15 @@ pub struct Game {
     pub competition: String,
 }
 
+/// `game` has started at `now` (Dutch local time): its start time has passed; without a start
+/// time, its date has begun.
+pub fn started(game: &Game, now: NaiveDateTime) -> bool {
+    match game.start_time {
+        Some(time) => now >= game.date.and_time(time),
+        None => now.date() >= game.date,
+    }
+}
+
 /// The source writes 00:00 when the start time is not known yet.
 pub fn start_time_from_source(time: NaiveTime) -> Option<NaiveTime> {
     (time != NaiveTime::MIN).then_some(time)
@@ -69,5 +78,24 @@ mod tests {
     fn other_times_stay() {
         assert_eq!(start_time_from_source(time(11, 15)), Some(time(11, 15)));
         assert_eq!(start_time_from_source(time(0, 30)), Some(time(0, 30)));
+    }
+
+    #[test]
+    fn a_game_starts_at_its_start_time_or_else_when_its_date_begins() {
+        let date = NaiveDate::from_ymd_opt(2026, 11, 7).expect("valid date");
+        let at = |day: u32, hour: u32, minute: u32| {
+            NaiveDate::from_ymd_opt(2026, 11, day)
+                .expect("valid date")
+                .and_hms_opt(hour, minute, 0)
+                .expect("valid time")
+        };
+        let mut game = crate::events::schedule::tests::game(1, TeamNumber(1), TeamNumber(2));
+        game.date = date;
+        game.start_time = Some(time(11, 15));
+        assert!(!started(&game, at(7, 11, 14)));
+        assert!(started(&game, at(7, 11, 15)));
+        game.start_time = None;
+        assert!(!started(&game, at(6, 23, 59)));
+        assert!(started(&game, at(7, 0, 0)));
     }
 }

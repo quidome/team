@@ -14,23 +14,25 @@ pub use contribution::attendance::{
 };
 pub use contribution::duties::{
     Assignment, Candidate, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted, DriverPart,
-    DutyError, DutyKind, DutyPlace, GameDuties, GamePlaces, KindTotals, NotOffered, Offer, Outcome,
-    PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart, SchedulePlace, StoredDuties, TeamRef,
-    Total, check_assignment, check_drivers, check_entered, check_outcome, check_team,
-    choice_players, clash_level, clashes, club_teams, display_names, driver_proposal, duty_rows,
-    duty_totals, game_places, has_team_places, highest_driver, kept_games, not_entered, offers,
-    open_by_kind, open_places, pick_team, players_playing_on, plays_games_on, required_duties,
-    who_did, worst_clash,
+    DutyError, DutyKind, DutyPlace, GameDuties, GameMoment, GamePlaces, KindTotals, NotOffered,
+    Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart, SchedulePlace,
+    StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered, check_outcome,
+    check_team, choice_players, clash_level, clashes, club_teams, display_names, driver_proposal,
+    duty_rows, duty_totals, game_places, has_team_places, highest_driver, kept_games, not_entered,
+    offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
+    required_duties, team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
     Answer, AnswerError, ENOUGH_PLAYERS, GameAttendance, GameCount, GameWarnings, ListRow,
     MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_moved, before_start, check_answer,
     drivers_not_coming, extra_players, game_count, game_list, game_warnings, in_warning_period,
-    row_count,
+    move_note, row_count,
 };
 pub use contribution::reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use events::club::{Club, ClubNumber, search_clubs};
-pub use events::game::{Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source};
+pub use events::game::{
+    Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source, started,
+};
 pub use events::schedule::{
     Schedule, ScheduleReason, ScheduledGame, StoredGame, in_schedule, schedule,
 };

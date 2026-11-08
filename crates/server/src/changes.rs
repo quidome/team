@@ -244,5 +244,7 @@ fn last_seen_from_json(value: serde_json::Value, season: Season) -> Result<Store
             competition: seen.competition,
         },
         in_list: seen.in_list,
+        // The game as last seen in the game list: the mark "Not played" is not part of it.
+        not_played_for: None,
     })
 }

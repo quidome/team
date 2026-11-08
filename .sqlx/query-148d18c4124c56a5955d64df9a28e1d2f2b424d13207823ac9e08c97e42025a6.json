@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE game_duties SET drivers_drove = $4, saved_at = $5\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Bool",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "148d18c4124c56a5955d64df9a28e1d2f2b424d13207823ac9e08c97e42025a6"
+}

@@ -304,6 +304,7 @@ pub fn next_events<'a>(
 
 #[cfg(test)]
 mod tests {
+    use crate::contribution::duties::GameMoment;
     use chrono::NaiveTime;
 
     use super::*;
@@ -367,6 +368,7 @@ mod tests {
             game,
             reason,
             in_list: true,
+            not_played: false,
         }
     }
 
@@ -704,8 +706,7 @@ mod tests {
             TEAM,
             &Default::default(),
             10,
-            in_list,
-            past,
+            GameMoment::played(in_list, past),
         )
         .expect("places")
     }
@@ -776,7 +777,15 @@ mod tests {
         let filled = (1..=filled)
             .map(|number| (DutyKind::Drive, number))
             .collect();
-        game_places(required, None, TEAM, &filled, players, in_list, false).expect("places")
+        game_places(
+            required,
+            None,
+            TEAM,
+            &filled,
+            players,
+            GameMoment::played(in_list, false),
+        )
+        .expect("places")
     }
 
     fn open_game(id: i64, open: &[(DutyKind, usize)]) -> OpenGame {
@@ -1040,5 +1049,75 @@ mod tests {
             ),
             []
         );
+    }
+
+    // A game that was not played (story E of attendance at games).
+
+    /// A home game of the club with table 1 of the team, open and not entered, marked "Not
+    /// played".
+    fn not_played_places(past: bool) -> GamePlaces {
+        use crate::contribution::duties::{
+            PlaceKind, RequiredDuties, StoredDuties, TeamRef, game_places,
+        };
+        let mut stored = StoredDuties::default();
+        stored.teams.insert(
+            (PlaceKind::Table, 1),
+            TeamRef {
+                number: TEAM,
+                name: "M16 1".to_owned(),
+            },
+        );
+        let required = RequiredDuties {
+            schedule: true,
+            drivers: false,
+        };
+        game_places(
+            required,
+            Some(&stored),
+            TEAM,
+            &Default::default(),
+            10,
+            GameMoment {
+                not_played: true,
+                ..GameMoment::played(true, past)
+            },
+        )
+        .expect("places")
+    }
+
+    #[test]
+    fn a_not_played_game_is_no_open_item_but_stays_in_next() {
+        let mut marked = scheduled(1, date(2026, 10, 31), ScheduleReason::DutyGame);
+        marked.not_played = true;
+        let games = [marked];
+        let events = coming(&games, &[]);
+        let places: PlacesOf = [(1, not_played_places(false))].into_iter().collect();
+        let today = date(2026, 10, 26);
+        assert!(schedule_not_entered(&events, &places, today).is_empty());
+        assert!(open_places_games(&events, &places, today).is_empty());
+        assert_eq!(
+            dates(&next_events(&events, &places, today)),
+            [date(2026, 10, 31)]
+        );
+    }
+
+    #[test]
+    fn a_not_played_game_stays_in_last() {
+        let mut marked = scheduled(1, date(2026, 10, 10), ScheduleReason::DutyGame);
+        marked.not_played = true;
+        let games = [marked];
+        let events = SeasonEvents {
+            coming: Vec::new(),
+            past: games
+                .iter()
+                .map(|scheduled| Event {
+                    date: scheduled.game.date,
+                    start: scheduled.game.start_time,
+                    kind: EventKind::Game(scheduled),
+                })
+                .collect(),
+        };
+        let places: PlacesOf = [(1, not_played_places(true))].into_iter().collect();
+        assert_eq!(last_games(&events, &places).len(), 1);
     }
 }
