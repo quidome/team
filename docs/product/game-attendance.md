@@ -1,6 +1,6 @@
 # Attendance at games
 
-**Status**: who comes to a game, the warnings in time, "Not played" and "Checked" are built. Games are not in the totals of "Attendance" yet.
+**Status**: who comes to a game, the warnings in time, "Not played" and "Checked" are built, and checked games count in the totals of [Attendance](trainings-and-attendance.md).
 
 ## Purpose
 During the week before a game the coordinator keeps track of who comes, from the chat with the players and parents. The coordinator sees at once how many players there are and whom to ask.
@@ -34,7 +34,7 @@ During the week before a game the coordinator keeps track of who comes, from the
 
 ### Not played
 - **Every game whose page opens** has the button "Not played" as its last button: a game of the team, a home game of another club team, a game kept for its duties or answers, coming or past, also a game that left the game list. A reading of the game list never sets or clears it.
-- **One tap** saves at once. The game then counts nothing: no duty in the totals (drive, table, referee), no open places and no "schedule not entered", no warning and no open item, no line in the messages or the duty overviews, and it blocks no player at another game ([duties](duties.md)). It will not count in the totals of "Attendance" either, once games are in them. Nothing stored is deleted.
+- **One tap** saves at once. The game then counts nothing: no duty in the totals (drive, table, referee), no open places and no "schedule not entered", no warning and no open item, no line in the messages or the duty overviews, and it blocks no player at another game ([duties](duties.md)). It does not count in the totals of "Attendance" either. Nothing stored is deleted.
 - **The page** shows "Not played" with "Undo" at the top. The list of who comes is closed behind "Show the list", with the count beside it; opened, it works as before. Answers, extra players and duty places can still be changed ([how the tool treats what is stored](principles.md)). A driver's "· not coming" is not shown. "Undo" saves at once and makes everything count as before.
 - **"The drivers drove."** From the start time (without a start time: from the start of the game day), a not played game with driver places of the team has the switch "The drivers drove", off at first, with "No drive counts." or "The drives count." When it is on, its drives count in the duty totals as at a played game (done by the player on the place); the game is still no open item and in no overview. "Undo" keeps the switch; it has effect again only after a new "Not played".
 - **The rows** on "Season", in "Next" and in "Last" show "· Not played" after the hall and town; on a game of the team it replaces the count. A not played game stays in "Next" and "Last".
@@ -48,6 +48,7 @@ During the week before a game the coordinator keeps track of who comes, from the
 - **"Undo check"** makes the game not checked and brings back to "no answer" only the players that "Checked" made absent and that were not tapped after that.
 - **A check holds for a date** (decision 0029): it stores the date of the game. When the game moves, the check has no effect and the players it made absent are "no answer" again; when the game moves back, both hold again. A check on the new date replaces the old one. Nothing stored is deleted.
 - **The open item** "Game Sat 31 Oct not checked" ("2 games not checked") is on the [start page](start-page.md) for each game of the team before today that is not checked, not "not played", still in the game list, and on or after the day "Checked" was released. Older games are never an open item, and show their list closed behind "Show the list"; they can still be marked and checked.
+- **The totals.** A checked game that was played counts on [Attendance](trainings-and-attendance.md) for each player on its list with "there" or "absent".
 - **The rows** on "Season" and in "Last" show "· Checked" after the hall and town.
 - Two screens: the last check or undo wins. A tap at the same moment as "Checked" wins over it.
 

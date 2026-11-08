@@ -35,7 +35,7 @@ Both values need fast capture and correct data. For example, attendance at train
 
 ## Where we are
 - **Fair duties: reached.** The games come in from the game list, the coordinator gives the duty places to players, the duty totals show the split, and the messages and duty overviews come from the tool.
-- **Effort: halfway.** Attendance at training is recorded with the reason for each absence, with totals for each player in a season. Who comes to a game is built, not released yet; no report brings the effort and the duties of each player together (priorities 7 and 8).
+- **Effort: halfway.** Attendance at training and at games is recorded with the reason for each absence, with totals for each player in a season. No report brings the effort and the duties of each player together (priorities 7 and 8).
 - **The sheet is still in use.**
 - The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it.
 
@@ -113,3 +113,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-10-31 | Words extra player and not played (a game that did not or will not take place stops counting for duties and attendance), from `/discover` of attendance at games |
 | 2026-11-03 | Purpose made explicit: the tool shows what each player gives to the team. Core values: 1 see who makes an effort, 2 share the duties fairly and easily; fast capture and correct data are a condition for both. Success tied to these goals. The report comes before attendance at games (priorities 7 and 8 change places). Word contribution |
 | 2026-11-03 | "Where we are" describes the product compared to its purpose (fair duties reached, effort halfway, the sheet still in use); the releases move to `docs/releases.md`; the change log keeps only changes to the vision |
+| 2026-11-08 | "Where we are": attendance at games counts in the totals of a season; effort stays halfway until the report |

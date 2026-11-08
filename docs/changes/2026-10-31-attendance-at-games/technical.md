@@ -67,7 +67,7 @@ let counts = |required: bool| !not_played && (past || (in_list && required));
 | B | [Warnings in time](../done/2026-11-04-warnings-in-time/) | feature | Core `too_few`, `in_warning_period`, `drivers_not_coming`, `answers_moved`. Three open items and their order. The line "Too few players", "Anna · not coming", the note with "Answers checked", the note in the choice of a driver. | A | review build + accept | 1 | done |
 | E | [Not played](../done/2026-11-08-not-played/) | feature | Migration `not_played_for`. `not_played` in `game_places`, the clash rule, the messages and overviews, the warnings. The button with "Undo". "· Not played" on rows. | A | review build + accept | 2 | done |
 | C | [After the game](../done/2026-11-08-after-the-game/) | feature | Migration `checked_for`, `settled`. "Checked" and "Undo check" under the row lock, the words after the date, the closed list, the open item "not checked", "· Checked" on rows. | A, E | review build + accept | 2 | done |
-| D | [Totals on "Attendance"](../2026-11-08-totals-on-attendance/) | feature | Games in the totals of "Attendance" (a not played game does not count: `ScheduledGame.not_played`, decision 0031), "Left the team", the texts. Every checked game that was played counts; the line about the release reads `game_check_start` (decision 0032). | C | review build + accept | 2 | in implement |
+| D | [Totals on "Attendance"](../done/2026-11-08-totals-on-attendance/) | feature | Games in the totals of "Attendance" (a not played game does not count: `ScheduledGame.not_played`, decision 0031), "Left the team", the texts. Every checked game that was played counts; the line about the release reads `game_check_start` (decision 0032). | C | review build + accept | 2 | done |
 
 Each story has its own change folder (type `feature`, stage `design`) and its own `/design`, which
 writes its steps, routes, screens and exact tests from this spec and `functional.md`.
@@ -111,7 +111,7 @@ Forward-only migrations with new tables; no data to move. Story E changes releas
 - [x] Release 1
 - [x] Story E – not played
 - [x] Story C – after the game
-- [ ] Story D – totals on "Attendance"
+- [x] Story D – totals on "Attendance"
 - [ ] Release 2
 - [ ] Epic review accept
 
