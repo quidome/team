@@ -108,13 +108,15 @@ does not come, **so that** I can act before the game.
 correct with almost no work.
 
 #### Acceptance criteria
-- [ ] After the date of the game, the buttons say "There" and "Absent", and the groups "No answer", "There" and "Absent"; the count says "8 there · 1 absent". On the date itself the words stay "coming" and "not coming". The stored state does not change: "coming" is "there", "not coming" is "absent".
-- [ ] A game of the team has the button "Checked" from its start time on; with no known start time, from the day after its date. Checked: the page shows "Checked" with "Undo check", and on "Season" and in "Last" the row shows "· Checked". A checked game shows only the count; a tap opens the list.
+- [ ] From the start time of the game (with no known start time: from the start of the game day), the buttons say "There" and "Absent", and the groups "No answer", "There" and "Absent"; the count says "8 there · 1 absent". Before that the words stay "coming" and "not coming". (Coordinator, 2026-11-08: from the start, the real attendance can be filled in.) The stored state does not change: "coming" is "there", "not coming" is "absent".
+- [ ] A game of the team has the button "Checked" from its start time on; with no known start time, from the start of the game day (coordinator, 2026-11-08). A game marked "not played" can be checked too (coordinator, 2026-11-08: "Checked" means the admin is complete). Checked: the page shows "Checked" with "Undo check", and on "Season" and in "Last" the row shows "· Checked". A checked game shows only the count; a tap opens the list.
 - [ ] A tap on "Checked" makes each "no answer" an "absent", without a reason, in one step, and says so: "2 players with no answer are absent."
 - [ ] "Undo check" brings back to "no answer" only the players that "Checked" settled and that were not tapped after that. Players marked by hand keep their state.
 - [ ] On a checked game a player can be changed between "there" and "absent"; a tap on the chosen state does nothing. A player who gets a role later shows as "no answer" on that game, does not count until the coordinator taps that player, and the page says so at the change of role, as at a training.
 - [ ] A game of the team before today that is not checked, is not marked "not played", and did not leave the game list is an open item: "Game Sat 31 Oct not checked", for more "2 games not checked"; a tap opens the oldest. This holds for games from the day of the release on, in the same seasons as the trainings (the current season, and in July and August the season before). Older games are never an open item, but can be marked and checked.
 - [ ] A game before its start time has no "Checked". On a game from before the release, the list is closed behind a tap.
+- [ ] "Checked" holds only for the date on which it was tapped. When the game moves, the check has no effect and the players it settled count as "no answer" again; when the game moves back, both hold again. Once the game is checked on its new date, moving it back does not bring back the old check. Nothing stored is deleted.
+- [ ] From the start time of a game (with no known start time: from the start of the game day), its duty places offer "Someone else" and "Nobody", and a filled place counts as done instead of planned; before, both came from the day after the date. (Coordinator, 2026-11-08: from the start, the actual drivers can be filled in.)
 
 #### Errors and edge cases
 - A save that fails: "Not saved. Try again." and the stored state.
@@ -149,7 +151,7 @@ driven, and the only way out is "Nobody" on each place. A game that left the gam
 - [ ] The page shows "Not played" with "Undo" at the top, and the list is closed behind a tap. "Undo" saves at once and makes everything count again as before.
 - [ ] On "Season", in "Next" and in "Last" the row shows "· Not played".
 - [ ] A not played game does not block a player in the clash rule of another game.
-- [ ] A not played game cannot be checked; a checked game can become not played, and "Undo" returns it to checked.
+- [ ] A not played game can be checked (coordinator, 2026-11-08, changed with story C); a checked game can become not played, and "Undo" returns it to checked.
 - [ ] A game that left the game list never becomes "not played" by itself: the list of changes keeps it until it is seen, and the coordinator opens the game and taps. (Coordinator, 2026-10-27: what is stored is never changed by a reading.)
 - [ ] "Not played" and "Checked" hold only for the date on which they were tapped. When the game gets another date, it is a normal game of its new date again, with its answers and duties; nothing is deleted.
 
