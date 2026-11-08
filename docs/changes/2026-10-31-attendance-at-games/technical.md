@@ -112,8 +112,8 @@ Forward-only migrations with new tables; no data to move. Story E changes releas
 - [x] Story E – not played
 - [x] Story C – after the game
 - [x] Story D – totals on "Attendance"
-- [ ] Release 2
-- [ ] Epic review accept
+- [x] Release 2 (v0.9.0, 2026-11-08)
+- [x] Epic review accept
 
 ## Deviations
 From `functional.md`, each a choice of the coordinator; the stricter readings are in the
