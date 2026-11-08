@@ -109,6 +109,13 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// "Checked" changes a past game that the earlier tests read: it runs after them.
+			name: 'checked',
+			testMatch: 'checked.e2e.ts',
+			dependencies: ['not-played'],
+			use: { baseURL: 'http://localhost:4100' }
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

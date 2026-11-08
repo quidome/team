@@ -2,12 +2,14 @@
 //! not, and who has not answered. A player without a stored answer is "no answer". The warnings in
 //! time (story B): too few players, a driver who does not come, and answers from before a move.
 
+use std::collections::BTreeMap;
+
 use chrono::{Days, NaiveDate, NaiveDateTime, NaiveTime};
 
 use crate::contribution::duties::{Assignment, DutyKind, plays_games_on};
 use crate::contribution::reasons::ReasonId;
-use crate::events::game::Game;
-use crate::events::schedule::ScheduledGame;
+use crate::events::game::{Game, started};
+use crate::events::schedule::{ScheduleReason, ScheduledGame};
 use crate::team::players::{Player, PlayerId, PlayerRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +36,8 @@ pub struct StoredAnswer {
     pub player: PlayerId,
     pub answer: Answer,
     pub reason: Option<ReasonId>,
+    /// "Checked" made it (a "no answer" that became absent); a tap clears it.
+    pub settled: bool,
 }
 
 /// What is stored for a game beside the answers.
@@ -42,6 +46,87 @@ pub struct GameAttendance {
     pub extra_players: u8,
     /// The date of the game when its answers were given or confirmed.
     pub answers_for: Option<NaiveDate>,
+    /// The date of the game when "Checked" was tapped; `None`: not checked.
+    pub checked_for: Option<NaiveDate>,
+}
+
+/// Why "Checked" is refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CheckError {
+    #[error("the game has not started")]
+    TooEarly,
+}
+
+/// The game, on `date` now, is checked: the check holds for its date (decision 0029).
+pub fn checked(attendance: &GameAttendance, date: NaiveDate) -> bool {
+    attendance.checked_for == Some(date)
+}
+
+/// The answers that count for the game on `date`: an answer that "Checked" made counts only while
+/// the check holds; after a move it is "no answer" again (story C).
+pub fn answers_in_effect(
+    answers: &[StoredAnswer],
+    attendance: &GameAttendance,
+    date: NaiveDate,
+) -> Vec<StoredAnswer> {
+    let checked = checked(attendance, date);
+    answers
+        .iter()
+        .filter(|answer| checked || !answer.settled)
+        .copied()
+        .collect()
+}
+
+/// The players "Checked" makes absent: the rows of `list` with no answer, in its order.
+pub fn to_settle(list: &[ListRow]) -> Vec<PlayerId> {
+    list.iter()
+        .filter(|row| row.answer.is_none())
+        .map(|row| row.player)
+        .collect()
+}
+
+/// The checked games of the team at which `player` now has "no answer" after a change of its roles
+/// from `before` to `after`: covered by a role "plays games" after and not before, and without an
+/// answer of the player in effect (`answers_in_effect`). `checks` and `answers`: what is stored for
+/// the games, by source id. The dates, sorted.
+pub fn now_no_answer(
+    player: PlayerId,
+    before: &[PlayerRole],
+    after: &[PlayerRole],
+    games: &[ScheduledGame],
+    checks: &BTreeMap<i64, GameAttendance>,
+    answers: &BTreeMap<i64, Vec<StoredAnswer>>,
+) -> Vec<NaiveDate> {
+    let mut found: Vec<NaiveDate> = games
+        .iter()
+        .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame)
+        .filter_map(|scheduled| {
+            let id = scheduled.game.source_id;
+            let date = scheduled.game.date;
+            let stored = checks.get(&id)?;
+            let in_effect = answers_in_effect(
+                answers.get(&id).map_or(&[][..], Vec::as_slice),
+                stored,
+                date,
+            );
+            (checked(stored, date)
+                && plays_games_on(after, player, date)
+                && !plays_games_on(before, player, date)
+                && !in_effect.iter().any(|answer| answer.player == player))
+            .then_some(date)
+        })
+        .collect();
+    found.sort();
+    found
+}
+
+/// "Checked" is possible once `game` has started (`started`; `now` in Dutch local time).
+pub fn check_game_checking(game: &Game, now: NaiveDateTime) -> Result<(), CheckError> {
+    if started(game, now) {
+        Ok(())
+    } else {
+        Err(CheckError::TooEarly)
+    }
 }
 
 /// A player on the list of a game; `answer`: `None` is "no answer".
@@ -254,7 +339,6 @@ pub fn game_warnings(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::schedule::ScheduleReason;
     use crate::shared::season::Season;
     use crate::team::players::{Role, RoleId};
 
@@ -291,6 +375,7 @@ mod tests {
             player: PlayerId(id),
             answer,
             reason: None,
+            settled: false,
         }
     }
 
@@ -516,6 +601,7 @@ mod tests {
         GameAttendance {
             extra_players: 0,
             answers_for: Some(on),
+            checked_for: None,
         }
     }
 
@@ -523,6 +609,7 @@ mod tests {
         let attendance = GameAttendance {
             extra_players: extra,
             answers_for: Some(game.date),
+            checked_for: None,
         };
         let has_answers = list.iter().any(|row| row.answer.is_some());
         game_warnings(
@@ -692,5 +779,136 @@ mod tests {
             of_game(true, true, at(10, 21, 9, 0)),
             GameWarnings::default()
         );
+    }
+
+    // "Checked" (story C).
+
+    #[test]
+    fn a_check_holds_for_the_date_of_the_game_now() {
+        let mut attendance = GameAttendance::default();
+        assert!(!checked(&attendance, date(10, 31)));
+        attendance.checked_for = Some(date(10, 31));
+        assert!(checked(&attendance, date(10, 31)));
+        assert!(!checked(&attendance, date(11, 7)), "moved");
+    }
+
+    #[test]
+    fn a_settled_answer_counts_only_while_the_check_holds() {
+        let settled = StoredAnswer {
+            settled: true,
+            ..answer(1, Answer::NotComing)
+        };
+        let tapped = answer(2, Answer::Coming);
+        let answers = [settled, tapped];
+        let checked_on = |on| GameAttendance {
+            checked_for: Some(on),
+            ..GameAttendance::default()
+        };
+        let players = |answers: Vec<StoredAnswer>| -> Vec<i64> {
+            answers.iter().map(|answer| answer.player.0).collect()
+        };
+        assert_eq!(
+            players(answers_in_effect(
+                &answers,
+                &checked_on(date(10, 31)),
+                date(10, 31)
+            )),
+            [1, 2]
+        );
+        // Moved: the settled player is "no answer" again; the tapped one stays.
+        assert_eq!(
+            players(answers_in_effect(
+                &answers,
+                &checked_on(date(10, 31)),
+                date(11, 7)
+            )),
+            [2]
+        );
+        assert_eq!(
+            players(answers_in_effect(
+                &answers,
+                &GameAttendance::default(),
+                date(10, 31)
+            )),
+            [2]
+        );
+    }
+
+    #[test]
+    fn checked_settles_only_the_players_with_no_answer() {
+        let list = game_list(
+            &[player(1, "Anna"), player(2, "Bram"), player(3, "Cas")],
+            &[plays(1), plays(2), plays(3)],
+            &[answer(2, Answer::Coming)],
+            date(10, 31),
+        );
+        assert_eq!(to_settle(&list), [PlayerId(1), PlayerId(3)]);
+        assert!(to_settle(&[]).is_empty());
+    }
+
+    #[test]
+    fn checked_is_possible_from_the_start_time() {
+        let game = saturday(Some((14, 30)));
+        assert_eq!(
+            check_game_checking(&game, at(10, 31, 14, 29)),
+            Err(CheckError::TooEarly)
+        );
+        assert_eq!(check_game_checking(&game, at(10, 31, 14, 30)), Ok(()));
+        // Without a start time: from 00:00 on the game day.
+        let unknown = saturday(None);
+        assert_eq!(
+            check_game_checking(&unknown, at(10, 30, 23, 59)),
+            Err(CheckError::TooEarly)
+        );
+        assert_eq!(check_game_checking(&unknown, at(10, 31, 0, 0)), Ok(()));
+    }
+
+    #[test]
+    fn after_a_role_change_a_covered_checked_game_without_an_answer_is_named() {
+        let on = |id: i64, day: u32| {
+            let mut game = game(id, OPPONENT, TEAM);
+            game.date = date(10, day);
+            scheduled(&game, true, false)
+        };
+        let games = [on(4, 24), on(1, 3), on(2, 10), on(3, 17), on(5, 31)];
+        let checked_on = |day: u32| GameAttendance {
+            extra_players: 0,
+            answers_for: None,
+            checked_for: Some(date(10, day)),
+        };
+        let checks = BTreeMap::from([
+            (1, checked_on(3)),
+            (2, checked_on(10)),
+            (3, checked_on(17)),
+            (4, checked_on(24)),
+            // Checked on another date: not checked now.
+            (5, checked_on(30)),
+        ]);
+        // Anna answered at the game of 17 Oct; a settled answer of another player does not count.
+        let settled = StoredAnswer {
+            settled: true,
+            ..answer(2, Answer::NotComing)
+        };
+        let answers = BTreeMap::from([(3, vec![answer(1, Answer::Coming)]), (2, vec![settled])]);
+        // Before: plays games from 5 Oct (covers 10 Oct); after: from 1 Oct (also 3 Oct).
+        let before = [role(1, Role::PlaysGames, date(10, 5), None)];
+        let after = [role(1, Role::PlaysGames, date(10, 1), None)];
+        assert_eq!(
+            now_no_answer(PlayerId(1), &before, &after, &games, &checks, &answers),
+            [date(10, 3)]
+        );
+        // A new role: every checked game without an answer, in date order.
+        assert_eq!(
+            now_no_answer(PlayerId(1), &[], &after, &games, &checks, &answers),
+            [date(10, 3), date(10, 10), date(10, 24)]
+        );
+        // A role "only trains" puts the player on no list.
+        let trains = [role(1, Role::OnlyTrains, date(10, 1), None)];
+        assert!(now_no_answer(PlayerId(1), &[], &trains, &games, &checks, &answers).is_empty());
+        // A game of another club team is not on a list.
+        let mut duty = on(6, 3);
+        duty.reason = ScheduleReason::DutyGame;
+        let checks = BTreeMap::from([(6, checked_on(3))]);
+        assert!(now_no_answer(PlayerId(1), &[], &after, &[duty], &checks, &answers).is_empty());
     }
 }

@@ -25,7 +25,7 @@
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { dayAfter, fullName, nowThereText, roleLabels } from '#lib/players.js';
+	import { dayAfter, fullName, nowThereLines, roleLabels } from '#lib/players.js';
 	import { formatDay } from '#lib/schedule.js';
 	import type { PageProps } from './$types';
 
@@ -58,14 +58,18 @@
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let warning = $state<string | null>(null);
-	/** After a role that starts earlier than trainings that exist: who now counts as there. */
+	/** After a role that starts earlier than trainings or checked games that exist: who now counts
+	 * as there, and who has no answer. */
 	let notices = $state<string[]>([]);
 
-	function noticesOf(entries: { player: number; trainings: string[] }[], page: TeamPage | null) {
+	function noticesOf(
+		entries: { player: number; trainings: string[]; games: string[] }[],
+		page: TeamPage | null
+	) {
 		const named = entries.length > 1;
-		notices = entries.map((entry) => {
+		notices = entries.flatMap((entry) => {
 			const member = page?.members.find((m) => m.id === entry.player);
-			return nowThereText(entry.trainings, named && member ? fullName(member) : undefined);
+			return nowThereLines(entry, named && member ? fullName(member) : undefined);
 		});
 	}
 

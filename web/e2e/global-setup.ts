@@ -9,4 +9,13 @@ export default function globalSetup() {
 	run(['database', 'drop', '-y', '--force']);
 	run(['database', 'create']);
 	run(['migrate', 'run', '--source', 'migrations']);
+	// The release of "Checked" for games is on the day of the test clock (DEV_NOW, 12 October
+	// 2026): the games before it are never the open item "not checked".
+	execFileSync(
+		'psql',
+		[e2eDatabase, '-c', "UPDATE game_check_start SET from_date = '2026-10-12'"],
+		{
+			stdio: 'inherit'
+		}
+	);
 }

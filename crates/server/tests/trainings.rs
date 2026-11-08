@@ -746,7 +746,7 @@ async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
     let casey = saved["player"]["id"].as_i64().unwrap();
     assert_eq!(
         saved["player"]["now_there"],
-        json!([{ "player": casey, "trainings": ["2026-09-01", "2026-09-08"] }])
+        json!([{ "player": casey, "trainings": ["2026-09-01", "2026-09-08"], "games": [] }])
     );
 
     // "Correct" of a role from today to 1 Sep.
@@ -767,7 +767,7 @@ async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
         .await;
     assert_eq!(
         player["now_there"],
-        json!([{ "player": avery, "trainings": ["2026-09-01", "2026-09-08"] }])
+        json!([{ "player": avery, "trainings": ["2026-09-01", "2026-09-08"], "games": [] }])
     );
     // A change that covers nothing new: empty.
     let player = coordinator
@@ -802,7 +802,7 @@ async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
         .await;
     assert_eq!(
         page["now_there"],
-        json!([{ "player": dana, "trainings": ["2026-09-08"] }])
+        json!([{ "player": dana, "trainings": ["2026-09-08"], "games": [] }])
     );
 
     // The next season: a training on Tue 7 Sep 2027, then "Add all" from 1 Sep.
@@ -823,7 +823,7 @@ async fn a_role_moved_earlier_counts_as_there(pool: PgPool) {
         .await;
     assert_eq!(
         page["now_there"],
-        json!([{ "player": casey, "trainings": ["2027-09-07"] }])
+        json!([{ "player": casey, "trainings": ["2027-09-07"], "games": [] }])
     );
 }
 

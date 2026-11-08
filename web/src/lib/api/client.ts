@@ -103,12 +103,14 @@ export function messageFor(error: unknown, status: number): string {
 		not_a_place_of_the_team: 'This place is no longer a place of the team. Load the page again.',
 		player_at_game: 'This player already has a place at this game.',
 		clash: 'This player is at another game at almost the same time.',
-		not_past: 'Only a past game can be corrected.',
+		not_started: 'Only a game that has started can be corrected.',
 		no_player_on_place: 'This place has no player. Load the page again.',
 		invalid_outcome: 'Choose who did the duty.',
 		unknown_player: 'This player no longer exists. Load the page again.',
 		invalid_place: 'This place cannot be read.',
-		invalid_game: 'This game cannot be read.'
+		invalid_game: 'This game cannot be read.',
+		checked_too_early: 'A game can be checked from its start time.',
+		not_a_team_game: 'This game is no longer a game of the team. Load the page again.'
 	};
 	if (typeof code === 'string' && code in players) return players[code];
 	if (status === 404) return 'This no longer exists. Load the page again.';
@@ -172,6 +174,7 @@ export type PlacesView = components['schemas']['PlacesView'];
 export type GamePage = components['schemas']['GamePage'];
 export type GameAttendanceView = components['schemas']['GameAttendanceView'];
 export type AttendanceView = components['schemas']['AttendanceView'];
+export type CheckedAnswer = components['schemas']['CheckedAnswer'];
 export type AnswerView = components['schemas']['AnswerView'];
 export type CountView = components['schemas']['CountView'];
 export type PlaceKind = components['schemas']['PlaceKindView'];
@@ -723,5 +726,18 @@ export async function setDriversDrove(
 		drove
 			? await api.PUT('/api/games/{season}/{id}/drivers-drove', { params })
 			: await api.DELETE('/api/games/{season}/{id}/drivers-drove', { params })
+	);
+}
+
+/** "Checked" (`checked`) or "Undo check" on the game `id` (story C of attendance at games). */
+export async function setChecked(season: string, id: string): Promise<CheckedAnswer> {
+	return dataOf(
+		await api.PUT('/api/games/{season}/{id}/checked', { params: { path: { season, id } } })
+	);
+}
+
+export async function unsetChecked(season: string, id: string): Promise<GamePage> {
+	return dataOf(
+		await api.DELETE('/api/games/{season}/{id}/checked', { params: { path: { season, id } } })
 	);
 }

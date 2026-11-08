@@ -194,16 +194,16 @@ impl Assignment {
 /// Who a filled place counts for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Counted {
-    /// A game before today: done by this player.
+    /// A game that has started: done by this player.
     Done(PlayerId),
-    /// A game of today or later: planned for this player.
+    /// A game that has not started: planned for this player.
     Planned(PlayerId),
     Nobody,
 }
 
-/// Who `assignment` counts for; `past`: its game is before today (Dutch date).
-pub fn who_did(assignment: &Assignment, past: bool) -> Counted {
-    if !past {
+/// Who `assignment` counts for; `started`: its game has started (`started`, Dutch time).
+pub fn who_did(assignment: &Assignment, started: bool) -> Counted {
+    if !started {
         return Counted::Planned(assignment.planned);
     }
     match assignment.outcome {
@@ -483,8 +483,8 @@ pub enum DutyError {
     NotInTeam,
     #[error("the player has a clash")]
     Clash,
-    #[error("the game is not past")]
-    NotPast,
+    #[error("the game has not started")]
+    NotStarted,
     #[error("no player is on the place")]
     NoPlayerOnPlace,
 }
@@ -604,7 +604,7 @@ pub struct Candidate {
 /// Putting `player` on the place `kind` `number` of a game with `places` and the assignments
 /// `at_game`: only on a place of the team; not a player who has another place at the game; only a
 /// player with the role "plays games" on the date (`plays_on_date`); not with a blocking `clash`,
-/// unless the game is `past`: then it records what happened, as "Someone else" does. The same
+/// unless the game has `started`: then it records what happened, as "Someone else" does. The same
 /// player again is no change.
 pub fn check_assignment(
     places: &GamePlaces,
@@ -612,7 +612,7 @@ pub fn check_assignment(
     number: u8,
     at_game: &[Assignment],
     candidate: Candidate,
-    past: bool,
+    started: bool,
 ) -> Result<(), DutyError> {
     let Candidate {
         player,
@@ -634,25 +634,25 @@ pub fn check_assignment(
     if !plays_on_date {
         return Err(DutyError::NotInTeam);
     }
-    if clash == Some(ClashLevel::Blocked) && !past {
+    if clash == Some(ClashLevel::Blocked) && !started {
         return Err(DutyError::Clash);
     }
     Ok(())
 }
 
-/// A correction of the place `kind` `number` after the game (`past`), from `assignment` (the
+/// A correction of the place `kind` `number` once the game has `started`, from `assignment` (the
 /// player on it, if any) to `new`; `plays_on_date`: the player of `DoneBy` has the role "plays
 /// games" on the date. Never blocked by a clash: it records what happened. Gives the outcome to
 /// store: "done by" the planned player is "as planned".
 pub fn check_outcome(
-    past: bool,
+    started: bool,
     assignment: Option<&Assignment>,
     new: Outcome,
     at_game: &[Assignment],
     plays_on_date: bool,
 ) -> Result<Outcome, DutyError> {
-    if !past {
-        return Err(DutyError::NotPast);
+    if !started {
+        return Err(DutyError::NotStarted);
     }
     let Some(assignment) = assignment else {
         return Err(DutyError::NoPlayerOnPlace);
@@ -678,8 +678,10 @@ pub struct GameDuties<'a> {
     pub game: &'a Game,
     pub places: &'a GamePlaces,
     pub assignments: &'a [Assignment],
-    /// The game is before today (Dutch date).
+    /// The game is before today (Dutch date): it counts what is stored.
     pub past: bool,
+    /// The game has started (`started`): a filled place counts as done, not planned.
+    pub started: bool,
 }
 
 /// Whether the place of `assignment` counts. A coming game: its part counts and it is a place of
@@ -707,7 +709,7 @@ fn drove(duties: &GameDuties<'_>, assignment: &Assignment) -> bool {
             .is_some_and(|part| part.drove)
 }
 
-/// The duties of one kind of a player: done before today, planned from today.
+/// The duties of one kind of a player: done from the start of the game (`started`), planned before.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Total {
     pub done: u32,
@@ -749,7 +751,7 @@ pub fn duty_totals(games: &[GameDuties<'_>]) -> BTreeMap<PlayerId, KindTotals> {
             if !place_counts(duties, assignment) && !drove(duties, assignment) {
                 continue;
             }
-            let (player, done) = match who_did(assignment, duties.past) {
+            let (player, done) = match who_did(assignment, duties.started) {
                 Counted::Done(player) => (player, true),
                 Counted::Planned(player) => (player, false),
                 Counted::Nobody => continue,
@@ -990,15 +992,15 @@ fn team_places(places: &GamePlaces) -> impl Iterator<Item = &DutyPlace> {
 
 /// For each place of the team of a game: can `player` be chosen there, and if not, why. The same
 /// checks as the saves (`check_assignment`, `check_outcome`), so the choice never offers a player
-/// that a save refuses. `clash`: the closest clash of the player (`worst_clash`); `past`: the game
-/// is before today.
+/// that a save refuses. `clash`: the closest clash of the player (`worst_clash`); `started`: the
+/// game has started.
 pub fn offers(
     places: &GamePlaces,
     at_game: &[Assignment],
     player: PlayerId,
     plays_on_date: bool,
     clash: Option<ClashLevel>,
-    past: bool,
+    started: bool,
 ) -> Vec<Offer> {
     team_places(places)
         .map(|place| {
@@ -1019,12 +1021,12 @@ pub fn offers(
                         plays_on_date,
                         clash,
                     },
-                    past,
+                    started,
                 )
                 .err()
                 .and_then(NotOffered::of)
             };
-            let correct = on.filter(|_| past).and_then(|on| {
+            let correct = on.filter(|_| started).and_then(|on| {
                 let already = match on.outcome {
                     Outcome::AsPlanned => on.planned == player,
                     Outcome::DoneBy(by) => by == player,
@@ -1034,7 +1036,7 @@ pub fn offers(
                     return Some(NotOffered::OnThisPlace);
                 }
                 check_outcome(
-                    past,
+                    started,
                     Some(on),
                     Outcome::DoneBy(player),
                     at_game,
@@ -1685,7 +1687,7 @@ mod tests {
     }
 
     #[test]
-    fn a_place_counts_as_done_after_the_game_and_as_planned_before() {
+    fn a_place_counts_as_done_once_the_game_has_started_and_as_planned_before() {
         let anna = planned(DutyKind::Table, 1, ANNA);
         assert_eq!(who_did(&anna, false), Counted::Planned(ANNA));
         assert_eq!(who_did(&anna, true), Counted::Done(ANNA));
@@ -2027,12 +2029,12 @@ mod tests {
     }
 
     #[test]
-    fn a_correction_is_only_for_a_past_game_with_a_player_on_the_place() {
+    fn a_correction_is_only_for_a_started_game_with_a_player_on_the_place() {
         let anna = planned(DutyKind::Table, 1, ANNA);
         let at_game = [anna, planned(DutyKind::Table, 2, CAS)];
         assert_eq!(
             check_outcome(false, Some(&anna), Outcome::NotDone, &at_game, true),
-            Err(DutyError::NotPast)
+            Err(DutyError::NotStarted)
         );
         assert_eq!(
             check_outcome(true, None, Outcome::NotDone, &at_game, true),
@@ -2155,6 +2157,7 @@ mod tests {
             places: &places,
             assignments: &assignments,
             past,
+            started: past,
         }];
         let found = clashes(ANNA, &this, &season, &[&plays, &this]);
         assert_eq!(
@@ -2206,12 +2209,14 @@ mod tests {
                 places: &past_places,
                 assignments: &past_list,
                 past: true,
+                started: true,
             },
             GameDuties {
                 game: &two,
                 places: &coming_places,
                 assignments: &coming_list,
                 past: false,
+                started: false,
             },
         ];
         let totals = duty_totals(&games);
@@ -2248,6 +2253,7 @@ mod tests {
             places: &places,
             assignments: &list,
             past: true,
+            started: true,
         }];
         assert!(duty_totals(&games).is_empty());
 
@@ -2270,6 +2276,7 @@ mod tests {
                 places: &places,
                 assignments: &anna,
                 past: false,
+                started: false,
             }];
             assert!(duty_totals(&games).is_empty());
         }
@@ -2301,6 +2308,7 @@ mod tests {
                 places: &places,
                 assignments: &anna,
                 past: true,
+                started: true,
             }];
             assert_eq!(
                 duty_totals(&games)[&ANNA].table,
@@ -2327,6 +2335,7 @@ mod tests {
             places: &places,
             assignments: &drive,
             past: true,
+            started: true,
         }];
         assert_eq!(duty_totals(&games)[&BRAM].drive.done, 1);
     }
@@ -2621,6 +2630,7 @@ mod tests {
                 places: &places,
                 assignments: &list,
                 past: true,
+                started: true,
             }])
         };
         assert!(totals(false, not_played(true, true)).is_empty());
@@ -2677,6 +2687,7 @@ mod tests {
             places: &places,
             assignments: &list,
             past: false,
+            started: false,
         }];
         // The team plays the not played game 3: `team_games` leaves it out.
         let mut team_game = plays.clone();
@@ -2717,10 +2728,45 @@ mod tests {
             places: &played,
             assignments: &list,
             past: false,
+            started: false,
         }];
         assert_eq!(
             worst_clash(&clashes(ANNA, &this, &season, &[&team_game, &this])),
             Some(ClashLevel::Blocked)
+        );
+    }
+
+    #[test]
+    fn on_the_game_day_a_place_counts_as_done_from_the_start_time() {
+        // Not past (today), started: done; not started: planned (story C).
+        let (places, list, _) = table_one(&[planned(DutyKind::Table, 1, ANNA)], false);
+        let one = game(1, CLUB_TEAM, OPPONENT);
+        let total = |started: bool| {
+            duty_totals(&[GameDuties {
+                game: &one,
+                places: &places,
+                assignments: &list,
+                past: false,
+                started,
+            }])
+            .get(&ANNA)
+            .copied()
+            .unwrap_or_default()
+            .of(DutyKind::Table)
+        };
+        assert_eq!(
+            total(false),
+            Total {
+                done: 0,
+                planned: 1
+            }
+        );
+        assert_eq!(
+            total(true),
+            Total {
+                done: 1,
+                planned: 0
+            }
         );
     }
 }

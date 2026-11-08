@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE game_attendance SET answers_for = $4\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3\n           AND NOT EXISTS (SELECT 1 FROM game_answers a\n                           WHERE a.club_number = $1 AND a.season_year = $2 AND a.source_id = $3\n                             AND NOT a.settled)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "802d1be2393c3d50f01c242f97803b72ad564b7ebbe3ec2c76378f66a255b254"
+}

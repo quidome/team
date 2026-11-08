@@ -148,6 +148,10 @@ pub fn app(state: AppState) -> Router {
             "/games/{season}/{id}/drivers-drove",
             put(games::set_drivers_drove).delete(games::unset_drivers_drove),
         )
+        .route(
+            "/games/{season}/{id}/checked",
+            put(games::set_checked).delete(games::unset_checked),
+        )
         .route("/start", get(start::get))
         .route("/messages/week", get(messages::week))
         .route("/messages/committee", get(messages::committee))

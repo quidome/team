@@ -249,13 +249,14 @@ test('a driver who is not coming shows it at the place and in the choice', async
 		place.getByTestId('choice-player').filter({ hasText: name }).getByTestId('choice-not-coming')
 	).toHaveText('Not coming');
 
-	// After the date: "· absent", but only for the planned driver; after "Nobody" no note.
-	const asPast = async (outcome: string) => {
+	// From the start: "· absent", but only for the planned driver; after "Nobody" no note.
+	const asPast = async (outcome: string, checked = false) => {
 		await page.unroute(`**${api}`);
 		await page.route(`**${api}`, async (route) => {
 			const response = await route.fetch();
 			const game = await response.json();
-			game.past = true;
+			game.started = true;
+			game.attendance.checked = checked;
 			const drive = game.game.places.drivers.places[0];
 			drive.player.outcome = outcome;
 			await route.fulfill({ response, json: game });
@@ -263,6 +264,10 @@ test('a driver who is not coming shows it at the place and in the choice', async
 		await page.goto(path);
 	};
 	await asPast('as_planned');
+	await expect(place.getByTestId('place-player')).toHaveText(`${name} · absent`);
+	// On a checked game the list is closed: the note comes from the stored answers.
+	await asPast('as_planned', true);
+	await expect(page.getByTestId('closed-list')).toBeVisible();
 	await expect(place.getByTestId('place-player')).toHaveText(`${name} · absent`);
 	await asPast('not_done');
 	await expect(place.getByTestId('place-player')).toHaveText(`not done (was ${name})`);

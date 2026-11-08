@@ -11,7 +11,10 @@
 	"· not coming" at the place ("· absent" after the date) and "Not coming" in the choice of a
 	driver (story B). "Not played" as the last button; a not played game shows "Not played" with
 	"Undo" at the top, the list of who comes closed behind a tap, and from the start time, with
-	driver places, the switch "The drivers drove" (story E).
+	driver places, the switch "The drivers drove" (story E). From the start time a game of the team
+	has "Checked" (story C): the message "2 players with no answer are absent.", then "Checked" with
+	"Undo check" at the top; a checked game, and a game from before the release, show only the count,
+	and "Show the list" opens the list.
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -22,12 +25,14 @@
 		clearAssignment,
 		loadGame,
 		setAssignment,
+		setChecked,
 		setDrivers,
 		setDriversDrove,
 		setNotPlayed,
 		setOutcome,
 		setPlace,
 		setScheduleEntered,
+		unsetChecked,
 		type AnswerView,
 		type DutyKind,
 		type GamePage,
@@ -36,6 +41,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import GameAttendance from '#lib/components/GameAttendance.svelte';
+	import { countText, settledText } from '#lib/attendance.js';
 	import {
 		clashText,
 		doerOf,
@@ -68,8 +74,10 @@
 	/** The place of the team whose choice is open; `correcting`: "Someone else". */
 	let chosen = $state<{ kind: DutyKind; number: number; correcting: boolean } | null>(null);
 
-	/** The list of who comes is open on a not played game ("Show who comes"). */
+	/** The list of who comes is open on a not played, checked or older game ("Show the list"). */
 	let listShown = $state(false);
+	/** After "Checked": how many players with no answer became absent. */
+	let settled = $state<string | null>(null);
 
 	let busy = $state(false);
 	let error = $state<string | null>(null);
@@ -108,8 +116,20 @@
 		}
 	}
 
-	/** The answer shown of each player on the list (`GameAttendance`). */
-	let answers = $state<Record<number, AnswerView | null>>({});
+	/** The answers shown by the open list (`GameAttendance`), with the page they belong to: its
+	 * taps save without a new page. */
+	let shown = $state.raw<{
+		page: GamePage;
+		answers: Record<number, AnswerView | null>;
+	} | null>(null);
+	/** The answer of each player: from the open list, else as stored, so a closed list (checked,
+	 * not played, before the release) still gives the notes at the driver places. */
+	const answers = $derived.by((): Record<number, AnswerView | null> => {
+		if (game && shown?.page === game) return shown.answers;
+		const stored: Record<number, AnswerView | null> = {};
+		for (const row of game?.attendance?.rows ?? []) stored[row.player] = row.answer ?? null;
+		return stored;
+	});
 
 	/** A player on a driver place, or in its choice, whose answer is "not coming"; never on a not
 	 * played game, which warns about nothing (story E). */
@@ -225,6 +245,31 @@
 			{/if}
 		{/if}
 
+		{#if page.attendance?.checked}
+			<div
+				class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted p-4"
+				data-testid="checked"
+			>
+				<div class="space-y-1">
+					<p class="font-medium" role="status">Checked ✓</p>
+					{#if settled}
+						<p class="text-sm" data-testid="settled">{settled}</p>
+					{/if}
+				</div>
+				<Button
+					variant="outline"
+					disabled={busy}
+					onclick={() => {
+						settled = null;
+						listShown = false;
+						save(page, (id) => unsetChecked(page.season, id));
+					}}
+				>
+					Undo check
+				</Button>
+			</div>
+		{/if}
+
 		{#each placesWarnings(page.game) as warning (warning)}
 			<p class="text-sm" role="status" data-testid="places-warning">{warning}</p>
 		{/each}
@@ -236,18 +281,26 @@
 			<p class="text-sm" role="alert" data-testid="save-error">{error}</p>
 		{/if}
 
-		{#if page.attendance && page.not_played && !listShown}
-			<Button variant="outline" onclick={() => (listShown = true)} data-testid="show-list">
-				Show who comes
-			</Button>
+		{#if page.attendance && (page.not_played || page.attendance.checked || page.attendance.before_release) && !listShown}
+			<div class="flex flex-wrap items-center gap-3" data-testid="closed-list">
+				{#if countText(page.attendance.count, page.started)}
+					<p class="text-sm font-semibold" data-testid="closed-count">
+						{countText(page.attendance.count, page.started)}
+					</p>
+				{/if}
+				<Button variant="outline" onclick={() => (listShown = true)} data-testid="show-list">
+					Show the list
+				</Button>
+			</div>
 		{:else if page.attendance}
-			{#key page.game.id}
+			{#key `${page.game.id}-${page.attendance.checked}`}
 				<GameAttendance
 					season={page.season}
 					id={String(page.game.id)}
 					date={page.game.date}
+					started={page.started}
 					attendance={page.attendance}
-					onanswers={(shown) => (answers = shown)}
+					onanswers={(list) => (shown = { page, answers: list })}
 				/>
 			{/key}
 		{/if}
@@ -324,7 +377,8 @@
 								<span class="text-sm">{name}</span>
 								<span class="min-w-0 truncate text-sm font-medium" data-testid="place-player">
 									{on
-										? playerText(on) + driverNote(on, notComingDriver(place.kind, on.id), page.past)
+										? playerText(on) +
+											driverNote(on, notComingDriver(place.kind, on.id), page.started)
 										: 'open'}
 								</span>
 							</button>
@@ -339,7 +393,7 @@
 							{#if isChosen(place) && chosen}
 								{@const correcting = chosen.correcting}
 								<div class="space-y-2 rounded-md bg-muted/40 p-2" data-testid="choice">
-									{#if on && page.past && !correcting}
+									{#if on && page.started && !correcting}
 										<div class="flex flex-wrap gap-2">
 											<Button
 												variant="outline"
@@ -360,7 +414,7 @@
 											</Button>
 										</div>
 									{/if}
-									{#if !on || !page.past || correcting}
+									{#if !on || !page.started || correcting}
 										<ul class="space-y-1" aria-label="Choose a player for {name}">
 											{#each page.players as player (player.id)}
 												{@const reason = notOffered(player, place, correcting)}
@@ -451,6 +505,24 @@
 					{/if}
 				</div>
 			</form>
+		{/if}
+
+		{#if page.attendance && page.started && !page.attendance.checked}
+			<div>
+				<Button
+					disabled={busy}
+					onclick={() =>
+						save(page, async (id) => {
+							const answer = await setChecked(page.season, id);
+							settled = settledText(answer.settled);
+							listShown = false;
+							return answer.page;
+						})}
+					data-testid="mark-checked"
+				>
+					Checked
+				</Button>
+			</div>
 		{/if}
 
 		{#if !page.not_played}

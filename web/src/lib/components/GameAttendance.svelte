@@ -5,7 +5,9 @@
 	"not coming" has the link "Reason". The rows keep the order of the first load while the page is
 	open. The taps of one player are sent one after the other; a tap that fails shows the stored
 	state again with "Not saved. Try again." Above the count, "Too few players: 6 of 7" (story B), and
-	for answers from before a move the note with "Answers checked".
+	for answers from before a move the note with "Answers checked". From the start of the game
+	(`started`) the words are "There" and "Absent" (story C); on a checked game a tap on the chosen
+	state does nothing.
 	`onanswers` gives the page the answer shown of each player, for the notes at the driver places.
 -->
 <script lang="ts">
@@ -28,6 +30,7 @@
 		season,
 		id,
 		date,
+		started,
 		attendance,
 		onanswers
 	}: {
@@ -35,6 +38,8 @@
 		id: string;
 		/** The date of the game now. */
 		date: string;
+		/** The game has started: the words "There" and "Absent". */
+		started: boolean;
 		attendance: GameAttendanceView;
 		onanswers?: (answers: Record<number, AnswerView | null>) => void;
 	} = $props();
@@ -50,11 +55,16 @@
 	// The first load: later answers of the server change the states, not the order.
 	const first = untrack(() => attendance);
 	const reasons = first.reasons;
+	const words = untrack(() =>
+		started
+			? { coming: 'There', notComing: 'Absent' }
+			: { coming: 'Coming', notComing: 'Not coming' }
+	);
 	const groups = (
 		[
 			['No answer', null],
-			['Coming', 'coming'],
-			['Not coming', 'not_coming']
+			[words.coming, 'coming'],
+			[words.notComing, 'not_coming']
 		] as const
 	)
 		.map(([title, answer]) => ({
@@ -175,6 +185,8 @@
 	function tapAnswer(player: number, answer: AnswerView) {
 		const row = shown[player];
 		picking = null;
+		// On a checked game a player is "there" or "absent": a tap on the chosen state does nothing.
+		if (first.checked && row.answer === answer) return;
 		save(
 			player,
 			row.answer === answer ? { answer: null, reason: null } : { answer, reason: row.reason }
@@ -231,7 +243,9 @@
 				Too few players: {count.coming} of {first.enough_players}
 			</p>
 		{/if}
-		<p class="min-h-5 text-sm font-semibold" data-testid="attendance-count">{countText(count)}</p>
+		<p class="min-h-5 text-sm font-semibold" data-testid="attendance-count">
+			{countText(count, started)}
+		</p>
 		{#if notSaved}
 			<p class="text-sm" role="alert" data-testid="attendance-not-saved">Not saved. Try again.</p>
 		{/if}
@@ -282,19 +296,19 @@
 									size="lg"
 									variant={row.answer === 'coming' ? 'default' : 'outline'}
 									aria-pressed={row.answer === 'coming'}
-									aria-label="Coming: {player.name}"
+									aria-label="{words.coming}: {player.name}"
 									onclick={() => tapAnswer(player.player, 'coming')}
 								>
-									Coming
+									{words.coming}
 								</Button>
 								<Button
 									size="lg"
 									variant={row.answer === 'not_coming' ? 'default' : 'outline'}
 									aria-pressed={row.answer === 'not_coming'}
-									aria-label="Not coming: {player.name}"
+									aria-label="{words.notComing}: {player.name}"
 									onclick={() => tapAnswer(player.player, 'not_coming')}
 								>
-									Not coming
+									{words.notComing}
 								</Button>
 							</span>
 						</div>

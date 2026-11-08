@@ -16,7 +16,7 @@
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { formatDay } from '#lib/schedule.js';
-	import { fullName, nowThereText, roleLabels } from '#lib/players.js';
+	import { fullName, nowThereLines, roleLabels } from '#lib/players.js';
 	import { untrack } from 'svelte';
 	import type { PageProps } from './$types';
 
@@ -89,7 +89,7 @@
 			});
 			correcting = null;
 			const counted = player.now_there[0];
-			notice = counted ? nowThereText(counted.trainings) : null;
+			notice = counted ? nowThereLines(counted).join(' ') : null;
 		} catch (failure) {
 			error = message(failure);
 		} finally {

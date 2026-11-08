@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT player_id, answer, reason_id FROM game_answers\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "query": "SELECT player_id, answer, reason_id, settled FROM game_answers\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "reason_id",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "settled",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -29,8 +34,9 @@
     "nullable": [
       false,
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "1ffa2b249f945f774d35219dc1cd5f3017aeb7753e6630c6c67db8ab9d84f9fa"
+  "hash": "a3db24c952ddf1d93abbfd6e8d835a59e791bace4a0bbb49c774424dc6c3482d"
 }

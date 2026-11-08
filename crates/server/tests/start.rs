@@ -267,6 +267,12 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
     reader.read_good().await;
     at(&mut reader, 2027, 7, 1, 10).await;
     add_tuesdays(&reader, "2027-09-07", "2028-05-30").await;
+    // The games of the season before that are not checked are an open item in July: this test is
+    // about the new season, so the open item starts on the day of the clock.
+    sqlx::query("UPDATE game_check_start SET from_date = '2027-07-01'")
+        .execute(reader.pool())
+        .await
+        .unwrap();
     // A stored game of M16 1 in the new season, in the window: without a chosen team it must not
     // show.
     sqlx::query(

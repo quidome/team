@@ -9,9 +9,9 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    DutyKind, ENOUGH_PLAYERS, Event, EventKind, Game, GameWarnings, OpenItem, PlayerId,
-    ReadingState, ScheduleReason, Season, last_games, last_training, next_events,
-    open_item_seasons, open_items, open_places_games, schedule_not_entered,
+    DutyKind, ENOUGH_PLAYERS, Event, EventKind, Game, GameWarnings, NotCheckedGame, OpenItem,
+    PlayerId, ReadingState, ScheduleReason, Season, games_not_checked, last_games, last_training,
+    next_events, open_item_seasons, open_items, open_places_games, schedule_not_entered,
 };
 use utoipa::ToSchema;
 
@@ -24,7 +24,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{reading, readings};
+use crate::{game_attendance, reading, readings};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct StartAnswer {
@@ -81,6 +81,32 @@ pub enum OpenItemView {
     NotOpened { first: String, count: usize },
     /// Trainings before today that are neither cancelled nor checked; `first` is the oldest.
     NotChecked { first: String, count: usize },
+    /// Games of the team before today, from the day of the release, that are not checked;
+    /// `first` is the oldest, for its page.
+    GamesNotChecked {
+        first: NotCheckedGameView,
+        count: usize,
+    },
+}
+
+/// The oldest game of the open item "games not checked".
+#[derive(Debug, Serialize, ToSchema)]
+pub struct NotCheckedGameView {
+    /// The season of the game, for example "2026-2027".
+    pub season: String,
+    /// The source's game id.
+    pub id: i64,
+    pub date: String,
+}
+
+impl From<NotCheckedGame> for NotCheckedGameView {
+    fn from(game: NotCheckedGame) -> Self {
+        Self {
+            season: game.season.to_string(),
+            id: game.id,
+            date: day(game.date),
+        }
+    }
 }
 
 /// A game of an open item: enough to show it in the list below the item and to open its page.
@@ -210,6 +236,10 @@ impl OpenItemView {
                 first: day(first),
                 count,
             },
+            OpenItem::GamesNotChecked { first, count } => Self::GamesNotChecked {
+                first: first.into(),
+                count,
+            },
         }
     }
 }
@@ -276,6 +306,26 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             )
         })
         .collect();
+    // The past games of the team that are not checked, in the seasons of the open items, from
+    // the day of the release.
+    let from_date = game_attendance::check_start(&state.pool).await?;
+    let mut not_checked = games_not_checked(
+        current,
+        &games.schedule.past,
+        &games.duties.attendance.games,
+        from_date,
+        today,
+    );
+    for &season in seasons.iter().skip(1) {
+        let earlier = games_of(&state, season, current, today).await?;
+        not_checked.extend(games_not_checked(
+            season,
+            &earlier.schedule.past,
+            &earlier.duties.attendance.games,
+            from_date,
+            today,
+        ));
+    }
     let items = open_items(
         &reading,
         games.unseen_changes,
@@ -283,6 +333,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         open_places_games(&events, &places, today),
         &lists,
         &warnings,
+        &not_checked,
     );
     let last = last_training(&lists)
         .map(|row| {
@@ -302,7 +353,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .transpose()?;
     let next = next_events(&events, &places, today)
         .into_iter()
-        .map(|event| coming_view(event, &places, &games.duties, true))
+        .map(|event| coming_view(event, &places, &games.duties, true, now))
         .collect::<Result<_, _>>()?;
 
     // The last games with places: the current season; in July and August, when it has none

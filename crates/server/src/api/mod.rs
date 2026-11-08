@@ -52,6 +52,8 @@ use utoipa::OpenApi;
         games::unset_not_played,
         games::set_drivers_drove,
         games::unset_drivers_drove,
+        games::set_checked,
+        games::unset_checked,
         start::get,
         messages::week,
         messages::committee,

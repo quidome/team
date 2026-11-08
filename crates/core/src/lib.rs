@@ -23,10 +23,11 @@ pub use contribution::duties::{
     required_duties, team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
-    Answer, AnswerError, ENOUGH_PLAYERS, GameAttendance, GameCount, GameWarnings, ListRow,
-    MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_moved, before_start, check_answer,
-    drivers_not_coming, extra_players, game_count, game_list, game_warnings, in_warning_period,
-    move_note, row_count,
+    Answer, AnswerError, CheckError, ENOUGH_PLAYERS, GameAttendance, GameCount, GameWarnings,
+    ListRow, MAX_EXTRA_PLAYERS, StoredAnswer, WARNING_DAYS, answers_in_effect, answers_moved,
+    before_start, check_answer, check_game_checking, checked, drivers_not_coming, extra_players,
+    game_count, game_list, game_warnings, in_warning_period, move_note, now_no_answer, row_count,
+    to_settle,
 };
 pub use contribution::reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use events::club::{Club, ClubNumber, search_clubs};
@@ -57,8 +58,9 @@ pub use output::messages::{
 };
 pub use output::season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use output::start_page::{
-    OpenGame, OpenItem, PlacesOf, ReadingState, last_games, last_training, next_events,
-    open_item_seasons, open_items, open_places_games, schedule_not_entered,
+    NotCheckedGame, OpenGame, OpenItem, PlacesOf, ReadingState, games_not_checked, last_games,
+    last_training, next_events, open_item_seasons, open_items, open_places_games,
+    schedule_not_entered,
 };
 pub use shared::access::{Identity, may_access};
 pub use shared::season::{Season, SeasonError};

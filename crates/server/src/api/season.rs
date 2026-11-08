@@ -13,10 +13,10 @@ use team_core::{
     FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
     GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
     ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, SeasonRow, StoredDuties,
-    StoredGame, Team, TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining, display_names,
-    game_list, game_places, game_warnings, kept_games, not_entered, open_places,
-    players_playing_on, plays_games_on, required_duties, row_count, schedule, season_events,
-    season_list, started, team_games, training_state,
+    StoredGame, Team, TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining,
+    answers_in_effect, checked, display_names, game_list, game_places, game_warnings, kept_games,
+    not_entered, open_places, players_playing_on, plays_games_on, required_duties, row_count,
+    schedule, season_events, season_list, started, team_games, training_state,
 };
 use utoipa::ToSchema;
 
@@ -53,6 +53,11 @@ pub struct ScheduleGame {
     pub in_list: bool,
     /// "Not played" on its date now (`team_core::not_played`): shown as "· Not played".
     pub not_played: bool,
+    /// "Checked" on its date now (`team_core::checked`): shown as "· Checked".
+    pub checked: bool,
+    /// Set only on a coming game with a count: it has started (`team_core::started`), so the count
+    /// says "there" and "absent".
+    pub started: bool,
     /// The duties of the game, when it has any (`team_core::game_places`).
     pub places: Option<PlacesView>,
     /// The count of a coming game of the team on the start page, and on "Season" with at least
@@ -329,7 +334,9 @@ impl SeasonDuties {
             .get(&source_id)
             .copied()
             .unwrap_or_default();
-        let list = game_list(&self.players, &self.roles, answers, scheduled.game.date);
+        // A settled answer counts only while the check holds (story C).
+        let answers = answers_in_effect(answers, &stored, scheduled.game.date);
+        let list = game_list(&self.players, &self.roles, &answers, scheduled.game.date);
         (list, stored, !answers.is_empty())
     }
 
@@ -406,7 +413,8 @@ pub(crate) struct SeasonPlaces<'a> {
     places: Vec<(&'a Game, GamePlaces)>,
     /// The games of the team that can block a player (`team_core::team_games`).
     pub team_games: Vec<&'a Game>,
-    today: NaiveDate,
+    /// Dutch local time of the page or the write.
+    now: NaiveDateTime,
 }
 
 impl<'a> SeasonPlaces<'a> {
@@ -434,7 +442,7 @@ impl<'a> SeasonPlaces<'a> {
         Self {
             places,
             team_games: team_games(stored, team),
-            today: now.date(),
+            now,
         }
     }
 
@@ -446,7 +454,8 @@ impl<'a> SeasonPlaces<'a> {
                 game,
                 places,
                 assignments: duties.assignments_of(game.source_id),
-                past: game.date < self.today,
+                past: game.date < self.now.date(),
+                started: started(game, self.now),
             })
             .collect()
     }
@@ -519,6 +528,8 @@ impl From<ScheduledGame> for ScheduleGame {
             reason: scheduled.reason.into(),
             in_list: scheduled.in_list,
             not_played: scheduled.not_played,
+            checked: false,
+            started: false,
             places: None,
             attendance: None,
         }
@@ -585,22 +596,30 @@ pub(crate) fn event_view_with(
         game.places = places
             .get(&scheduled.game.source_id)
             .map(|places| duties.view(&scheduled.game, places));
+        game.checked = duties
+            .attendance
+            .games
+            .get(&scheduled.game.source_id)
+            .is_some_and(|stored| checked(stored, scheduled.game.date));
     }
     Ok(view)
 }
 
 /// A coming event with the duties of its game and, for a game of the team, its count;
-/// `without_answers`: also for a game with no answer and no extra player.
+/// `without_answers`: also for a game with no answer and no extra player; `now`: Dutch local time,
+/// for the words of the count.
 pub(crate) fn coming_view(
     event: &Event,
     places: &PlacesOf,
     duties: &SeasonDuties,
     without_answers: bool,
+    now: NaiveDateTime,
 ) -> Result<EventView, StoreError> {
     let mut view = event_view_with(event, places, duties)?;
     if let (Some(game), EventKind::Game(scheduled)) = (view.game.as_mut(), event.kind) {
         if scheduled.reason == ScheduleReason::TeamGame {
             game.attendance = duties.row_count(scheduled, without_answers).map(Into::into);
+            game.started = started(&scheduled.game, now);
         }
     }
     Ok(view)
@@ -671,7 +690,7 @@ pub async fn get(
         coming: events
             .coming
             .iter()
-            .map(|event| coming_view(event, &places, &duties, false))
+            .map(|event| coming_view(event, &places, &duties, false, now))
             .collect::<Result<_, _>>()?,
         past: events
             .past

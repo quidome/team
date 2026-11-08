@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT extra_players, answers_for FROM game_attendance\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "query": "SELECT extra_players, answers_for, checked_for FROM game_attendance\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
   "describe": {
     "columns": [
       {
@@ -11,6 +11,11 @@
       {
         "ordinal": 1,
         "name": "answers_for",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "checked_for",
         "type_info": "Date"
       }
     ],
@@ -23,8 +28,9 @@
     },
     "nullable": [
       false,
+      true,
       true
     ]
   },
-  "hash": "26ab4db1c459602b122f9d126dc0b3bbfe09cafef5ff5888e03fe837f4feaf02"
+  "hash": "8cb250f311131c772ce7c24f8552aab65fcedc255f4a5bfef7da9ae4013b1955"
 }

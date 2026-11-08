@@ -10,11 +10,12 @@ use serde_json::json;
 use sqlx::PgExecutor;
 use team_core::{
     PlayerError, PlayerId, PlayerRole, Role, RoleId, Season, check_change, check_role, clean_name,
-    now_there, role_on, same_name,
+    now_no_answer, now_there, role_on, same_name,
 };
 use utoipa::ToSchema;
 
 use super::format::day;
+use super::season::games_of;
 use super::team::{self, TeamPageView};
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
@@ -117,12 +118,16 @@ pub struct PlayerDetail {
     pub has_answers: bool,
 }
 
-/// A player who counts as "there" at trainings after a role started or its start moved earlier.
+/// A player who counts as "there" at trainings, or has "no answer" at checked games, after a role
+/// started or its start moved earlier.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct NowThere {
     pub player: i64,
     /// The dates of those trainings, for example "2026-09-01", in order.
     pub trainings: Vec<String>,
+    /// The dates of the checked games of the team at which the player now has "no answer", in
+    /// order: the player does not count there until tapped.
+    pub games: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -211,8 +216,9 @@ pub(crate) fn role_view(role: &PlayerRole) -> RoleView {
     }
 }
 
-/// The trainings of the current season at which `player` counts as there after its roles changed
-/// from `before` to `after`; `None` when there are none.
+/// The trainings of the current season at which `player` counts as there, and its checked games
+/// at which the player has "no answer", after its roles changed from `before` to `after`; `None`
+/// when there are none.
 pub(crate) async fn now_there_of(
     state: &AppState,
     player: PlayerId,
@@ -224,10 +230,31 @@ pub(crate) async fn now_there_of(
     let ids: Vec<_> = stored.iter().map(|training| training.id).collect();
     let absences = trainings::absences_at(&state.pool, &ids).await?;
     let found = now_there(player, before, after, &stored, &absences);
-    Ok((!found.is_empty()).then(|| NowThere {
-        player: player.0,
-        trainings: found.iter().map(|training| day(training.date)).collect(),
-    }))
+    let today = today_in_netherlands(state.clock.as_ref());
+    let games = games_of(state, season, season, today).await?;
+    let attendance = &games.duties.attendance;
+    let all: Vec<_> = games
+        .schedule
+        .past
+        .iter()
+        .chain(&games.schedule.coming)
+        .cloned()
+        .collect();
+    let no_answer = now_no_answer(
+        player,
+        before,
+        after,
+        &all,
+        &attendance.games,
+        &attendance.answers,
+    );
+    Ok(
+        (!found.is_empty() || !no_answer.is_empty()).then(|| NowThere {
+            player: player.0,
+            trainings: found.iter().map(|training| day(training.date)).collect(),
+            games: no_answer.into_iter().map(day).collect(),
+        }),
+    )
 }
 
 /// The roles of `player` in the current season and the season before.

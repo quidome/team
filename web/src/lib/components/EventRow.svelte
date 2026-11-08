@@ -1,7 +1,8 @@
 <!--
 	One event of "Season" and the start page: a game (as in the schedule: start time, teams, hall
 	and town, the badge "Team", crossed out when no longer in the game list; its duty places and
-	what changed for them; the count of who comes, or "· Not played" instead; a tap opens it when
+	what changed for them; the count of who comes, or "· Not played" instead; "· Checked"; a tap
+	opens it when
 	`gameSeason` is given) or a training (start time,
 	status, "· Checked", "extra"; a tap opens it). "Cancel" shows on a training day that is not
 	opened only when `onCancel` is given.
@@ -81,10 +82,15 @@
 							>· Not played</span
 						>
 					{/if}
+					{#if game.checked}
+						<span class="shrink-0 font-medium text-foreground" data-testid="game-checked"
+							>· Checked</span
+						>
+					{/if}
 				</p>
-				{#if !game.not_played && game.attendance && countText(game.attendance)}
+				{#if !game.not_played && game.attendance && countText(game.attendance, game.started)}
 					<p class="mt-1 text-xs font-medium" data-testid="game-count">
-						{countText(game.attendance)}
+						{countText(game.attendance, game.started)}
 					</p>
 				{/if}
 				{#if game.places}

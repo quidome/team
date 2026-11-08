@@ -649,7 +649,103 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team`"
+            "description": "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_started`, `no_player_on_place`, `player_at_game`, `not_in_team`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      }
+    },
+    "/api/games/{season}/{id}/checked": {
+      "put": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "setChecked",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checked: each \"no answer\" is absent; how many, and the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckedAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early`"
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "No such game of the club chosen for that season"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "games"
+        ],
+        "operationId": "unsetChecked",
+        "parameters": [
+          {
+            "name": "season",
+            "in": "path",
+            "description": "The season, for example 2026-2027",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The source's game id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "\"Undo check\": the settled players have no answer again; the game page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GamePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`"
           },
           "401": {
             "description": "Not logged in"
@@ -3213,6 +3309,24 @@
           }
         }
       },
+      "CheckedAnswer": {
+        "type": "object",
+        "description": "The answer of \"Checked\": how many players with no answer became absent, and the page.",
+        "required": [
+          "settled",
+          "page"
+        ],
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/GamePage"
+          },
+          "settled": {
+            "type": "integer",
+            "description": "The players with \"no answer\" that \"Checked\" made absent (\"2 players with no answer are\nabsent.\"); 0 when the game was already checked.",
+            "minimum": 0
+          }
+        }
+      },
       "ChoiceView": {
         "type": "object",
         "description": "A player in the choice of a place.",
@@ -3656,12 +3770,22 @@
           "max_extra_players",
           "too_few",
           "enough_players",
-          "answers_moved"
+          "answers_moved",
+          "checked",
+          "before_release"
         ],
         "properties": {
           "answers_moved": {
             "type": "boolean",
             "description": "\"Answers from before the move\": the answers were given for another date than the date of\nthe game now; until \"Answers checked\" (`team_core::answers_moved`)."
+          },
+          "before_release": {
+            "type": "boolean",
+            "description": "The game is before the release of \"Checked\" (`game_check_start`): the list is closed behind\na tap, and the game is never an open item."
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "\"Checked\" on the date of the game now (`team_core::checked`): the page shows \"Checked\" with\n\"Undo check\", and the list closed behind a tap."
           },
           "count": {
             "$ref": "#/components/schemas/CountView"
@@ -3747,7 +3871,6 @@
           "team",
           "game",
           "club_teams",
-          "past",
           "players",
           "not_played",
           "drivers_drove",
@@ -3786,10 +3909,6 @@
           "not_played": {
             "type": "boolean",
             "description": "\"Not played\" on its date now: its duties and attendance do not count."
-          },
-          "past": {
-            "type": "boolean",
-            "description": "The game is before today: its places can be corrected (\"Someone else\", \"Nobody\")."
           },
           "players": {
             "type": "array",
@@ -4238,6 +4357,29 @@
           }
         }
       },
+      "NotCheckedGameView": {
+        "type": "object",
+        "description": "The oldest game of the open item \"games not checked\".",
+        "required": [
+          "season",
+          "id",
+          "date"
+        ],
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The source's game id."
+          },
+          "season": {
+            "type": "string",
+            "description": "The season of the game, for example \"2026-2027\"."
+          }
+        }
+      },
       "NotOfferedView": {
         "type": "string",
         "description": "Why a player cannot be chosen for a place.",
@@ -4250,12 +4392,20 @@
       },
       "NowThere": {
         "type": "object",
-        "description": "A player who counts as \"there\" at trainings after a role started or its start moved earlier.",
+        "description": "A player who counts as \"there\" at trainings, or has \"no answer\" at checked games, after a role\nstarted or its start moved earlier.",
         "required": [
           "player",
-          "trainings"
+          "trainings",
+          "games"
         ],
         "properties": {
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dates of the checked games of the team at which the player now has \"no answer\", in\norder: the player does not count there until tapped."
+          },
           "player": {
             "type": "integer",
             "format": "int64"
@@ -4295,7 +4445,7 @@
               },
               {
                 "$ref": "#/components/schemas/NotOfferedView",
-                "description": "As \"Someone else\" on a past place with a player; `null`: can be chosen (or no correction\nis possible there)."
+                "description": "As \"Someone else\" on a place with a player of a game that has started; `null`: can be chosen (or no correction\nis possible there)."
               }
             ]
           },
@@ -4550,6 +4700,30 @@
                 "type": "string",
                 "enum": [
                   "not_checked"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Games of the team before today, from the day of the release, that are not checked;\n`first` is the oldest, for its page.",
+            "required": [
+              "first",
+              "count",
+              "kind"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "first": {
+                "$ref": "#/components/schemas/NotCheckedGameView"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "games_not_checked"
                 ]
               }
             }
@@ -5234,7 +5408,9 @@
           "town",
           "reason",
           "in_list",
-          "not_played"
+          "not_played",
+          "checked",
+          "started"
         ],
         "properties": {
           "attendance": {
@@ -5250,6 +5426,10 @@
           },
           "away": {
             "type": "string"
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "\"Checked\" on its date now (`team_core::checked`): shown as \"· Checked\"."
           },
           "date": {
             "type": "string",
@@ -5295,6 +5475,10 @@
               "null"
             ],
             "description": "Dutch local start time, for example \"13:00\"; `null` when it is not known yet."
+          },
+          "started": {
+            "type": "boolean",
+            "description": "Set only on a coming game with a count: it has started (`team_core::started`), so the count\nsays \"there\" and \"absent\"."
           },
           "town": {
             "type": "string"

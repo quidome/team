@@ -1,6 +1,6 @@
 # Technical spec: After the game
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: [2026-11-08-after-the-game](./)
 **Date**: 2026-11-08
@@ -233,12 +233,12 @@ changed; "in the past" changes only how events are shown; "not played" changes o
 - One more read (`check_start`) on the start page.
 
 ## Progress
-- [ ] Step 1: duties from the start time
-- [ ] Step 2: "Checked" is stored
-- [ ] Step 3: the page
-- [ ] Step 4: the open item and the rows
-- [ ] Step 5: the note on the players page
-- [ ] All checks pass
+- [x] Step 1: duties from the start time
+- [x] Step 2: "Checked" is stored
+- [x] Step 3: the page
+- [x] Step 4: the open item and the rows
+- [x] Step 5: the note on the players page
+- [x] All checks pass
 
 ## Deviations
 - **D1** (from the epic `technical.md`): "Checked" and "Undo check" use their own lock on the row of
@@ -254,6 +254,32 @@ changed; "in the past" changes only how events are shown; "not played" changes o
   `game_check_start`, filled by the migration.
 - Stricter readings: a second "Checked" on a checked game changes nothing; a reason added through
   "Reason" after the check counts as a tap (S34a).
+- Implement, step 1: the choice of a player (`offers`) and the save of a planned player
+  (`check_assignment`) also use "started": from the start a clash does not block a place, because
+  it then records what happened, as "Someone else" does (one rule with the correction). The browser
+  tests set the release day in `web/e2e/global-setup.ts` after the migrations, to 12 October 2026
+  (the test clock), so the existing open items of the start page stay; the open item is tested in
+  the server (added in step 2, when the table exists).
+- Implement, step 2: the rule is named `check_game_checking`, because `check_checking` is the rule
+  of trainings. The race test lets the other screen take the row lock first and store its check
+  only after the request started; a first version, where the other screen had already changed the
+  row, also passed without `FOR UPDATE` (the insert at the start of the lock waits for such a
+  change by itself), so it proved nothing. The server tests are in `tests/checked.rs` and
+  `tests/checked_logs.rs`.
+- Implement, step 3: the closed list (checked, before the release, or not played) shows the count
+  with "Show who comes". The browser test of a driver who is not coming
+  (`web/e2e/game-attendance.e2e.ts`) mocked the removed field `past`; it now sets `started`. Step 1
+  did not catch it, because `npx playwright test duties` runs only the files named "duties". The
+  browser tests are in `web/e2e/checked.e2e.ts`, project `checked`, after `not-played`.
+- Implement, step 4: `games_not_checked` also takes the season, so the open item can open the
+  page of its oldest game (`NotCheckedGame`: season, id, date). The test of a new season without a
+  team (`tests/start.rs`, clock 1 July 2027) now sets the release day to its clock: in July the
+  open item also covers the season before, whose games are not checked.
+- Implement, step 5: `now_no_answer` takes the games of the schedule with what is stored for them
+  (`checks`, `answers`), and leaves out games of other club teams. The note of a player now also
+  comes when only games are named; the texts follow the note of the trainings: "This player has no
+  answer at 1 checked game: Sat 10 Oct.", with the name when more players are named. The server
+  tests of the training note (`tests/trainings.rs`) now also check `"games": []`.
 
 ### Spec review of the deviations
 Fresh review, 2026-11-08 (`/review spec … deviations`). Read: this file (only the deviations are
@@ -303,3 +329,158 @@ a date).
   - 2026-11-08: Fixed: `check` gives the number of players with "no answer" in effect just before the tap (`to_settle`), not the rows inserted; a test in step 2; the spec says that a check on the new date replaces the old one (coordinator).
 
 ## Review findings
+
+### Acceptance review
+Fresh review, 2026-11-08 (`/review accept`). Read: `change.md`, story C (and the parts of A, B
+and E it touches) of `../2026-10-31-attendance-at-games/functional.md`, the epic `idea.md`, the
+objective and requirements of this file, the diff against `main` (committed and not), and only
+then the **Deviations**. The arguments held no extra text. Run: `cargo test -p team_core` (342
+passed), `cargo test -p team --test checked --test checked_logs --test games --test start --test
+trainings` (all passed). Not run: `web/e2e/checked.e2e.ts` (the e2e ports were in use by another
+run); the browser parts below are checked by a code trace only.
+
+**Verdict: accepted with notes.** Each acceptance criterion of story C is built as meant; the
+differences are small and none works against the coordinator's goal (the record after the game
+with almost no work).
+
+| Criterion of story C | Built | How checked |
+|---|---|---|
+| Words "There" / "Absent", groups and count from the start time | Yes, on the page of the game | trace: `GameAttendance.svelte` (`words`), `attendance.ts` `countText(count, started)`, `+page.svelte` |
+| "Checked" from the start (no start time: from 00:00); also not played and gone games; "· Checked" on "Season" and "Last"; a checked game shows only the count | Yes | run: `checked.rs` (`checked_is_refused_before…`, `a_not_played_game_can_be_checked`, `a_past_game_from_the_release…`); core `checked_is_possible_from_the_start_time`; trace of `find` for a gone game |
+| One tap settles each "no answer", without a reason, and says how many | Yes | run: `checked_settles_each_no_answer…`; trace: `settledText` |
+| "Undo check" brings back only the settled players not tapped since (also a reason counts as a tap) | Yes | run: same test (Bram, Cas, Anna, Dora) |
+| On a checked game: there ↔ absent, a tap on the chosen state does nothing; a later role shows "no answer" and the players page says so | Yes (see A2) | run: `a_role_moved_earlier_names…`; trace: `tapAnswer` |
+| Open item "Game Sat 31 Oct not checked" / "2 games not checked", the oldest opens; from the release, in the seasons of the trainings; not for not played or gone games | Yes | run: `a_past_game_from_the_release…`; core `games_not_checked` tests; trace: `api/start.rs` over `open_item_seasons` |
+| No "Checked" before the start; before the release the list is closed | Yes | run: `a_game_before_the_release…`; trace: `+page.svelte` |
+| A check holds for its date; a move back restores it; a check on the new date replaces it | Yes | run: `a_moved_game_shows_its_settled_players…` |
+| Duty places offer "Someone else" / "Nobody" and count as done from the start | Yes | run: `games.rs` `from_the_start_time_a_place_can_be_corrected…` |
+
+- **A1. The clash no longer blocks a place once the game has started** (Deviations, step 1).
+  **Faithful adaptation.** It is the same rule as "Someone else" from the same moment: from the
+  start the coordinator records what happened, and a clash cannot make that wrong. Checked: trace
+  of `check_assignment` and `offers` with `started`.
+  - 2026-11-08: not fixed: a faithful adaptation, written under Deviations (step 1).
+- **A2. "A tap on the chosen state does nothing" on a checked game holds only in the page.** The
+  server still accepts "no answer" for a player on a checked game (`api/games.rs`, the route that
+  calls `game_attendance::no_answer`, has no check of `checked`), so a second screen opened before
+  the check can bring a player back to "no answer". **Neutral drift**: the spec says "two screens:
+  the last tap wins", the page itself follows the rule, and the coordinator sees the "no answer"
+  in the count. Checked: search `no_answer(` in `crates/server/src/api/games.rs` and a read of
+  `set_answer`.
+  - 2026-11-08: not fixed: "the last tap wins" covers a second screen; the page follows the rule.
+- **A3. On the rows of "Next" and "Season" a game of today keeps the words "coming" and "not
+  coming" after its start time**, also when it is checked: "· Checked" with "9 coming · 1 not
+  coming" in "Next" on the evening of the game (it is in "Next" all day, in "Last" from the next
+  day). The spec names the new words only for the page of the game, and story A names the row
+  words, so this is **neutral drift**; for a coordinator who checks right after the game the row
+  reads oddly until midnight. Checked: trace of `next_events` (`events.coming`, from `today`),
+  `coming_view` and `EventRow.svelte` (`countText(game.attendance)` without `started`).
+  - 2026-11-08: fixed: a coming game of the team has `started` on its row (`coming_view` gets `now`), and the count says "there" and "absent" from the start time; test `the_row_of_a_game_of_today_says_started_from_its_start_time`.
+- **A4. The closed list says "Show who comes"** on a checked game and on a game before the
+  release, where the page says "There" and "Absent". **Neutral drift** in wording; the tap does
+  what the spec asks. Checked: search `Show who comes` in `web/src`.
+  - 2026-11-08: fixed: the button says "Show the list".
+- **A5. A game without a start time starts its words and "Checked" at 00:00 while its warnings run
+  until the end of the date** (S40). **Faithful adaptation**: the coordinator accepted it as rare.
+  Checked: the note under S40.
+  - 2026-11-08: not fixed: S40, accepted by the coordinator as rare.
+- **A6. For Close:** the living documents still give the old moment: `docs/product/duties.md`
+  (lines 30–32: "after the game (a game before today)", "a clash never blocks a place of a past
+  game", "from today it counts as planned"), `docs/product/game-attendance.md` (line 15 "a past
+  game keeps the words coming and not coming", line 31 "after the date") and
+  `docs/product/principles.md` line 11; the header comment of
+  `web/src/routes/game/[season]/[id]/+page.svelte` (line 11, '"· absent" after the date') too.
+  Not a defect of the build; Close must update them. Checked: search `day after|after the date|before today|past game` in `docs/product/`.
+  - 2026-11-08: not fixed here: for Close.
+
+### Build review
+Fresh review, 2026-11-08 (`/review build`). Read: the diff against `main` (committed and not,
+with the new files `migrations/0015_game_checks.sql`, `tests/checked.rs`, `tests/checked_logs.rs`,
+`web/e2e/checked.e2e.ts`), this change folder, `docs/architecture.md`, decisions 0022, 0023, 0028,
+0029, 0030, 0031, `CLAUDE.md`. The arguments held no extra text. Run: `cargo test -p team_core`
+(342 passed), `cargo test -p team --test checked --test checked_logs --test games --test start
+--test trainings --test team` (all passed), `cargo clippy --workspace --all-targets -- -D
+warnings` and `cargo fmt --check` (clean), `just check-web` (passed), `npx playwright test checked
+ game-attendance` (158 passed, with the projects these depend on). The domain map holds:
+`now_no_answer` (contribution) uses events and team, `games_not_checked` (output) uses
+contribution; only `game_attendance.rs` touches the new columns and table (search
+`checked_for|settled|game_check_start` in `crates/server/src`).
+
+- **R1. On a checked game, and on every game before the release, the driver note "· absent" is
+  gone.** The note at a driver place and "Not coming" in the choice of a driver come from
+  `answers` in `+page.svelte`, which only `GameAttendance` fills (`onanswers`). The list is now
+  closed on a checked game and on a game before `game_check_start`, so `GameAttendance` is not
+  mounted and `answers` stays `{}` after a load: a planned driver who did not come shows no
+  "· absent" exactly when the coordinator corrects the drivers after the game (story B), and on
+  all older games until "Show who comes" is tapped. Right after "Checked" the page keeps the
+  answers of before the tap, so a driver settled from "no answer" shows nothing either. The
+  browser test of the note (`game-attendance.e2e.ts`) mocks a coming game with `started`, whose
+  list is open, so it cannot see this. Fix: fill `answers` from `page.attendance.rows` at each
+  load, not only from the mounted list. Checked: trace of `notComingDriver`, `answers` and the
+  `{#if … !listShown}` block in `web/src/routes/game/[season]/[id]/+page.svelte`; search
+  `answers =` there (one hit, `onanswers`).
+  - 2026-11-08: fixed: the page takes the answers from the open list while it shows, else from the stored answers of the page (`answers` in `+page.svelte`); the browser test of the driver note also checks a checked game with its list closed. The answers of the open list are kept with `$state.raw`: a `$state` wraps the page, so it no longer equals the page shown (found by `just check`).
+- **R2. A check of a game with no answers leaves `answers_for` empty for good, so a later move is
+  not noticed** (decision 0029). `check` inserts the settled rows but never sets `answers_for`;
+  `answer` sets it only `NOT EXISTS (SELECT 1 FROM game_answers …)`, which the settled rows now
+  fail. Case: nobody answered before the game; the coordinator taps "Checked", then taps Anna
+  "There"; the game list later moves the game. `answers_moved` needs `answers_for` to be set, so
+  Anna's "there" of the old date counts on the new date with no note "answers from before the
+  move" and no warning. The same happens when the settled rows of an old date stay after a move
+  (they no longer count, but still block the first answer on the new date). Fix: `check` sets
+  `answers_for = COALESCE(answers_for, date)`, or the `NOT EXISTS` of `answer` counts only the
+  answers in effect; a server test of the case. Checked: trace of `game_attendance::check`,
+  `game_attendance::answer` and `team_core::answers_moved`; not run.
+  - 2026-11-08: fixed: the answers that "Checked" made no longer stop the first answer from storing its date (`NOT a.settled` in `game_attendance::answer`); tests `a_game_checked_without_answers_still_notices_a_move` (fails without the fix) and `after_a_move_the_settled_answers_do_not_hold_back_the_first_answer`. The proposed `COALESCE` at "Checked" was left out: with this fix it changed no result.
+- **R3. "Checked" reads the list before it takes the lock.** `set_checked` reads the answers and
+  works out `to_settle` with the pool, then `game_attendance::check` locks the row in its own
+  transaction. Decision 0023 and the architecture ("reads the places and the players under the
+  lock, checks in the core, and writes") read under the lock. Results: "Checked" on one screen
+  while "Undo check" commits on another stores a check whose list was read while the game was
+  still checked: the players "Undo check" brought back are left out, and the game shows
+  "Checked" with players at "no answer" (the spec: "the last check or undo wins"); and `settled`
+  counts a player whose tap at the same moment won the `ON CONFLICT DO NOTHING`. Rare (two
+  screens), but the fix is small: read the answers in `tx` after `lock`. The race test holds the
+  lock before the request reads, so it passes either way for this case. Checked: trace of
+  `set_checked` and `check`; not run.
+  - 2026-11-08: fixed: `game_attendance::check` reads what is stored under the lock and gets the rule of who is settled as a function; test `checked_reads_the_list_after_an_undo_check_on_another_screen` (fails when the read is moved before the lock).
+- **R4. Two test rules of the architecture are not met for the new saves.** "A save of more than
+  one write has a test that makes the second write fail with a trigger … and checks that nothing
+  changed": `check` (insert of the row, `checked_for`, the settled answers) and `uncheck` (delete,
+  update) have none. "A save guarded by … `ON CONFLICT` has a test that holds an insert of the
+  same key in an open transaction": the settled insert (`ON CONFLICT … DO NOTHING`, "a tap at the
+  same moment wins") has none. Checked: search `trigger` and `begin()` in
+  `crates/server/tests/checked.rs` (only the row-lock test).
+  - 2026-11-08: fixed: tests `a_checked_that_fails_halfway_changes_nothing`, `an_undo_check_that_fails_halfway_changes_nothing` (a trigger makes the second write fail) and `a_tap_at_the_same_moment_as_checked_wins` (an insert of the same answer held open).
+- **R5. Claims in this file.** True: the race test of the row lock waits and would not wait without
+  `FOR UPDATE` (reasoned: `INSERT … ON CONFLICT DO NOTHING` does not wait for a lock on a committed
+  row; not checked by removing it); S41 is tested (`a_moved_game_shows…`, `settled: 2` on the new
+  date); the log test asserts that the names are absent. "All checks pass" is not ticked: of
+  `just check`, this review ran the Rust checks, `check-web` and the e2e; `check-sqlx` and `lint-ci` were not run. The new `.sqlx/` files are untracked and five old ones are deleted: they
+  must go into the commit.
+  - 2026-11-08: no change needed; `.sqlx/` goes into the commit, `just check` runs before it.
+- **R6. Siblings.** The week message and the duty overviews still use `who_did(…, past)`
+  (`output/messages.rs`), so on the evening of a game a correction ("Someone else") shows on the
+  page and in the totals but not in the message until the next day; the design chose this ("a game
+  of today stays all day"), so it is a note, not a defect. Every other reader of the answers goes
+  through `answers_in_effect` (search `of_game(|of_season(` in `crates/server/src/api`; the
+  exceptions read only the reason of the player for `check_answer`, and `kept_games`, where a
+  settled row rightly keeps the game).
+  - 2026-11-08: not fixed: the design chose it.
+- **R7. Reads done twice.** `api/start.rs` now calls `games_of` for the season before twice in
+  July and August (line 320 for the open item, line 368 for "Last"), and `now_there_of` calls
+  `games_of` (with the list of changes) for each player of a role save, also in the loop of the
+  team page. Correct, and a few requests a week; reuse the first read when the code is touched.
+  Checked: search `games_of(` in `crates/server/src/api/`.
+  - 2026-11-08: not fixed: correct and rare; reuse the first read when the code is touched.
+- **R8. Comments and docs the diff made false.** Besides A6: the doc comment of `Total` in
+  `crates/core/src/contribution/duties.rs` ("done before today, planned from today"; now from the
+  start time); `docs/product/duties.md` lines 57 and 64 (the page field `past`, the refusal
+  `not_past`; now `started`, `not_started`); `docs/architecture.md` (migrations end at `0014`,
+  the store functions of `game_attendance.rs`, the Playwright project `checked`, the release day
+  set in `global-setup.ts`) at Close. Checked: search `not_past|past\b|after the date|before
+  today` in `docs/` and the diff.
+  - 2026-11-08: fixed in part: the doc comment of `Total`; the docs at Close.
+
+**Overall:** R1 and R2 are bugs against the spec's intent and should be fixed before Close; R3
+and R4 are breaks of the project's patterns, small to fix; the rest is for Close.

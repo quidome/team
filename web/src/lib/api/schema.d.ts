@@ -180,6 +180,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/games/{season}/{id}/checked': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put: operations['setChecked'];
+		post?: never;
+		delete: operations['unsetChecked'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/games/{season}/{id}/drivers': {
 		parameters: {
 			query?: never;
@@ -979,6 +995,15 @@ export interface components {
 			 */
 			season?: string | null;
 		};
+		/** @description The answer of "Checked": how many players with no answer became absent, and the page. */
+		CheckedAnswer: {
+			page: components['schemas']['GamePage'];
+			/**
+			 * @description The players with "no answer" that "Checked" made absent ("2 players with no answer are
+			 *     absent."); 0 when the game was already checked.
+			 */
+			settled: number;
+		};
 		/** @description A player in the choice of a place. */
 		ChoiceView: {
 			/** @description The clashes with other games. */
@@ -1136,6 +1161,16 @@ export interface components {
 			 *     the game now; until "Answers checked" (`team_core::answers_moved`).
 			 */
 			answers_moved: boolean;
+			/**
+			 * @description The game is before the release of "Checked" (`game_check_start`): the list is closed behind
+			 *     a tap, and the game is never an open item.
+			 */
+			before_release: boolean;
+			/**
+			 * @description "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
+			 *     "Undo check", and the list closed behind a tap.
+			 */
+			checked: boolean;
 			count: components['schemas']['CountView'];
 			/** @description The number of players that is enough (7). */
 			enough_players: number;
@@ -1182,8 +1217,6 @@ export interface components {
 			game: components['schemas']['ScheduleGame'];
 			/** @description "Not played" on its date now: its duties and attendance do not count. */
 			not_played: boolean;
-			/** @description The game is before today: its places can be corrected ("Someone else", "Nobody"). */
-			past: boolean;
 			/**
 			 * @description The choice of a player for the places of the team: the players with the role "plays
 			 *     games" on the date (hidden players too), and the players already at the game; sorted by
@@ -1348,13 +1381,32 @@ export interface components {
 			from: string;
 			role: components['schemas']['RoleKind'];
 		};
+		/** @description The oldest game of the open item "games not checked". */
+		NotCheckedGameView: {
+			date: string;
+			/**
+			 * Format: int64
+			 * @description The source's game id.
+			 */
+			id: number;
+			/** @description The season of the game, for example "2026-2027". */
+			season: string;
+		};
 		/**
 		 * @description Why a player cannot be chosen for a place.
 		 * @enum {string}
 		 */
 		NotOfferedView: 'on_this_place' | 'at_game' | 'not_in_team' | 'clash';
-		/** @description A player who counts as "there" at trainings after a role started or its start moved earlier. */
+		/**
+		 * @description A player who counts as "there" at trainings, or has "no answer" at checked games, after a role
+		 *     started or its start moved earlier.
+		 */
 		NowThere: {
+			/**
+			 * @description The dates of the checked games of the team at which the player now has "no answer", in
+			 *     order: the player does not count there until tapped.
+			 */
+			games: string[];
 			/** Format: int64 */
 			player: number;
 			/** @description The dates of those trainings, for example "2026-09-01", in order. */
@@ -1427,6 +1479,12 @@ export interface components {
 					first: string;
 					/** @enum {string} */
 					kind: 'not_checked';
+			  }
+			| {
+					count: number;
+					first: components['schemas']['NotCheckedGameView'];
+					/** @enum {string} */
+					kind: 'games_not_checked';
 			  };
 		/**
 		 * @description A correction after the game: as planned, done by `player` ("Someone else"), or not done
@@ -1649,6 +1707,8 @@ export interface components {
 		ScheduleGame: {
 			attendance?: null | components['schemas']['CountView'];
 			away: string;
+			/** @description "Checked" on its date now (`team_core::checked`): shown as "· Checked". */
+			checked: boolean;
 			/** @description Dutch local date, for example "2026-10-31". */
 			date: string;
 			hall: string;
@@ -1670,6 +1730,11 @@ export interface components {
 			reason: components['schemas']['ScheduleReasonView'];
 			/** @description Dutch local start time, for example "13:00"; `null` when it is not known yet. */
 			start_time?: string | null;
+			/**
+			 * @description Set only on a coming game with a count: it has started (`team_core::started`), so the count
+			 *     says "there" and "absent".
+			 */
+			started: boolean;
 			town: string;
 		};
 		SchedulePartView: {
@@ -2506,7 +2571,99 @@ export interface operations {
 					'application/json': components['schemas']['GamePage'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team` */
+			/** @description `invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_started`, `no_player_on_place`, `player_at_game`, `not_in_team` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	setChecked: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description Checked: each "no answer" is absent; how many, and the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['CheckedAnswer'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early` */
+			400: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description Not logged in */
+			401: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+			/** @description No such game of the club chosen for that season */
+			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	unsetChecked: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description The season, for example 2026-2027 */
+				season: string;
+				/** @description The source's game id */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description "Undo check": the settled players have no answer again; the game page */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['GamePage'];
+				};
+			};
+			/** @description `invalid_season`, `invalid_game`, `not_a_team_game` */
 			400: {
 				headers: {
 					[name: string]: unknown;

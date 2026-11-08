@@ -37,3 +37,23 @@ export function nowThereText(trainings: string[], name?: string): string {
 	const what = count === 1 ? '1 earlier training' : `${count} earlier trainings`;
 	return `${name ?? 'This player'} now counts as there at ${what}: ${trainings.map(formatDay).join(', ')}.`;
 }
+
+/** "This player has no answer at 2 checked games: Sat 10 Oct, Sat 17 Oct." With a name in place of
+ * "This player" when more than one player is named. */
+export function noAnswerText(games: string[], name?: string): string {
+	const count = games.length;
+	const what = count === 1 ? '1 checked game' : `${count} checked games`;
+	return `${name ?? 'This player'} has no answer at ${what}: ${games.map(formatDay).join(', ')}.`;
+}
+
+/** The notes after a change of role: the trainings at which the player now counts as there, and
+ * the checked games at which the player has no answer; each only when it has dates. */
+export function nowThereLines(
+	entry: { trainings: string[]; games: string[] },
+	name?: string
+): string[] {
+	return [
+		...(entry.trainings.length > 0 ? [nowThereText(entry.trainings, name)] : []),
+		...(entry.games.length > 0 ? [noAnswerText(entry.games, name)] : [])
+	];
+}

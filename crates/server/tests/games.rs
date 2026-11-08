@@ -999,7 +999,10 @@ async fn a_place_after_the_game_is_corrected(pool: PgPool) {
     let (status, answer) = reader
         .send("PUT", &coming, Some(json!({ "outcome": "not_done" })))
         .await;
-    assert_eq!((status, answer["error"].as_str()), (400, Some("not_past")));
+    assert_eq!(
+        (status, answer["error"].as_str()),
+        (400, Some("not_started"))
+    );
     let (status, answer) = reader
         .send("PUT", &path, Some(json!({ "outcome": "done_by" })))
         .await;
@@ -1104,7 +1107,7 @@ async fn the_choice_has_the_players_of_the_date_with_their_totals_and_clashes(po
     assign(&reader, X12_31_OCT, "table", 1, anna).await;
 
     let page = ok(&reader, "GET", &game_path(X14_31_OCT), None).await;
-    assert_eq!(page["past"], false);
+    assert_eq!(page["started"], false);
     let names: Vec<&str> = page["players"]
         .as_array()
         .unwrap()
@@ -1151,7 +1154,7 @@ async fn the_choice_has_the_players_of_the_date_with_their_totals_and_clashes(po
     );
     // A past game: "Someone else" offers Bram, not Anna again.
     let page = ok(&reader, "GET", &game_path(X12_3_OCT), None).await;
-    assert_eq!(page["past"], true);
+    assert_eq!(page["started"], true);
     assert_eq!(
         in_choice(&page, anna).unwrap()["offers"][0]["correct"],
         "on_this_place"
@@ -1316,5 +1319,62 @@ async fn a_past_game_with_a_player_on_a_proposed_driver_place_stays(pool: PgPool
     assert_eq!(
         game["places"]["drivers"]["places"][0]["player"]["name"],
         "Anna"
+    );
+}
+
+/// The table totals of `player` on the page "Duties".
+async fn table_total(reader: &Reader, player: i64) -> Value {
+    let duties = ok(reader, "GET", "/api/duties", None).await;
+    duties["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["player"] == player)
+        .map_or(json!(null), |row| row["totals"]["table"].clone())
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn from_the_start_time_a_place_can_be_corrected_and_counts_as_done(pool: PgPool) {
+    // The home game of X12 1 on Saturday 31 October 2026 at 13:00 (story C).
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    set_place(&reader, X12_31_OCT, "table", 1, Some(M16_1)).await;
+    let anna = add_player(&reader, "Anna", None, "plays_games").await;
+    let bram = add_player(&reader, "Bram", None, "plays_games").await;
+    assign(&reader, X12_31_OCT, "table", 1, anna).await;
+    let path = format!("{}/outcome", assignment_path(X12_31_OCT, "table", 1));
+    let correct = json!({ "outcome": "done_by", "player": bram });
+
+    // 12:59 Dutch time (UTC+1): not started.
+    reader.harness.clock.set(utc(2026, 10, 31, 11, 59));
+    reader.log_in_again().await;
+    let (status, answer) = reader.send("PUT", &path, Some(correct.clone())).await;
+    assert_eq!(
+        (status, answer["error"].as_str()),
+        (400, Some("not_started"))
+    );
+    assert_eq!(
+        table_total(&reader, anna).await,
+        json!({ "done": 0, "planned": 1 })
+    );
+    let page = ok(&reader, "GET", &game_path(X12_31_OCT), None).await;
+    assert_eq!(page["started"], false);
+
+    // 13:00: started, the same day.
+    reader.harness.clock.set(utc(2026, 10, 31, 12, 0));
+    reader.log_in_again().await;
+    assert_eq!(
+        table_total(&reader, anna).await,
+        json!({ "done": 1, "planned": 0 })
+    );
+    let page = ok(&reader, "PUT", &path, Some(correct)).await;
+    assert_eq!(on_place(&page, 0)["done_by"]["name"], "Bram");
+    assert_eq!(
+        table_total(&reader, bram).await,
+        json!({ "done": 1, "planned": 0 })
+    );
+    assert_eq!(
+        table_total(&reader, anna).await,
+        json!({ "done": 0, "planned": 0 })
     );
 }

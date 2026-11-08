@@ -10,14 +10,15 @@ use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Answer, AnswerError, Assignment, Candidate, Clash, ClashLevel, ClashWhat, Club, DutyError,
-    DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GameMoment, GamePlaces,
+    Answer, AnswerError, Assignment, Candidate, CheckError, Clash, ClashLevel, ClashWhat, Club,
+    DutyError, DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GameMoment, GamePlaces,
     GameWarnings, ListRow, MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome, PlaceKind, PlayerId,
     ReasonId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties, StoredGame,
-    Team, TeamNumber, check_answer, check_assignment, check_drivers, check_entered, check_outcome,
-    check_team, choice_players, clashes, club_teams, duty_totals, extra_players, game_count,
-    game_list, game_places, game_warnings, in_schedule, kept_games, move_note, offers, pick_team,
-    players_playing_on, plays_games_on, required_duties, started, worst_clash,
+    Team, TeamNumber, answers_in_effect, check_answer, check_assignment, check_drivers,
+    check_entered, check_game_checking, check_outcome, check_team, checked, choice_players,
+    clashes, club_teams, duty_totals, extra_players, game_count, game_list, game_places,
+    game_warnings, in_schedule, kept_games, move_note, offers, pick_team, players_playing_on,
+    plays_games_on, required_duties, started, to_settle, worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -45,8 +46,6 @@ pub struct GamePage {
     pub game: ScheduleGame,
     /// The pull-down list of the places: the club teams of the season, sorted by name.
     pub club_teams: Vec<TeamView>,
-    /// The game is before today: its places can be corrected ("Someone else", "Nobody").
-    pub past: bool,
     /// The choice of a player for the places of the team: the players with the role "plays
     /// games" on the date (hidden players too), and the players already at the game; sorted by
     /// first name.
@@ -82,6 +81,12 @@ pub struct GameAttendanceView {
     /// "Answers from before the move": the answers were given for another date than the date of
     /// the game now; until "Answers checked" (`team_core::answers_moved`).
     pub answers_moved: bool,
+    /// "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
+    /// "Undo check", and the list closed behind a tap.
+    pub checked: bool,
+    /// The game is before the release of "Checked" (`game_check_start`): the list is closed behind
+    /// a tap, and the game is never an open item.
+    pub before_release: bool,
 }
 
 /// The answer of a tap: kept small, so a tap is quick.
@@ -167,6 +172,23 @@ impl From<GameCount> for CountView {
     }
 }
 
+impl From<CheckError> for AppError {
+    fn from(error: CheckError) -> Self {
+        Self::BadRequest(match error {
+            CheckError::TooEarly => "checked_too_early",
+        })
+    }
+}
+
+/// The answer of "Checked": how many players with no answer became absent, and the page.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CheckedAnswer {
+    /// The players with "no answer" that "Checked" made absent ("2 players with no answer are
+    /// absent."); 0 when the game was already checked.
+    pub settled: usize,
+    pub page: GamePage,
+}
+
 impl From<AnswerError> for AppError {
     fn from(error: AnswerError) -> Self {
         Self::BadRequest(match error {
@@ -213,7 +235,7 @@ pub struct OfferView {
     pub number: u8,
     /// As the planned player; `null`: can be chosen.
     pub assign: Option<NotOfferedView>,
-    /// As "Someone else" on a past place with a player; `null`: can be chosen (or no correction
+    /// As "Someone else" on a place with a player of a game that has started; `null`: can be chosen (or no correction
     /// is possible there).
     pub correct: Option<NotOfferedView>,
 }
@@ -347,7 +369,7 @@ impl From<DutyError> for AppError {
             DutyError::PlayerAtGame => Self::BadRequest("player_at_game"),
             DutyError::NotInTeam => Self::BadRequest("not_in_team"),
             DutyError::Clash => Self::BadRequest("clash"),
-            DutyError::NotPast => Self::BadRequest("not_past"),
+            DutyError::NotStarted => Self::BadRequest("not_started"),
             DutyError::NoPlayerOnPlace => Self::BadRequest("no_player_on_place"),
             DutyError::BelowFilled { filled, highest } => Self::Refused {
                 status: StatusCode::BAD_REQUEST,
@@ -529,7 +551,6 @@ async fn find(state: &AppState, season: &str, id: &str) -> Result<Found, AppErro
 /// The page of `found`, with the duties as stored now.
 async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
     let local = in_netherlands(state.clock.now());
-    let today = local.date();
     let duties = duties_of(state, found.club.number, found.season).await?;
     let places = duties.places_of(
         &found.game,
@@ -548,7 +569,6 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         .stored
         .get(&found.game.source_id)
         .is_some_and(|stored| stored.drivers_drove);
-    let past = found.past(today);
     let attendance = attendance_of(state, &found, &duties).await?;
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
@@ -563,7 +583,6 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         team: TeamView::from(found.team),
         game,
         club_teams: found.club_teams.iter().map(TeamView::from).collect(),
-        past,
         players,
         attendance,
         not_played: found.not_played,
@@ -581,6 +600,8 @@ async fn stored_list(
     duties: &SeasonDuties,
 ) -> Result<(Vec<ListRow>, GameAttendance, GameWarnings, bool), AppError> {
     let (attendance, answers) = game_attendance::of_game(&state.pool, found.key()).await?;
+    // A settled answer counts only while the check holds (story C).
+    let answers = answers_in_effect(&answers, &attendance, found.game.date);
     let list = game_list(&duties.players, &duties.roles, &answers, found.game.date);
     let scheduled = ScheduledGame {
         game: found.game.clone(),
@@ -623,6 +644,7 @@ async fn attendance_of(
         return Ok(None);
     }
     let (list, attendance, warnings, moved) = stored_list(state, found, duties).await?;
+    let start = game_attendance::check_start(&state.pool).await?;
     Ok(Some(GameAttendanceView {
         rows: list.iter().map(|row| answer_row(row, duties)).collect(),
         reasons: reasons::all(&state.pool)
@@ -636,6 +658,8 @@ async fn attendance_of(
         too_few: warnings.too_few_line,
         enough_players: ENOUGH_PLAYERS,
         answers_moved: moved,
+        checked: checked(&attendance, found.game.date),
+        before_release: found.game.date < start,
     }))
 }
 
@@ -681,7 +705,6 @@ fn choice(
     places: Option<&GamePlaces>,
     local: chrono::NaiveDateTime,
 ) -> Vec<ChoiceView> {
-    let today = local.date();
     let season = found.season_places(duties, local);
     let season_duties = season.duties(duties);
     let totals = duty_totals(&season_duties);
@@ -699,7 +722,7 @@ fn choice(
                     player.id,
                     choice.plays_on_date,
                     worst_clash(&clashes),
-                    found.past(today),
+                    started(&found.game, local),
                 )
             });
             ChoiceView {
@@ -955,7 +978,6 @@ pub async fn set_assignment(
     let found = find(&state, &season, &id).await?;
     let player = player(&state, input.player).await?;
     let local = in_netherlands(state.clock.now());
-    let today = local.date();
     let duties = duties_of(&state, found.club.number, found.season).await?;
     let plays = plays_games_on(&duties.roles, player, found.game.date);
     let clash = found.clash(&duties, player, local);
@@ -974,7 +996,7 @@ pub async fn set_assignment(
                 plays_on_date: plays,
                 clash,
             },
-            found.past(today),
+            started(&found.game, local),
         )?;
         // The same player again is no change: a correction after the game stays.
         if locked
@@ -1035,7 +1057,7 @@ pub async fn clear_assignment(
     request_body = OutcomeInput,
     responses(
         (status = 200, description = "Saved; the game with its duties", body = GamePage),
-        (status = 400, description = "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_past`, `no_player_on_place`, `player_at_game`, `not_in_team`"),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `invalid_place`, `invalid_outcome`, `unknown_player`, `not_started`, `no_player_on_place`, `player_at_game`, `not_in_team`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
     )
@@ -1054,7 +1076,6 @@ pub async fn set_outcome(
         _ => return Err(AppError::BadRequest("invalid_outcome")),
     };
     let local = in_netherlands(state.clock.now());
-    let today = local.date();
     let plays = match new {
         Outcome::DoneBy(player) => {
             let duties = duties_of(&state, found.club.number, found.season).await?;
@@ -1062,10 +1083,16 @@ pub async fn set_outcome(
         }
         Outcome::AsPlanned | Outcome::NotDone => true,
     };
-    let past = found.past(today);
+    let started = started(&found.game, local);
     let now = state.clock.now();
     write(&state, &found, async |tx, locked| {
-        let outcome = check_outcome(past, locked.on(kind, number), new, &locked.at_game, plays)?;
+        let outcome = check_outcome(
+            started,
+            locked.on(kind, number),
+            new,
+            &locked.at_game,
+            plays,
+        )?;
         duties::set_outcome(tx, found.key(), kind, number, outcome, now).await?;
         Ok(())
     })
@@ -1331,5 +1358,69 @@ async fn drivers_drove(
         Ok(())
     })
     .await?;
+    Ok(Json(page(&state, found).await?))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/games/{season}/{id}/checked",
+    operation_id = "setChecked",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "Checked: each \"no answer\" is absent; how many, and the game page", body = CheckedAnswer),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn set_checked(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<CheckedAnswer>, AppError> {
+    let (found, duties) = team_game(&state, &season, &id).await?;
+    check_game_checking(&found.game, in_netherlands(state.clock.now()))?;
+    let date = found.game.date;
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    // The list is read under the lock of the game, so "Undo check" on another screen is seen.
+    let settled = game_attendance::check(&mut tx, found.key(), date, |attendance, answers| {
+        let answers = answers_in_effect(answers, attendance, date);
+        to_settle(&game_list(&duties.players, &duties.roles, &answers, date))
+    })
+    .await?;
+    tx.commit().await.map_err(StoreError::from)?;
+    tracing::info!(season = %found.season, game = found.game.source_id, settled, "game checked");
+    Ok(Json(CheckedAnswer {
+        settled,
+        page: page(&state, found).await?,
+    }))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/games/{season}/{id}/checked",
+    operation_id = "unsetChecked",
+    params(
+        ("season" = String, Path, description = "The season, for example 2026-2027"),
+        ("id" = String, Path, description = "The source's game id"),
+    ),
+    responses(
+        (status = 200, description = "\"Undo check\": the settled players have no answer again; the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`"),
+        (status = 401, description = "Not logged in"),
+        (status = 404, description = "No such game of the club chosen for that season"),
+    )
+)]
+pub async fn unset_checked(
+    State(state): State<AppState>,
+    Path((season, id)): Path<(String, String)>,
+) -> Result<Json<GamePage>, AppError> {
+    let (found, _) = team_game(&state, &season, &id).await?;
+    let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
+    game_attendance::uncheck(&mut tx, found.key()).await?;
+    tx.commit().await.map_err(StoreError::from)?;
+    tracing::info!(season = %found.season, game = found.game.source_id, "game check undone");
     Ok(Json(page(&state, found).await?))
 }

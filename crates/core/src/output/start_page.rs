@@ -9,8 +9,8 @@ use crate::contribution::attendance::TrainingState;
 use crate::contribution::duties::{
     DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind,
 };
-use crate::contribution::game_attendance::{GameCount, GameWarnings};
-use crate::events::schedule::ScheduleReason;
+use crate::contribution::game_attendance::{GameAttendance, GameCount, GameWarnings, checked};
+use crate::events::schedule::{ScheduleReason, ScheduledGame};
 use crate::events::training::{SeasonList, SeasonRow, not_checked, not_opened};
 use crate::output::season_view::{Event, EventKind, SeasonEvents};
 use crate::shared::season::Season;
@@ -69,6 +69,51 @@ pub enum OpenItem {
         first: NaiveDate,
         count: usize,
     },
+    /// Games of the team before today that are not checked (`games_not_checked`); `first` is the
+    /// oldest.
+    GamesNotChecked {
+        first: NotCheckedGame,
+        count: usize,
+    },
+}
+
+/// A game of the team that is not checked: enough to open its page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotCheckedGame {
+    pub season: Season,
+    pub id: i64,
+    pub date: NaiveDate,
+}
+
+/// The games of the team of `season` before `today` (Dutch date) that are not checked on their
+/// date now: still in the game list, not "not played", and on or after `from_date` (the day of
+/// the release; older games are never an open item). `games`: the past games of the schedule;
+/// `checks`: what is stored for the attendance of each game, by source id. In time order.
+pub fn games_not_checked(
+    season: Season,
+    games: &[ScheduledGame],
+    checks: &BTreeMap<i64, GameAttendance>,
+    from_date: NaiveDate,
+    today: NaiveDate,
+) -> Vec<NotCheckedGame> {
+    let mut open: Vec<NotCheckedGame> = games
+        .iter()
+        .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame)
+        .filter(|scheduled| scheduled.in_list && !scheduled.not_played)
+        .filter(|scheduled| (from_date..today).contains(&scheduled.game.date))
+        .filter(|scheduled| {
+            !checks
+                .get(&scheduled.game.source_id)
+                .is_some_and(|stored| checked(stored, scheduled.game.date))
+        })
+        .map(|scheduled| NotCheckedGame {
+            season,
+            id: scheduled.game.source_id,
+            date: scheduled.game.date,
+        })
+        .collect();
+    open.sort_by_key(|game| (game.date, game.id));
+    open
 }
 
 /// The seasons the open items and the last training cover: the season of `today`, and in July
@@ -153,8 +198,9 @@ pub fn open_places_games(
 /// players, drivers not coming, answers from before a move (from `warnings`: the warnings of the
 /// coming games of the team in time order, `game_warnings`), the home games whose schedule is not
 /// entered (`schedule_not_entered`), the games with open places (`open_places_games`), the
-/// training days not opened, the trainings not checked. A kind without items gives nothing. The
-/// training items count over all `lists`, with the oldest date as `first`.
+/// training days not opened, the trainings not checked, the games not checked
+/// (`games_not_checked`, over all seasons). A kind without items gives nothing. The training items
+/// count over all `lists`, with the oldest date as `first`.
 pub fn open_items(
     reading: &ReadingState,
     unseen: u32,
@@ -162,6 +208,7 @@ pub fn open_items(
     open_places: Vec<OpenGame>,
     lists: &[SeasonList<'_>],
     warnings: &[(i64, GameWarnings)],
+    games_not_checked: &[NotCheckedGame],
 ) -> Vec<OpenItem> {
     let mut items = Vec::new();
     if reading.held_back {
@@ -216,6 +263,15 @@ pub fn open_items(
         items.push(OpenItem::NotChecked {
             first,
             count: trainings.len(),
+        });
+    }
+    if let Some(&first) = games_not_checked
+        .iter()
+        .min_by_key(|game| (game.date, game.id))
+    {
+        items.push(OpenItem::GamesNotChecked {
+            first,
+            count: games_not_checked.len(),
         });
     }
     items
@@ -403,7 +459,7 @@ mod tests {
             out_of_date_since: Some(date(2026, 10, 8)),
         };
         assert_eq!(
-            open_items(&reading, 4, Vec::new(), Vec::new(), &[list], &[]),
+            open_items(&reading, 4, Vec::new(), Vec::new(), &[list], &[], &[]),
             [
                 OpenItem::ReadingHeldBack,
                 OpenItem::OutOfDate {
@@ -432,6 +488,7 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[one],
+                &[],
                 &[]
             ),
             [OpenItem::NotOpened {
@@ -451,6 +508,7 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[three],
+                &[],
                 &[]
             ),
             [OpenItem::NotOpened {
@@ -471,6 +529,7 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[this, before],
+                &[],
                 &[]
             ),
             [OpenItem::NotOpened {
@@ -492,6 +551,7 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[list],
+                &[],
                 &[]
             ),
             []
@@ -510,6 +570,7 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[list],
+                &[],
                 &[]
             ),
             []
@@ -753,6 +814,7 @@ mod tests {
                 vec![7, 8],
                 Vec::new(),
                 &[list],
+                &[],
                 &[]
             ),
             [
@@ -861,6 +923,7 @@ mod tests {
                 vec![7],
                 open.clone(),
                 &[list],
+                &[],
                 &[]
             ),
             [
@@ -976,7 +1039,7 @@ mod tests {
         }];
         let warnings = [(5, warned(Some(5), &[3], true))];
         assert_eq!(
-            open_items(&reading, 4, vec![7], open.clone(), &[list], &warnings),
+            open_items(&reading, 4, vec![7], open.clone(), &[list], &warnings, &[]),
             [
                 OpenItem::ReadingHeldBack,
                 OpenItem::OutOfDate {
@@ -1019,7 +1082,8 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[],
-                &warnings
+                &warnings,
+                &[]
             ),
             [
                 OpenItem::TooFewPlayers {
@@ -1045,7 +1109,8 @@ mod tests {
                 Vec::new(),
                 Vec::new(),
                 &[],
-                &line_only
+                &line_only,
+                &[]
             ),
             []
         );
@@ -1119,5 +1184,100 @@ mod tests {
         };
         let places: PlacesOf = [(1, not_played_places(true))].into_iter().collect();
         assert_eq!(last_games(&events, &places).len(), 1);
+    }
+
+    // The games not checked (story C of attendance at games).
+
+    fn checked_on(on: NaiveDate) -> GameAttendance {
+        GameAttendance {
+            extra_players: 0,
+            answers_for: None,
+            checked_for: Some(on),
+        }
+    }
+
+    #[test]
+    fn a_past_game_of_the_team_from_the_release_that_is_not_checked_is_open() {
+        let season = Season::from_start_year(2026);
+        let from = date(2026, 10, 3);
+        let today = date(2026, 10, 20);
+        let mut gone = scheduled(5, date(2026, 10, 10), ScheduleReason::TeamGame);
+        gone.in_list = false;
+        let mut cancelled = scheduled(6, date(2026, 10, 10), ScheduleReason::TeamGame);
+        cancelled.not_played = true;
+        let games = [
+            // Newest first, as the schedule gives the past games.
+            scheduled(9, today, ScheduleReason::TeamGame),
+            scheduled(8, date(2026, 10, 17), ScheduleReason::TeamGame),
+            scheduled(7, date(2026, 10, 17), ScheduleReason::DutyGame),
+            scheduled(4, date(2026, 10, 17), ScheduleReason::Kept),
+            gone,
+            cancelled,
+            scheduled(3, date(2026, 10, 10), ScheduleReason::TeamGame),
+            scheduled(2, from, ScheduleReason::TeamGame),
+            scheduled(1, date(2026, 10, 2), ScheduleReason::TeamGame),
+        ];
+        let checks = BTreeMap::from([
+            (3, checked_on(date(2026, 10, 10))),
+            // Checked on another date: the check has no effect.
+            (8, checked_on(date(2026, 10, 16))),
+        ]);
+        let open = games_not_checked(season, &games, &checks, from, today);
+        assert_eq!(
+            open,
+            [
+                NotCheckedGame {
+                    season,
+                    id: 2,
+                    date: from
+                },
+                NotCheckedGame {
+                    season,
+                    id: 8,
+                    date: date(2026, 10, 17)
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn the_games_not_checked_come_last_with_the_oldest_first() {
+        let not_checked = training(1, date(2026, 10, 6));
+        let list = past(vec![row(date(2026, 10, 6), Some(&not_checked))]);
+        let older = Season::from_start_year(2025);
+        let current = Season::from_start_year(2026);
+        let games = [
+            NotCheckedGame {
+                season: current,
+                id: 3,
+                date: date(2026, 7, 4),
+            },
+            NotCheckedGame {
+                season: older,
+                id: 8,
+                date: date(2026, 6, 27),
+            },
+        ];
+        assert_eq!(
+            open_items(
+                &ReadingState::default(),
+                0,
+                Vec::new(),
+                Vec::new(),
+                &[list],
+                &[],
+                &games
+            ),
+            [
+                OpenItem::NotChecked {
+                    first: date(2026, 10, 6),
+                    count: 1
+                },
+                OpenItem::GamesNotChecked {
+                    first: games[1],
+                    count: 2
+                },
+            ]
+        );
     }
 }

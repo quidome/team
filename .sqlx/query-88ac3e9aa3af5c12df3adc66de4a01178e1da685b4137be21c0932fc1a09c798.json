@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE game_attendance SET checked_for = $4\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "88ac3e9aa3af5c12df3adc66de4a01178e1da685b4137be21c0932fc1a09c798"
+}
