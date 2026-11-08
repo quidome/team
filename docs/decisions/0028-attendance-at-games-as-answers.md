@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-11-01
-**Change**: [2026-10-31-attendance-at-games](../changes/2026-10-31-attendance-at-games/) (story [who comes to a game](../changes/done/2026-11-01-who-comes-to-a-game/))
+**Change**: [2026-10-31-attendance-at-games](../changes/done/2026-10-31-attendance-at-games/) (story [who comes to a game](../changes/done/2026-11-01-who-comes-to-a-game/))
 
 ## Context
 Before a game the coordinator keeps who comes, who does not and who has not answered. A training stores only absences (decision 0020), because "there" is the normal state. At a game no state is normal: most players start with no answer, and roles can change during the week. The tool is used on a phone, tap after tap, and sometimes on a second screen.

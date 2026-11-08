@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-11-04
-**Change**: [2026-10-31-attendance-at-games](../changes/2026-10-31-attendance-at-games/) (story [warnings in time](../changes/done/2026-11-04-warnings-in-time/))
+**Change**: [2026-10-31-attendance-at-games](../changes/done/2026-10-31-attendance-at-games/) (story [warnings in time](../changes/done/2026-11-04-warnings-in-time/))
 
 ## Context
 A game can move to another date after players answered. The answers stay stored (nothing the

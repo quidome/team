@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [Attendance at games](changes/2026-10-31-attendance-at-games/) – feature, epic, stage implement (2026-11-01); stories A and B are done and released as release 1 (v0.8.0, 2026-11-04); story E, not played, is done; stories C (after the game) and D (totals on "Attendance") are done and released as release 2 (v0.9.0, 2026-11-08); the acceptance review of the epic is done; next: close the epic.
+- None open.
 
 Small:
 - Move the read of `player_roles` in `crates/server/src/trainings.rs` (`seasons`) to `players.rs`, so each domain owns its tables (design of not played, 2026-11-08; decision 0030 at its close).

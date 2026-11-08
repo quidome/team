@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-11-08
-**Change**: [2026-11-08-not-played](../changes/done/2026-11-08-not-played/) (story E of [attendance at games](../changes/2026-10-31-attendance-at-games/))
+**Change**: [2026-11-08-not-played](../changes/done/2026-11-08-not-played/) (story E of [attendance at games](../changes/done/2026-10-31-attendance-at-games/))
 
 ## Context
 Decision 0027 gives the core six domains with a fixed direction of use, but says nothing about the

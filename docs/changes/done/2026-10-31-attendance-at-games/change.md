@@ -1,7 +1,7 @@
 ---
 title: Attendance at games
 type: feature
-stage: implement
+stage: done
 closure: review accept   # epic: each story has its own closure (review build + accept); a fresh agent checks the whole result after story D
 created: 2026-10-31
 ---
@@ -30,3 +30,4 @@ game when fewer than 7 players come, and when a player on a driver place does no
 | 2026-11-08 | implement | story D, totals on "Attendance": technical.md approved (`changes/2026-11-08-totals-on-attendance/`), 3 steps; every checked game that was played counts, also from before the release day (coordinator) |
 | 2026-11-08 | implement | story D, totals on "Attendance", is done (`changes/done/2026-11-08-totals-on-attendance/`): product documents, architecture and "Where we are" in the vision updated; all stories are done; next: release 2 and the acceptance review of the epic |
 | 2026-11-08 | implement | release 2 (v0.9.0): stories E, C and D; acceptance review of the epic done (A1, A3 fixed in 2c51cb1); next: `/close` of the epic |
+| 2026-11-08 | done | closed: all stories done and released (v0.8.0, v0.9.0); product documents, architecture, vision and language were updated at the close of each story and by `/vision`; decision records 0028–0032; ideas: the report (priority 7) and the place of "Checked" (A4) |
