@@ -3,9 +3,11 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [The report](changes/2026-11-09-the-report/) (close)
+- None open.
 
 Small:
+- Look at the report on the phone with the real names after its release: the headings that break with a hyphen ("Train-ings"), the width of the five columns, the details, and a tap on "Copy" with the text in the chat (close of the report, 2026-11-09).
+- A test that the report reads one moment: a save on another connection between two reads of `GET /api/report` must not show (decision 0033; build review R3 of the report).
 - Move the read of `player_roles` in `crates/server/src/trainings.rs` (`seasons`) to `players.rs`, so each domain owns its tables (design of not played, 2026-11-08; decision 0030 at its close).
 - A test that checks that the SQL of each table is only in the store module of its domain, like `crates/core/tests/domains.rs` for the core (design of not played, 2026-11-08).
 - A race test for the saves with `ON CONFLICT` of story A of attendance at games, `set_extra` and `answer` in `crates/server/src/game_attendance.rs` (pattern in `docs/architecture.md`; build review R2 of warnings in time, 2026-11-04).

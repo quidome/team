@@ -2,7 +2,7 @@
 
 **Status**: valid
 **Date**: 2026-11-09
-**Change**: [2026-11-09-the-report](../changes/2026-11-09-the-report/)
+**Change**: [2026-11-09-the-report](../changes/done/2026-11-09-the-report/)
 
 ## Context
 The page "Report" shows, for each player of the current season, attendance at trainings and games
@@ -45,3 +45,4 @@ different rules), and whether the many reads of the page see one moment.
 - A write added to `trainings_of`, `games_of` or `duties_of` breaks the report (its tests show it);
   writes belong in their own handlers.
 - If the rows of "Attendance" or "Duties" change, `report_rows` must be checked too.
+- Built so (2026-11-09, at close): the rule of a duty row is `has_duty_row`, used by both `duty_rows` and `report_rows`, and the attendance totals are fed by `overview_of`, used by both "Attendance" and the report.

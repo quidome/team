@@ -35,7 +35,7 @@ Both values need fast capture and correct data. For example, attendance at train
 
 ## Where we are
 - **Fair duties: reached.** The games come in from the game list, the coordinator gives the duty places to players, the duty totals show the split, and the messages and duty overviews come from the tool.
-- **Effort: halfway.** Attendance at training and at games is recorded with the reason for each absence, with totals for each player in a season. No report brings the effort and the duties of each player together (priorities 7 and 8).
+- **Effort: reached in the tool.** Attendance at training and at games is recorded with the reason for each absence, and the report shows the attendance and the duties of each player side by side, with the details behind the numbers. Whether it replaces the sheet shows in real use.
 - **The sheet is still in use.**
 - The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it.
 
@@ -50,7 +50,7 @@ see it.
 
 ## Where we are going
 First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews and attendance at games (built), then the report of what each player did. Each step must be good
+Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews and attendance at games, then the report of what each player did (built). Each step must be good
 enough to replace that part of the sheet.
 
 ## Longer horizon
@@ -79,7 +79,7 @@ These stay ideas until real use shows the need.
 4. **Duties and the message of the week** – the weekly message is the second thing done every week.
 5. **The committee message** – built on the same duties.
 6. **The duty overviews** – show the team and the parents who does which coming duty.
-7. **The report of what each player did** – the place where the effort and the duties of each player come together; the main goal of the tool. With trainings, games and duties.
+7. **The report of what each player did** (built) – the place where the effort and the duties of each player come together; the main goal of the tool. With trainings, games and duties.
 8. **Attendance at games** (built) – shows during the week if there are enough players; adds the games to the report.
 
 ## Principles
@@ -116,3 +116,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-11-08 | "Where we are": attendance at games counts in the totals of a season; effort stays halfway until the report |
 | 2026-11-08 | Attendance at games is built: "Where we are going", journeys 2, 7 and 8 and the priorities say so; the report of what each player did is the next step, with trainings, games and duties. Word checked: a game can be checked from its start time |
 | 2026-11-09 | Journey 8: the report is one page with a table (attendance as percentages, duties done and planned) and the details of a player on a tap (valid and not valid absences, duties taken over), for the current season, used now and then to steer a conversation; a part can be copied to show an imbalance. Word report: one or more tables |
+| 2026-11-09 | The report is built: "Where we are" says effort is reached in the tool (the sheet still to be replaced in real use); "Where we are going" and priority 7 say built |
