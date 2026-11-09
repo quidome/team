@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- [The report](changes/2026-11-09-the-report/) (design)
+- [The report](changes/2026-11-09-the-report/) (implement)
 
 Small:
 - Move the read of `player_roles` in `crates/server/src/trainings.rs` (`seasons`) to `players.rs`, so each domain owns its tables (design of not played, 2026-11-08; decision 0030 at its close).

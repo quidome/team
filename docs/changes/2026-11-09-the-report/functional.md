@@ -84,7 +84,7 @@ can explain a low percentage or a difference in duties.
 - [ ] Each percentage in the details is the number of that part divided by the number counted, rounded to a whole number, half up. The three percentages can add up to 99 or 101; the numbers are always exact.
 - [ ] For each duty kind with at least one duty of the player: "Drive: 3 done · 1 planned".
 - [ ] Below a kind, only when not 0: "1 done by another player" (planned for this player, done by another player with "Someone else"), "1 done for another player" (planned for another player, done by this player with "Someone else"), "1 not done" (planned for this player, corrected to "Nobody").
-- [ ] The corrections count only at games whose duties count (the same rules as "done"), and only on the places of the team.
+- [ ] The corrections count with the same rule as "done": only at games whose duties count, on the places that count (also the past places of an earlier team, as the duty totals do). Changed at design, 2026-11-09, with the coordinator.
 - [ ] A player with no line at all: "Nothing counts yet this season."
 - [ ] A link "Missed trainings and games" opens "Attendance" of the current season with the list of that player already open (each missed training and game with its date and reason); "Back" there returns to "Report".
 
