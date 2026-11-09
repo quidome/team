@@ -1,7 +1,7 @@
 ---
 title: The report
 type: feature
-stage: discover
+stage: design
 closure: checks      # set by /design; only the user lowers it
 created: 2026-11-09
 ---
@@ -18,3 +18,4 @@ else). Each column can be copied as text for the chat, to show an imbalance.
 |------|-------|------|
 | 2026-11-09 | idea | created from `/vision` (line of 2026-10-30 in `ideas.md`): a table with the details of each player on one new page; journey 8 and the word "report" changed |
 | 2026-11-09 | discover | idea ready for discovery |
+| 2026-11-09 | design | functional.md approved: three stories (A the table, B the details of a player, C copy a column); spec review: all "serves – note", notes 1 to 4 answered (a line for training days not opened and games not checked, "today or later", the link to "Attendance" with the player open and "Back", copy stays percentage only) |
