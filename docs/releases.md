@@ -6,6 +6,7 @@ the steps are in `README.md`.
 
 | Version | Date | What changed for the user |
 |---------|------|---------------------------|
+| v0.10.0 | 2026-11-09 | The report: one page for the current season with, for each player, trainings and games as a percentage and drive, table and referee as done + planned; the players who left below it; a line with the training days not opened and the games not checked; the details of a player on a tap (absences valid and not valid, duties done by or for another player, and not done); "Copy" for each column as a Dutch text for the chat. |
 | v0.9.0 | 2026-11-08 | Attendance at games, release 2: "Not played" for a game (it counts nothing, with "The drivers drove"); from the start time "There" and "Absent", "Checked" with "Undo check", the open item "games not checked" from 4 Nov, and "· Checked" on the rows; duty places offer "Someone else" and "Nobody" and count as done from the start time; checked games in the totals on "Attendance". |
 | v0.8.0 | 2026-11-04 | Attendance at games, release 1: who comes to each game of the team (coming, not coming with a reason, no answer, extra players, the count on the rows), and the warnings in time: too few players in the last 3 days, a driver who is not coming, and answers from before a move with "Answers checked". |
 | v0.7.0 | 2026-10-31 | The message of the week (replaces the message for the next game), the committee message, and the duty overviews (all coming drives, or all coming table and referee places). Duties is complete. |
