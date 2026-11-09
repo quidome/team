@@ -29,7 +29,8 @@
 
 	function duty(row: ReportRow, key: (typeof kinds)[number]['key']): string {
 		const total = row.duties?.[key];
-		return total ? `${total.done} + ${total.planned}` : '–';
+		// Narrow spaces (U+2009) around "+", so three duty columns side by side keep a gap.
+		return total ? `${total.done}\u2009+\u2009${total.planned}` : '–';
 	}
 
 	function count(n: number, one: string, more: string): string {
@@ -37,12 +38,13 @@
 	}
 
 	type Column = keyof Report['copies'];
-	const columns: { key: Column; name: string }[] = [
-		{ key: 'trainings', name: 'Trainings' },
-		{ key: 'games', name: 'Games' },
-		{ key: 'drive', name: 'Drive' },
-		{ key: 'table', name: 'Table' },
-		{ key: 'referee', name: 'Referee' }
+	// `short`: the heading, with a soft hyphen where a narrow column may break it.
+	const columns: { key: Column; name: string; short: string }[] = [
+		{ key: 'trainings', name: 'Trainings', short: 'Train\u00adings' },
+		{ key: 'games', name: 'Games', short: 'Games' },
+		{ key: 'drive', name: 'Drive', short: 'Drive' },
+		{ key: 'table', name: 'Table', short: 'Table' },
+		{ key: 'referee', name: 'Referee', short: 'Ref\u00aderee' }
 	];
 
 	// The last "Copy": its column and whether the browser took the text.
@@ -100,24 +102,25 @@
 </svelte:head>
 
 {#snippet table(rows: ReportRow[], testid: string, copies: Report['copies'] | null)}
-	<div class="rounded-xl border bg-card shadow-xs">
+	<!-- The same space inside the card on the left and the right (px-2), so the names and the last column keep the same distance to the border. -->
+	<div class="rounded-xl border bg-card px-2 shadow-xs">
 		<table class="w-full table-fixed text-sm" data-testid={testid}>
 			<thead>
 				<tr class="border-b text-left">
-					<th scope="col" class="w-[28%] px-2 py-2 font-medium"
+					<th scope="col" class="w-[28%] px-1 py-2 font-medium"
 						><span class="sr-only">Player</span></th
 					>
 					{#each columns as column (column.key)}
 						{@const text = copies?.[column.key]}
 						<th
 							scope="col"
-							class="px-0.5 py-2 text-right align-top text-[11px] font-medium break-words hyphens-auto"
+							class="px-0.5 py-2 text-right align-top text-[11px] font-medium hyphens-manual"
 						>
-							<span class="block">{column.name}</span>
+							<span class="block">{column.short}</span>
 							{#if text}
 								<button
 									type="button"
-									class="mt-1 min-h-8 rounded-md border px-1.5 text-xs font-normal"
+									class="mt-1 min-h-8 max-w-full rounded-md border px-1 text-[11px] font-normal"
 									aria-label={`Copy ${column.name}`}
 									onclick={() => copy(column.key, text)}
 									data-testid={`copy-${column.key}`}>Copy</button
@@ -135,57 +138,59 @@
 						<th scope="row" class="truncate p-0 text-left font-medium">
 							<button
 								type="button"
-								class="min-h-11 w-full truncate px-2 py-2 text-left underline-offset-4 hover:underline"
+								class="min-h-11 w-full truncate px-1 py-2 text-left underline-offset-4 hover:underline"
 								aria-expanded={shown}
 								onclick={() => toggle(row.player)}>{row.name}</button
 							>
 						</th>
-						<td class="px-0.5 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
+						<td class="px-1 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
 							>{share(row.trainings)}</td
 						>
-						<td class="px-0.5 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
+						<td class="px-1 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
 							>{share(row.games)}</td
 						>
 						{#each kinds as kind (kind.key)}
-							<td class="px-0.5 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
+							<td class="px-1 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
 								>{duty(row, kind.key)}</td
 							>
 						{/each}
 					</tr>
 					{#if shown}
-						<tr class="border-b bg-muted/40 last:border-b-0" data-testid="report-details">
-							<td colspan="6" class="space-y-1 px-3 py-2 text-sm">
-								<p class="font-medium">{row.name}</p>
-								{#if row.trainings}
-									<p class="tabular-nums" data-testid="details-trainings">
-										{shareLine(row.trainings, 'training', 'trainings')}
-									</p>
-								{/if}
-								{#if row.games}
-									<p class="tabular-nums" data-testid="details-games">
-										{shareLine(row.games, 'game', 'games')}
-									</p>
-								{/if}
-								{#each duties as line (line.name)}
-									<div data-testid="details-duty">
-										<p class="tabular-nums">{line.name}: {line.text}</p>
-										{#each line.corrections as correction (correction)}
-											<p class="pl-4 text-muted-foreground tabular-nums">{correction}</p>
-										{/each}
-									</div>
-								{/each}
-								{#if !row.trainings && !row.games && duties.length === 0}
-									<p class="text-muted-foreground">Nothing counts yet this season.</p>
-								{/if}
-								{#if row.trainings || row.games}
-									<p>
-										<a
-											href={resolve(`/attendance?player=${row.player}&from=report`)}
-											class="font-medium underline underline-offset-4"
-											data-testid="details-missed">Missed trainings and games</a
-										>
-									</p>
-								{/if}
+						<tr class="border-b last:border-b-0" data-testid="report-details">
+							<td colspan="6" class="py-1 text-sm">
+								<div class="space-y-1 rounded-md bg-muted/40 px-2 py-2">
+									<p class="font-medium">{row.name}</p>
+									{#if row.trainings}
+										<p class="tabular-nums" data-testid="details-trainings">
+											{shareLine(row.trainings, 'training', 'trainings')}
+										</p>
+									{/if}
+									{#if row.games}
+										<p class="tabular-nums" data-testid="details-games">
+											{shareLine(row.games, 'game', 'games')}
+										</p>
+									{/if}
+									{#each duties as line (line.name)}
+										<div data-testid="details-duty">
+											<p class="tabular-nums">{line.name}: {line.text}</p>
+											{#each line.corrections as correction (correction)}
+												<p class="pl-4 text-muted-foreground tabular-nums">{correction}</p>
+											{/each}
+										</div>
+									{/each}
+									{#if !row.trainings && !row.games && duties.length === 0}
+										<p class="text-muted-foreground">Nothing counts yet this season.</p>
+									{/if}
+									{#if row.trainings || row.games}
+										<p>
+											<a
+												href={resolve(`/attendance?player=${row.player}&from=report`)}
+												class="font-medium underline underline-offset-4"
+												data-testid="details-missed">Missed trainings and games</a
+											>
+										</p>
+									{/if}
+								</div>
 							</td>
 						</tr>
 					{/if}

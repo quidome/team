@@ -330,6 +330,21 @@ test('every heading and cell fits its column on a phone', async ({ page }) => {
 				.map((cell) => cell.textContent?.trim())
 		);
 	expect(overflowing).toEqual([]);
+	// The text keeps the same distance to the border on the left and on the right.
+	const gaps = await page.getByTestId('report-team').evaluate((table) => {
+		const card = table.parentElement!.getBoundingClientRect();
+		const text = (cell: Element) => {
+			const range = document.createRange();
+			range.selectNodeContents(cell);
+			return range.getBoundingClientRect();
+		};
+		const row = table.querySelector('tbody tr')!;
+		const name = text(row.querySelector('th button')!);
+		const last = text([...row.querySelectorAll('td')].at(-1)!);
+		return { left: name.left - card.left, right: card.right - last.right };
+	});
+	expect(Math.abs(gaps.left - gaps.right), JSON.stringify(gaps)).toBeLessThanOrEqual(4);
+	expect(gaps.right).toBeGreaterThanOrEqual(8);
 	await expectNoHorizontalScroll(page, 360);
 });
 
