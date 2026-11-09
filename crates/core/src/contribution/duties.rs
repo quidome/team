@@ -714,6 +714,12 @@ fn drove(duties: &GameDuties<'_>, assignment: &Assignment) -> bool {
 pub struct Total {
     pub done: u32,
     pub planned: u32,
+    /// Planned for this player; another player did it ("Someone else"). Not in `done`.
+    pub done_by_other: u32,
+    /// Done by this player in place of the planned player ("Someone else"). Also in `done`.
+    pub done_for_other: u32,
+    /// Planned for this player; nobody did it ("Nobody"). Not in `done`.
+    pub not_done: u32,
 }
 
 /// The duties of a player for each kind.
@@ -733,6 +739,13 @@ impl KindTotals {
         }
     }
 
+    /// The player has a duty done or planned of some kind; the corrections alone do not count.
+    pub fn has_duty(&self) -> bool {
+        [self.drive, self.table, self.referee]
+            .iter()
+            .any(|total| total.done + total.planned > 0)
+    }
+
     fn of_mut(&mut self, kind: DutyKind) -> &mut Total {
         match kind {
             DutyKind::Drive => &mut self.drive,
@@ -743,7 +756,10 @@ impl KindTotals {
 }
 
 /// The duty totals of `games` (usually one season): the only source of the numbers (decision
-/// 0022). A player with no counted duty is not in it.
+/// 0022), with the corrections after a game in the same pass (decision 0033): "Someone else" adds
+/// `done_for_other` to the player who did it and `done_by_other` to the planned player, "Nobody"
+/// adds `not_done` to the planned player. A player with no counted place is not in it; a player
+/// with only corrections is (see [`KindTotals::has_duty`]).
 pub fn duty_totals(games: &[GameDuties<'_>]) -> BTreeMap<PlayerId, KindTotals> {
     let mut totals: BTreeMap<PlayerId, KindTotals> = BTreeMap::new();
     for duties in games {
@@ -751,16 +767,30 @@ pub fn duty_totals(games: &[GameDuties<'_>]) -> BTreeMap<PlayerId, KindTotals> {
             if !place_counts(duties, assignment) && !drove(duties, assignment) {
                 continue;
             }
-            let (player, done) = match who_did(assignment, duties.started) {
-                Counted::Done(player) => (player, true),
-                Counted::Planned(player) => (player, false),
-                Counted::Nobody => continue,
-            };
-            let total = totals.entry(player).or_default().of_mut(assignment.kind);
-            if done {
-                total.done += 1;
-            } else {
-                total.planned += 1;
+            let kind = assignment.kind;
+            match who_did(assignment, duties.started) {
+                Counted::Planned(player) => {
+                    totals.entry(player).or_default().of_mut(kind).planned += 1
+                }
+                Counted::Done(player) => {
+                    let total = totals.entry(player).or_default().of_mut(kind);
+                    total.done += 1;
+                    if player != assignment.planned {
+                        total.done_for_other += 1;
+                        totals
+                            .entry(assignment.planned)
+                            .or_default()
+                            .of_mut(kind)
+                            .done_by_other += 1;
+                    }
+                }
+                Counted::Nobody => {
+                    totals
+                        .entry(assignment.planned)
+                        .or_default()
+                        .of_mut(kind)
+                        .not_done += 1;
+                }
             }
         }
     }
@@ -1055,6 +1085,21 @@ pub fn offers(
         .collect()
 }
 
+/// Whether `player` has duty numbers in `season`, on "Duties" and in the report (decision 0033):
+/// the role "plays games" in the season, or a duty done or planned (`totals`, from
+/// `duty_totals`). Corrections alone do not count.
+pub fn has_duty_row(
+    player: PlayerId,
+    roles: &[PlayerRole],
+    season: crate::shared::season::Season,
+    totals: &BTreeMap<PlayerId, KindTotals>,
+) -> bool {
+    totals.get(&player).is_some_and(KindTotals::has_duty)
+        || roles.iter().any(|role| {
+            role.player == player && role.season == season && role.role == Role::PlaysGames
+        })
+}
+
 /// The rows of the page "Duties" of `season`: each player with the role "plays games" in the
 /// season or with a duty in it (`totals`, from `duty_totals`), also players who left and hidden
 /// players, in the order of `players`, with the totals (zero without a duty).
@@ -1066,14 +1111,7 @@ pub fn duty_rows<'a>(
 ) -> Vec<(&'a Player, KindTotals)> {
     players
         .iter()
-        .filter(|player| {
-            totals.contains_key(&player.id)
-                || roles.iter().any(|role| {
-                    role.player == player.id
-                        && role.season == season
-                        && role.role == Role::PlaysGames
-                })
-        })
+        .filter(|player| has_duty_row(player.id, roles, season, totals))
         .map(|player| (player, totals.get(&player.id).copied().unwrap_or_default()))
         .collect()
 }
@@ -2225,18 +2263,27 @@ mod tests {
             total(ANNA, DutyKind::Table),
             Total {
                 done: 1,
-                planned: 1
+                planned: 1,
+                ..Total::default()
             }
         );
         assert_eq!(
             total(CAS, DutyKind::Table),
             Total {
                 done: 1,
-                planned: 0
+                done_for_other: 1,
+                ..Total::default()
             }
         );
-        // Bram was planned but someone else did it.
-        assert_eq!(totals.get(&BRAM), None);
+        // Bram was planned but someone else did it: only the correction.
+        assert_eq!(
+            total(BRAM, DutyKind::Table),
+            Total {
+                done_by_other: 1,
+                ..Total::default()
+            }
+        );
+        assert!(!totals[&BRAM].has_duty());
         assert_eq!(total(ANNA, DutyKind::Referee), Total::default());
     }
 
@@ -2255,7 +2302,16 @@ mod tests {
             past: true,
             started: true,
         }];
-        assert!(duty_totals(&games).is_empty());
+        // "Nobody": not done, only the correction (decision 0033).
+        let totals = duty_totals(&games);
+        assert_eq!(
+            totals[&ANNA].table,
+            Total {
+                not_done: 1,
+                ..Total::default()
+            }
+        );
+        assert!(!totals[&ANNA].has_duty());
 
         // A coming game that left the game list, and a coming swapped game.
         let stored = teams(&[((PlaceKind::Table, 1), TEAM)]);
@@ -2314,7 +2370,8 @@ mod tests {
                 duty_totals(&games)[&ANNA].table,
                 Total {
                     done: 1,
-                    planned: 0
+                    planned: 0,
+                    ..Total::default()
                 }
             );
         }
@@ -2508,6 +2565,106 @@ mod tests {
             .collect();
         // Bram played games only last season.
         assert_eq!(rows, [(ANNA, 0), (CAS, 1)]);
+
+        // A player with only a correction (planned, then replaced) gets no row (decision 0033).
+        let mut replaced = KindTotals::default();
+        replaced.table.done_by_other = 1;
+        let totals = BTreeMap::from([(BRAM, replaced), (CAS, cas)]);
+        let rows = duty_rows(
+            &players,
+            &roles,
+            crate::shared::season::Season::from_start_year(2026),
+            &totals,
+        );
+        let ids: Vec<PlayerId> = rows.iter().map(|(player, _)| player.id).collect();
+        assert_eq!(ids, [ANNA, CAS]);
+    }
+
+    #[test]
+    fn corrections_count_only_where_done_counts() {
+        let one = game(1, CLUB_TEAM, OPPONENT);
+        let list = [
+            Assignment {
+                outcome: Outcome::DoneBy(CAS),
+                ..planned(DutyKind::Table, 1, ANNA)
+            },
+            Assignment {
+                outcome: Outcome::NotDone,
+                ..planned(DutyKind::Table, 2, BRAM)
+            },
+        ];
+        let (places, _, _) = table_one(&list, true);
+        let at = |past: bool, started: bool| {
+            duty_totals(&[GameDuties {
+                game: &one,
+                places: &places,
+                assignments: &list,
+                past,
+                started,
+            }])
+        };
+        // Started: all three corrections.
+        let totals = at(true, true);
+        assert_eq!(totals[&ANNA].table.done_by_other, 1);
+        assert_eq!(totals[&CAS].table.done_for_other, 1);
+        assert_eq!(totals[&CAS].table.done, 1);
+        assert_eq!(totals[&BRAM].table.not_done, 1);
+        // Not started: planned only, no correction.
+        let totals = at(false, false);
+        assert_eq!(
+            totals[&ANNA].table,
+            Total {
+                planned: 1,
+                ..Total::default()
+            }
+        );
+        assert_eq!(
+            totals[&BRAM].table,
+            Total {
+                planned: 1,
+                ..Total::default()
+            }
+        );
+        assert_eq!(totals.get(&CAS), None);
+    }
+
+    #[test]
+    fn corrections_at_a_not_played_game_count_only_for_the_drives_that_count() {
+        let one = game(1, CLUB_TEAM, OPPONENT);
+        let list = [
+            Assignment {
+                outcome: Outcome::NotDone,
+                ..planned(DutyKind::Table, 1, ANNA)
+            },
+            Assignment {
+                outcome: Outcome::DoneBy(CAS),
+                ..planned(DutyKind::Drive, 1, BRAM)
+            },
+        ];
+        let filled = filled(&[(DutyKind::Table, 1), (DutyKind::Drive, 1)]);
+        let totals = |drove: bool| {
+            let places = game_places(
+                BOTH,
+                Some(&table_and_drivers(drove)),
+                TEAM,
+                &filled,
+                10,
+                not_played(true, true),
+            )
+            .expect("places");
+            duty_totals(&[GameDuties {
+                game: &one,
+                places: &places,
+                assignments: &list,
+                past: true,
+                started: true,
+            }])
+        };
+        assert!(totals(false).is_empty());
+        let drove = totals(true);
+        assert_eq!(drove.get(&ANNA), None);
+        assert_eq!(drove[&BRAM].drive.done_by_other, 1);
+        assert_eq!(drove[&CAS].drive.done_for_other, 1);
     }
 
     /// A game marked "Not played"; `started`: its start time has passed.
@@ -2644,7 +2801,8 @@ mod tests {
                 .of(DutyKind::Drive),
             Total {
                 done: 1,
-                planned: 0
+                planned: 0,
+                ..Total::default()
             }
         );
         // "Undo": the totals are as before the mark.
@@ -2658,7 +2816,8 @@ mod tests {
                 .of(DutyKind::Table),
             Total {
                 done: 1,
-                planned: 0
+                planned: 0,
+                ..Total::default()
             }
         );
     }
@@ -2758,14 +2917,16 @@ mod tests {
             total(false),
             Total {
                 done: 0,
-                planned: 1
+                planned: 1,
+                ..Total::default()
             }
         );
         assert_eq!(
             total(true),
             Total {
                 done: 1,
-                planned: 0
+                planned: 0,
+                ..Total::default()
             }
         );
     }

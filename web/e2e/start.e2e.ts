@@ -33,6 +33,7 @@ test('the start page shows the team, the open items, "Last", "Next" and the link
 		'Season',
 		'Attendance',
 		'Duties',
+		'Report',
 		'Team',
 		'Players',
 		'Settings'

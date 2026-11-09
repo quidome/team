@@ -614,6 +614,22 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/api/report': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get: operations['report'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/api/season': {
 		parameters: {
 			query?: never;
@@ -1138,6 +1154,28 @@ export interface components {
 			/** Format: int64 */
 			player: number;
 			totals: components['schemas']['KindTotalsView'];
+		};
+		/** @description One duty kind of a player, with the corrections after a game. */
+		DutyView: {
+			/** Format: int32 */
+			done: number;
+			/**
+			 * Format: int32
+			 * @description Planned for this player; another player did it.
+			 */
+			done_by_other: number;
+			/**
+			 * Format: int32
+			 * @description Done by this player for another player (also in `done`).
+			 */
+			done_for_other: number;
+			/**
+			 * Format: int32
+			 * @description Planned for this player; nobody did it.
+			 */
+			not_done: number;
+			/** Format: int32 */
+			planned: number;
 		};
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
@@ -1679,6 +1717,56 @@ export interface components {
 			/** @description For `confirm_removal`: the roles "Remove from the team" would remove, in order of start. */
 			roles?: components['schemas']['RoleView'][] | null;
 		};
+		/** @description The page "Report". */
+		Report: {
+			copies: components['schemas']['ReportCopies'];
+			incomplete: components['schemas']['ReportIncomplete'];
+			/** @description "Left the team": everyone else with a number. */
+			left: components['schemas']['ReportRowView'][];
+			/** @description The current season, for example "2026-2027". */
+			season: string;
+			/** @description A role today or later in the season; sorted by first name. */
+			team: components['schemas']['ReportRowView'][];
+		};
+		/** @description The texts to copy for each column; `null`: no line, no "Copy". */
+		ReportCopies: {
+			drive?: string | null;
+			games?: string | null;
+			referee?: string | null;
+			table?: string | null;
+			trainings?: string | null;
+		};
+		ReportDutiesView: {
+			drive: components['schemas']['DutyView'];
+			referee: components['schemas']['DutyView'];
+			table: components['schemas']['DutyView'];
+		};
+		/** @description A game not checked, to open from the report. */
+		ReportGameRef: {
+			/** Format: int64 */
+			id: number;
+			season: string;
+		};
+		/** @description What does not count yet: training days not opened and games not checked. */
+		ReportIncomplete: {
+			first_not_checked?: null | components['schemas']['ReportGameRef'];
+			/** @description The oldest training day not opened, for example "2026-10-13". */
+			first_not_opened?: string | null;
+			/** @description The games of the open item "not checked" of the start page in this season. */
+			not_checked: number;
+			not_opened: number;
+		};
+		/** @description A row of the report. */
+		ReportRowView: {
+			duties?: null | components['schemas']['ReportDutiesView'];
+			games?: null | components['schemas']['ShareView'];
+			hidden: boolean;
+			/** @description The name shown ("Anna", "Anna B."). */
+			name: string;
+			/** Format: int64 */
+			player: number;
+			trainings?: null | components['schemas']['ShareView'];
+		};
 		/** @enum {string} */
 		ResultKind: 'good' | 'failed' | 'held_back';
 		RoleChange: {
@@ -1844,6 +1932,22 @@ export interface components {
 					state: 'chosen';
 					team: components['schemas']['TeamView'];
 			  };
+		/** @description Trainings or games of a player: what counts, with the percentages (half up). */
+		ShareView: {
+			absent_not_valid: number;
+			absent_valid: number;
+			counted: number;
+			/**
+			 * Format: int32
+			 * @description "there" of `counted`, for example 67.
+			 */
+			percent: number;
+			/** Format: int32 */
+			percent_not_valid: number;
+			/** Format: int32 */
+			percent_valid: number;
+			there: number;
+		};
 		StartAnswer: {
 			last?: null | components['schemas']['EventView'];
 			/**
@@ -4029,6 +4133,33 @@ export interface operations {
 			};
 			/** @description No such reason */
 			404: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content?: never;
+			};
+		};
+	};
+	report: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description The report of the current season */
+			200: {
+				headers: {
+					[name: string]: unknown;
+				};
+				content: {
+					'application/json': components['schemas']['Report'];
+				};
+			};
+			/** @description Not logged in */
+			401: {
 				headers: {
 					[name: string]: unknown;
 				};

@@ -236,7 +236,8 @@
 		}
 	}
 
-	/** Where the training was opened from: `?from=start` or `?from=attendance`, else "Season". */
+	/** Where the training was opened from: `?from=start`, `?from=attendance` or `?from=report`, else
+	 * "Season". */
 	const from = $derived(current.url.searchParams.get('from'));
 
 	/** The page "Season" of the training's season, so "Back" returns to the season it came from. */
@@ -247,6 +248,7 @@
 	/** "Back": the page the training was opened from. */
 	function backOf(season: string): ResolvedPathname {
 		if (from === 'start') return resolve('/');
+		if (from === 'report') return resolve('/report');
 		if (from === 'attendance') return resolve(`/attendance?season=${encodeURIComponent(season)}`);
 		return seasonOf(season);
 	}

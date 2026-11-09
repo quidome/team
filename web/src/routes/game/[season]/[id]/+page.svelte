@@ -83,11 +83,13 @@
 	let error = $state<string | null>(null);
 	let notSaved = $state(false);
 
-	/** Where the game was opened from: `?from=start` or `?from=changes`, else "Season". */
+	/** Where the game was opened from: `?from=start`, `?from=changes` or `?from=report`, else
+	 * "Season". */
 	const from = $derived(current.url.searchParams.get('from'));
 	function backOf(season: string): ResolvedPathname {
 		if (from === 'start') return resolve('/');
 		if (from === 'changes') return resolve('/changes');
+		if (from === 'report') return resolve('/report');
 		return resolve(`/season?season=${encodeURIComponent(season)}`);
 	}
 

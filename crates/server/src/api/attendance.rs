@@ -4,15 +4,16 @@
 
 use axum::Json;
 use axum::extract::{Query, State};
+use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
-    GameTotals, MissedKind, PlayerTotals, ReasonId, ScheduledGame, Season, counted_games,
-    season_overview,
+    GameTotals, MissedKind, Player, PlayerTotals, ReasonId, ScheduledGame, Season, SeasonOverview,
+    counted_games, season_overview,
 };
 use utoipa::ToSchema;
 
 use super::format::{day, query_season};
-use super::season::{SeasonTrainings, games_of, trainings_of};
+use super::season::{SeasonGames, SeasonTrainings, games_of, trainings_of};
 use super::trainings::SeasonQuery;
 use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
@@ -138,6 +139,49 @@ fn totals_view(totals: &PlayerTotals, reasons: &[StoredReason]) -> PlayerTotalsV
     }
 }
 
+/// The totals of `season` on `today` from what is loaded (`team_core::season_overview`): the one
+/// way to feed it, for "Attendance" and the report (decision 0033). The games count by the rules of
+/// the page of a game: checked, played, a player on the list with an answer.
+pub(crate) fn overview_of<'a>(
+    season: Season,
+    players: &'a [Player],
+    trainings: &SeasonTrainings,
+    reasons: &[StoredReason],
+    games: &SeasonGames,
+    today: NaiveDate,
+) -> SeasonOverview<'a> {
+    let valid: Vec<(ReasonId, bool)> = reasons
+        .iter()
+        .map(|reason| (ReasonId(reason.id), reason.valid))
+        .collect();
+    let all: Vec<ScheduledGame> = games
+        .schedule
+        .past
+        .iter()
+        .chain(&games.schedule.coming)
+        .cloned()
+        .collect();
+    let attendance = &games.duties.attendance;
+    let counted = counted_games(
+        &all,
+        &games.duties.players,
+        &games.duties.roles,
+        &attendance.games,
+        &attendance.answers,
+    );
+    season_overview(
+        season,
+        players,
+        &trainings.roles,
+        &trainings.weekly,
+        &trainings.trainings,
+        &trainings.absences,
+        &valid,
+        &counted,
+        today,
+    )
+}
+
 #[utoipa::path(
     get,
     path = "/api/attendance",
@@ -164,30 +208,20 @@ pub async fn get(
         roles,
     } = trainings_of(&state, season).await?;
     let reasons = reasons::all(&state.pool).await?;
-    let valid: Vec<(ReasonId, bool)> = reasons
-        .iter()
-        .map(|reason| (ReasonId(reason.id), reason.valid))
-        .collect();
-    // The checked games of the team that were played: the rules of the page of a game.
     let games = games_of(&state, season, current, today).await?;
-    let all: Vec<ScheduledGame> = games
-        .schedule
-        .past
-        .iter()
-        .chain(&games.schedule.coming)
-        .cloned()
-        .collect();
-    let attendance = &games.duties.attendance;
-    let counted = counted_games(
-        &all,
-        &games.duties.players,
-        &games.duties.roles,
-        &attendance.games,
-        &attendance.answers,
-    );
     let release = game_attendance::check_start(&state.pool).await?;
-    let overview = season_overview(
-        season, &players, &roles, &weekly, &stored, &absences, &valid, &counted, today,
+    let overview = overview_of(
+        season,
+        &players,
+        &SeasonTrainings {
+            weekly,
+            trainings: stored,
+            absences,
+            roles,
+        },
+        &reasons,
+        &games,
+        today,
     );
 
     let mut seasons = trainings::seasons(&state.pool).await?;

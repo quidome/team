@@ -58,6 +58,8 @@
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/duties')} class="font-medium underline underline-offset-4">Duties</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
+		<a href={resolve('/report')} class="font-medium underline underline-offset-4">Report</a>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/team')} class="font-medium underline underline-offset-4">Team</a>
 		<span class="text-muted-foreground" aria-hidden="true">·</span>
 		<a href={resolve('/players')} class="font-medium underline underline-offset-4">Players</a>

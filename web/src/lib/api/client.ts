@@ -549,6 +549,14 @@ export async function loadDuties(
 	return dataOf(await api.GET('/api/duties', { fetch, params: { query: { season } } }));
 }
 
+export type Report = components['schemas']['Report'];
+export type ReportRow = components['schemas']['ReportRowView'];
+
+/** The report of the current season (decision 0033). */
+export async function loadReport(fetch: typeof globalThis.fetch): Promise<Report> {
+	return dataOf(await api.GET('/api/report', { fetch }));
+}
+
 export type AttendanceOverview = components['schemas']['AttendanceOverview'];
 export type PlayerTotals = components['schemas']['PlayerTotalsView'];
 

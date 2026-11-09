@@ -12,6 +12,7 @@ pub mod messages;
 pub mod players;
 pub mod readings;
 pub mod reasons;
+pub mod report;
 pub mod season;
 pub mod selection;
 pub mod start;
@@ -75,6 +76,7 @@ use utoipa::OpenApi;
         team::team_undo,
         attendance::get,
         duties::get,
+        report::get,
         trainings::get,
         trainings::open,
         trainings::add,

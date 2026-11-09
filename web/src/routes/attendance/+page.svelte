@@ -3,11 +3,14 @@
 	of each player in the chosen season (the current one by default, `?season=` in the address), at
 	trainings and at checked games that were played, then "Left the team"; a tap on a player shows
 	the trainings and games it missed. Above the totals: the training days not opened, and in the
-	season of the release the line about the games. The list of trainings is on "Season".
+	season of the release the line about the games. The list of trainings is on "Season". Opened
+	from "Report" (`?player=<id>&from=report`, decision 0033): that player's list is open, and
+	"Back" returns to the report.
 -->
 <script lang="ts">
 	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page as here } from '$app/state';
 	import type { PlayerTotals } from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { fullName } from '#lib/players.js';
@@ -33,10 +36,14 @@
 			: [...expanded, player];
 	}
 
-	// Another season (or a return to the page) starts with no open missed list.
+	// Another season (or a return to the page) starts with no open missed list, except the player
+	// in the address (`?player=`, from "Report").
 	afterNavigate(() => {
-		expanded = [];
+		const player = Number(here.url.searchParams.get('player'));
+		expanded = Number.isInteger(player) && player > 0 ? [player] : [];
 	});
+
+	const fromReport = $derived(here.url.searchParams.get('from') === 'report');
 
 	function chooseSeason(season: string) {
 		goto(resolve(`/attendance?season=${encodeURIComponent(season)}`));
@@ -111,7 +118,7 @@
 	<section class="space-y-6">
 		<div class="flex items-center justify-between gap-3">
 			<h1 class="text-2xl font-semibold tracking-tight">Attendance · {overview.season}</h1>
-			<Button href={resolve('/')} variant="ghost">Back</Button>
+			<Button href={fromReport ? resolve('/report') : resolve('/')} variant="ghost">Back</Button>
 		</div>
 
 		{#if overview.seasons.length > 1}

@@ -6,6 +6,7 @@
 <script lang="ts">
 	import type { Message } from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { copyText } from '#lib/copy.js';
 
 	let {
 		title,
@@ -22,15 +23,10 @@
 		message: Message | null;
 	} = $props();
 
-	let copy = $state<'idle' | 'copied' | 'failed'>('idle');
+	let copyState = $state<'idle' | 'copied' | 'failed'>('idle');
 
-	async function copyText(text: string) {
-		try {
-			await navigator.clipboard.writeText(text);
-			copy = 'copied';
-		} catch {
-			copy = 'failed';
-		}
+	async function copy(text: string) {
+		copyState = await copyText(text);
 	}
 </script>
 
@@ -59,11 +55,11 @@
 				data-testid="message-text">{text}</pre>
 
 			<div class="flex items-center gap-3">
-				<Button onclick={() => copyText(text)} data-testid="copy">Copy</Button>
+				<Button onclick={() => copy(text)} data-testid="copy">Copy</Button>
 				<p class="text-sm text-muted-foreground" aria-live="polite" data-testid="copy-state">
-					{#if copy === 'copied'}
+					{#if copyState === 'copied'}
 						Copied
-					{:else if copy === 'failed'}
+					{:else if copyState === 'failed'}
 						Select the text and copy it.
 					{/if}
 				</p>

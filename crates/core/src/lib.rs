@@ -19,8 +19,8 @@ pub use contribution::duties::{
     Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart, SchedulePlace,
     StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered, check_outcome,
     check_team, choice_players, clash_level, clashes, club_teams, display_names, driver_proposal,
-    duty_rows, duty_totals, game_places, has_team_places, highest_driver, kept_games, not_entered,
-    offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
+    duty_rows, duty_totals, game_places, has_duty_row, has_team_places, highest_driver, kept_games,
+    not_entered, offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
     required_duties, team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
@@ -57,6 +57,7 @@ pub use output::messages::{
     MessageGame, committee_message, driving_overview, full_names, table_referee_overview,
     week_message, week_of,
 };
+pub use output::report::{ReportColumn, ReportRow, Share, percent, report_copy, report_rows};
 pub use output::season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use output::start_page::{
     NotCheckedGame, OpenGame, OpenItem, PlacesOf, ReadingState, games_not_checked, last_games,

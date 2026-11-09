@@ -80,6 +80,11 @@ fn long_date(date: NaiveDate) -> String {
     format!("{day} {}", day_and_month(date))
 }
 
+/// "9 nov".
+pub(crate) fn day_and_short_month(date: NaiveDate) -> String {
+    format!("{} {}", date.day(), SHORT_MONTHS[date.month0() as usize])
+}
+
 /// "za 31 okt".
 fn short_date(date: NaiveDate) -> String {
     let day = SHORT_DAYS[date.weekday().num_days_from_monday() as usize];

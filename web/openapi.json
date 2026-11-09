@@ -2110,6 +2110,29 @@
         }
       }
     },
+    "/api/report": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "operationId": "report",
+        "responses": {
+          "200": {
+            "description": "The report of the current season",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/api/season": {
       "get": {
         "tags": [
@@ -3700,6 +3723,47 @@
           },
           "totals": {
             "$ref": "#/components/schemas/KindTotalsView"
+          }
+        }
+      },
+      "DutyView": {
+        "type": "object",
+        "description": "One duty kind of a player, with the corrections after a game.",
+        "required": [
+          "done",
+          "planned",
+          "done_by_other",
+          "done_for_other",
+          "not_done"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "done_by_other": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Planned for this player; another player did it.",
+            "minimum": 0
+          },
+          "done_for_other": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Done by this player for another player (also in `done`).",
+            "minimum": 0
+          },
+          "not_done": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Planned for this player; nobody did it.",
+            "minimum": 0
+          },
+          "planned": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -5329,6 +5393,207 @@
           }
         }
       },
+      "Report": {
+        "type": "object",
+        "description": "The page \"Report\".",
+        "required": [
+          "season",
+          "incomplete",
+          "team",
+          "left",
+          "copies"
+        ],
+        "properties": {
+          "copies": {
+            "$ref": "#/components/schemas/ReportCopies"
+          },
+          "incomplete": {
+            "$ref": "#/components/schemas/ReportIncomplete"
+          },
+          "left": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRowView"
+            },
+            "description": "\"Left the team\": everyone else with a number."
+          },
+          "season": {
+            "type": "string",
+            "description": "The current season, for example \"2026-2027\"."
+          },
+          "team": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRowView"
+            },
+            "description": "A role today or later in the season; sorted by first name."
+          }
+        }
+      },
+      "ReportCopies": {
+        "type": "object",
+        "description": "The texts to copy for each column; `null`: no line, no \"Copy\".",
+        "properties": {
+          "drive": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "games": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referee": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "table": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trainings": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ReportDutiesView": {
+        "type": "object",
+        "required": [
+          "drive",
+          "table",
+          "referee"
+        ],
+        "properties": {
+          "drive": {
+            "$ref": "#/components/schemas/DutyView"
+          },
+          "referee": {
+            "$ref": "#/components/schemas/DutyView"
+          },
+          "table": {
+            "$ref": "#/components/schemas/DutyView"
+          }
+        }
+      },
+      "ReportGameRef": {
+        "type": "object",
+        "description": "A game not checked, to open from the report.",
+        "required": [
+          "season",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "season": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportIncomplete": {
+        "type": "object",
+        "description": "What does not count yet: training days not opened and games not checked.",
+        "required": [
+          "not_opened",
+          "not_checked"
+        ],
+        "properties": {
+          "first_not_checked": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportGameRef",
+                "description": "The oldest of them."
+              }
+            ]
+          },
+          "first_not_opened": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The oldest training day not opened, for example \"2026-10-13\"."
+          },
+          "not_checked": {
+            "type": "integer",
+            "description": "The games of the open item \"not checked\" of the start page in this season.",
+            "minimum": 0
+          },
+          "not_opened": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ReportRowView": {
+        "type": "object",
+        "description": "A row of the report.",
+        "required": [
+          "player",
+          "name",
+          "hidden"
+        ],
+        "properties": {
+          "duties": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReportDutiesView",
+                "description": "`null` (\"–\"): no team chosen, or no role \"plays games\" in the season and no duty."
+              }
+            ]
+          },
+          "games": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShareView",
+                "description": "`null`: no game counts (\"–\")."
+              }
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name shown (\"Anna\", \"Anna B.\")."
+          },
+          "player": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "trainings": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShareView",
+                "description": "`null`: no training counts (\"–\")."
+              }
+            ]
+          }
+        }
+      },
       "ResultKind": {
         "type": "string",
         "enum": [
@@ -5830,6 +6095,53 @@
           }
         ],
         "description": "The state of the choice. `season` is always the current season."
+      },
+      "ShareView": {
+        "type": "object",
+        "description": "Trainings or games of a player: what counts, with the percentages (half up).",
+        "required": [
+          "counted",
+          "there",
+          "absent_valid",
+          "absent_not_valid",
+          "percent",
+          "percent_valid",
+          "percent_not_valid"
+        ],
+        "properties": {
+          "absent_not_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "absent_valid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "counted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "percent": {
+            "type": "integer",
+            "format": "int32",
+            "description": "\"there\" of `counted`, for example 67.",
+            "minimum": 0
+          },
+          "percent_not_valid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "percent_valid": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "there": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       },
       "StartAnswer": {
         "type": "object",

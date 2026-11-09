@@ -471,7 +471,8 @@ pub(crate) async fn duties_of(
     load_duties(state, &mut db, club, season).await
 }
 
-async fn load_duties(
+/// As [`duties_of`], on `db` (for example a transaction, decision 0033).
+pub(crate) async fn load_duties(
     state: &AppState,
     db: &mut sqlx::PgConnection,
     club: ClubNumber,
@@ -747,7 +748,19 @@ pub(crate) async fn games_of(
     current: Season,
     today: NaiveDate,
 ) -> Result<SeasonGames, AppError> {
-    let choice = followed_teams::for_season(&state.pool, season).await?;
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
+    games_in(state, &mut db, season, current, today).await
+}
+
+/// As [`games_of`], with every read on `db` (for example a transaction, decision 0033).
+pub(crate) async fn games_in(
+    state: &AppState,
+    db: &mut sqlx::PgConnection,
+    season: Season,
+    current: Season,
+    today: NaiveDate,
+) -> Result<SeasonGames, AppError> {
+    let choice = followed_teams::for_season(&mut *db, season).await?;
     let Some(FollowedTeam {
         club,
         team: Some(team),
@@ -767,17 +780,16 @@ pub(crate) async fn games_of(
             duties: SeasonDuties::default(),
         });
     };
-    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
-    let stored = games::stored(&mut db, club.number, season).await?;
+    let stored = games::stored(&mut *db, club.number, season).await?;
     let changes = if season == current {
-        api::changes::list(state, &mut db, club.number, team.number, season, &stored).await?
+        api::changes::list(state, &mut *db, club.number, team.number, season, &stored).await?
     } else {
         Vec::new()
     };
     let open: BTreeSet<i64> = changes.iter().map(|change| change.id).collect();
     let unseen_changes = u32::try_from(changes.len())
         .map_err(|_| StoreError::Invalid(format!("{} changes", changes.len())))?;
-    let duties = load_duties(state, &mut db, club.number, season).await?;
+    let duties = load_duties(state, &mut *db, club.number, season).await?;
     let schedule = schedule(
         stored,
         club.number,
@@ -828,11 +840,20 @@ pub(crate) async fn trainings_of(
     state: &AppState,
     season: Season,
 ) -> Result<SeasonTrainings, AppError> {
-    let weekly = weekly_trainings::for_season(&state.pool, season).await?;
-    let trainings = trainings::for_season(&state.pool, season).await?;
+    let mut db = state.pool.acquire().await.map_err(StoreError::from)?;
+    trainings_in(&mut db, season).await
+}
+
+/// As [`trainings_of`], with every read on `db` (for example a transaction, decision 0033).
+pub(crate) async fn trainings_in(
+    db: &mut sqlx::PgConnection,
+    season: Season,
+) -> Result<SeasonTrainings, AppError> {
+    let weekly = weekly_trainings::for_season(&mut *db, season).await?;
+    let trainings = trainings::for_season(&mut *db, season).await?;
     let ids: Vec<_> = trainings.iter().map(|training| training.id).collect();
-    let absences = trainings::absences_at(&state.pool, &ids).await?;
-    let roles = players::roles_in(&state.pool, &[season]).await?;
+    let absences = trainings::absences_at(&mut *db, &ids).await?;
+    let roles = players::roles_in(&mut *db, &[season]).await?;
     Ok(SeasonTrainings {
         weekly,
         trainings,

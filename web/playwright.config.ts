@@ -116,6 +116,16 @@ export default defineConfig({
 			use: { baseURL: 'http://localhost:4100' }
 		},
 		{
+			// The report reads what all earlier tests stored: it runs after them.
+			name: 'report',
+			testMatch: 'report.e2e.ts',
+			dependencies: ['checked'],
+			use: {
+				baseURL: 'http://localhost:4100',
+				permissions: ['clipboard-read', 'clipboard-write']
+			}
+		},
+		{
 			name: 'logged-out',
 			testMatch: 'logged-out.e2e.ts',
 			use: { baseURL: 'http://localhost:4101' }

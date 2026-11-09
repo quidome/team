@@ -19,7 +19,7 @@ use tracing::Span;
 
 use crate::api::{
     attendance, changes, clubs, duties, games, health, me, messages, players, readings, reasons,
-    season, selection, start, team, trainings, weekly_trainings,
+    report, season, selection, start, team, trainings, weekly_trainings,
 };
 use crate::auth;
 use crate::auth::oidc::Oidc;
@@ -175,6 +175,7 @@ pub fn app(state: AppState) -> Router {
         .route("/team", get(team::get))
         .route("/attendance", get(attendance::get))
         .route("/duties", get(duties::get))
+        .route("/report", get(report::get))
         .route("/trainings", post(trainings::add))
         .route(
             "/trainings/{date}",
