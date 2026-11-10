@@ -3,7 +3,7 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
-- None open.
+- [A quieter start page](changes/2026-11-10-quieter-start-page/change.md) (review, design)
 
 Small:
 - Look at the report on the phone with the real names after its release: the headings that break with a hyphen ("Train-ings"), the width of the five columns, the details, and a tap on "Copy" with the text in the chat (close of the report, 2026-11-09).
