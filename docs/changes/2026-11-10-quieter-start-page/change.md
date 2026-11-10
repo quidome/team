@@ -1,8 +1,8 @@
 ---
 title: A quieter start page
 type: review
-stage: design
-closure: checks      # set by /design; only the user lowers it
+stage: implement
+closure: review build + accept
 created: 2026-11-10
 ---
 
@@ -42,3 +42,4 @@ last date with duties stay; the committee message stays on the start page in wee
 |------|-------|------|
 | 2026-11-10 | discover | created as a review of the start page; starting point from the coordinator's choices on the mockups |
 | 2026-11-10 | discover | functional spec written; two spec reviews (serves – note), their notes answered with the coordinator; spec approved |
+| 2026-11-10 | design | technical spec approved: one story in 4 steps (core rules, new places, start page, check of the look); closure review build + accept (a rule moves out of the messages, the start answer changes shape, a part of decision 0026 is replaced; the reason is a feeling that only a fresh look can check) |
