@@ -7,7 +7,7 @@ use chrono::{Datelike, Days, NaiveDate};
 
 use crate::contribution::attendance::TrainingState;
 use crate::contribution::duties::{
-    DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind,
+    DutyKind, GamePlaces, has_team_places, not_entered, open_by_kind, open_places,
 };
 use crate::contribution::game_attendance::{GameAttendance, GameCount, GameWarnings, checked};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
@@ -310,6 +310,43 @@ pub fn last_games<'a>(events: &'a SeasonEvents<'a>, places: &PlacesOf) -> Vec<&'
         .into_iter()
         .filter(|event| event.date == newest)
         .collect()
+}
+
+/// How an event looks on the start page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventLook {
+    Normal,
+    /// Nothing is left to do: the row is lighter.
+    Lighter,
+}
+
+/// `Lighter` when nothing is left to do for `event`: a training that is checked or cancelled; a
+/// game of the team that is checked (`game_checked`) or not played; another game that is not
+/// played, or whose places of the team are all filled and whose schedule is entered. All else is
+/// `Normal`, also a game no longer in the game list (its row is crossed out). `places`:
+/// `game_places` of the game.
+pub fn event_look(event: &Event<'_>, places: Option<&GamePlaces>, game_checked: bool) -> EventLook {
+    let lighter = match event.kind {
+        EventKind::Training(row, state) => {
+            matches!(state, TrainingState::Cancelled)
+                || row
+                    .training
+                    .is_some_and(|training| training.checked || training.cancelled)
+        }
+        EventKind::Game(scheduled) if scheduled.not_played => true,
+        EventKind::Game(scheduled) if scheduled.reason == ScheduleReason::TeamGame => game_checked,
+        EventKind::Game(scheduled) => {
+            scheduled.in_list
+                && places.is_some_and(|places| {
+                    has_team_places(places) && open_places(places) == 0 && !not_entered(places)
+                })
+        }
+    };
+    if lighter {
+        EventLook::Lighter
+    } else {
+        EventLook::Normal
+    }
 }
 
 /// The last day of the window of "Next": the Sunday of next week (on a Sunday: the next Sunday).
@@ -1278,6 +1315,155 @@ mod tests {
                     count: 2
                 },
             ]
+        );
+    }
+
+    // How an event looks (the quieter start page, story 2).
+
+    /// The places of a home game of the club with table 1 for the team and a player on it;
+    /// `entered`: the schedule of the committee is entered.
+    fn filled_home_places(entered: bool) -> GamePlaces {
+        use crate::contribution::duties::{
+            PlaceKind, RequiredDuties, StoredDuties, TeamRef, game_places,
+        };
+        let mut stored = StoredDuties {
+            schedule_entered: entered,
+            ..StoredDuties::default()
+        };
+        stored.teams.insert(
+            (PlaceKind::Table, 1),
+            TeamRef {
+                number: TEAM,
+                name: "M16 1".to_owned(),
+            },
+        );
+        let required = RequiredDuties {
+            schedule: true,
+            drivers: false,
+        };
+        let filled = [(DutyKind::Table, 1)].into_iter().collect();
+        game_places(
+            required,
+            Some(&stored),
+            TEAM,
+            &filled,
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places")
+    }
+
+    fn game_look(
+        scheduled: &ScheduledGame,
+        places: Option<&GamePlaces>,
+        checked: bool,
+    ) -> EventLook {
+        let event = Event {
+            date: scheduled.game.date,
+            start: scheduled.game.start_time,
+            kind: EventKind::Game(scheduled),
+        };
+        event_look(&event, places, checked)
+    }
+
+    fn training_look(row: &SeasonRow<'_>, state: TrainingState) -> EventLook {
+        let event = Event {
+            date: row.date,
+            start: Some(row.start),
+            kind: EventKind::Training(row, state),
+        };
+        event_look(&event, None, false)
+    }
+
+    #[test]
+    fn a_checked_or_cancelled_training_is_lighter() {
+        let on = date(2026, 11, 10);
+        let mut checked = training(1, on);
+        checked.checked = true;
+        assert_eq!(
+            training_look(&row(on, Some(&checked)), TrainingState::Absent(7)),
+            EventLook::Lighter
+        );
+        let mut cancelled = training(2, on);
+        cancelled.cancelled = true;
+        assert_eq!(
+            training_look(&row(on, Some(&cancelled)), TrainingState::Cancelled),
+            EventLook::Lighter
+        );
+    }
+
+    #[test]
+    fn a_coming_training_and_a_training_day_are_normal() {
+        let on = date(2026, 11, 17);
+        let opened = training(1, on);
+        assert_eq!(
+            training_look(&row(on, Some(&opened)), TrainingState::AllThere),
+            EventLook::Normal
+        );
+        assert_eq!(
+            training_look(&row(on, None), TrainingState::NotOpened),
+            EventLook::Normal
+        );
+    }
+
+    #[test]
+    fn a_game_of_the_team_is_lighter_only_when_checked_or_not_played() {
+        let on = date(2026, 11, 21);
+        let game = scheduled(1, on, ScheduleReason::TeamGame);
+        // All driver places filled is not enough: the game is still to come.
+        let drivers = driver_places(9, 3, true);
+        assert_eq!(open_places(&drivers), 0);
+        assert_eq!(game_look(&game, Some(&drivers), false), EventLook::Normal);
+        assert_eq!(game_look(&game, Some(&drivers), true), EventLook::Lighter);
+        let mut not_played = game.clone();
+        not_played.not_played = true;
+        assert_eq!(game_look(&not_played, None, false), EventLook::Lighter);
+    }
+
+    #[test]
+    fn a_duty_game_is_lighter_when_filled_and_entered_or_not_played() {
+        let on = date(2026, 11, 14);
+        let game = scheduled(2, on, ScheduleReason::DutyGame);
+        assert_eq!(
+            game_look(&game, Some(&filled_home_places(true)), false),
+            EventLook::Lighter
+        );
+        let mut not_played = game.clone();
+        not_played.not_played = true;
+        assert_eq!(
+            game_look(
+                &not_played,
+                Some(&home_places(true, true, true, true, false)),
+                false
+            ),
+            EventLook::Lighter
+        );
+    }
+
+    #[test]
+    fn a_duty_game_with_something_left_to_do_is_normal() {
+        let on = date(2026, 11, 14);
+        let game = scheduled(2, on, ScheduleReason::DutyGame);
+        // An open place of the team.
+        assert_eq!(
+            game_look(
+                &game,
+                Some(&home_places(true, true, true, true, false)),
+                false
+            ),
+            EventLook::Normal
+        );
+        // Filled, but the schedule of the committee is not entered.
+        assert_eq!(
+            game_look(&game, Some(&filled_home_places(false)), false),
+            EventLook::Normal
+        );
+        // No longer in the game list: crossed out, not lighter.
+        let mut gone = game.clone();
+        gone.in_list = false;
+        assert_eq!(
+            game_look(&gone, Some(&filled_home_places(true)), false),
+            EventLook::Normal
         );
     }
 }

@@ -53,16 +53,17 @@ pub use game_list::guard::{Guard, HoldReason, guard, guard_after_confirm, is_fir
 pub use game_list::nightly::{
     NIGHTLY_AT, OUT_OF_DATE_NIGHTS, last_run_moment, nightly_due, out_of_date,
 };
+pub use output::home_or_away::{HomeOrAway, team_side};
 pub use output::messages::{
     MessageGame, committee_message, driving_overview, full_names, table_referee_overview,
-    week_message, week_of,
+    week_has_duty_places, week_message, week_of,
 };
 pub use output::report::{ReportColumn, ReportRow, Share, percent, report_copy, report_rows};
 pub use output::season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use output::start_page::{
-    NotCheckedGame, OpenGame, OpenItem, PlacesOf, ReadingState, games_not_checked, last_games,
-    last_training, next_events, open_item_seasons, open_items, open_places_games,
-    schedule_not_entered,
+    EventLook, NotCheckedGame, OpenGame, OpenItem, PlacesOf, ReadingState, event_look,
+    games_not_checked, last_games, last_training, next_events, open_item_seasons, open_items,
+    open_places_games, schedule_not_entered,
 };
 pub use shared::access::{Identity, may_access};
 pub use shared::season::{Season, SeasonError};

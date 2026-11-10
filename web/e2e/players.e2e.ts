@@ -23,6 +23,31 @@ test('the start page links to attendance, duties, the team, players and settings
 	await expect(links.getByRole('link', { name: 'Settings' })).toBeVisible();
 });
 
+test('"More" has the team, the players and the settings, and "Back" returns', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/more');
+	await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+	const links = page.getByTestId('more-links');
+	await expect(links.getByRole('link')).toHaveText(['Team ›', 'Players ›', 'Settings ›']);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	await links.getByRole('link', { name: /Players/ }).click();
+	await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
+	await page.goto('/more');
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/$/);
+	expect(errors).toEqual([]);
+});
+
+test('"Change club or team" on the settings opens the choice of club and team', async ({
+	page
+}) => {
+	await page.goto('/settings');
+	await page.getByRole('link', { name: 'Change club or team' }).click();
+	await expect(page).toHaveURL(/\/choose$/);
+});
+
 test('add a player with a first name only', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/players');

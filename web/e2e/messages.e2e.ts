@@ -107,6 +107,19 @@ test('the start page opens the committee message, and "Back" returns', async ({ 
 	expect(errors).toEqual([]);
 });
 
+test('"Duties" opens the committee message, and "Back" returns to "Duties"', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/duties');
+	await page.getByTestId('overviews').getByRole('link', { name: 'Committee message' }).click();
+	await expect(page).toHaveURL(/\/messages\/committee\?from=duties$/);
+	await expect(page.getByTestId('message-text')).toHaveText(COMMITTEE);
+
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/duties$/);
+	await expect(page.getByTestId('overviews')).toBeVisible();
+	expect(errors).toEqual([]);
+});
+
 test('without a team the committee page says so', async ({ page }) => {
 	await page.route('**/api/messages/committee', (route) => route.fulfill({ json: { text: null } }));
 	await page.goto('/messages/committee');

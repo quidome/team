@@ -224,6 +224,10 @@
 			<Button href={resolve('/')} variant="ghost">Back</Button>
 		</div>
 
+		<div>
+			<Button href={resolve('/choose')} variant="outline">Change club or team</Button>
+		</div>
+
 		<section
 			class="space-y-4 rounded-xl border bg-card p-4 shadow-xs"
 			aria-labelledby="weekly-heading"

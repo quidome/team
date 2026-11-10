@@ -1,6 +1,6 @@
 # Technical spec: A quieter start page
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-11-10-quieter-start-page/
 **Date**: 2026-11-10
@@ -207,8 +207,8 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
   rules are in memory.
 
 ## Progress
-- [ ] Step 1: the core rules
-- [ ] Step 2: the new places
+- [x] Step 1: the core rules (2026-11-10)
+- [x] Step 2: the new places (2026-11-10)
 - [ ] Step 3: the start page
 - [ ] Step 4: the check of the look
 - [ ] All checks pass
@@ -217,5 +217,16 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
 None. Design reads the spec as written; points the spec leaves to Design: a game that left the
 game list is not lighter (the spec lists all lighter cases and says "All other events have
 normal text"); the header date comes from the server (`today`), so it follows the test clock.
+
+- 2026-11-10, step 1 (Implement): the enum is `HomeOrAway`, not `Side`, in the module
+  `output/home_or_away.rs`: `team_core` already exports `Side` (one side of a game,
+  `events::game::Side`), and the server uses only flat names. `opponent` moved into that module
+  too, because the driving overview also uses it. Only names; no behaviour changes.
+- 2026-11-10, step 2 (Implement): "Committee message" on "Duties" shows with the two duty
+  overviews, also without a chosen team; its page then says "No message: no team chosen.". The
+  spec says "whenever a team is chosen" and "as it shows no overviews", but the overviews do show
+  without a team (`docs/product/messages.md`), and "Duties" does not know whether a team is
+  chosen. Following the overviews keeps the three buttons together; the other way needs a new
+  field in the answer of "Duties". Accepted by the coordinator on 2026-11-10.
 
 ## Review findings

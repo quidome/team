@@ -11,6 +11,7 @@ use crate::contribution::duties::{
 use crate::events::club::ClubNumber;
 use crate::events::game::{Game, TeamNumber};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
+use crate::output::home_or_away::{HomeOrAway, opponent, team_side};
 use crate::team::players::{Player, PlayerId};
 
 /// A game of the season with its duties, as the messages read it.
@@ -148,15 +149,6 @@ fn drivers_of_team<'a>(game: &MessageGame<'a>) -> Option<&'a DriverPart> {
         .filter(|part| part.counts && !part.places.is_empty())
 }
 
-/// The name of the other side of a game of `team`.
-fn opponent(game: &Game, team: TeamNumber) -> &str {
-    if game.home.team == team {
-        &game.away.team_name
-    } else {
-        &game.home.team_name
-    }
-}
-
 /// The drivers of a coming game and the open places.
 fn drivers_and_open(
     part: &DriverPart,
@@ -177,14 +169,14 @@ fn game_block(
 ) -> String {
     let game = &message_game.scheduled.game;
     let time = game.start_time.map_or(TIME_NOT_KNOWN.to_owned(), clock);
-    let side = if game.home.club == club {
-        "Thuis"
-    } else {
-        "Uit"
+    let (side, opponent) = team_side(game, club, team);
+    let side = match side {
+        HomeOrAway::Home => "Thuis",
+        HomeOrAway::Away => "Uit",
     };
     let mut lines = vec![
         format!("Wedstrijd: {}, {time}", long_date(game.date)),
-        format!("{side} tegen {}", opponent(game, team)),
+        format!("{side} tegen {opponent}"),
         format!("{}, {}", game.place.hall, game.place.town),
     ];
     if let Some(part) = drivers_of_team(message_game) {
@@ -303,6 +295,15 @@ pub fn full_names(players: &[Player]) -> BTreeMap<PlayerId, String> {
             (player.id, name)
         })
         .collect()
+}
+
+/// Whether the week that holds `today` has table or referee places of the team that count: the
+/// same games as the lines of [`committee_message`] and of "Tafel en scheidsrechter:" in
+/// [`week_message`], also on a day that has passed. `games`: as [`week_message`].
+pub fn week_has_duty_places(games: &[MessageGame<'_>], today: NaiveDate) -> bool {
+    week_games(games, today)
+        .iter()
+        .any(|game| places_of_team(game).is_some())
 }
 
 /// The committee message of the week that holds `today`. `games`: as [`week_message`]; `names`:
@@ -646,6 +647,25 @@ mod tests {
             })
             .collect();
         committee_message(&games, names, "Blue Drakes", "M16 1", today)
+    }
+
+    /// `week_has_duty_places` of `fixtures` on `today`; it must agree with the committee message.
+    fn has_duty_places(fixtures: &[Fixture], today: NaiveDate) -> bool {
+        let places: Vec<Option<GamePlaces>> = fixtures.iter().map(|f| f.places(today)).collect();
+        let games: Vec<MessageGame<'_>> = fixtures
+            .iter()
+            .zip(&places)
+            .map(|(fixture, places)| MessageGame {
+                scheduled: &fixture.scheduled,
+                places: places.as_ref(),
+                assignments: &fixture.assignments,
+            })
+            .collect();
+        let has = week_has_duty_places(&games, today);
+        let lines =
+            committee_message(&games, &full(&[]), "Blue Drakes", "M16 1", today) != NO_DUTIES;
+        assert_eq!(has, lines, "the rule and the committee text disagree");
+        has
     }
 
     /// `make` over the games of `fixtures`, with their duties on `today`.
@@ -1419,5 +1439,31 @@ mod tests {
         let home = Fixture::home(13, date(2026, 11, 14), NaiveTime::from_hms_opt(13, 0, 0));
         assert!(message_with(std::slice::from_ref(&home), &names(), today).is_some());
         assert_eq!(message_with(&[home.not_played()], &names(), today), None);
+    }
+
+    #[test]
+    fn the_week_has_duty_places_like_the_committee_message() {
+        let friday = date(2026, 10, 30);
+        assert!(has_duty_places(&[example_duty()], monday()));
+        // A place on a day that has passed this week, also when it stayed open.
+        let tuesday =
+            Fixture::duty(2, date(2026, 10, 27), time(19, 0)).of_team(PlaceKind::Table, 1);
+        assert!(has_duty_places(&[tuesday], friday));
+        // A past game that left the game list stays.
+        assert!(has_duty_places(&[example_duty().gone()], date(2026, 11, 1)));
+    }
+
+    #[test]
+    fn the_week_has_no_duty_places_without_places_that_count() {
+        assert!(!has_duty_places(&[], monday()));
+        let others =
+            Fixture::duty(2, date(2026, 10, 31), time(16, 0)).of_other_team(PlaceKind::Table, 1);
+        let game = Fixture::away(1, date(2026, 10, 31), time(14, 30)).drivers(2);
+        assert!(!has_duty_places(&[others, game], monday()));
+        assert!(!has_duty_places(&[example_duty().gone()], monday()));
+        assert!(!has_duty_places(&[example_duty().not_played()], monday()));
+        // Places of the next week are not in this week.
+        let next = Fixture::duty(4, date(2026, 11, 2), time(19, 0)).of_team(PlaceKind::Table, 1);
+        assert!(!has_duty_places(&[next], date(2026, 11, 1)));
     }
 }
