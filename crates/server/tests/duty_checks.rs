@@ -150,3 +150,131 @@ async fn a_duty_check_holds_only_for_its_date_and_its_kind(pool: PgPool) {
     assert!(page["duty_checked"].is_null());
     assert!(!checked_on_season(&reader, id).await);
 }
+
+/// The team number of the home team of game `id`, as stored.
+async fn home_team(reader: &Reader, id: i64) -> i64 {
+    sqlx::query_scalar("SELECT home_team_number FROM games WHERE source_id = $1")
+        .bind(id)
+        .fetch_one(reader.pool())
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_check_from_a_page_of_another_kind_is_refused(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    // A page that still shows a team game (another team was chosen meanwhile).
+    refused(
+        &reader,
+        "PUT",
+        &format!("{}?kind=team", checked_path(id)),
+        "game_changed",
+    )
+    .await;
+    refused(
+        &reader,
+        "DELETE",
+        &format!("{}?kind=team", checked_path(id)),
+        "game_changed",
+    )
+    .await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}?kind=duty", checked_path(id)),
+        None,
+    )
+    .await;
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], true);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_duty_game_that_becomes_a_team_game_loses_its_duty_check(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    ok(&reader, "PUT", &checked_path(id), None).await;
+    // The home team of the game is chosen: it is now a team game, with its own check.
+    reader.choose(home_team(&reader, id).await).await;
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["game"]["reason"], "team");
+    assert!(page["duty_checked"].is_null());
+    assert!(!checked_on_season(&reader, id).await);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_duty_game_kept_for_its_duties_can_be_checked(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    // It left the game list after it was played: kept for its duties.
+    sqlx::query("UPDATE games SET in_list = false WHERE source_id = $1")
+        .bind(id)
+        .execute(reader.pool())
+        .await
+        .unwrap();
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], false, "{page}");
+    let answer = ok(&reader, "PUT", &checked_path(id), None).await;
+    assert_eq!(answer["page"]["duty_checked"], true);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_second_check_keeps_the_first_moment(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    let moment = async || -> Option<chrono::DateTime<chrono::Utc>> {
+        sqlx::query_scalar("SELECT checked_at FROM game_duties WHERE source_id = $1")
+            .bind(id)
+            .fetch_one(reader.pool())
+            .await
+            .unwrap()
+    };
+    ok(&reader, "PUT", &checked_path(id), None).await;
+    let first = moment().await;
+    assert!(first.is_some());
+    reader
+        .harness
+        .clock
+        .set(common::game_list::utc(2026, 10, 12, 13, 0));
+    ok(&reader, "PUT", &checked_path(id), None).await;
+    assert_eq!(moment().await, first);
+    ok(&reader, "DELETE", &checked_path(id), None).await;
+    assert_eq!(moment().await, None);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_checked_duty_game_marked_not_played_is_not_checked(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    ok(&reader, "PUT", &checked_path(id), None).await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/not-played", game_path(id)),
+        None,
+    )
+    .await;
+    assert!(!checked_on_season(&reader, id).await);
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], false);
+    // "Undo" of "Not played": the stored check holds again.
+    ok(
+        &reader,
+        "DELETE",
+        &format!("{}/not-played", game_path(id)),
+        None,
+    )
+    .await;
+    assert!(checked_on_season(&reader, id).await);
+}

@@ -2755,7 +2755,10 @@ export interface operations {
 	};
 	setChecked: {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description "team" or "duty"; left out: no comparison. */
+				kind?: string;
+			};
 			header?: never;
 			path: {
 				/** @description The season, for example 2026-2027 */
@@ -2776,7 +2779,7 @@ export interface operations {
 					'application/json': components['schemas']['CheckedAnswer'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played` */
+			/** @description `invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played`, `game_changed` */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -2801,7 +2804,10 @@ export interface operations {
 	};
 	unsetChecked: {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description "team" or "duty"; left out: no comparison. */
+				kind?: string;
+			};
 			header?: never;
 			path: {
 				/** @description The season, for example 2026-2027 */
@@ -2822,7 +2828,7 @@ export interface operations {
 					'application/json': components['schemas']['GamePage'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game` */
+			/** @description `invalid_season`, `invalid_game`, `game_changed` */
 			400: {
 				headers: {
 					[name: string]: unknown;

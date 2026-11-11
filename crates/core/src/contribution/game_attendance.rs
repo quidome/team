@@ -7,10 +7,10 @@ use std::collections::BTreeMap;
 use chrono::{Days, NaiveDate, NaiveDateTime, NaiveTime};
 
 use crate::contribution::duties::{Assignment, DutyKind, plays_games_on};
-use crate::contribution::mark::mark_holds;
 use crate::contribution::reasons::ReasonId;
 use crate::events::game::{Game, started};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
+use crate::shared::mark::mark_holds;
 use crate::team::players::{Player, PlayerId, PlayerRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

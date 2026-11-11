@@ -9,12 +9,12 @@ use axum::extract::{Query, State};
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::Serialize;
 use team_core::{
-    Absence, Assignment, CheckKind, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event,
-    EventKind, FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
+    Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
+    FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
     GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
     ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties, StoredGame,
-    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, check_kind, checked,
-    display_names, game_list, game_places, game_warnings, kept_games, mark_holds, not_entered,
+    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, check_kind,
+    display_names, game_checked, game_list, game_places, game_warnings, kept_games, not_entered,
     open_places, players_playing_on, plays_games_on, plays_the_game, required_duties, row_count,
     schedule, season_events, season_list, started, team_games,
 };
@@ -607,19 +607,14 @@ pub(crate) fn event_view_with(
         let id = scheduled.game.source_id;
         let game_places = places.get(&id);
         game.places = game_places.map(|places| duties.view(&scheduled.game, places));
-        // Each check holds only for its own kind of game (`team_core::check_kind`).
-        game.checked = match check_kind(scheduled.reason, game_places) {
-            Some(CheckKind::Team) => duties
-                .attendance
-                .games
-                .get(&id)
-                .is_some_and(|stored| checked(stored, scheduled.game.date)),
-            Some(CheckKind::Duty) => duties
-                .stored
-                .get(&id)
-                .is_some_and(|stored| mark_holds(stored.checked_for, scheduled.game.date)),
-            None => false,
-        };
+        // Each check holds only for its own kind of game (`team_core::game_checked`).
+        game.checked = game_checked(
+            check_kind(scheduled.reason, game_places),
+            duties.attendance.games.get(&id),
+            duties.stored.get(&id),
+            scheduled.game.date,
+            scheduled.not_played,
+        );
     }
     Ok(view)
 }

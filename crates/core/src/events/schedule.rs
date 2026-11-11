@@ -1,5 +1,6 @@
 //! Which games of the club's game list go in the coordinator's schedule.
 
+use crate::shared::mark::mark_holds;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
@@ -29,7 +30,7 @@ impl StoredGame {
 /// `game` is not played: it has the mark "Not played" for its date now. A mark for another date
 /// (the game moved) has no effect, and the game is a normal game of its new date (decision 0029).
 pub fn not_played(game: &Game, not_played_for: Option<NaiveDate>) -> bool {
-    not_played_for == Some(game.date)
+    mark_holds(not_played_for, game.date)
 }
 
 /// Why a game is in the schedule.

@@ -1,6 +1,6 @@
-//! A mark that holds for a date (decision 0029): a check of an event stores the date of the event
-//! it was made for, and holds only while the event is on that date. One rule for the check of a
-//! team game and of a duty game.
+//! A mark that holds for a date (decision 0029): a mark of an event ("Not played", "Checked")
+//! stores the date of the event it was made for, and holds only while the event is on that date.
+//! One rule for every such mark.
 
 use chrono::NaiveDate;
 

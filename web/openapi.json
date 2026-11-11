@@ -684,6 +684,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "\"team\" or \"duty\"; left out: no comparison.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -698,7 +707,7 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played`"
+            "description": "`invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played`, `game_changed`"
           },
           "401": {
             "description": "Not logged in"
@@ -731,6 +740,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "\"team\" or \"duty\"; left out: no comparison.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -745,7 +763,7 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`"
+            "description": "`invalid_season`, `invalid_game`, `game_changed`"
           },
           "401": {
             "description": "Not logged in"

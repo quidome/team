@@ -281,7 +281,9 @@
 						{busy}
 						onclick={() =>
 							save(page, async (id) =>
-								done ? unsetChecked(page.season, id) : (await setChecked(page.season, id)).page
+								done
+									? unsetChecked(page.season, id, 'duty')
+									: (await setChecked(page.season, id, 'duty')).page
 							)}
 						testid="mark-duty-checked"
 					>
@@ -302,10 +304,10 @@
 							if (checked) {
 								settled = null;
 								listShown = false;
-								save(page, (id) => unsetChecked(page.season, id));
+								save(page, (id) => unsetChecked(page.season, id, 'team'));
 							} else
 								save(page, async (id) => {
-									const answer = await setChecked(page.season, id);
+									const answer = await setChecked(page.season, id, 'team');
 									settled = settledText(answer.settled);
 									listShown = false;
 									return answer.page;

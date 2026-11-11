@@ -7,6 +7,8 @@
 //! Story B: a player on each place of the team (`Assignment`), with the outcome after the game.
 //! A reading of the game list never changes what is stored: a past game counts what is stored.
 
+use crate::contribution::game_attendance::{GameAttendance, checked};
+use crate::shared::mark::mark_holds;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::NaiveDate;
@@ -443,8 +445,9 @@ pub enum CheckKind {
 }
 
 /// The check of a game by its reason now: a team game is `Team`; another game with table or
-/// referee places of the team (a duty game, also one kept for its duties after it left the game
-/// list) is `Duty`; else no check. A stored check holds only for its own kind.
+/// referee places of the team is `Duty`: a duty game, or a game no longer in the schedule that is
+/// kept for its duties (`ScheduleReason::Kept`, for example after it left the game list or after
+/// another team was chosen); else no check. A stored check holds only for its own kind.
 pub fn check_kind(reason: ScheduleReason, places: Option<&GamePlaces>) -> Option<CheckKind> {
     if reason == ScheduleReason::TeamGame {
         return Some(CheckKind::Team);
@@ -453,6 +456,25 @@ pub fn check_kind(reason: ScheduleReason, places: Option<&GamePlaces>) -> Option
         .and_then(|places| places.schedule.as_ref())
         .is_some_and(|part| !part.of_team.is_empty())
         .then_some(CheckKind::Duty)
+}
+
+/// Whether the game counts as checked now: the check of its own kind (`check_kind`) holds for its
+/// date (`mark_holds`, decision 0029). A team game by the check of its attendance; a duty game by
+/// its duty check, never while it is "not played" (it needs no check); another game never.
+pub fn game_checked(
+    kind: Option<CheckKind>,
+    attendance: Option<&GameAttendance>,
+    stored: Option<&StoredDuties>,
+    date: NaiveDate,
+    not_played: bool,
+) -> bool {
+    match kind {
+        Some(CheckKind::Team) => attendance.is_some_and(|attendance| checked(attendance, date)),
+        Some(CheckKind::Duty) => {
+            !not_played && stored.is_some_and(|stored| mark_holds(stored.checked_for, date))
+        }
+        None => false,
+    }
 }
 
 /// The game has a place of the team in a part that is in use, also when the game is "not
@@ -2999,11 +3021,69 @@ mod tests {
         // A home game of another club team without places of the team.
         assert_eq!(check_kind(ScheduleReason::DutyGame, Some(&without)), None);
         assert_eq!(check_kind(ScheduleReason::DutyGame, None), None);
-        // Kept for its duties after it left the game list, or only for its answers.
+        // Kept for its duties (no longer in the schedule), or only for its answers.
         assert_eq!(
             check_kind(ScheduleReason::Kept, Some(&with_table)),
             Some(CheckKind::Duty)
         );
         assert_eq!(check_kind(ScheduleReason::Kept, None), None);
+    }
+
+    #[test]
+    fn a_game_is_checked_only_by_the_check_of_its_kind() {
+        use crate::contribution::game_attendance::GameAttendance;
+        let on = NaiveDate::from_ymd_opt(2026, 10, 3).expect("valid date");
+        let attendance = GameAttendance {
+            checked_for: Some(on),
+            ..GameAttendance::default()
+        };
+        let stored = StoredDuties {
+            checked_for: Some(on),
+            ..StoredDuties::default()
+        };
+        assert!(game_checked(
+            Some(CheckKind::Team),
+            Some(&attendance),
+            None,
+            on,
+            false
+        ));
+        // A duty check does not count for a team game, nor the other way round.
+        assert!(!game_checked(
+            Some(CheckKind::Team),
+            None,
+            Some(&stored),
+            on,
+            false
+        ));
+        assert!(game_checked(
+            Some(CheckKind::Duty),
+            None,
+            Some(&stored),
+            on,
+            false
+        ));
+        assert!(!game_checked(
+            Some(CheckKind::Duty),
+            Some(&attendance),
+            None,
+            on,
+            false
+        ));
+        // A not played duty game needs no check: it does not count as checked.
+        assert!(!game_checked(
+            Some(CheckKind::Duty),
+            None,
+            Some(&stored),
+            on,
+            true
+        ));
+        assert!(!game_checked(
+            None,
+            Some(&attendance),
+            Some(&stored),
+            on,
+            false
+        ));
     }
 }
