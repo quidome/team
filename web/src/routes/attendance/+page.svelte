@@ -143,6 +143,10 @@
 			</p>
 		{/if}
 
+		<p class="text-sm text-muted-foreground" data-testid="games-checked">
+			Games count once they are checked.
+		</p>
+
 		<section aria-labelledby="totals-heading" class="space-y-2">
 			<h2 id="totals-heading" class="text-lg font-semibold tracking-tight">Totals</h2>
 			{#if overview.trainings === 0 && overview.games === 0}
