@@ -66,7 +66,7 @@ test('a "Mark as checked" that fails shows "Not saved. Try again." and the store
 	page
 }) => {
 	await page.goto(gamePage);
-	await page.route('**/checked', (route) => route.abort());
+	await page.route('**/checked?**', (route) => route.abort());
 	await page.getByRole('button', { name: 'Mark as checked' }).click();
 	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
 	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'false');

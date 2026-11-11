@@ -14,14 +14,15 @@ pub use contribution::attendance::{
     season_overview, training_state,
 };
 pub use contribution::duties::{
-    Assignment, Candidate, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted, DriverPart,
-    DutyError, DutyKind, DutyPlace, GameDuties, GameMoment, GamePlaces, KindTotals, NotOffered,
-    Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart, SchedulePlace,
-    StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered, check_outcome,
-    check_team, choice_players, clash_level, clashes, club_teams, display_names, driver_proposal,
-    duty_rows, duty_totals, game_places, has_duty_row, has_team_places, highest_driver, kept_games,
-    not_entered, offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
-    plays_the_game, required_duties, team_games, who_did, worst_clash,
+    Assignment, Candidate, CheckKind, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted,
+    DriverPart, DutyError, DutyKind, DutyPlace, GameDuties, GameMoment, GamePlaces, KindTotals,
+    NotOffered, Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart,
+    SchedulePlace, StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered,
+    check_kind, check_outcome, check_team, choice_players, clash_level, clashes, club_teams,
+    display_names, driver_proposal, duty_rows, duty_totals, game_checked, game_places,
+    has_duty_row, has_team_places, highest_driver, kept_games, not_entered, offers, open_by_kind,
+    open_places, pick_team, players_playing_on, plays_games_on, plays_the_game, required_duties,
+    team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
     Answer, AnswerError, CheckError, CountedGame, ENOUGH_PLAYERS, GameAttendance, GameCount,
@@ -66,6 +67,7 @@ pub use output::start_page::{
     schedule_not_entered,
 };
 pub use shared::access::{Identity, may_access};
+pub use shared::mark::mark_holds;
 pub use shared::season::{Season, SeasonError};
 pub use team::players::{
     Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,

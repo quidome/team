@@ -684,11 +684,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "\"team\" or \"duty\"; left out: no comparison.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Checked: each \"no answer\" is absent; how many, and the game page",
+            "description": "Checked: a team game makes each \"no answer\" absent (how many); a duty game stores its duty check (`settled` 0); and the game page",
             "content": {
               "application/json": {
                 "schema": {
@@ -698,7 +707,7 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early`"
+            "description": "`invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played`, `game_changed`"
           },
           "401": {
             "description": "Not logged in"
@@ -731,11 +740,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "\"team\" or \"duty\"; left out: no comparison.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "\"Undo\" of a check: the settled players have no answer again; the game page",
+            "description": "\"Undo\" of a check: the settled players have no answer again (a duty game: the duty check goes); the game page",
             "content": {
               "application/json": {
                 "schema": {
@@ -745,7 +763,7 @@
             }
           },
           "400": {
-            "description": "`invalid_season`, `invalid_game`, `not_a_team_game`"
+            "description": "`invalid_season`, `invalid_game`, `game_changed`"
           },
           "401": {
             "description": "Not logged in"
@@ -3985,6 +4003,13 @@
           "drivers_drove": {
             "type": "boolean",
             "description": "\"Count the drives\": the drives of a not played game count from its start time."
+          },
+          "duty_checked": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "\"Checked\" of a duty game (`team_core::check_kind`): `null` when the game is not a duty game,\nelse whether its check holds for the date of the game now (decision 0029)."
           },
           "game": {
             "$ref": "#/components/schemas/ScheduleGame",

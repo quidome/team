@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE game_duties\n         SET checked_at = CASE WHEN $4::date IS NULL THEN NULL\n                               WHEN checked_for = $4 THEN checked_at\n                               ELSE $5 END,\n             checked_for = $4,\n             saved_at = $5\n         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int4",
+        "Int8",
+        "Date",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fbec156adf1b76a1ca619ea4e3f0f16746f4d0136b94794d5bf3cf0533356e53"
+}

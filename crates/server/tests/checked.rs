@@ -167,7 +167,7 @@ async fn checked_is_refused_before_the_start_time_and_on_another_game(pool: PgPo
         (status, answer["error"].as_str()),
         (400, Some("checked_too_early"))
     );
-    // A home game of another club team has no list.
+    // A home game of another club team without places of the team has no check.
     let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
     let duty = season["coming"]
         .as_array()
@@ -180,7 +180,7 @@ async fn checked_is_refused_before_the_start_time_and_on_another_game(pool: PgPo
     let (status, answer) = reader.send("PUT", &checked_path(duty), None).await;
     assert_eq!(
         (status, answer["error"].as_str()),
-        (400, Some("not_a_team_game"))
+        (400, Some("not_checkable"))
     );
     // A game with no player on its list can be checked.
     let checked = ok(&reader, "PUT", &checked_path(AWAY_10_OCT), None).await;

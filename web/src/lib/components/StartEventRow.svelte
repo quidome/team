@@ -77,8 +77,9 @@
 					{/if}
 				{:else if game.not_played || game.checked}
 					<span class="block text-sm">
-						{#if game.not_played}<span data-testid="game-not-played">Not played</span
-							>{/if}{#if game.checked}<span data-testid="game-checked">Checked</span>{/if}
+						{#if game.not_played}<span data-testid="game-not-played">Not played</span>{/if}
+						{#if game.not_played && game.checked}·{/if}
+						{#if game.checked}<span data-testid="game-checked">Checked</span>{/if}
 					</span>
 				{/if}
 				{#if game.places}

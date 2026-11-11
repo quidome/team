@@ -5,20 +5,21 @@
 //! page.
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use team_core::{
-    Answer, AnswerError, Assignment, Candidate, CheckError, Clash, ClashLevel, ClashWhat, Club,
-    DutyError, DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount, GameMoment, GamePlaces,
-    GameWarnings, ListRow, MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome, PlaceKind, PlayerId,
-    ReasonId, RequiredDuties, ScheduleReason, ScheduledGame, Season, StoredDuties, StoredGame,
-    Team, TeamNumber, answers_in_effect, check_answer, check_assignment, check_drivers,
-    check_entered, check_game_checking, check_outcome, check_team, checked, choice_players,
-    clashes, club_teams, duty_totals, extra_players, game_count, game_list, game_places,
-    game_warnings, in_schedule, kept_games, move_note, offers, pick_team, players_playing_on,
-    plays_games_on, required_duties, started, to_settle, worst_clash,
+    Answer, AnswerError, Assignment, Candidate, CheckError, CheckKind, Clash, ClashLevel,
+    ClashWhat, Club, DutyError, DutyKind, ENOUGH_PLAYERS, Game, GameAttendance, GameCount,
+    GameMoment, GamePlaces, GameWarnings, ListRow, MAX_EXTRA_PLAYERS, NotOffered, Offer, Outcome,
+    PlaceKind, PlayerId, ReasonId, RequiredDuties, ScheduleReason, ScheduledGame, Season,
+    StoredDuties, StoredGame, Team, TeamNumber, answers_in_effect, check_answer, check_assignment,
+    check_drivers, check_entered, check_game_checking, check_kind, check_outcome, check_team,
+    checked, choice_players, clashes, club_teams, duty_totals, extra_players, game_checked,
+    game_count, game_list, game_places, game_warnings, in_schedule, kept_games, move_note, offers,
+    pick_team, players_playing_on, plays_games_on, required_duties, started, to_settle,
+    worst_clash,
 };
 use utoipa::ToSchema;
 
@@ -59,6 +60,9 @@ pub struct GamePage {
     /// The start time has passed (without a start time: the game day has begun; Dutch time): the
     /// page shows the row "The drives count" on a not played game with driver places.
     pub started: bool,
+    /// "Checked" of a duty game (`team_core::check_kind`): `null` when the game is not a duty game,
+    /// else whether its check holds for the date of the game now (decision 0029).
+    pub duty_checked: Option<bool>,
 }
 
 /// Who comes to a game of the team.
@@ -569,6 +573,16 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         .stored
         .get(&found.game.source_id)
         .is_some_and(|stored| stored.drivers_drove);
+    let kind = check_kind(found.reason, places.as_ref());
+    let duty_checked = (kind == Some(CheckKind::Duty)).then(|| {
+        game_checked(
+            kind,
+            None,
+            duties.stored.get(&found.game.source_id),
+            found.game.date,
+            found.not_played,
+        )
+    });
     let attendance = attendance_of(state, &found, &duties).await?;
     let mut game = ScheduleGame::from(ScheduledGame {
         game: found.game,
@@ -588,6 +602,7 @@ async fn page(state: &AppState, found: Found) -> Result<GamePage, AppError> {
         not_played: found.not_played,
         drivers_drove,
         started,
+        duty_checked,
     })
 }
 
@@ -695,6 +710,74 @@ async fn team_game(
     }
     let duties = duties_of(state, found.club.number, found.season).await?;
     Ok((found, duties))
+}
+
+/// The check the page shows (`?kind=team` or `?kind=duty`). The page sends it, so a check from a
+/// page that is out of date (for example another team was chosen on another screen meanwhile) is
+/// refused instead of running the check of the other kind.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct CheckQuery {
+    /// "team" or "duty"; left out: no comparison.
+    pub kind: Option<String>,
+}
+
+/// Refuses a check whose kind (from the page) is not the check of the game now: `game_changed`.
+fn same_kind(sent: Option<&str>, now: Option<CheckKind>) -> Result<(), AppError> {
+    let now = match now {
+        Some(CheckKind::Team) => Some("team"),
+        Some(CheckKind::Duty) => Some("duty"),
+        None => None,
+    };
+    match sent {
+        Some(sent) if Some(sent) != now => Err(AppError::BadRequest("game_changed")),
+        _ => Ok(()),
+    }
+}
+
+/// The check the game of `found` has now (`team_core::check_kind`), from its places as on its page;
+/// with the duties of its season.
+async fn check_of(
+    state: &AppState,
+    found: &Found,
+) -> Result<(Option<CheckKind>, SeasonDuties), AppError> {
+    let local = in_netherlands(state.clock.now());
+    let duties = duties_of(state, found.club.number, found.season).await?;
+    let places = duties.places_of(
+        &found.game,
+        found.in_list,
+        found.not_played,
+        found.club.number,
+        found.team.number,
+        local,
+    );
+    Ok((check_kind(found.reason, places.as_ref()), duties))
+}
+
+/// "Checked" of a duty game (`on`) or its "Undo", under the row lock of the game in duties. A
+/// check is refused before the start time and on a game marked "Not played".
+async fn duty_check(
+    state: AppState,
+    found: Found,
+    on: bool,
+) -> Result<Json<CheckedAnswer>, AppError> {
+    if on {
+        check_game_checking(&found.game, in_netherlands(state.clock.now()))?;
+        if found.not_played {
+            return Err(AppError::BadRequest("duty_game_not_played"));
+        }
+    }
+    let (date, now) = (found.game.date, state.clock.now());
+    write(&state, &found, async |tx, _| {
+        duties::set_checked(tx, found.key(), on.then_some(date), now).await?;
+        Ok(())
+    })
+    .await?;
+    tracing::info!(season = %found.season, game = found.game.source_id, on, "duty game check");
+    Ok(Json(CheckedAnswer {
+        settled: 0,
+        page: page(&state, found).await?,
+    }))
 }
 
 /// The choice of a player for the places of the game of `found`, with the totals of its season
@@ -1368,10 +1451,11 @@ async fn drivers_drove(
     params(
         ("season" = String, Path, description = "The season, for example 2026-2027"),
         ("id" = String, Path, description = "The source's game id"),
+        CheckQuery,
     ),
     responses(
-        (status = 200, description = "Checked: each \"no answer\" is absent; how many, and the game page", body = CheckedAnswer),
-        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early`"),
+        (status = 200, description = "Checked: a team game makes each \"no answer\" absent (how many); a duty game stores its duty check (`settled` 0); and the game page", body = CheckedAnswer),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played`, `game_changed`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
     )
@@ -1379,8 +1463,16 @@ async fn drivers_drove(
 pub async fn set_checked(
     State(state): State<AppState>,
     Path((season, id)): Path<(String, String)>,
+    Query(query): Query<CheckQuery>,
 ) -> Result<Json<CheckedAnswer>, AppError> {
-    let (found, duties) = team_game(&state, &season, &id).await?;
+    let found = find(&state, &season, &id).await?;
+    let (kind, duties) = check_of(&state, &found).await?;
+    same_kind(query.kind.as_deref(), kind)?;
+    match kind {
+        Some(CheckKind::Team) => {}
+        Some(CheckKind::Duty) => return duty_check(state, found, true).await,
+        None => return Err(AppError::BadRequest("not_checkable")),
+    }
     check_game_checking(&found.game, in_netherlands(state.clock.now()))?;
     let date = found.game.date;
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
@@ -1405,10 +1497,11 @@ pub async fn set_checked(
     params(
         ("season" = String, Path, description = "The season, for example 2026-2027"),
         ("id" = String, Path, description = "The source's game id"),
+        CheckQuery,
     ),
     responses(
-        (status = 200, description = "\"Undo\" of a check: the settled players have no answer again; the game page", body = GamePage),
-        (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`"),
+        (status = 200, description = "\"Undo\" of a check: the settled players have no answer again (a duty game: the duty check goes); the game page", body = GamePage),
+        (status = 400, description = "`invalid_season`, `invalid_game`, `game_changed`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
     )
@@ -1416,8 +1509,15 @@ pub async fn set_checked(
 pub async fn unset_checked(
     State(state): State<AppState>,
     Path((season, id)): Path<(String, String)>,
+    Query(query): Query<CheckQuery>,
 ) -> Result<Json<GamePage>, AppError> {
-    let (found, _) = team_game(&state, &season, &id).await?;
+    let found = find(&state, &season, &id).await?;
+    let kind = check_of(&state, &found).await?.0;
+    same_kind(query.kind.as_deref(), kind)?;
+    // The "Undo" of a duty check is always allowed: a stored check of another kind has no effect.
+    if kind != Some(CheckKind::Team) {
+        return Ok(Json(duty_check(state, found, false).await?.0.page));
+    }
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     game_attendance::uncheck(&mut tx, found.key()).await?;
     tx.commit().await.map_err(StoreError::from)?;

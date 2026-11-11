@@ -110,7 +110,10 @@ export function messageFor(error: unknown, status: number): string {
 		invalid_place: 'This place cannot be read.',
 		invalid_game: 'This game cannot be read.',
 		checked_too_early: 'A game can be checked from its start time.',
-		not_a_team_game: 'This game is no longer a game of the team. Load the page again.'
+		not_a_team_game: 'This game is no longer a game of the team. Load the page again.',
+		not_checkable: 'This game has nothing to check. Load the page again.',
+		game_changed: 'This game changed. Load the page again.',
+		duty_game_not_played: 'A game that is not played needs no check.'
 	};
 	if (typeof code === 'string' && code in players) return players[code];
 	if (status === 404) return 'This no longer exists. Load the page again.';
@@ -739,14 +742,26 @@ export async function setDriversDrove(
 }
 
 /** "Mark as checked" (`checked`) or its "Undo" on the game `id` (story C of attendance at games). */
-export async function setChecked(season: string, id: string): Promise<CheckedAnswer> {
+export async function setChecked(
+	season: string,
+	id: string,
+	kind: 'team' | 'duty'
+): Promise<CheckedAnswer> {
 	return dataOf(
-		await api.PUT('/api/games/{season}/{id}/checked', { params: { path: { season, id } } })
+		await api.PUT('/api/games/{season}/{id}/checked', {
+			params: { path: { season, id }, query: { kind } }
+		})
 	);
 }
 
-export async function unsetChecked(season: string, id: string): Promise<GamePage> {
+export async function unsetChecked(
+	season: string,
+	id: string,
+	kind: 'team' | 'duty'
+): Promise<GamePage> {
 	return dataOf(
-		await api.DELETE('/api/games/{season}/{id}/checked', { params: { path: { season, id } } })
+		await api.DELETE('/api/games/{season}/{id}/checked', {
+			params: { path: { season, id }, query: { kind } }
+		})
 	);
 }

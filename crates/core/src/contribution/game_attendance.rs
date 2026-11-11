@@ -10,6 +10,7 @@ use crate::contribution::duties::{Assignment, DutyKind, plays_games_on};
 use crate::contribution::reasons::ReasonId;
 use crate::events::game::{Game, started};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
+use crate::shared::mark::mark_holds;
 use crate::team::players::{Player, PlayerId, PlayerRole};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +60,7 @@ pub enum CheckError {
 
 /// The game, on `date` now, is checked: the check holds for its date (decision 0029).
 pub fn checked(attendance: &GameAttendance, date: NaiveDate) -> bool {
-    attendance.checked_for == Some(date)
+    mark_holds(attendance.checked_for, date)
 }
 
 /// The answers that count for the game on `date`: an answer that "Checked" made counts only while

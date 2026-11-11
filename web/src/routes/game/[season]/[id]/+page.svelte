@@ -56,6 +56,7 @@
 		driversNumber,
 		notOffered,
 		placeName,
+		placesLine,
 		placesWarnings,
 		playerText,
 		teamPlacesText,
@@ -207,6 +208,7 @@
 	{@const drivesRow = page.not_played && page.started && (driverPart?.places.length ?? 0) > 0}
 	{@const scheduleRow = !!schedule && (schedule.required || schedule.entered)}
 	{@const checkedRow = !!page.attendance && page.started}
+	{@const dutyRow = page.duty_checked != null && page.started && !page.not_played}
 	<section class="space-y-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0">
@@ -229,7 +231,7 @@
 			<Button href={backOf(page.season)} variant="ghost">Back</Button>
 		</div>
 
-		{#if page.not_played || drivesRow || scheduleRow || checkedRow}
+		{#if page.not_played || drivesRow || scheduleRow || checkedRow || dutyRow}
 			<AdminPanel>
 				{#if page.not_played}
 					<MarkRow
@@ -269,6 +271,25 @@
 						testid="mark-entered"
 					/>
 				{/if}
+				{#if dutyRow && schedule}
+					{@const done = page.duty_checked === true}
+					<MarkRow
+						state={done ? 'Checked' : 'Not checked'}
+						{done}
+						action={done ? 'Undo' : 'Mark as checked'}
+						next={!done}
+						{busy}
+						onclick={() =>
+							save(page, async (id) =>
+								done
+									? unsetChecked(page.season, id, 'duty')
+									: (await setChecked(page.season, id, 'duty')).page
+							)}
+						testid="mark-duty-checked"
+					>
+						{#snippet line()}<span data-testid="duty-places">{placesLine(schedule)}</span>{/snippet}
+					</MarkRow>
+				{/if}
 				{#if checkedRow && page.attendance}
 					{@const checked = page.attendance.checked}
 					{@const count = countText(liveCount ?? page.attendance.count, page.started)}
@@ -283,10 +304,10 @@
 							if (checked) {
 								settled = null;
 								listShown = false;
-								save(page, (id) => unsetChecked(page.season, id));
+								save(page, (id) => unsetChecked(page.season, id, 'team'));
 							} else
 								save(page, async (id) => {
-									const answer = await setChecked(page.season, id);
+									const answer = await setChecked(page.season, id, 'team');
 									settled = settledText(answer.settled);
 									listShown = false;
 									return answer.page;
