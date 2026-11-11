@@ -1,6 +1,6 @@
 # Technical spec: The administration panel
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-11-11-administration-panel/
 **Date**: 2026-11-11
@@ -103,12 +103,20 @@ From the epic's `functional.md`, story 1 (`docs/changes/2026-11-11-checked-for-e
 - Front end only; no change to the API or the data.
 
 ## Progress
-- [ ] Step 1: the components and the page of a training
-- [ ] Step 2: the page of a game
-- [ ] Step 3: the lines below "Not checked" and the note of a moved game
-- [ ] Step 4: the check of the look
-- [ ] All checks pass
+- [x] Step 1: the components and the page of a training (2026-11-11)
+- [x] Step 2: the page of a game (2026-11-11)
+- [x] Step 3: the lines below "Not checked" and the note of a moved game (2026-11-11)
+- [x] Step 4: the check of the look (2026-11-11). Screenshots at 390 × 844 in light and dark mode
+  of a training, a team game (with the drivers and the warning), a duty game and a not played away
+  game: all readable. Contrast on the panel, light / dark: the grey line 5.28 / 6.26, the red
+  warning 5.81 / 7.86, the text 15.20 / 13.84 (need 4.5). Nothing changed.
+- [x] All checks pass
 
 ## Deviations
+- 2026-11-11, step 2: the last button "Mark as not played" has the test id `set-not-played`; the
+  row "Not played" of the panel has `mark-not-played`, as the design names the rows. Only names.
+- 2026-11-11, step 3: the warning has a form for one player too ("…makes the 1 player absent.").
+  The drivers line also shows the open places ("Drivers: Anna, 1 open"), so an open place is in
+  view when the coordinator checks the game.
 
 ## Review findings

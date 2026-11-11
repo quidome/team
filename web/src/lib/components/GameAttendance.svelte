@@ -5,7 +5,7 @@
 	"not coming" has the link "Reason". The rows keep the order of the first load while the page is
 	open. The taps of one player are sent one after the other; a tap that fails shows the stored
 	state again with "Not saved. Try again." Above the count, "Too few players: 6 of 7" (story B), and
-	for answers from before a move the note with "Answers checked". From the start of the game
+	for answers from before a move the note with "Mark answers as checked". From the start of the game
 	(`started`) the words are "There" and "Absent" (story C); on a checked game a tap on the chosen
 	state does nothing.
 	`onanswers` gives the page the answer shown of each player, for the notes at the driver places.
@@ -49,7 +49,7 @@
 
 	/** The queue of the extra players; a player's queue has the id of the player. */
 	const EXTRA = 0;
-	/** The queue of "Answers checked". */
+	/** The queue of "Mark answers as checked". */
 	const CHECKED = -1;
 
 	// The first load: later answers of the server change the states, not the order.
@@ -258,7 +258,7 @@
 		>
 			<p class="text-sm">Answers from before the move to {formatDay(date)}.</p>
 			<Button variant="outline" disabled={(saving[CHECKED] ?? 0) > 0} onclick={tapAnswersChecked}>
-				Answers checked
+				Mark answers as checked
 			</Button>
 		</div>
 	{/if}

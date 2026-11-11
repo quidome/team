@@ -295,7 +295,7 @@ test('a driver who is not coming shows it at the place and in the choice', async
 	expect(errors).toEqual([]);
 });
 
-test('the note of a move goes away at "Answers checked"', async ({ page }) => {
+test('the note of a move goes away at "Mark answers as checked"', async ({ page }) => {
 	const errors = watchConsole(page);
 	const path = await lastGame(page);
 	// A fixed answer of the page: answers from before a move. The tap goes to the real route,
@@ -310,7 +310,7 @@ test('the note of a move goes away at "Answers checked"', async ({ page }) => {
 	const note = page.getByTestId('answers-moved');
 	await expect(note).toContainText(/^Answers from before the move to \w{3} \d{1,2} \w{3}\./);
 	await expectAccessible(page);
-	await note.getByRole('button', { name: 'Answers checked' }).click();
+	await note.getByRole('button', { name: 'Mark answers as checked' }).click();
 	await expect(note).toHaveCount(0);
 	expect(errors).toEqual([]);
 });

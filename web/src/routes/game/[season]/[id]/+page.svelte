@@ -1,20 +1,23 @@
 <!--
-	The page of a game (story A of duties): the game, and its duty places. At a home game of the
-	club the 4 places (Referee 1, Referee 2, Table 1, Table 2), each a pull-down list of "—" and the
-	club teams that saves on change, the places of the team, and "Schedule entered". At an away game
-	of the team the number of drivers, proposed until the coordinator sets one ("Use proposal" goes
-	back). The places of the team (story B): a tap opens the choice of a player, with the totals of
-	that kind and the clashes; a tap on a player saves at once; "Clear". On a past game "Someone
-	else" (the same choice, never blocked by a clash) and "Nobody". A save that fails shows "Not
-	saved. Try again." and the stored state. At the top of a game of the team: who comes
+	The page of a game (story A of duties): the game, and its duty places. Below the heading the
+	panel "Administration" (the administration panel): one row for each mark that can be set now,
+	in this order: "Not played" (when set) with "Undo"; on a not played game from its start time
+	with driver places "No drive counts" / "The drives count" with "Count the drives" / "Undo";
+	on a home game of the club "Schedule not entered" / "Schedule entered" with "Mark as entered" /
+	"Undo"; on a game of the team from its start time "Not checked" / "Checked" with "Mark as
+	checked" / "Undo", the count below it and after the tap "2 players with no answer are absent.".
+	At a home game of the club the 4 places (Referee 1, Referee 2, Table 1, Table 2), each a
+	pull-down list of "—" and the club teams that saves on change, and the places of the team. At
+	an away game of the team the number of drivers, proposed until the coordinator sets one ("Use
+	proposal" goes back). The places of the team (story B): a tap opens the choice of a player, with
+	the totals of that kind and the clashes; a tap on a player saves at once; "Clear". On a past
+	game "Someone else" (the same choice, never blocked by a clash) and "Nobody". A save that fails
+	shows "Not saved. Try again." and the stored state. At the top of a game of the team: who comes
 	(`GameAttendance`, story A of attendance at games). A driver whose answer is "not coming" shows
 	"· not coming" at the place ("· absent" after the date) and "Not coming" in the choice of a
-	driver (story B). "Not played" as the last button; a not played game shows "Not played" with
-	"Undo" at the top, the list of who comes closed behind a tap, and from the start time, with
-	driver places, the switch "The drivers drove" (story E). From the start time a game of the team
-	has "Checked" (story C): the message "2 players with no answer are absent.", then "Checked" with
-	"Undo check" at the top; a checked game, and a game from before the release, show only the count,
-	and "Show the list" opens the list.
+	driver (story B). "Mark as not played" as the last button; a not played game shows the list of
+	who comes closed behind a tap. A checked game, and a game from before the release, show only
+	the count, and "Show the list" opens the list.
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -40,12 +43,15 @@
 	} from '#lib/api/client.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import AdminPanel from '#lib/components/AdminPanel.svelte';
 	import GameAttendance from '#lib/components/GameAttendance.svelte';
-	import { countText, settledText } from '#lib/attendance.js';
+	import MarkRow from '#lib/components/MarkRow.svelte';
+	import { countText, noAnswerWarning, settledText } from '#lib/attendance.js';
 	import {
 		clashText,
 		doerOf,
 		driverNote,
+		driversLine,
 		driversNumber,
 		notOffered,
 		placeName,
@@ -190,6 +196,9 @@
 	{@const page = game}
 	{@const schedule = page.game.places?.schedule}
 	{@const driverPart = page.game.places?.drivers}
+	{@const drivesRow = page.not_played && page.started && (driverPart?.places.length ?? 0) > 0}
+	{@const scheduleRow = !!schedule && (schedule.required || schedule.entered)}
+	{@const checkedRow = !!page.attendance && page.started}
 	<section class="space-y-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0">
@@ -212,64 +221,86 @@
 			<Button href={backOf(page.season)} variant="ghost">Back</Button>
 		</div>
 
-		{#if page.not_played}
-			<div
-				class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted p-4"
-				data-testid="not-played"
-			>
-				<p class="font-medium" role="status">Not played</p>
-				<Button
-					variant="outline"
-					disabled={busy}
-					onclick={() => {
-						listShown = false;
-						save(page, (id) => setNotPlayed(page.season, id, false));
-					}}
-				>
-					Undo
-				</Button>
-			</div>
-			{#if page.started && (driverPart?.places.length ?? 0) > 0}
-				<div class="flex flex-wrap items-center gap-3" data-testid="drivers-drove">
-					<Button
-						variant={page.drivers_drove ? 'default' : 'outline'}
-						aria-pressed={page.drivers_drove}
-						disabled={busy}
+		{#if page.not_played || drivesRow || scheduleRow || checkedRow}
+			<AdminPanel>
+				{#if page.not_played}
+					<MarkRow
+						state="Not played"
+						done={true}
+						action="Undo"
+						{busy}
+						onclick={() => {
+							listShown = false;
+							save(page, (id) => setNotPlayed(page.season, id, false));
+						}}
+						testid="mark-not-played"
+					>
+						{#snippet line()}Its duties and attendance do not count.{/snippet}
+					</MarkRow>
+				{/if}
+				{#if drivesRow}
+					<MarkRow
+						state={page.drivers_drove ? 'The drives count' : 'No drive counts'}
+						done={page.drivers_drove}
+						action={page.drivers_drove ? 'Undo' : 'Count the drives'}
+						{busy}
 						onclick={() =>
 							save(page, (id) => setDriversDrove(page.season, id, !page.drivers_drove))}
+						testid="mark-drives"
+					/>
+				{/if}
+				{#if scheduleRow && schedule}
+					<MarkRow
+						state={schedule.entered ? 'Schedule entered' : 'Schedule not entered'}
+						done={schedule.entered}
+						action={schedule.entered ? 'Undo' : 'Mark as entered'}
+						next={!schedule.entered}
+						{busy}
+						onclick={() =>
+							save(page, (id) => setScheduleEntered(page.season, id, !schedule.entered))}
+						testid="mark-entered"
+					/>
+				{/if}
+				{#if checkedRow && page.attendance}
+					{@const checked = page.attendance.checked}
+					{@const count = countText(page.attendance.count, page.started)}
+					{@const warning = noAnswerWarning(page.attendance.count)}
+					<MarkRow
+						state={checked ? 'Checked' : 'Not checked'}
+						done={checked}
+						action={checked ? 'Undo' : 'Mark as checked'}
+						next={!checked}
+						{busy}
+						onclick={() => {
+							if (checked) {
+								settled = null;
+								listShown = false;
+								save(page, (id) => unsetChecked(page.season, id));
+							} else
+								save(page, async (id) => {
+									const answer = await setChecked(page.season, id);
+									settled = settledText(answer.settled);
+									listShown = false;
+									return answer.page;
+								});
+						}}
+						testid="mark-checked"
 					>
-						The drivers drove
-					</Button>
-					<p class="text-sm text-muted-foreground">
-						{page.drivers_drove ? 'The drives count.' : 'No drive counts.'}
-					</p>
-				</div>
-			{/if}
-		{/if}
-
-		{#if page.attendance?.checked}
-			<div
-				class="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted p-4"
-				data-testid="checked"
-			>
-				<div class="space-y-1">
-					<p class="font-medium" role="status">Checked ✓</p>
-					{#if settled}
-						<p class="text-sm" data-testid="settled">{settled}</p>
-					{/if}
-				</div>
-				<Button
-					variant="outline"
-					disabled={busy}
-					onclick={() => {
-						settled = null;
-						listShown = false;
-						save(page, (id) => unsetChecked(page.season, id));
-					}}
-				>
-					Undo check
-				</Button>
-			</div>
+						{#snippet line()}
+							{#if count}<span class="block">{count}</span>{/if}
+							{#if driverPart && driverPart.places.length > 0}<span
+									class="block"
+									data-testid="checked-drivers">{driversLine(driverPart)}</span
+								>{/if}
+							{#if !checked && warning}<span class="block text-gone" data-testid="no-answer-warning"
+									>{warning}</span
+								>{/if}
+							{#if checked && settled}<span class="block" data-testid="settled">{settled}</span
+								>{/if}
+						{/snippet}
+					</MarkRow>
+				{/if}
+			</AdminPanel>
 		{/if}
 
 		{#each placesWarnings(page.game) as warning (warning)}
@@ -346,22 +377,6 @@
 				<p class="text-sm font-medium" data-testid="team-places">
 					{teamPlacesText(page.team, schedule)}
 				</p>
-				{#if schedule.required || schedule.entered}
-					<div class="flex flex-wrap items-center gap-3">
-						<p class="text-sm" data-testid="schedule-state">
-							{schedule.entered ? 'Schedule entered' : 'Schedule not entered'}
-						</p>
-						<Button
-							variant={schedule.entered ? 'outline' : 'default'}
-							aria-pressed={schedule.entered}
-							disabled={busy}
-							onclick={() =>
-								save(page, (id) => setScheduleEntered(page.season, id, !schedule.entered))}
-						>
-							Schedule entered
-						</Button>
-					</div>
-				{/if}
 			</div>
 		{/if}
 
@@ -518,33 +533,15 @@
 			</form>
 		{/if}
 
-		{#if page.attendance && page.started && !page.attendance.checked}
-			<div>
-				<Button
-					disabled={busy}
-					onclick={() =>
-						save(page, async (id) => {
-							const answer = await setChecked(page.season, id);
-							settled = settledText(answer.settled);
-							listShown = false;
-							return answer.page;
-						})}
-					data-testid="mark-checked"
-				>
-					Checked
-				</Button>
-			</div>
-		{/if}
-
 		{#if !page.not_played}
 			<div>
 				<Button
 					variant="outline"
 					disabled={busy}
 					onclick={() => save(page, (id) => setNotPlayed(page.season, id, true))}
-					data-testid="mark-not-played"
+					data-testid="set-not-played"
 				>
-					Not played
+					Mark as not played
 				</Button>
 			</div>
 		{/if}
