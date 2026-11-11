@@ -6,6 +6,7 @@ the steps are in `README.md`.
 
 | Version | Date | What changed for the user |
 |---------|------|---------------------------|
+| v0.12.0 | 2026-11-11 | One panel "Administration" at the top of the page of a training and a game: each mark (Checked, Cancelled, Not played, The drives count, Schedule entered) is a row with its state (○ / ✓) and one button ("Mark as checked", "Mark as entered", "Count the drives", or "Undo"); orange only for the next step. Below "Not checked" an away game shows its drivers, and a game without any answer warns that the check makes every player absent. New words "Mark as not played" and "Mark answers as checked". |
 | v0.11.2 | 2026-11-11 | The page of a game: a table or referee place that names a club team that plays that game shows "This team plays this game."; the place still saves. |
 | v0.11.1 | 2026-11-11 | The report: a tap anywhere on a row opens or closes the details of the player, and the details no longer repeat the name. |
 | v0.11.0 | 2026-11-11 | A quieter start page: the team and today's date, the open items as rows, then one list of the coming events grouped by date (games of the team stand out, duty games have a blue bar, done events are lighter, "Home game against" / "Away game at"); no "Last", except the duty games of the last date with duties; "Message of the week" and the committee message only when they have something (the committee message is always on "Duties"); Team, Players and Settings under "More", "Change club or team" on Settings. |
