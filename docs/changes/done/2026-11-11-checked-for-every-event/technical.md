@@ -102,3 +102,77 @@ alone, in this order.
 None. Design reads the spec as written.
 
 ## Review findings
+Acceptance review of the epic, 2026-11-11, by `/review accept` (fresh agent). Input: the mode
+and the change folder only. Read: `functional.md`, `idea.md`, `change.md`, this file (the
+objective first, **Deviations** after forming a view), `docs/language.md`, the product way of
+working; the result as the diff `aa3b628..HEAD` (v0.11.2 to v0.15.0, the four stories, code only).
+Not read: `docs/changes/done/`. Run: `cargo test -p team --test duty_checks --test start --test
+checked --test report --test not_played` (58 passed) and `npx playwright test start checked duties
+trainings not-played game-attendance` (169 passed). The app was not opened by hand.
+
+**Verdict: accepted with notes.** The four stories do what the coordinator meant: every mark is
+one row of one panel, a duty game has "Checked" for its date and its kind, every past event of the
+season that is not checked asks once, and the start page lists only today and later. A1 is one
+small fix of the front end (a line in `backlog.md`, not a spec correction); A2 to A5 are notes.
+
+| Criterion | Matches the intent? | Checked by |
+|---|---|---|
+| S1 one panel, ○ / ✓, one button, "Undo", no repeated words | yes | reading `AdminPanel.svelte`, `MarkRow.svelte`, both pages; e2e `checked`, `trainings` |
+| S1 the lines below "Not checked" (attendance; count and drivers on an away game; the message after) | yes | reading `+page.svelte` of a game, `driversLine`; e2e `checked.e2e.ts:104` |
+| S1 "Schedule entered", "The drives count", the rare marks, "Mark answers as checked" as a note | yes | reading the pages, `GameAttendance.svelte` |
+| S1 orange only for the next step | yes, except A1 | reading `next=` of every `MarkRow`; e2e `not-played.e2e.ts:101` |
+| S1 the warning of a team game without answers | yes | reading `noAnswerWarning`; e2e `checked.e2e.ts:75` |
+| S2 "Checked" of a duty game: from the start time, the places on the line, for its date, only for its kind, not when not played, only the attention | yes | reading `check_kind`, `game_checked`, `duty_check`, `same_kind`; run `duty_checks.rs` |
+| S2 "· Checked" on "Season" | yes, see A3 | reading `StartEventRow.svelte`; e2e `duties.e2e.ts:720` |
+| S3 duty games not checked, games not checked from the start of the season, the seasons of the open items, the list of more games, the report's line | yes | reading `games_not_checked`, `duty_games_not_checked`, `api/start.rs`, `api/report.rs`; search `before_release\|game_check_start\|games_from` in `crates`, `web/src` (none left but migration 0018 and comments); run `start.rs`, `report.rs`, `duty_checks.rs` |
+| S4 no past event in the list; today and later as now | yes | reading `routes/+page.svelte`, `event_look`; run `duty_checks.rs` (`the_list_of_the_start_page_has_no_past_event`) |
+
+### Findings
+- **A1 – Orange "Mark as checked" on a not played team game. Concerning deviation (small).** On
+  a team game marked "Not played", from its start time, the panel shows "Not played ✓" and also
+  "Not checked ○" with an orange "Mark as checked" (`checkedRow = !!page.attendance &&
+  page.started`, `next={!checked}` in `web/src/routes/game/[season]/[id]/+page.svelte`; the e2e
+  test `not-played.e2e.ts:101` expects the row `mark-checked` there). But such a game is never an
+  open item (`games_not_checked` drops `not_played`), and its attendance does not count, so
+  nothing needs the coordinator: against "orange only for the next step the coordinator must do;
+  a panel without orange means the administration of the event is done" (story 1). The twin case
+  is built the other way: a not played duty game has no "Checked" row at all (story 2). Story 1
+  allows both rows in one panel ("Not played" and "Checked"), so the row may stay; only the orange
+  is wrong. Suggest: `next={!checked && !page.not_played}`, and the e2e test asks `data-next`
+  `false` there. Checked by reading the page and the test; not run in a browser by hand.
+  - 2026-11-11: fixed: `next={!checked && !page.not_played}`; `not-played.e2e.ts` now asks `data-next` `false` on `mark-checked`.
+- **A2 – Living documents with the old words. Neutral drift (docs).** The button words changed,
+  the documents still use some old ones: "Undo check" in
+  `docs/product/trainings-and-attendance.md` (lines 49, 50, 77) and
+  `docs/product/game-attendance.md:65`; the refusal `not_a_team_game` for `PUT .../checked` in
+  `game-attendance.md:65` (the code answers `not_checkable`, `duty_game_not_played`,
+  `game_changed`); "The drivers drove" as the name of the mark in `docs/product/report.md:20`,
+  `docs/product/duties.md:34` and `docs/architecture.md:63`; "Answers checked" in
+  `docs/architecture.md:167`. Checked by a search for `Undo check|"Answers checked"|drivers
+  drove|not_a_team_game` in `docs/product`, `docs/architecture.md` and the code.
+  - 2026-11-11: fixed in the Close: "Undo", "The drives count", "Mark answers as checked", and the three refusals in `game-attendance.md`.
+- **A3 – "Checked" of a duty game on "Season" without the dot. Faithful adaptation.** The spec
+  says "· Checked", as a team game. A row of another club team has no hall line to put it after,
+  so "Checked" stands on its own line below the teams, as "Not played" did already
+  (`StartEventRow.svelte`). Checked by reading.
+  - 2026-11-11: not fixed: accepted as it is.
+- **A4 – The whole sentence on "Attendance" went. Neutral drift.** Story 3 asked that "Attendance"
+  no longer says "The start page asks for games from Wed 4 Nov."; the build removed the whole
+  line, also its first half "Games count once they are checked." (`gamesFromText`, removed from
+  `web/src/lib/trainings.ts`). The rule still holds, and the open item now finds every game, so the
+  hint is less needed; but it was the one place on "Attendance" that said why a played game is
+  not in the totals yet. The coordinator may want it back. Checked by the diff of
+  `routes/attendance/+page.svelte`.
+  - 2026-11-11: fixed: "Attendance" shows "Games count once they are checked." again above the totals, without the date; `checked.e2e.ts` asks for it; `trainings-and-attendance.md` describes it.
+- **A5 – A team game with places of its own team. Note, as intended.** Spec review S2 asked which
+  check covers the table or referee places of the team at its own game ("This team plays this
+  game."); the answers of Discover left this open. The build answers it: such a game is a team game
+  (`check_kind` gives `Team` for `ScheduleReason::TeamGame`), so one "Mark as checked" of its
+  attendance covers it, and it never gets a duty check or a duty open item. It fits the club rule
+  in the word list (a team never has those places at its own game), but the line below "Not
+  checked" shows the drivers only, not those places. Rare; known limit. Checked by reading
+  `check_kind` and the page.
+  - 2026-11-11: not fixed: a note, accepted by the coordinator (rare, and the club rule says the team never has those places).
+
+**Deviations** of Design ("None") read after the view above: none of A1 to A5 is listed there; the
+deviations of the stories are in their own folders, not read (`docs/changes/done/`).

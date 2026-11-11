@@ -1,7 +1,7 @@
 ---
 title: Checked for every event
 type: feature
-stage: implement
+stage: done
 closure: review accept   # epic: each story has its own closure; a fresh agent checks the whole result after story 4
 created: 2026-11-11
 ---
@@ -27,3 +27,4 @@ lists only today and later.
 | 2026-11-11 | implement | story 3, open items from the start of the season, is done (`changes/done/2026-11-11-open-items-from-the-start-of-the-season/`): decision 0036; next: story 4, only today and later on the start page |
 | 2026-11-11 | implement | story 4, only today and later on the start page: technical.md approved (`changes/2026-11-11-only-today-and-later/`), 2 steps |
 | 2026-11-11 | implement | story 4, only today and later on the start page, is done (`changes/done/2026-11-11-only-today-and-later/`); all four stories are built; next: the acceptance review of the epic |
+| 2026-11-11 | close | acceptance review: accepted with notes; A1 (orange "Mark as checked" on a not played team game) and A4 ("Games count once they are checked." on "Attendance") fixed, A2 (old words in the living documents) fixed in the Close, A3 and A5 notes; done |
