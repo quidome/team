@@ -35,6 +35,28 @@ The coordinator looked at the start page and the report after v0.11.1 (2026-11-1
   ask for attention at once, also the duty games and the team games before 4 November 2026: the
   coordinator checks them one time, and then the record of the season is complete.
 
+## The administration panel (decided with the coordinator, 2026-11-11)
+How a mark (a fact the coordinator sets on an event and can undo) looks on the page of an event.
+Mockups: the rows "Marks" and "One panel per event" on the design canvas
+(https://claude.ai/artifact/9mH5jgbtjyEJwLyXUoQTJ1, private to the coordinator).
+- **One panel "Administration" for each event**, with one row for each mark that can be set now.
+  The panel shows only from the moment a mark can be set (a training from its date, a game from
+  its start time; "Schedule entered" also before the game).
+- **Each row is a fact with one action:** "Not checked ○" with **[Mark as checked]**; "Checked ✓"
+  with **[Undo]**. The state is always visible; the button never repeats the words of the state.
+- **Buttons are actions:** "Mark as …" for every mark ("Mark as checked", "Mark as entered",
+  "Mark as not played", "Mark answers as checked"), except "Count the drives" (the drivers drove)
+  and "Cancel training", which are clear verbs already. "Undo" alone when set.
+- **Orange only for the next step the coordinator must do;** a panel without orange means the
+  administration of the event is done. Optional marks ("Count the drives") are outlined.
+- **Rare marks** ("Cancel training", "Mark as not played") stay a plain button until they are set;
+  then they are a row of the panel ("Cancelled", "Not played", with [Undo]).
+- **Not a mark:** a choice between options ("Coming" / "Not coming", the reasons) stays as it is.
+- Today two marks break this: "Schedule entered" (the state text next to a button with the same
+  words; grey when set) and "The drivers drove" (a switch that stays pressed; orange when set).
+  This change brings all marks into the panel. At Close the rule goes into
+  `docs/product/principles.md`.
+
 ## Why now
 The quieter start page (v0.11.0) made the open items the place for what needs the coordinator.
 In real use the gaps above showed up within a day, and the duty record is half of the purpose.
