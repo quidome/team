@@ -1,0 +1,152 @@
+//! "Checked" of a duty game through the API (story 2 of "Checked for every event"): a home game of
+//! another club team where the team has table or referee places can be marked as checked from its
+//! start time, for its date, only while it is a duty game.
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+mod common;
+
+use common::game_list::{M16_1, M16_2, Reader};
+use serde_json::{Value, json};
+use sqlx::PgPool;
+
+async fn ok(reader: &Reader, method: &str, path: &str, body: Option<Value>) -> Value {
+    let (status, answer) = reader.send(method, path, body).await;
+    assert_eq!(status, 200, "{method} {path}: {answer}");
+    answer
+}
+
+async fn refused(reader: &Reader, method: &str, path: &str, code: &str) {
+    let (status, answer) = reader.send(method, path, None).await;
+    assert_eq!(
+        (status, answer["error"].as_str()),
+        (400, Some(code)),
+        "{path}"
+    );
+}
+
+fn game_path(id: i64) -> String {
+    format!("/api/games/2026-2027/{id}")
+}
+
+fn checked_path(id: i64) -> String {
+    format!("{}/checked", game_path(id))
+}
+
+/// The first home game of another club team on `date` (the clock is 12 October 2026).
+async fn duty_game(reader: &Reader, part: &str, date: &str) -> i64 {
+    let season = ok(reader, "GET", "/api/season?season=2026-2027", None).await;
+    season[part]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|event| &event["game"])
+        .find(|game| game["reason"] == "duty" && game["date"] == date)
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap()
+}
+
+async fn give_place(reader: &Reader, id: i64, team: i64) {
+    ok(
+        reader,
+        "PUT",
+        &format!("{}/places/referee/1", game_path(id)),
+        Some(json!({ "team": team })),
+    )
+    .await;
+}
+
+/// The row of game `id` on "Season" is "· Checked".
+async fn checked_on_season(reader: &Reader, id: i64) -> bool {
+    let season = ok(reader, "GET", "/api/season?season=2026-2027", None).await;
+    ["coming", "past"]
+        .iter()
+        .flat_map(|part| season[*part].as_array().unwrap().clone())
+        .find(|event| event["game"]["id"] == id)
+        .unwrap()["game"]["checked"]
+        .as_bool()
+        .unwrap()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_duty_game_is_checked_from_its_start_time_and_undone(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], false);
+    assert!(page["attendance"].is_null(), "a duty game has no list");
+
+    let answer = ok(&reader, "PUT", &checked_path(id), None).await;
+    assert_eq!(answer["settled"], 0);
+    assert_eq!(answer["page"]["duty_checked"], true);
+    assert!(checked_on_season(&reader, id).await);
+    // A second check changes nothing.
+    ok(&reader, "PUT", &checked_path(id), None).await;
+
+    let page = ok(&reader, "DELETE", &checked_path(id), None).await;
+    assert_eq!(page["duty_checked"], false);
+    assert!(!checked_on_season(&reader, id).await);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_duty_check_is_refused_too_early_when_not_played_and_without_places(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Before the start time.
+    let coming = duty_game(&reader, "coming", "2026-10-31").await;
+    give_place(&reader, coming, M16_1).await;
+    refused(&reader, "PUT", &checked_path(coming), "checked_too_early").await;
+
+    // A home game of another club team without places of the team has no check.
+    let past = duty_game(&reader, "past", "2026-10-03").await;
+    let page = ok(&reader, "GET", &game_path(past), None).await;
+    assert!(page["duty_checked"].is_null());
+    refused(&reader, "PUT", &checked_path(past), "not_checkable").await;
+
+    // A duty game marked "Not played" needs no check; its "Undo" is still allowed.
+    give_place(&reader, past, M16_1).await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/not-played", game_path(past)),
+        None,
+    )
+    .await;
+    refused(&reader, "PUT", &checked_path(past), "duty_game_not_played").await;
+    ok(&reader, "DELETE", &checked_path(past), None).await;
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_duty_check_holds_only_for_its_date_and_its_kind(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    ok(&reader, "PUT", &checked_path(id), None).await;
+
+    // The game moved a day earlier: the check has no effect.
+    sqlx::query("UPDATE games SET date = date - 1 WHERE source_id = $1")
+        .bind(id)
+        .execute(reader.pool())
+        .await
+        .unwrap();
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], false);
+    // Back on its date, the check holds again.
+    sqlx::query("UPDATE games SET date = date + 1 WHERE source_id = $1")
+        .bind(id)
+        .execute(reader.pool())
+        .await
+        .unwrap();
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert_eq!(page["duty_checked"], true);
+
+    // Another team chosen: the place no longer names the team, so the game has no duty check.
+    reader.choose(M16_2).await;
+    let page = ok(&reader, "GET", &game_path(id), None).await;
+    assert!(page["duty_checked"].is_null());
+    assert!(!checked_on_season(&reader, id).await);
+}

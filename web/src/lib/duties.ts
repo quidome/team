@@ -78,6 +78,18 @@ export function driversLine(part: DriverPart): string {
 	return `Drivers: ${[...names, ...(open > 0 ? [`${open} open`] : [])].join(', ')}`;
 }
 
+/** The table and referee places of the team with their players, on the line below "Not checked"
+ * of a duty game (the administration panel): "Table 1: Anna · Table 2: Cas (was Bram)", "open"
+ * for a place without a player. */
+export function placesLine(part: SchedulePart): string {
+	return part.of_team
+		.map(
+			(place) =>
+				`${placeName(place.kind, place.number)}: ${place.player ? playerText(place.player) : 'open'}`
+		)
+		.join(' · ');
+}
+
 /** The places of the team in a line, for the rows of a game. */
 export function placesText(view: PlacesView): string {
 	const parts: string[] = [];

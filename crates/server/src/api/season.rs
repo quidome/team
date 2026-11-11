@@ -9,14 +9,14 @@ use axum::extract::{Query, State};
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::Serialize;
 use team_core::{
-    Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
-    FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
+    Absence, Assignment, CheckKind, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event,
+    EventKind, FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
     GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
     ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties, StoredGame,
-    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, checked, display_names,
-    game_list, game_places, game_warnings, kept_games, not_entered, open_places,
-    players_playing_on, plays_games_on, plays_the_game, required_duties, row_count, schedule,
-    season_events, season_list, started, team_games,
+    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, check_kind, checked,
+    display_names, game_list, game_places, game_warnings, kept_games, mark_holds, not_entered,
+    open_places, players_playing_on, plays_games_on, plays_the_game, required_duties, row_count,
+    schedule, season_events, season_list, started, team_games,
 };
 use utoipa::ToSchema;
 
@@ -604,14 +604,22 @@ pub(crate) fn event_view_with(
 ) -> Result<EventView, StoreError> {
     let mut view = event_view(event)?;
     if let (Some(game), EventKind::Game(scheduled)) = (view.game.as_mut(), event.kind) {
-        game.places = places
-            .get(&scheduled.game.source_id)
-            .map(|places| duties.view(&scheduled.game, places));
-        game.checked = duties
-            .attendance
-            .games
-            .get(&scheduled.game.source_id)
-            .is_some_and(|stored| checked(stored, scheduled.game.date));
+        let id = scheduled.game.source_id;
+        let game_places = places.get(&id);
+        game.places = game_places.map(|places| duties.view(&scheduled.game, places));
+        // Each check holds only for its own kind of game (`team_core::check_kind`).
+        game.checked = match check_kind(scheduled.reason, game_places) {
+            Some(CheckKind::Team) => duties
+                .attendance
+                .games
+                .get(&id)
+                .is_some_and(|stored| checked(stored, scheduled.game.date)),
+            Some(CheckKind::Duty) => duties
+                .stored
+                .get(&id)
+                .is_some_and(|stored| mark_holds(stored.checked_for, scheduled.game.date)),
+            None => false,
+        };
     }
     Ok(view)
 }

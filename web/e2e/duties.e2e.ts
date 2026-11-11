@@ -752,3 +752,43 @@ test('under a corrected place the note is of the player who did it', async ({ pa
 	await expect(table2.getByTestId('place-player')).toHaveText('Yusuf (was Yara)');
 	await expect(table2.getByTestId('place-clash')).toHaveText(['also Table 13:00']);
 });
+
+test('a past duty game is marked as checked in the panel, and shows "· Checked" on "Season"', async ({
+	page
+}) => {
+	const season = await (await page.request.get('/api/season')).json();
+	// A past home game of another club team where the team has no place yet.
+	const game = season.past
+		.map((event: { game?: Game & { date: string } }) => event.game)
+		.find(
+			(game?: Game & { places?: { schedule?: { of_team: unknown[] } | null } | null }) =>
+				game?.reason === 'duty' && game.places?.schedule?.of_team.length === 0
+		);
+	expect(game, 'a past duty game without places of the team').toBeTruthy();
+	const api = `/api/games/2026-2027/${game.id}`;
+	await page.request.put(`${api}/places/referee/2`, { ...origin, data: { team: 184 } });
+	try {
+		await page.goto(`/game/2026-2027/${game.id}`);
+		const row = page.getByTestId('mark-duty-checked');
+		await expect(row).toHaveAttribute('data-done', 'false');
+		await expect(row).toHaveAttribute('data-next', 'true');
+		await expect(row.getByTestId('duty-places')).toHaveText('Referee 2: open');
+		await row.getByRole('button', { name: 'Mark as checked' }).click();
+		await expect(row).toHaveAttribute('data-done', 'true');
+		await expect(row.getByRole('button', { name: 'Undo' })).toBeVisible();
+		await expectAccessible(page);
+		await expectNoHorizontalScroll(page, 320);
+
+		await page.goto('/season');
+		await page.getByTestId('labels').getByRole('button', { name: 'Past', exact: true }).click();
+		await expect(
+			page
+				.getByTestId('part-past')
+				.locator(`[data-testid="game"][data-id="${game.id}"]`)
+				.getByTestId('game-checked')
+		).toHaveText('· Checked');
+	} finally {
+		await page.request.delete(`${api}/checked`, origin);
+		await page.request.put(`${api}/places/referee/2`, { ...origin, data: { team: null } });
+	}
+});

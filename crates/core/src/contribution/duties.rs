@@ -13,7 +13,7 @@ use chrono::NaiveDate;
 
 use crate::events::club::{Club, ClubNumber};
 use crate::events::game::{Game, TeamNumber};
-use crate::events::schedule::StoredGame;
+use crate::events::schedule::{ScheduleReason, StoredGame};
 use crate::team::players::{Player, PlayerId, PlayerRole, Role};
 use crate::team::team_choice::own_teams;
 
@@ -74,8 +74,10 @@ pub struct StoredDuties {
     pub drivers: Option<u8>,
     /// The places that name a team; an empty place is not in it.
     pub teams: BTreeMap<(PlaceKind, u8), TeamRef>,
-    /// The switch "The drivers drove": the drives of a not played game count from its start time.
+    /// "Count the drives": the drives of a not played game count from its start time.
     pub drivers_drove: bool,
+    /// "Checked" of a duty game: the date of the game when it was checked (decision 0029).
+    pub checked_for: Option<NaiveDate>,
 }
 
 /// The 4 places of a home game of the club, in the order shown.
@@ -430,6 +432,27 @@ pub fn open_by_kind(places: &GamePlaces) -> BTreeMap<DutyKind, usize> {
         *open.entry(place.kind).or_insert(0) += 1;
     }
     open
+}
+
+/// Which check a game has (story 2 of "Checked for every event"): a team game has the check of
+/// its attendance; a duty game the check of its places.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckKind {
+    Team,
+    Duty,
+}
+
+/// The check of a game by its reason now: a team game is `Team`; another game with table or
+/// referee places of the team (a duty game, also one kept for its duties after it left the game
+/// list) is `Duty`; else no check. A stored check holds only for its own kind.
+pub fn check_kind(reason: ScheduleReason, places: Option<&GamePlaces>) -> Option<CheckKind> {
+    if reason == ScheduleReason::TeamGame {
+        return Some(CheckKind::Team);
+    }
+    places
+        .and_then(|places| places.schedule.as_ref())
+        .is_some_and(|part| !part.of_team.is_empty())
+        .then_some(CheckKind::Duty)
 }
 
 /// The game has a place of the team in a part that is in use, also when the game is "not
@@ -2947,5 +2970,40 @@ mod tests {
         let club_against_club = game(2, CLUB_TEAM, TEAM);
         assert!(plays_the_game(&club_against_club, CLUB_TEAM));
         assert!(plays_the_game(&club_against_club, TEAM));
+    }
+
+    #[test]
+    fn a_team_game_has_the_team_check_and_a_duty_game_the_duty_check() {
+        let with_table = table_places(CLUB_TEAM);
+        // Both table places for another club team: no place of the team.
+        let without = game_places(
+            SCHEDULE,
+            Some(&teams(&[
+                ((PlaceKind::Table, 1), CLUB_TEAM),
+                ((PlaceKind::Table, 2), CLUB_TEAM),
+            ])),
+            TEAM,
+            &none(),
+            10,
+            GameMoment::played(true, false),
+        )
+        .expect("places");
+        assert_eq!(
+            check_kind(ScheduleReason::TeamGame, None),
+            Some(CheckKind::Team)
+        );
+        assert_eq!(
+            check_kind(ScheduleReason::DutyGame, Some(&with_table)),
+            Some(CheckKind::Duty)
+        );
+        // A home game of another club team without places of the team.
+        assert_eq!(check_kind(ScheduleReason::DutyGame, Some(&without)), None);
+        assert_eq!(check_kind(ScheduleReason::DutyGame, None), None);
+        // Kept for its duties after it left the game list, or only for its answers.
+        assert_eq!(
+            check_kind(ScheduleReason::Kept, Some(&with_table)),
+            Some(CheckKind::Duty)
+        );
+        assert_eq!(check_kind(ScheduleReason::Kept, None), None);
     }
 }

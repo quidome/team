@@ -1263,6 +1263,11 @@ export interface components {
 			current_season: string;
 			/** @description "Count the drives": the drives of a not played game count from its start time. */
 			drivers_drove: boolean;
+			/**
+			 * @description "Checked" of a duty game (`team_core::check_kind`): `null` when the game is not a duty game,
+			 *     else whether its check holds for the date of the game now (decision 0029).
+			 */
+			duty_checked?: boolean | null;
 			/** @description The game, with its duties. */
 			game: components['schemas']['ScheduleGame'];
 			/** @description "Not played" on its date now: its duties and attendance do not count. */
@@ -2762,7 +2767,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description Checked: each "no answer" is absent; how many, and the game page */
+			/** @description Checked: a team game makes each "no answer" absent (how many); a duty game stores its duty check (`settled` 0); and the game page */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -2771,7 +2776,7 @@ export interface operations {
 					'application/json': components['schemas']['CheckedAnswer'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game`, `not_a_team_game`, `checked_too_early` */
+			/** @description `invalid_season`, `invalid_game`, `not_checkable`, `checked_too_early`, `duty_game_not_played` */
 			400: {
 				headers: {
 					[name: string]: unknown;
@@ -2808,7 +2813,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description "Undo" of a check: the settled players have no answer again; the game page */
+			/** @description "Undo" of a check: the settled players have no answer again (a duty game: the duty check goes); the game page */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -2817,7 +2822,7 @@ export interface operations {
 					'application/json': components['schemas']['GamePage'];
 				};
 			};
-			/** @description `invalid_season`, `invalid_game`, `not_a_team_game` */
+			/** @description `invalid_season`, `invalid_game` */
 			400: {
 				headers: {
 					[name: string]: unknown;

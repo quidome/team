@@ -14,14 +14,15 @@ pub use contribution::attendance::{
     season_overview, training_state,
 };
 pub use contribution::duties::{
-    Assignment, Candidate, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted, DriverPart,
-    DutyError, DutyKind, DutyPlace, GameDuties, GameMoment, GamePlaces, KindTotals, NotOffered,
-    Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart, SchedulePlace,
-    StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered, check_outcome,
-    check_team, choice_players, clash_level, clashes, club_teams, display_names, driver_proposal,
-    duty_rows, duty_totals, game_places, has_duty_row, has_team_places, highest_driver, kept_games,
-    not_entered, offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
-    plays_the_game, required_duties, team_games, who_did, worst_clash,
+    Assignment, Candidate, CheckKind, ChoicePlayer, Clash, ClashLevel, ClashWhat, Counted,
+    DriverPart, DutyError, DutyKind, DutyPlace, GameDuties, GameMoment, GamePlaces, KindTotals,
+    NotOffered, Offer, Outcome, PlaceKind, RequiredDuties, SCHEDULE_PLACES, SchedulePart,
+    SchedulePlace, StoredDuties, TeamRef, Total, check_assignment, check_drivers, check_entered,
+    check_kind, check_outcome, check_team, choice_players, clash_level, clashes, club_teams,
+    display_names, driver_proposal, duty_rows, duty_totals, game_places, has_duty_row,
+    has_team_places, highest_driver, kept_games, not_entered, offers, open_by_kind, open_places,
+    pick_team, players_playing_on, plays_games_on, plays_the_game, required_duties, team_games,
+    who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
     Answer, AnswerError, CheckError, CountedGame, ENOUGH_PLAYERS, GameAttendance, GameCount,
@@ -30,6 +31,7 @@ pub use contribution::game_attendance::{
     drivers_not_coming, extra_players, game_count, game_list, game_warnings, in_warning_period,
     move_note, now_no_answer, row_count, to_settle,
 };
+pub use contribution::mark::mark_holds;
 pub use contribution::reasons::{ReasonError, ReasonId, clean_reason_name};
 pub use events::club::{Club, ClubNumber, search_clubs};
 pub use events::game::{

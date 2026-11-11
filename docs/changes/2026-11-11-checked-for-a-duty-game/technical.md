@@ -1,6 +1,6 @@
 # Technical spec: Checked for a duty game
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-11-11-checked-for-a-duty-game/
 **Date**: 2026-11-11
@@ -119,12 +119,20 @@ From the epic's `functional.md`, story 2 (`docs/changes/2026-11-11-checked-for-e
   gets one field. One more small query when the duties of a season are loaded.
 
 ## Progress
-- [ ] Step 1: the core rules
-- [ ] Step 2: the data and the routes
-- [ ] Step 3: the row on the page
-- [ ] Step 4: the check of the look and the checks
-- [ ] All checks pass
+- [x] Step 1: the core rules (2026-11-11)
+- [x] Step 2: the data and the routes (2026-11-11)
+- [x] Step 3: the row on the page (2026-11-11)
+- [x] Step 4: the check of the look and the checks (2026-11-11). Screenshots at 390 × 844 in
+  light and dark mode of a past duty game with two places of the team, before and after "Mark as
+  checked": readable; after the tap the panel has no orange left (the first picture caught the
+  colour animation of the button, `transition-all`, halfway). Nothing changed.
+- [x] All checks pass
 
 ## Deviations
+- 2026-11-11, step 2: the duty check is two columns of `game_duties` (`checked_for`,
+  `checked_at`, migration `0017_duty_checks.sql`), not a new table `duty_checks`. `game_duties` is
+  the row of a game that duties owns and locks; "Schedule entered" and "The drives count" are
+  columns of it too. The same owner, the same lock, one less table; the design's reason (not in
+  the attendance of a team game) holds.
 
 ## Review findings

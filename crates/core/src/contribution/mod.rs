@@ -3,4 +3,5 @@
 pub mod attendance;
 pub mod duties;
 pub mod game_attendance;
+pub mod mark;
 pub mod reasons;

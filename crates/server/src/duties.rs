@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{PgConnection, PgExecutor};
 use team_core::{
     Assignment, ClubNumber, DutyKind, Outcome, PlaceKind, PlayerId, Season, StoredDuties,
@@ -55,6 +55,7 @@ struct DutiesRow {
     entered: bool,
     drivers: Option<i16>,
     drivers_drove: bool,
+    checked_for: Option<NaiveDate>,
 }
 
 struct TeamRow {
@@ -71,6 +72,7 @@ fn duties_of(row: &DutiesRow) -> Result<StoredDuties, StoreError> {
         drivers: row.drivers.map(small).transpose()?,
         teams: BTreeMap::new(),
         drivers_drove: row.drivers_drove,
+        checked_for: row.checked_for,
     })
 }
 
@@ -293,7 +295,8 @@ pub async fn for_season(
 ) -> Result<BTreeMap<i64, StoredDuties>, StoreError> {
     let rows = sqlx::query_as!(
         DutiesRow,
-        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove
+        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove,
+                  checked_for
            FROM game_duties WHERE club_number = $1 AND season_year = $2"#,
         club.0,
         season.start_year(),
@@ -346,7 +349,8 @@ pub async fn lock(
     .await?;
     let row = sqlx::query_as!(
         DutiesRow,
-        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove
+        r#"SELECT source_id, schedule_entered_at IS NOT NULL AS "entered!", drivers, drivers_drove,
+                  checked_for
            FROM game_duties WHERE club_number = $1 AND season_year = $2 AND source_id = $3
            FOR UPDATE"#,
         key.club.0,
@@ -449,6 +453,33 @@ pub async fn set_entered(
         key.season.start_year(),
         key.source_id,
         on,
+        now,
+    )
+    .execute(tx)
+    .await?;
+    Ok(())
+}
+
+/// "Checked" of a duty game for `checked_for`, the date of the game now, or its "Undo" (`None`);
+/// the game must be locked. A check for the same date keeps its first moment.
+pub async fn set_checked(
+    tx: &mut PgConnection,
+    key: GameKey,
+    checked_for: Option<NaiveDate>,
+    now: DateTime<Utc>,
+) -> Result<(), StoreError> {
+    sqlx::query!(
+        "UPDATE game_duties
+         SET checked_at = CASE WHEN $4::date IS NULL THEN NULL
+                               WHEN checked_for = $4 THEN checked_at
+                               ELSE $5 END,
+             checked_for = $4,
+             saved_at = $5
+         WHERE club_number = $1 AND season_year = $2 AND source_id = $3",
+        key.club.0,
+        key.season.start_year(),
+        key.source_id,
+        checked_for,
         now,
     )
     .execute(tx)
