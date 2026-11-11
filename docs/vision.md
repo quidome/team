@@ -94,7 +94,6 @@ The first design answered the questions about logging in, the backend language, 
 and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from the spec of
 `docs/changes/done/2026-10-10-games-from-game-list/`:
 - The word list calls the game list "the federation's list", but the source appears to be a private site built on the federation's data. Must the meaning change?
-- Is a word needed for the home games of other club teams, where players can get table and referee duties (the spec says "possible duty games" in plain words)?
 
 ## Change log
 | Date | Change |
@@ -117,3 +116,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-11-08 | Attendance at games is built: "Where we are going", journeys 2, 7 and 8 and the priorities say so; the report of what each player did is the next step, with trainings, games and duties. Word checked: a game can be checked from its start time |
 | 2026-11-09 | Journey 8: the report is one page with a table (attendance as percentages, duties done and planned) and the details of a player on a tap (valid and not valid absences, duties taken over), for the current season, used now and then to steer a conversation; a part can be copied to show an imbalance. Word report: one or more tables |
 | 2026-11-09 | The report is built: "Where we are" says effort is reached in the tool (the sheet still to be replaced in real use); "Where we are going" and priority 7 say built |
+| 2026-11-11 | Words team game (a game the team plays; its only duty is drive, at an away game) and duty game (a home game of another club team where the team has table or referee places); "checked" means an event is done in the administration and no longer asks for attention, for every event, also a duty game (was: only attendance is checked). Answers the open question about a word for these games. From `/vision` of "every past event that is not done is an open item" |
