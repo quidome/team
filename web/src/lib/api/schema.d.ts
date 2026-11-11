@@ -1179,6 +1179,8 @@ export interface components {
 		};
 		/** @enum {string} */
 		ErrorKind: 'source_unavailable' | 'source_format';
+		/** @enum {string} */
+		EventLookView: 'normal' | 'lighter';
 		/**
 		 * @description One event: a game or a training (or a training day not opened). Exactly one of `game` and
 		 *     `training` is set.
@@ -1411,7 +1413,7 @@ export interface components {
 		};
 		/** @description Which buttons the part "Messages" shows. */
 		MessagesView: {
-			/** @description "Committee message": the same rule as `GET /api/messages/committee`. */
+			/** @description "Committee message": this week has table or referee places of the team (decision 0034). */
 			committee: boolean;
 			/** @description "Message of the week": the same rule as `GET /api/messages/week`. */
 			week: boolean;
@@ -1948,13 +1950,15 @@ export interface components {
 			percent_valid: number;
 			there: number;
 		};
+		/** @enum {string} */
+		SideView: 'home' | 'away';
 		StartAnswer: {
-			last?: null | components['schemas']['EventView'];
 			/**
-			 * @description The games of the last date before today with places of the team, in time order, in the
-			 *     seasons of the open items (in July and August also the season before).
+			 * @description The games of the last date before today with places of the team that are not games of the
+			 *     team, in time order, in the seasons of the open items (in July and August, when the
+			 *     current season has none, the season before).
 			 */
-			last_games: components['schemas']['EventView'][];
+			last_games: components['schemas']['StartEvent'][];
 			/** @description The season of `last_games`, for their pages; `null` when there are none. */
 			last_games_season?: string | null;
 			/** @description The messages the start page offers. */
@@ -1964,9 +1968,25 @@ export interface components {
 			 *     the trainings from today until the Sunday of next week, in time order; when there are
 			 *     none, the first coming one.
 			 */
-			next: components['schemas']['EventView'][];
+			next: components['schemas']['StartEvent'][];
 			/** @description What still needs the coordinator, in the order of the start page. */
 			open_items: components['schemas']['OpenItemView'][];
+			/**
+			 * @description The header shows the season: in July and August, when the open items also cover the
+			 *     season before.
+			 */
+			show_season: boolean;
+			/** @description Today, the Dutch date, for example "2026-11-10". */
+			today: string;
+		};
+		/** @description One event of the start page: the event as on "Season", and how its row looks. */
+		StartEvent: {
+			event: components['schemas']['EventView'];
+			/** @description `lighter`: nothing is left to do (`team_core::event_look`). */
+			look: components['schemas']['EventLookView'];
+			/** @description The other team; only for a game of the team. */
+			opponent?: string | null;
+			side?: null | components['schemas']['SideView'];
 		};
 		/** @description The team of the current season. */
 		TeamPageView: {
@@ -4285,7 +4305,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The open items, the last training and the next events */
+			/** @description The open items, the last duty games and the next events */
 			200: {
 				headers: {
 					[name: string]: unknown;

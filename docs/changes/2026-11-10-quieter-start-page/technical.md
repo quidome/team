@@ -209,8 +209,14 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
 ## Progress
 - [x] Step 1: the core rules (2026-11-10)
 - [x] Step 2: the new places (2026-11-10)
-- [ ] Step 3: the start page
-- [ ] Step 4: the check of the look
+- [x] Step 3: the start page (2026-11-11)
+- [x] Step 4: the check of the look (2026-11-11). Contrast (WCAG, from the colours in
+  `layout.css`), light / dark: lighter text on the page 5.76 / 7.70 and on the orange row 5.25 /
+  6.14 (need 4.5); blue bar 5.74 / 7.75, orange bar on the orange row 4.38 / 6.28, open item dot
+  4.81 / 7.88 (need 3); the message links 4.81 / 7.28 (need 4.5). The lighter bars are decoration
+  only: the grey text carries "done". Screenshots at 390 × 844 of a quiet week (the test data)
+  and a busy Saturday (real games of the test data with changed dates and places) in light and
+  dark mode: all readable, nothing changed.
 - [ ] All checks pass
 
 ## Deviations
@@ -228,5 +234,11 @@ normal text"); the header date comes from the server (`today`), so it follows th
   without a team (`docs/product/messages.md`), and "Duties" does not know whether a team is
   chosen. Following the overviews keeps the three buttons together; the other way needs a new
   field in the answer of "Duties". Accepted by the coordinator on 2026-11-10.
+- 2026-11-11, step 3 (Implement): `SeasonTrainings::state` in `api/season.rs` is removed too:
+  only the last training used it. The dot and the arrow of an open item come from CSS, so the
+  text of the row (and of the browser tests) stays only its words. The browser tests of a game
+  marked "Not played" and of the last duty games replace the answer of the start page, because
+  the test clock (12 October 2026) has no coming game of the team in the two weeks; the server
+  tests check the same with stored data.
 
 ## Review findings

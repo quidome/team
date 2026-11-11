@@ -1,5 +1,6 @@
 //! The start page (story B of start page and season): the open items (what still needs the
-//! coordinator), the last training, and the events of this week and the next.
+//! coordinator), the duty games of the last date with duties, how each event looks, and the
+//! events of this week and the next.
 
 use std::collections::BTreeMap;
 
@@ -11,7 +12,7 @@ use crate::contribution::duties::{
 };
 use crate::contribution::game_attendance::{GameAttendance, GameCount, GameWarnings, checked};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
-use crate::events::training::{SeasonList, SeasonRow, not_checked, not_opened};
+use crate::events::training::{SeasonList, not_checked, not_opened};
 use crate::output::season_view::{Event, EventKind, SeasonEvents};
 use crate::shared::season::Season;
 use crate::team::players::PlayerId;
@@ -277,29 +278,23 @@ pub fn open_items(
     items
 }
 
-/// The newest row before today with a training that is not cancelled, over all `lists`; checked
-/// or not.
-pub fn last_training<'a>(lists: &'a [SeasonList<'a>]) -> Option<&'a SeasonRow<'a>> {
-    lists
-        .iter()
-        .flat_map(|list| &list.past)
-        .filter(|row| row.training.is_some_and(|training| !training.cancelled))
-        .max_by_key(|row| row.date)
-}
-
 /// Whether a game has places of the team that count.
 fn has_places(places: &PlacesOf, source_id: i64) -> bool {
     places.get(&source_id).is_some_and(has_team_places)
 }
 
 /// The games of the newest date before today that have places of the team (table, referee or
-/// drivers), in time order; also games that left the game list later (a past game counts).
+/// drivers) and are not games of the team, in time order; also games that left the game list
+/// later (a past game counts). A game of the team is an open item until it is checked.
 pub fn last_games<'a>(events: &'a SeasonEvents<'a>, places: &PlacesOf) -> Vec<&'a Event<'a>> {
     let with_places: Vec<&Event<'_>> = events
         .past
         .iter()
         .filter(|event| match event.kind {
-            EventKind::Game(scheduled) => has_places(places, scheduled.game.source_id),
+            EventKind::Game(scheduled) => {
+                scheduled.reason != ScheduleReason::TeamGame
+                    && has_places(places, scheduled.game.source_id)
+            }
             EventKind::Training(..) => false,
         })
         .collect();
@@ -404,7 +399,7 @@ mod tests {
     use crate::contribution::attendance::training_state;
     use crate::events::schedule::ScheduledGame;
     use crate::events::schedule::tests::{CLUB_TEAM, OPPONENT, TEAM, game};
-    use crate::events::training::{DayStatus, Training, TrainingId};
+    use crate::events::training::{DayStatus, SeasonRow, Training, TrainingId};
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
@@ -612,45 +607,6 @@ mod tests {
             ),
             []
         );
-    }
-
-    #[test]
-    fn last_is_the_newest_past_training_also_when_checked() {
-        let mut checked = training(1, date(2026, 10, 6));
-        checked.checked = true;
-        let mut cancelled = training(2, date(2026, 10, 8));
-        cancelled.cancelled = true;
-        let older = training(3, date(2026, 9, 29));
-        let list = past(vec![
-            row(date(2026, 10, 9), None),
-            row(date(2026, 10, 8), Some(&cancelled)),
-            row(date(2026, 10, 6), Some(&checked)),
-            row(date(2026, 9, 29), Some(&older)),
-        ]);
-        let lists = [list];
-        assert_eq!(
-            last_training(&lists).map(|row| row.date),
-            Some(date(2026, 10, 6))
-        );
-    }
-
-    #[test]
-    fn on_2_july_last_is_the_training_of_30_june() {
-        let june = training(1, date(2027, 6, 30));
-        let lists = [
-            past(vec![row(date(2027, 7, 1), None)]),
-            past(vec![row(date(2027, 6, 30), Some(&june))]),
-        ];
-        assert_eq!(
-            last_training(&lists).map(|row| row.date),
-            Some(date(2027, 6, 30))
-        );
-    }
-
-    #[test]
-    fn no_past_training_gives_no_last() {
-        let lists = [past(vec![row(date(2026, 10, 6), None)])];
-        assert_eq!(last_training(&lists), None);
     }
 
     /// The events of the season from `games` and training days on `days`, all coming.
@@ -1038,6 +994,44 @@ mod tests {
         // 11 Oct has no places; 10 Oct has two games with places, also the gone one.
         assert_eq!(ids, [2, 4]);
         assert!(last_games(&events, &PlacesOf::new()).is_empty());
+    }
+
+    #[test]
+    fn last_games_leave_out_the_games_of_the_team() {
+        let games = [
+            // The newest past date has only a game of the team with drivers.
+            scheduled(1, date(2026, 10, 17), ScheduleReason::TeamGame),
+            scheduled(2, date(2026, 10, 10), ScheduleReason::DutyGame),
+            scheduled(3, date(2026, 10, 10), ScheduleReason::TeamGame),
+        ];
+        let mut past_events: Vec<Event<'_>> = games
+            .iter()
+            .map(|scheduled| Event {
+                date: scheduled.game.date,
+                start: scheduled.game.start_time,
+                kind: EventKind::Game(scheduled),
+            })
+            .collect();
+        past_events.sort_by(|a, b| b.date.cmp(&a.date));
+        let events = SeasonEvents {
+            coming: Vec::new(),
+            past: past_events,
+        };
+        let places: PlacesOf = [
+            (1, driver_places(9, 3, true)),
+            (2, home_places(true, true, true, true, true)),
+            (3, driver_places(9, 3, true)),
+        ]
+        .into_iter()
+        .collect();
+        let ids: Vec<i64> = last_games(&events, &places)
+            .iter()
+            .filter_map(|event| match event.kind {
+                EventKind::Game(scheduled) => Some(scheduled.game.source_id),
+                EventKind::Training(..) => None,
+            })
+            .collect();
+        assert_eq!(ids, [2]);
     }
 
     // The warnings of the games (story B of attendance at games).

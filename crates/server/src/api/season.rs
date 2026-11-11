@@ -12,11 +12,11 @@ use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
     FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
     GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
-    ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, SeasonRow, StoredDuties,
-    StoredGame, Team, TeamNumber, TeamRef, Training, TrainingState, WeeklyTraining,
-    answers_in_effect, checked, display_names, game_list, game_places, game_warnings, kept_games,
-    not_entered, open_places, players_playing_on, plays_games_on, required_duties, row_count,
-    schedule, season_events, season_list, started, team_games, training_state,
+    ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties, StoredGame,
+    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, checked, display_names,
+    game_list, game_places, game_warnings, kept_games, not_entered, open_places,
+    players_playing_on, plays_games_on, required_duties, row_count, schedule, season_events,
+    season_list, started, team_games,
 };
 use utoipa::ToSchema;
 
@@ -827,11 +827,6 @@ impl SeasonTrainings {
     /// (`team_core::season_events`).
     pub fn events<'a>(&self, games: &'a Schedule, list: &'a SeasonList<'a>) -> SeasonEvents<'a> {
         season_events(games, list, &self.absences, &self.roles)
-    }
-
-    /// The attendance of `row`, a row of `list` (`team_core::training_state`).
-    pub fn state(&self, row: &SeasonRow<'_>) -> TrainingState {
-        training_state(row, &self.absences, &self.roles)
     }
 }
 

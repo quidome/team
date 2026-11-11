@@ -1,7 +1,7 @@
-//! `GET /api/start`: the start page (story B of start page and season): the open items, the last
-//! training and the last games with places of the team, and the events of this week and next
-//! week, in one answer. Each open item comes from the function of its source: the "Game list"
-//! card, the list of changes, the page of a game, "Attendance".
+//! `GET /api/start`: the start page (story B of start page and season, and the quieter start
+//! page): the open items, the duty games of the last date with duties, and the events of this
+//! week and next week with how each looks, in one answer. Each open item comes from the function
+//! of its source: the "Game list" card, the list of changes, the page of a game, "Attendance".
 
 use std::collections::BTreeMap;
 
@@ -9,41 +9,107 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    DutyKind, ENOUGH_PLAYERS, Event, EventKind, Game, GameWarnings, NotCheckedGame, OpenItem,
-    PlayerId, ReadingState, ScheduleReason, Season, games_not_checked, last_games, last_training,
-    next_events, open_item_seasons, open_items, open_places_games, schedule_not_entered,
+    DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HomeOrAway,
+    NotCheckedGame, OpenItem, PlacesOf, PlayerId, ReadingState, ScheduleReason, Season, event_look,
+    games_not_checked, last_games, next_events, open_item_seasons, open_items, open_places_games,
+    schedule_not_entered, team_side,
 };
 use utoipa::ToSchema;
 
 use super::format::{clock_time, day};
-use super::messages::{committee_text, week_text};
+use super::messages::{committee_offered, week_text};
 use super::season::{
-    EventView, coming_view, event_view, event_view_with, games_of, places_of_season, trainings_of,
+    EventView, SeasonGames, coming_view, event_view_with, games_of, places_of_season, trainings_of,
 };
 use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands};
-use crate::db::StoreError;
 use crate::error::AppError;
 use crate::{game_attendance, reading, readings};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct StartAnswer {
+    /// Today, the Dutch date, for example "2026-11-10".
+    pub today: String,
+    /// The header shows the season: in July and August, when the open items also cover the
+    /// season before.
+    pub show_season: bool,
     /// What still needs the coordinator, in the order of the start page.
     pub open_items: Vec<OpenItemView>,
-    /// The last training before today that is not cancelled, as an event; `null` when there is
-    /// none.
-    pub last: Option<EventView>,
     /// The games of the team, the home games of other club teams with places of the team, and
     /// the trainings from today until the Sunday of next week, in time order; when there are
     /// none, the first coming one.
-    pub next: Vec<EventView>,
-    /// The games of the last date before today with places of the team, in time order, in the
-    /// seasons of the open items (in July and August also the season before).
-    pub last_games: Vec<EventView>,
+    pub next: Vec<StartEvent>,
+    /// The games of the last date before today with places of the team that are not games of the
+    /// team, in time order, in the seasons of the open items (in July and August, when the
+    /// current season has none, the season before).
+    pub last_games: Vec<StartEvent>,
     /// The season of `last_games`, for their pages; `null` when there are none.
     pub last_games_season: Option<String>,
     /// The messages the start page offers.
     pub messages: MessagesView,
+}
+
+/// One event of the start page: the event as on "Season", and how its row looks.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct StartEvent {
+    pub event: EventView,
+    /// `lighter`: nothing is left to do (`team_core::event_look`).
+    pub look: EventLookView,
+    /// Home or away; only for a game of the team.
+    pub side: Option<SideView>,
+    /// The other team; only for a game of the team.
+    pub opponent: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EventLookView {
+    Normal,
+    Lighter,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SideView {
+    Home,
+    Away,
+}
+
+/// `view` (of `event`) with its look, and for a game of the team its side and opponent.
+fn start_event(
+    event: &Event,
+    view: EventView,
+    places: &PlacesOf,
+    games: &SeasonGames,
+) -> StartEvent {
+    let mut start = StartEvent {
+        look: EventLookView::Normal,
+        side: None,
+        opponent: None,
+        event: view,
+    };
+    let checked = start.event.game.as_ref().is_some_and(|game| game.checked);
+    let game_places = match event.kind {
+        EventKind::Game(scheduled) => places.get(&scheduled.game.source_id),
+        EventKind::Training(..) => None,
+    };
+    if event_look(event, game_places, checked) == EventLook::Lighter {
+        start.look = EventLookView::Lighter;
+    }
+    if let (EventKind::Game(scheduled), Some(club), Some(team)) =
+        (event.kind, &games.club, &games.team)
+    {
+        if scheduled.reason != ScheduleReason::TeamGame {
+            return start;
+        }
+        let (side, opponent) = team_side(&scheduled.game, club.number, team.number);
+        start.side = Some(match side {
+            HomeOrAway::Home => SideView::Home,
+            HomeOrAway::Away => SideView::Away,
+        });
+        start.opponent = Some(opponent.to_owned());
+    }
+    start
 }
 
 /// Which buttons the part "Messages" shows.
@@ -51,7 +117,7 @@ pub struct StartAnswer {
 pub struct MessagesView {
     /// "Message of the week": the same rule as `GET /api/messages/week`.
     pub week: bool,
-    /// "Committee message": the same rule as `GET /api/messages/committee`.
+    /// "Committee message": this week has table or referee places of the team (decision 0034).
     pub committee: bool,
 }
 
@@ -249,7 +315,7 @@ impl OpenItemView {
     path = "/api/start",
     operation_id = "start",
     responses(
-        (status = 200, description = "The open items, the last training and the next events", body = StartAnswer),
+        (status = 200, description = "The open items, the last duty games and the next events", body = StartAnswer),
         (status = 401, description = "Not logged in"),
     )
 )]
@@ -335,33 +401,23 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         &warnings,
         &not_checked,
     );
-    let last = last_training(&lists)
-        .map(|row| {
-            // The trainings of the season of the row hold its absences.
-            let (_, trainings) = seasons
-                .iter()
-                .zip(&inputs)
-                .find(|(season, _)| **season == Season::of(row.date))
-                .ok_or_else(|| StoreError::Invalid(format!("no trainings for {}", row.date)))?;
-            let state = trainings.state(row);
-            event_view(&Event {
-                date: row.date,
-                start: Some(row.start),
-                kind: EventKind::Training(row, state),
-            })
-        })
-        .transpose()?;
     let next = next_events(&events, &places, today)
         .into_iter()
-        .map(|event| coming_view(event, &places, &games.duties, true, now))
+        .map(|event| {
+            coming_view(event, &places, &games.duties, true, now)
+                .map(|view| start_event(event, view, &places, &games))
+        })
         .collect::<Result<_, _>>()?;
 
     // The last games with places: the current season; in July and August, when it has none
     // yet, the season before.
     let mut last_games_season = None;
-    let mut last_game_views: Vec<EventView> = last_games(&events, &places)
+    let mut last_game_views: Vec<StartEvent> = last_games(&events, &places)
         .into_iter()
-        .map(|event| event_view_with(event, &places, &games.duties))
+        .map(|event| {
+            event_view_with(event, &places, &games.duties)
+                .map(|view| start_event(event, view, &places, &games))
+        })
         .collect::<Result<_, _>>()?;
     if last_game_views.is_empty() {
         for (&season, trainings) in seasons.iter().zip(&inputs).skip(1) {
@@ -371,7 +427,10 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             let earlier_events = trainings.events(&earlier.schedule, &list);
             last_game_views = last_games(&earlier_events, &earlier_places)
                 .into_iter()
-                .map(|event| event_view_with(event, &earlier_places, &earlier.duties))
+                .map(|event| {
+                    event_view_with(event, &earlier_places, &earlier.duties)
+                        .map(|view| start_event(event, view, &earlier_places, &earlier))
+                })
                 .collect::<Result<_, _>>()?;
             if !last_game_views.is_empty() {
                 last_games_season = Some(season);
@@ -383,7 +442,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     }
     let messages = MessagesView {
         week: week_text(&games, &places, today).is_some(),
-        committee: committee_text(&games, &places, today).is_some(),
+        committee: committee_offered(&games, &places, today),
     };
     let by_id: BTreeMap<i64, &Game> = games
         .schedule
@@ -392,11 +451,12 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .map(|scheduled| (scheduled.game.source_id, &scheduled.game))
         .collect();
     Ok(Json(StartAnswer {
+        today: day(today),
+        show_season: seasons.len() > 1,
         open_items: items
             .into_iter()
             .map(|item| OpenItemView::of(item, current, &by_id, &games.duties.names))
             .collect(),
-        last,
         next,
         last_games: last_game_views,
         last_games_season: last_games_season.map(|season| season.to_string()),

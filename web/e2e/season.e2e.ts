@@ -32,15 +32,7 @@ test('"Season" is first in the links and opens with "Coming" on', async ({ page 
 	const errors = watchConsole(page);
 	await page.goto('/');
 	const links = page.getByTestId('team-links').getByRole('link');
-	await expect(links).toHaveText([
-		'Season',
-		'Attendance',
-		'Duties',
-		'Report',
-		'Team',
-		'Players',
-		'Settings'
-	]);
+	await expect(links).toHaveText(['Season', 'Attendance', 'Duties', 'Report', 'More']);
 	await links.first().click();
 
 	await expect(page.getByRole('heading', { name: 'Season 2026-2027' })).toBeVisible();

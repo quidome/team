@@ -187,7 +187,12 @@ async fn an_away_game_has_its_drivers(pool: PgPool) {
 async fn committee(reader: &Reader) -> Value {
     let text = ok(reader, "GET", "/api/messages/committee", None).await["text"].clone();
     let start = ok(reader, "GET", "/api/start", None).await;
-    assert_eq!(start["messages"]["committee"], !text.is_null());
+    // The start page offers it only in a week with places of the team (decision 0034); the text
+    // always exists with a team (decision 0026).
+    let has_places = text
+        .as_str()
+        .is_some_and(|text| !text.contains("Geen tafel- of scheidsrechtersdiensten"));
+    assert_eq!(start["messages"]["committee"], has_places);
     text
 }
 
@@ -213,7 +218,7 @@ async fn the_committee_message_has_the_full_names_of_this_week(pool: PgPool) {
     reader.read_good().await;
     reader.harness.clock.set(utc(2026, 10, 26, 10, 0));
     reader.log_in_again().await;
-    // Without places: the text says so, and the button stays.
+    // Without places: the text says so, and the start page has no link to it.
     assert_eq!(
         committee(&reader).await,
         "Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november\n\

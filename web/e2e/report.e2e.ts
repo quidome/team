@@ -68,15 +68,7 @@ test('the start page links to the report after "Duties"', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/');
 	const links = page.getByTestId('team-links').getByRole('link');
-	await expect(links).toHaveText([
-		'Season',
-		'Attendance',
-		'Duties',
-		'Report',
-		'Team',
-		'Players',
-		'Settings'
-	]);
+	await expect(links).toHaveText(['Season', 'Attendance', 'Duties', 'Report', 'More']);
 	await links.filter({ hasText: 'Report' }).click();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Report 2026-2027');
 	await page.getByRole('link', { name: 'Back' }).click();

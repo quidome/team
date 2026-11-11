@@ -31,7 +31,9 @@ test('the start page opens the message of the week, and "Back" returns', async (
 	await answers(page, TEXT);
 	await page.goto('/');
 	const messages = page.getByTestId('messages');
-	await expect(messages.getByRole('heading', { name: 'Messages' })).toBeVisible();
+	// One quiet link, without a heading "Messages".
+	await expect(messages.getByRole('heading')).toHaveCount(0);
+	await expect(messages.getByRole('link')).toHaveText(['Message of the week ›']);
 	await messages.getByRole('link', { name: 'Message of the week' }).click();
 	await expect(page).toHaveURL(/\/messages\/week$/);
 
@@ -79,9 +81,8 @@ test('without a message of the week the start page has no button for it, and the
 	// The real answers: the test data has nothing in this week.
 	await page.goto('/');
 	await expect(page.getByTestId('next')).toBeVisible();
-	const messages = page.getByTestId('messages');
-	await expect(messages.getByRole('link', { name: 'Committee message' })).toBeVisible();
-	await expect(messages.getByRole('link', { name: 'Message of the week' })).toHaveCount(0);
+	// No places this week: no committee message on the start page either (it is on "Duties").
+	await expect(page.getByTestId('messages')).toHaveCount(0);
 
 	await page.goto('/messages/week');
 	await expect(page.getByTestId('no-message')).toHaveText('No message this week.');
@@ -96,6 +97,12 @@ Geen tafel- of scheidsrechtersdiensten deze week.`;
 
 test('the start page opens the committee message, and "Back" returns', async ({ page }) => {
 	const errors = watchConsole(page);
+	// A week with places of the team: the start page offers the committee message.
+	await page.route('**/api/start', async (route) => {
+		const start = await (await route.fetch()).json();
+		start.messages.committee = true;
+		await route.fulfill({ json: start });
+	});
 	await page.goto('/');
 	await page.getByTestId('messages').getByRole('link', { name: 'Committee message' }).click();
 	await expect(page).toHaveURL(/\/messages\/committee$/);

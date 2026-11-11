@@ -165,7 +165,15 @@ test('two taps from "Next" save an answer', async ({ page }) => {
 		const response = await route.fetch();
 		const start = await response.json();
 		start.next = [
-			{ ...event, game: { ...event.game, attendance: { coming: 6, not_coming: 0, no_answer: 2 } } }
+			{
+				event: {
+					...event,
+					game: { ...event.game, attendance: { coming: 6, not_coming: 0, no_answer: 2 } }
+				},
+				look: 'normal',
+				side: 'away',
+				opponent: 'Rivals'
+			}
 		];
 		await route.fulfill({ response, json: start });
 	});

@@ -506,6 +506,7 @@ export async function loadSeason(
 }
 
 export type StartAnswer = components['schemas']['StartAnswer'];
+export type StartEvent = components['schemas']['StartEvent'];
 export type OpenItemView = components['schemas']['OpenItemView'];
 export type OpenGame = components['schemas']['OpenGameView'];
 export type TooFewGameView = components['schemas']['TooFewGameView'];

@@ -805,18 +805,20 @@ async fn next_shows_a_home_game_of_another_club_team_with_a_place_of_the_team(po
     })
     .await;
     set_place(&reader, ours, "table", 1, Some(M16_1)).await;
-    let next = start(&reader).await["next"].clone();
-    let duty_ids: Vec<i64> = next
+    let answer = start(&reader).await;
+    let next: Vec<Value> = answer["next"]
         .as_array()
         .unwrap()
+        .iter()
+        .map(|item| item["event"].clone())
+        .collect();
+    let duty_ids: Vec<i64> = next
         .iter()
         .filter(|event| event["game"]["reason"] == "duty")
         .map(|event| event["game"]["id"].as_i64().unwrap())
         .collect();
     assert_eq!(duty_ids, [ours]);
     let event = next
-        .as_array()
-        .unwrap()
         .iter()
         .find(|event| event["game"]["id"] == ours)
         .unwrap();
@@ -827,7 +829,9 @@ async fn next_shows_a_home_game_of_another_club_team_with_a_place_of_the_team(po
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn last_has_all_games_of_the_last_date_with_places_also_without_a_training(pool: PgPool) {
+async fn the_last_duty_games_are_the_games_of_the_last_date_with_places_but_not_of_the_team(
+    pool: PgPool,
+) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
     // Two home games of other club teams on 3 October with places of the team; no trainings.
@@ -842,14 +846,29 @@ async fn last_has_all_games_of_the_last_date_with_places_also_without_a_training
     for &id in &on_3_october {
         set_place(&reader, id, "referee", 1, Some(M16_1)).await;
     }
+    // The away game of the team on 10 October, newer and with a driver place, is left out: a game
+    // of the team is an open item until it is checked.
+    let away = season_games(&reader)
+        .await
+        .into_iter()
+        .find(|game| game["reason"] == "team" && game["date"] == "2026-10-10")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/drivers", game_path(away)),
+        Some(json!({ "drivers": 1 })),
+    )
+    .await;
     let answer = start(&reader).await;
-    assert!(answer["last"].is_null());
     assert_eq!(answer["last_games_season"], "2026-2027");
     let mut ids: Vec<i64> = answer["last_games"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|event| event["game"]["id"].as_i64().unwrap())
+        .map(|item| item["event"]["game"]["id"].as_i64().unwrap())
         .collect();
     ids.sort_unstable();
     let mut expected = on_3_october.clone();

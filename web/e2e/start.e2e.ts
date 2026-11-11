@@ -15,28 +15,30 @@ async function withOpenItems(page: import('@playwright/test').Page, items: objec
 	});
 }
 
-test('the start page shows the team, the open items, "Last", "Next" and the links', async ({
+test('the start page shows the team and the date, the open items, the events and the links', async ({
 	page
 }) => {
 	const errors = watchConsole(page);
 	await page.goto('/');
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
+	await expect(page.getByTestId('today')).toHaveText('Monday 12 October');
+	// In October the header has no season, and the team is changed on the settings.
+	await expect(page.getByTestId('season')).toHaveCount(0);
+	await expect(page.getByRole('link', { name: 'Change', exact: true })).toHaveCount(0);
 	const parts = page.locator(
-		'[data-testid="open-items"], [data-testid="last"], [data-testid="next"], [data-testid="team-links"]'
+		'[data-testid="open-items"], [data-testid="next"], [data-testid="team-links"]'
 	);
-	await expect(parts).toHaveCount(4);
+	await expect(parts).toHaveCount(3);
 	const order = await parts.evaluateAll((elements) =>
 		elements.map((element) => element.getAttribute('data-testid'))
 	);
-	expect(order).toEqual(['open-items', 'last', 'next', 'team-links']);
+	expect(order).toEqual(['open-items', 'next', 'team-links']);
 	await expect(page.getByTestId('team-links').getByRole('link')).toHaveText([
 		'Season',
 		'Attendance',
 		'Duties',
 		'Report',
-		'Team',
-		'Players',
-		'Settings'
+		'More'
 	]);
 	// The old parts are gone.
 	await expect(page.getByTestId('game-list-card')).toHaveCount(0);
@@ -47,10 +49,10 @@ test('the start page shows the team, the open items, "Last", "Next" and the link
 	expect(errors).toEqual([]);
 });
 
-test('without open items the start page says "Nothing open."', async ({ page }) => {
+test('without open items the start page says "Nothing needs you."', async ({ page }) => {
 	await withOpenItems(page, []);
 	await page.goto('/');
-	await expect(page.getByTestId('nothing-open')).toHaveText('Nothing open.');
+	await expect(page.getByTestId('nothing-open')).toHaveText('Nothing needs you.');
 	await expect(page.getByTestId('open-item')).toHaveCount(0);
 });
 
@@ -179,20 +181,16 @@ test('a training not checked is an open item that opens it', async ({ page }) =>
 	await expect(page).toHaveURL(/\/training\/2026-10-06\?from=start$/);
 });
 
-test('"Last" opens the last training, also after "Checked"', async ({ page }) => {
+test('a past training is not in the list of events, only as an open item', async ({ page }) => {
 	await page.goto('/');
-	const last = page.getByTestId('last');
-	await expect(last.getByTestId('training-row')).toHaveCount(1);
-	const date = await last.getByTestId('training-row').getAttribute('data-date');
-	await last.getByTestId('training-row').getByRole('button').click();
-	await expect(page).toHaveURL(new RegExp(`/training/${date}\\?from=start$`));
-	if (await page.getByRole('button', { name: 'Checked', exact: true }).isVisible())
-		await page.getByRole('button', { name: 'Checked', exact: true }).click();
-	await expect(page.getByTestId('checked')).toHaveText('Checked');
-	await page.getByRole('link', { name: 'Back' }).click();
-	await expect(page).toHaveURL(/\/$/);
-	await expect(last.getByTestId('training-row')).toHaveAttribute('data-date', date ?? '');
-	await expect(last.getByTestId('training-status')).toHaveText(/ · Checked$/);
+	await expect(page.getByTestId('next').getByTestId('training-row').first()).toBeVisible();
+	await expect(page.getByTestId('last-games')).toHaveCount(0);
+	const dates = await page
+		.getByTestId('next')
+		.getByTestId('training-row')
+		.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-date') ?? ''));
+	expect(dates.length).toBeGreaterThan(0);
+	expect(dates.every((date) => date >= '2026-10-12')).toBe(true);
 });
 
 test('"Next" shows the trainings of two weeks, and a tap opens one', async ({ page }) => {
