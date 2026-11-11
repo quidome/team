@@ -489,6 +489,13 @@ pub enum DutyError {
     NoPlayerOnPlace,
 }
 
+/// Whether `team` plays `game`, so a table or referee place at it breaks the club rule that a team
+/// never has the places of its own game (`docs/language.md`, "team game"). The tool still allows
+/// it and shows a warning: the club does not always keep to the rule.
+pub fn plays_the_game(game: &Game, team: TeamNumber) -> bool {
+    game.home.team == team || game.away.team == team
+}
+
 /// The team `number` from the pull-down list `list` (`club_teams`).
 pub fn pick_team(list: &[TeamRef], number: TeamNumber) -> Result<TeamRef, DutyError> {
     list.iter()
@@ -2929,5 +2936,16 @@ mod tests {
                 ..Total::default()
             }
         );
+    }
+
+    #[test]
+    fn a_team_plays_its_own_home_and_away_game() {
+        use crate::events::schedule::tests::{CLUB_TEAM, OPPONENT, TEAM, game};
+        let home = game(1, TEAM, OPPONENT);
+        assert!(plays_the_game(&home, TEAM));
+        assert!(!plays_the_game(&home, CLUB_TEAM));
+        let club_against_club = game(2, CLUB_TEAM, TEAM);
+        assert!(plays_the_game(&club_against_club, CLUB_TEAM));
+        assert!(plays_the_game(&club_against_club, TEAM));
     }
 }

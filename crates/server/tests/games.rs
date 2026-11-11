@@ -841,6 +841,31 @@ async fn look_in_next(reader: &Reader, find: impl Fn(&Value) -> bool) -> String 
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_place_of_a_team_that_plays_the_game_says_so(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // A home game of M16 1: the club rule says M16 1 does not have its places, but the tool
+    // allows it and the place says so.
+    let id = first_game(&reader, |game| {
+        game["reason"] == "team" && game["home"].as_str().unwrap().contains("Blue Drakes")
+    })
+    .await;
+    let page = set_place(&reader, id, "table", 1, Some(M16_1)).await;
+    let plays = |page: &Value| -> Vec<bool> {
+        page["game"]["places"]["schedule"]["places"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|place| place["plays"].as_bool().unwrap())
+            .collect()
+    };
+    // Referee 1, referee 2, table 1, table 2.
+    assert_eq!(plays(&page), [false, false, true, false]);
+    let page = set_place(&reader, id, "table", 1, Some(M16_2)).await;
+    assert_eq!(plays(&page), [false, false, false, false]);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_row_of_the_start_page_is_lighter_when_nothing_is_left_to_do(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
