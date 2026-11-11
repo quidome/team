@@ -99,7 +99,7 @@ pub fn games_not_checked(
     checks: &BTreeMap<i64, GameAttendance>,
     today: NaiveDate,
 ) -> Vec<NotCheckedGame> {
-    let mut open: Vec<NotCheckedGame> = games
+    let open: Vec<&ScheduledGame> = games
         .iter()
         .filter(|scheduled| scheduled.reason == ScheduleReason::TeamGame)
         .filter(|scheduled| scheduled.in_list && !scheduled.not_played)
@@ -109,14 +109,30 @@ pub fn games_not_checked(
                 .get(&scheduled.game.source_id)
                 .is_some_and(|stored| checked(stored, scheduled.game.date))
         })
+        .collect();
+    in_time_order(season, open)
+}
+
+/// `games` of `season` in time order: by date, then by start time (a game without a known start
+/// time last on its date), then by id.
+fn in_time_order(season: Season, mut games: Vec<&ScheduledGame>) -> Vec<NotCheckedGame> {
+    games.sort_by_key(|scheduled| {
+        let game = &scheduled.game;
+        (
+            game.date,
+            game.start_time.is_none(),
+            game.start_time,
+            game.source_id,
+        )
+    });
+    games
+        .into_iter()
         .map(|scheduled| NotCheckedGame {
             season,
             id: scheduled.game.source_id,
             date: scheduled.game.date,
         })
-        .collect();
-    open.sort_by_key(|game| (game.date, game.id));
-    open
+        .collect()
 }
 
 /// The games not checked of the open items: of the team (`games_not_checked`) and duty games
@@ -138,7 +154,7 @@ pub fn duty_games_not_checked(
     stored: &BTreeMap<i64, StoredDuties>,
     today: NaiveDate,
 ) -> Vec<NotCheckedGame> {
-    let mut open: Vec<NotCheckedGame> = games
+    let open: Vec<&ScheduledGame> = games
         .iter()
         .filter(|scheduled| scheduled.in_list && !scheduled.not_played)
         .filter(|scheduled| scheduled.game.date < today)
@@ -148,14 +164,8 @@ pub fn duty_games_not_checked(
             kind == Some(CheckKind::Duty)
                 && !game_checked(kind, None, stored.get(&id), scheduled.game.date, false)
         })
-        .map(|scheduled| NotCheckedGame {
-            season,
-            id: scheduled.game.source_id,
-            date: scheduled.game.date,
-        })
         .collect();
-    open.sort_by_key(|game| (game.date, game.id));
-    open
+    in_time_order(season, open)
 }
 
 /// The seasons the open items and the last training cover: the season of `today`, and in July
@@ -312,9 +322,10 @@ pub fn open_items(
             count: trainings.len(),
         });
     }
+    // By date over the seasons; within a date the time order of each list stays (stable sort).
     let oldest_first = |games: &[NotCheckedGame]| {
         let mut games = games.to_vec();
-        games.sort_by_key(|game| (game.date, game.id));
+        games.sort_by_key(|game| game.date);
         games
     };
     if !games_not_checked.is_empty() {
@@ -1479,6 +1490,35 @@ mod tests {
         // Today's game (9) is not past; 2 is checked; 4 has no place of the team; 5 is gone; 6 is
         // not played; 7 is a game of the team. Oldest first.
         assert_eq!(ids, [3, 1]);
+    }
+
+    #[test]
+    fn the_games_not_checked_of_one_date_are_in_time_order() {
+        let season = Season::from_start_year(2026);
+        let on = date(2026, 10, 10);
+        let at = |id, hour, minute| {
+            let mut game = scheduled(id, on, ScheduleReason::DutyGame);
+            game.game.start_time = Some(time(hour, minute));
+            game
+        };
+        let mut unknown = scheduled(1, on, ScheduleReason::DutyGame);
+        unknown.game.start_time = None;
+        // Lower ids later in the day, and a game without a start time.
+        let games = [unknown, at(2, 16, 0), at(3, 10, 0), at(4, 13, 15)];
+        let places: PlacesOf = (1..=4)
+            .map(|id| (id, home_places(true, true, true, true, true)))
+            .collect();
+        let ids: Vec<i64> = duty_games_not_checked(
+            season,
+            &games,
+            &places,
+            &BTreeMap::new(),
+            date(2026, 10, 20),
+        )
+        .iter()
+        .map(|game| game.id)
+        .collect();
+        assert_eq!(ids, [3, 4, 2, 1]);
     }
 
     #[test]

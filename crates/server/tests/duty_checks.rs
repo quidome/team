@@ -356,3 +356,40 @@ async fn a_past_duty_game_that_is_not_checked_is_an_open_item(pool: PgPool) {
             .is_empty()
     );
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn in_july_the_duty_games_of_the_season_before_are_an_open_item(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    // July 2027: the new season has no team yet; the open items also cover the season before.
+    reader
+        .harness
+        .clock
+        .set(common::game_list::utc(2027, 7, 2, 10, 0));
+    reader.log_in_again().await;
+    let start = ok(&reader, "GET", "/api/start", None).await;
+    let item = start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "duty_games_not_checked")
+        .unwrap_or_else(|| panic!("{start}"))
+        .clone();
+    let games = item["games"].as_array().unwrap();
+    assert_eq!(games.len(), 1, "{item}");
+    assert_eq!(games[0]["id"], id);
+    assert_eq!(games[0]["season"], "2026-2027");
+    // From September the season before is no longer covered.
+    reader
+        .harness
+        .clock
+        .set(common::game_list::utc(2027, 9, 1, 10, 0));
+    reader.log_in_again().await;
+    assert!(
+        item_games(&reader, "duty_games_not_checked")
+            .await
+            .is_empty()
+    );
+}

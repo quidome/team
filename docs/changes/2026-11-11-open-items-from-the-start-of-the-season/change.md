@@ -1,7 +1,7 @@
 ---
 title: Open items from the start of the season
 type: feature
-stage: implement
+stage: close
 closure: review build + accept
 created: 2026-11-11
 ---
@@ -19,3 +19,4 @@ story 3; the architecture in its `technical.md`.
 |------|-------|------|
 | 2026-11-11 | design | created from the epic (story 3) |
 | 2026-11-11 | implement | technical.md approved: 5 steps (core rules, server, front end, browser tests, look and checks); closure review build + accept (a table dropped, two API shapes changed, a decision record) |
+| 2026-11-11 | implement | 5 steps built on the branch open-items-season; build and acceptance reviews: R1 (time order), R2 (season and id), R3/R4/A5 (tests), R7 (a comment) fixed; R5 a deviation; the documents at Close |

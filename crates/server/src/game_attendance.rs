@@ -1,5 +1,5 @@
-//! Attendance at games (tables `game_attendance`, `game_answers` and `game_check_start`; stories A
-//! and C of attendance at games). An answer needs no lock (decision 0020): each tap is one write,
+//! Attendance at games (tables `game_attendance` and `game_answers`; stories A and C of
+//! attendance at games). An answer needs no lock (decision 0020): each tap is one write,
 //! the last tap wins. "Mark as checked" and its "Undo" lock the row of the game in `game_attendance`.
 
 use std::collections::{BTreeMap, BTreeSet};

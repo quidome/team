@@ -213,17 +213,23 @@ impl GameItemView {
 
 impl OpenItemView {
     /// The view of `item`; the games of an item come from `games` (the games of `season`), the
-    /// games not checked from `past` (the past games of the seasons of the open items).
+    /// games not checked from `past` (the past games of the seasons of the open items, by season
+    /// and id).
     fn of(
         item: OpenItem,
         season: Season,
         games: &BTreeMap<i64, &Game>,
-        past: &BTreeMap<i64, Game>,
+        past: &BTreeMap<(Season, i64), Game>,
         names: &BTreeMap<PlayerId, String>,
     ) -> Self {
         let not_checked = |list: Vec<NotCheckedGame>| -> Vec<GameItemView> {
             list.iter()
-                .filter_map(|game| Some(GameItemView::of(game.season, past.get(&game.id)?)))
+                .filter_map(|game| {
+                    Some(GameItemView::of(
+                        game.season,
+                        past.get(&(game.season, game.id))?,
+                    ))
+                })
                 .collect()
         };
         let item_of = |id: &i64| games.get(id).map(|game| GameItemView::of(season, game));
@@ -377,11 +383,12 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         &games.duties.stored,
         today,
     );
-    let mut past: BTreeMap<i64, Game> = games
+    // By season and id: the key of a game (`GameKey`), so two seasons never mix.
+    let mut past: BTreeMap<(Season, i64), Game> = games
         .schedule
         .past
         .iter()
-        .map(|scheduled| (scheduled.game.source_id, scheduled.game.clone()))
+        .map(|scheduled| ((current, scheduled.game.source_id), scheduled.game.clone()))
         .collect();
     for &season in seasons.iter().skip(1) {
         let earlier = games_of(&state, season, current, today).await?;
@@ -404,7 +411,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
                 .schedule
                 .past
                 .iter()
-                .map(|scheduled| (scheduled.game.source_id, scheduled.game.clone())),
+                .map(|scheduled| ((season, scheduled.game.source_id), scheduled.game.clone())),
         );
     }
     let items = open_items(
