@@ -2,7 +2,7 @@
 	Report (decision 0033): for the current season, one row for each player with the attendance at
 	trainings and games as a percentage and the duties as done + planned, the players who left
 	below it, and a line with what does not count yet (training days not opened, games not
-	checked). A tap on a name opens the details of that player under the row: there, absent valid
+	checked). A tap on a row opens the details of that player under it: there, absent valid
 	and absent not valid, and for each duty kind done, planned and the corrections after a game.
 	All numbers come from the server; the page calculates nothing.
 -->
@@ -134,13 +134,18 @@
 				{#each rows as row (row.player)}
 					{@const shown = open.includes(row.player)}
 					{@const duties = dutyLines(row)}
-					<tr class="border-b last:border-b-0" data-testid="report-row">
+					<!-- A tap anywhere on the row opens or closes the details. The button on the name is the
+						way for the keyboard and screen readers: its click reaches the row. -->
+					<tr
+						class="cursor-pointer border-b last:border-b-0 hover:bg-muted/40"
+						data-testid="report-row"
+						onclick={() => toggle(row.player)}
+					>
 						<th scope="row" class="truncate p-0 text-left font-medium">
 							<button
 								type="button"
 								class="min-h-11 w-full truncate px-1 py-2 text-left underline-offset-4 hover:underline"
-								aria-expanded={shown}
-								onclick={() => toggle(row.player)}>{row.name}</button
+								aria-expanded={shown}>{row.name}</button
 							>
 						</th>
 						<td class="px-1 py-2 text-right text-[13px] whitespace-nowrap tabular-nums"
@@ -159,7 +164,6 @@
 						<tr class="border-b last:border-b-0" data-testid="report-details">
 							<td colspan="6" class="py-1 text-sm">
 								<div class="space-y-1 rounded-md bg-muted/40 px-2 py-2">
-									<p class="font-medium">{row.name}</p>
 									{#if row.trainings}
 										<p class="tabular-nums" data-testid="details-trainings">
 											{shareLine(row.trainings, 'training', 'trainings')}
