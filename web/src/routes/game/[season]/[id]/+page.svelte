@@ -298,7 +298,7 @@
 						state={checked ? 'Checked' : 'Not checked'}
 						done={checked}
 						action={checked ? 'Undo' : 'Mark as checked'}
-						next={!checked}
+						next={!checked && !page.not_played}
 						{busy}
 						onclick={() => {
 							if (checked) {

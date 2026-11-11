@@ -99,6 +99,8 @@ test('after the start time a not played away game has the row "The drives count"
 		.locator('[data-done]')
 		.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')));
 	expect(rows).toEqual(['mark-not-played', 'mark-drives', 'mark-checked']);
+	// A not played game is never an open item: its check is optional, so never orange.
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-next', 'false');
 	await page.reload();
 	await expect(drove).toHaveAttribute('data-done', 'true');
 

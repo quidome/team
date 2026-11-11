@@ -151,7 +151,9 @@ test('"Attendance" counts a checked game and lists it as missed', async ({ page 
 	try {
 		await page.setViewportSize({ width: 320, height: 700 });
 		await page.goto('/attendance');
-		await expect(page.getByTestId('games-from')).toHaveCount(0);
+		await expect(page.getByTestId('games-checked')).toHaveText(
+			'Games count once they are checked.'
+		);
 		// A player who had no answer: "Checked" made the player absent, without a reason.
 		const row = page
 			.getByTestId('player-totals')
