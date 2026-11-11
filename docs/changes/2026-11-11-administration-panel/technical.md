@@ -1,6 +1,6 @@
 # Technical spec: The administration panel
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-11-11-administration-panel/
 **Date**: 2026-11-11
@@ -120,3 +120,91 @@ From the epic's `functional.md`, story 1 (`docs/changes/2026-11-11-checked-for-e
   view when the coordinator checks the game.
 
 ## Review findings
+Reviewed 2026-11-11 by `/review accept` (fresh agent). Read: `change.md`, this file, the epic's
+`idea.md` and `functional.md` (story 1, and the spec review), `docs/language.md`, and the diff
+`main...administration-panel` (commit 5eb5afc, the working tree was clean). Ran: `npm run build`,
+then the whole browser suite with one extra test of my own from the scratchpad (167 passed, the
+extra one included). The Deviations were read after the view below was formed.
+
+**Verdict: needs correction** – one fix in the front end (A1); the spec stays as it is. The rest
+matches what was meant.
+
+| # | Point of story 1 | Built | Sort |
+|---|---|---|---|
+| A1 | The warning without answers, and the count below "Not checked" | Stale after a tap in the list | **concerning deviation** |
+| A2 | One panel, one row for each mark that can be set now, none without | Yes | faithful |
+| A3 | State as a fact with ○ / ✓, one button, "Undo" when set | Yes | faithful |
+| A4 | Orange only for "Mark as checked" and "Mark as entered" | Yes | faithful |
+| A5 | Count and drivers below "Not checked"; the message after the tap | Separate lines; open places too | faithful adaptation |
+| A6 | The warning: "no answer and no extra player" (technical) | Extra players not looked at | neutral drift |
+| A7 | Rare marks, the note of a moved game, test ids | As the spec | neutral drift |
+
+- **A1 – The count and the warning in the panel do not follow the taps in the list (concerning).**
+  The row "Not checked" of a game reads `page.attendance.count` (`countText`, `noAnswerWarning`
+  in `web/src/routes/game/[season]/[id]/+page.svelte`). Only the saves of the page change that
+  count. A tap in the list (`GameAttendance.svelte`) changes the count inside that component and
+  never reaches the page. Checked by a trace, and by a run on the away game of Sat 10 Oct in the
+  e2e database. Before a tap the panel showed "5 no answer · Drivers: 1 open · Nobody has an
+  answer yet: marking as checked makes all 5 players absent.". After one tap on "There" the list
+  showed "1 there · 4 no answer", and the panel still showed "5 no answer" and the same warning.
+  This is the case the warning was made for (spec review S5: old team games with no answers).
+  The coordinator starts entering who was there and is told that all 5 players will be made
+  absent, which is no longer true. That makes the taps look lost, and the page shows two
+  different counts. The same stale count is below "Not checked" on every team game while the
+  list is open. Correction: the row reads the count the list shows (for example a callback next
+  to `onanswers`), and a browser test makes a tap in the list and then checks the panel. The
+  existing warning test mocks the page answer and makes no tap, so it cannot see this. The page
+  of a training does not have this problem: its line uses the live marks (`topLine(page, shown)`).
+- **A2 – The panel.** It shows below the heading on both pages, only when a row is there: on a
+  game when it is "Not played", the drives, the schedule or "Checked"; on a training when it is
+  "Cancelled", "Checked" or can be checked. The rows are in the spec's order. A coming game
+  without marks has no panel. "Schedule entered" shows before the game, under the same rule as
+  before. Checked by reading the diff and the new tests in `not-played`, `duties` and `trainings`
+  (they ran and passed).
+- **A3 – Rows.** `MarkRow` shows the state, ✓ / ○ (`aria-hidden`) and one button. The button
+  never repeats the state: "Mark as checked", "Mark as entered" and "Count the drives", with
+  "Undo" when set. "Undo check" and "Undo cancel" are gone. "Schedule entered" left the card of
+  the places. "The drivers drove" is no longer a pressed switch. Checked by reading the diff, and
+  by a search for `Undo check|Undo cancel|The drivers drove|aria-pressed` in `web/src`. On the
+  screen the pressed state is only left in the choices, which are not marks. The old words are
+  still in the comments of `web/src/lib/api/client.ts` (lines 634, 644, 727, 741) and in the API
+  descriptions in `schema.d.ts` (made from the server's doc comments). These are not on the
+  screen; Close can bring them up to date.
+- **A4 – Orange.** `next` sets the button variant `default`, which is `--primary`, orange (hue
+  40, `web/src/routes/layout.css`). Only "Mark as checked" and "Mark as entered" get `next` while
+  the mark is not set. "Count the drives", "Undo", "Mark as not played", "Cancel training" and
+  "Mark answers as checked" are outlined. Checked by reading the diff.
+- **A5 – The lines below "Not checked".** The count, the drivers and the message after the tap
+  ("N players with no answer are absent.") are each on their own line, not one line joined by
+  "·" as in the spec's example. The drivers line also shows the open places ("Drivers: 1 open").
+  That serves the intent of S1 better: one check also confirms the drive, so an open place has to
+  be in view. Faithful adaptation (the same as the deviation of step 3).
+- **A6 – The warning and extra players.** The technical spec asks for the warning only "with no
+  extra player". The code checks only the players: no coming and no not coming, and at least one
+  with no answer. With an extra player and no answers the warning still shows. It is still true
+  there (all N players become absent), and it matches the functional spec ("no player has an
+  answer, and no player is marked there or absent"). Neutral drift; the technical spec can be
+  brought in line at Close. Checked by reading `noAnswerWarning` and `CountView` in
+  `web/src/lib/api/schema.d.ts`.
+- **A7 – The rest.** "Mark as not played" and "Cancel training" are plain outlined buttons that
+  become the rows "Not played" ("Its duties and attendance do not count.") and "Cancelled" with
+  "Undo". "Mark answers as checked" stays in its note. The test id `set-not-played` (deviation of
+  step 2) changes only names. What each mark does is not changed: the same API calls as before,
+  and no server change (`git diff --stat` touches only `web/` and this file). Checked by reading
+  the diff.
+
+Not checked: the screenshots in light and dark mode, and the contrast figures of step 4 (I did
+not take them again; the accessibility checks in the tests passed).
+
+**Answers (2026-11-11, Implement).**
+- A1: fixed. `GameAttendance.svelte` reports the count it shows (`oncount`, next to `onanswers`);
+  the row "Not checked" reads that count while the list is open, so the count and the warning
+  follow each tap. New browser test `the row "Not checked" follows the taps in the list`
+  (`checked.e2e.ts`): a tap on "There" shows "1 there" and removes the warning; a tap back brings
+  the warning back.
+- A2–A5: as meant; no change.
+- A6: not changed: the warning follows the functional spec (no player with an answer); an extra
+  player does not change what "Mark as checked" does to the players. Step 3 above said "and no
+  extra player"; the build is right, the step text was wider.
+- A7: not changed. The old words in comments of `web/src/lib/api/client.ts` and the API
+  descriptions (`schema.d.ts`) are updated at Close.

@@ -8,7 +8,8 @@
 	for answers from before a move the note with "Mark answers as checked". From the start of the game
 	(`started`) the words are "There" and "Absent" (story C); on a checked game a tap on the chosen
 	state does nothing.
-	`onanswers` gives the page the answer shown of each player, for the notes at the driver places.
+	`onanswers` gives the page the answer shown of each player, for the notes at the driver places;
+	`oncount` the count shown, for the row "Not checked" of the panel "Administration".
 -->
 <script lang="ts">
 	import {
@@ -19,6 +20,7 @@
 		setExtraPlayers,
 		type AnswerView,
 		type AttendanceView,
+		type CountView,
 		type GameAttendanceView
 	} from '#lib/api/client.js';
 	import { countText } from '#lib/attendance.js';
@@ -32,7 +34,8 @@
 		date,
 		started,
 		attendance,
-		onanswers
+		onanswers,
+		oncount
 	}: {
 		season: string;
 		id: string;
@@ -42,6 +45,8 @@
 		started: boolean;
 		attendance: GameAttendanceView;
 		onanswers?: (answers: Record<number, AnswerView | null>) => void;
+		/** The count shown, after each tap: the row "Not checked" of the page follows it. */
+		oncount?: (count: CountView) => void;
 	} = $props();
 
 	type Row = { answer: AnswerView | null; reason: number | null };
@@ -89,6 +94,10 @@
 	let count = $state(first.count);
 	let tooFew = $state(first.too_few);
 	let moved = $state(first.answers_moved);
+
+	$effect(() => {
+		oncount?.(count);
+	});
 
 	$effect(() => {
 		onanswers?.(

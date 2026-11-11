@@ -88,6 +88,21 @@ test('a game without any answer warns before "Mark as checked"', async ({ page }
 	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
 });
 
+test('the row "Not checked" follows the taps in the list', async ({ page }) => {
+	await page.goto(gamePage);
+	const row = page.getByTestId('mark-checked');
+	await expect(page.getByTestId('no-answer-warning')).toBeVisible();
+	await page.getByTestId('show-list').click();
+	const player = page.getByTestId('attendance-row').first();
+	await player.getByRole('button', { name: /^There/ }).click();
+	await expect(row).toContainText('1 there');
+	await expect(page.getByTestId('no-answer-warning')).toHaveCount(0);
+	// A tap on the chosen state goes back to "no answer", and the warning comes back.
+	await player.getByRole('button', { name: /^There/ }).click();
+	await expect(row).not.toContainText('there');
+	await expect(page.getByTestId('no-answer-warning')).toBeVisible();
+});
+
 test('an away game shows its drivers below "Not checked"', async ({ page }) => {
 	const drivers = `/api/games/2026-2027/${AWAY_10_OCT}/drivers`;
 	await page.request.put(drivers, { ...origin, data: { drivers: 1 } });

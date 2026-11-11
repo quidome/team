@@ -1,7 +1,7 @@
 ---
 title: The administration panel
 type: feature
-stage: implement
+stage: close
 closure: review accept
 created: 2026-11-11
 ---
@@ -18,3 +18,4 @@ every mark of a training and a game in one panel "Administration", one row each,
 |------|-------|------|
 | 2026-11-11 | design | created from the epic (story 1); front end only |
 | 2026-11-11 | implement | technical.md approved: 4 steps (components and training page, game page, lines below "Not checked" and the note, look); closure review accept (the reason is that the marks read clearly; no server change) |
+| 2026-11-11 | implement | 4 steps built on the branch administration-panel; acceptance review: A1 (the count and the warning did not follow taps in the list) fixed, the rest as meant |

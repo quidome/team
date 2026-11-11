@@ -37,6 +37,7 @@
 		setScheduleEntered,
 		unsetChecked,
 		type AnswerView,
+		type CountView,
 		type DutyKind,
 		type GamePage,
 		type PlaceOfTeam
@@ -138,6 +139,13 @@
 		for (const row of game?.attendance?.rows ?? []) stored[row.player] = row.answer ?? null;
 		return stored;
 	});
+
+	/** The count shown by the open list, with the page it belongs to: the row "Not checked" follows
+	 * the taps in the list. */
+	let shownCount = $state.raw<{ page: GamePage; count: CountView } | null>(null);
+	const liveCount = $derived(
+		game && shownCount?.page === game ? shownCount.count : game?.attendance?.count
+	);
 
 	/** A player on a driver place, or in its choice, whose answer is "not coming"; never on a not
 	 * played game, which warns about nothing (story E). */
@@ -263,8 +271,8 @@
 				{/if}
 				{#if checkedRow && page.attendance}
 					{@const checked = page.attendance.checked}
-					{@const count = countText(page.attendance.count, page.started)}
-					{@const warning = noAnswerWarning(page.attendance.count)}
+					{@const count = countText(liveCount ?? page.attendance.count, page.started)}
+					{@const warning = noAnswerWarning(liveCount ?? page.attendance.count)}
 					<MarkRow
 						state={checked ? 'Checked' : 'Not checked'}
 						done={checked}
@@ -334,6 +342,7 @@
 					started={page.started}
 					attendance={page.attendance}
 					onanswers={(list) => (shown = { page, answers: list })}
+					oncount={(count) => (shownCount = { page, count })}
 				/>
 			{/key}
 		{/if}
