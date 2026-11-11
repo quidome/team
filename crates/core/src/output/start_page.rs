@@ -346,30 +346,6 @@ fn has_places(places: &PlacesOf, source_id: i64) -> bool {
     places.get(&source_id).is_some_and(has_team_places)
 }
 
-/// The games of the newest date before today that have places of the team (table, referee or
-/// drivers) and are not games of the team, in time order; also games that left the game list
-/// later (a past game counts). A game of the team is an open item until it is checked.
-pub fn last_games<'a>(events: &'a SeasonEvents<'a>, places: &PlacesOf) -> Vec<&'a Event<'a>> {
-    let with_places: Vec<&Event<'_>> = events
-        .past
-        .iter()
-        .filter(|event| match event.kind {
-            EventKind::Game(scheduled) => {
-                scheduled.reason != ScheduleReason::TeamGame
-                    && has_places(places, scheduled.game.source_id)
-            }
-            EventKind::Training(..) => false,
-        })
-        .collect();
-    let Some(newest) = with_places.first().map(|event| event.date) else {
-        return Vec::new();
-    };
-    with_places
-        .into_iter()
-        .filter(|event| event.date == newest)
-        .collect()
-}
-
 /// How an event looks on the start page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventLook {
@@ -378,37 +354,28 @@ pub enum EventLook {
     Lighter,
 }
 
-/// `Lighter` when nothing is left to do for `event`: an event before `today` (its date has passed:
-/// the last duty games; a past training or game of the team is an open item, not a row); a
-/// training that is checked or cancelled; a game that is not played; a game of the team that is
+/// `Lighter` when nothing is left to do for `event` (an event of today or later: a past event is
+/// only an open item, decision 0036): a training that is checked or cancelled; a game that is not played; a game of the team that is
 /// checked (`game_checked`); another game in the game list whose places of the team are all
 /// filled and whose schedule is entered. All else is `Normal`, also another game that left the
 /// game list (its row is crossed out). `places`: `game_places` of the game.
-pub fn event_look(
-    event: &Event<'_>,
-    places: Option<&GamePlaces>,
-    game_checked: bool,
-    today: NaiveDate,
-) -> EventLook {
-    let lighter = event.date < today
-        || match event.kind {
-            EventKind::Training(row, state) => {
-                matches!(state, TrainingState::Cancelled)
-                    || row
-                        .training
-                        .is_some_and(|training| training.checked || training.cancelled)
-            }
-            EventKind::Game(scheduled) if scheduled.not_played => true,
-            EventKind::Game(scheduled) if scheduled.reason == ScheduleReason::TeamGame => {
-                game_checked
-            }
-            EventKind::Game(scheduled) => {
-                scheduled.in_list
-                    && places.is_some_and(|places| {
-                        has_team_places(places) && open_places(places) == 0 && !not_entered(places)
-                    })
-            }
-        };
+pub fn event_look(event: &Event<'_>, places: Option<&GamePlaces>, game_checked: bool) -> EventLook {
+    let lighter = match event.kind {
+        EventKind::Training(row, state) => {
+            matches!(state, TrainingState::Cancelled)
+                || row
+                    .training
+                    .is_some_and(|training| training.checked || training.cancelled)
+        }
+        EventKind::Game(scheduled) if scheduled.not_played => true,
+        EventKind::Game(scheduled) if scheduled.reason == ScheduleReason::TeamGame => game_checked,
+        EventKind::Game(scheduled) => {
+            scheduled.in_list
+                && places.is_some_and(|places| {
+                    has_team_places(places) && open_places(places) == 0 && !not_entered(places)
+                })
+        }
+    };
     if lighter {
         EventLook::Lighter
     } else {
@@ -1054,90 +1021,6 @@ mod tests {
         assert!(matches!(next[0].kind, EventKind::Game(game) if game.game.source_id == 1));
     }
 
-    #[test]
-    fn last_games_are_the_games_of_the_newest_date_with_places_also_when_gone() {
-        let mut gone = scheduled(2, date(2026, 10, 10), ScheduleReason::DutyGame);
-        gone.in_list = false;
-        let games = [
-            gone,
-            scheduled(4, date(2026, 10, 10), ScheduleReason::DutyGame),
-            scheduled(5, date(2026, 10, 10), ScheduleReason::TeamGame),
-            scheduled(1, date(2026, 10, 3), ScheduleReason::DutyGame),
-            scheduled(3, date(2026, 10, 11), ScheduleReason::TeamGame),
-        ];
-        let past_events: Vec<Event<'_>> = games
-            .iter()
-            .map(|scheduled| Event {
-                date: scheduled.game.date,
-                start: scheduled.game.start_time,
-                kind: EventKind::Game(scheduled),
-            })
-            .collect();
-        let mut past_events = past_events;
-        past_events.sort_by(|a, b| b.date.cmp(&a.date));
-        let events = SeasonEvents {
-            coming: Vec::new(),
-            past: past_events,
-        };
-        let places: PlacesOf = [
-            (1, home_places(true, true, true, true, true)),
-            (2, home_places(true, true, true, false, true)),
-            (4, home_places(true, true, true, true, true)),
-            // No place of the team: not among the last duty games.
-            (5, home_places(true, false, true, true, true)),
-        ]
-        .into_iter()
-        .collect();
-        let ids: Vec<i64> = last_games(&events, &places)
-            .iter()
-            .filter_map(|event| match event.kind {
-                EventKind::Game(scheduled) => Some(scheduled.game.source_id),
-                EventKind::Training(..) => None,
-            })
-            .collect();
-        // 11 Oct has no places; 10 Oct has two games with places, also the gone one.
-        assert_eq!(ids, [2, 4]);
-        assert!(last_games(&events, &PlacesOf::new()).is_empty());
-    }
-
-    #[test]
-    fn last_games_leave_out_the_games_of_the_team() {
-        let games = [
-            // The newest past date has only a game of the team with drivers.
-            scheduled(1, date(2026, 10, 17), ScheduleReason::TeamGame),
-            scheduled(2, date(2026, 10, 10), ScheduleReason::DutyGame),
-            scheduled(3, date(2026, 10, 10), ScheduleReason::TeamGame),
-        ];
-        let mut past_events: Vec<Event<'_>> = games
-            .iter()
-            .map(|scheduled| Event {
-                date: scheduled.game.date,
-                start: scheduled.game.start_time,
-                kind: EventKind::Game(scheduled),
-            })
-            .collect();
-        past_events.sort_by(|a, b| b.date.cmp(&a.date));
-        let events = SeasonEvents {
-            coming: Vec::new(),
-            past: past_events,
-        };
-        let places: PlacesOf = [
-            (1, driver_places(9, 3, true)),
-            (2, home_places(true, true, true, true, true)),
-            (3, driver_places(9, 3, true)),
-        ]
-        .into_iter()
-        .collect();
-        let ids: Vec<i64> = last_games(&events, &places)
-            .iter()
-            .filter_map(|event| match event.kind {
-                EventKind::Game(scheduled) => Some(scheduled.game.source_id),
-                EventKind::Training(..) => None,
-            })
-            .collect();
-        assert_eq!(ids, [2]);
-    }
-
     // The warnings of the games (story B of attendance at games).
 
     fn short(coming: usize) -> GameCount {
@@ -1316,26 +1199,6 @@ mod tests {
             dates(&next_events(&events, &places, today)),
             [date(2026, 10, 31)]
         );
-    }
-
-    #[test]
-    fn a_not_played_game_stays_in_last() {
-        let mut marked = scheduled(1, date(2026, 10, 10), ScheduleReason::DutyGame);
-        marked.not_played = true;
-        let games = [marked];
-        let events = SeasonEvents {
-            coming: Vec::new(),
-            past: games
-                .iter()
-                .map(|scheduled| Event {
-                    date: scheduled.game.date,
-                    start: scheduled.game.start_time,
-                    kind: EventKind::Game(scheduled),
-                })
-                .collect(),
-        };
-        let places: PlacesOf = [(1, not_played_places(true))].into_iter().collect();
-        assert_eq!(last_games(&events, &places).len(), 1);
     }
 
     // The games not checked (story C of attendance at games).
@@ -1599,7 +1462,7 @@ mod tests {
             start: scheduled.game.start_time,
             kind: EventKind::Game(scheduled),
         };
-        event_look(&event, places, checked, scheduled.game.date)
+        event_look(&event, places, checked)
     }
 
     fn training_look(row: &SeasonRow<'_>, state: TrainingState) -> EventLook {
@@ -1608,7 +1471,7 @@ mod tests {
             start: Some(row.start),
             kind: EventKind::Training(row, state),
         };
-        event_look(&event, None, false, row.date)
+        event_look(&event, None, false)
     }
 
     #[test]
@@ -1699,34 +1562,6 @@ mod tests {
         gone.in_list = false;
         assert_eq!(
             game_look(&gone, Some(&filled_home_places(true)), false),
-            EventLook::Normal
-        );
-    }
-
-    #[test]
-    fn a_past_duty_game_is_lighter_also_with_an_open_place_or_no_schedule() {
-        let on = date(2026, 11, 14);
-        let game = scheduled(2, on, ScheduleReason::DutyGame);
-        let event = Event {
-            date: on,
-            start: game.game.start_time,
-            kind: EventKind::Game(&game),
-        };
-        let monday = date(2026, 11, 16);
-        let open = home_places(true, true, true, true, true);
-        assert_eq!(open_places(&open), 1);
-        assert_eq!(
-            event_look(&event, Some(&open), false, monday),
-            EventLook::Lighter
-        );
-        let not_entered = filled_home_places(false);
-        assert_eq!(
-            event_look(&event, Some(&not_entered), false, monday),
-            EventLook::Lighter
-        );
-        // On its own date it still needs the coordinator.
-        assert_eq!(
-            event_look(&event, Some(&open), false, on),
             EventLook::Normal
         );
     }

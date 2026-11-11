@@ -916,61 +916,6 @@ async fn a_row_of_the_start_page_is_lighter_when_nothing_is_left_to_do(pool: PgP
     assert_eq!(look_in_next(&reader, today).await, "lighter");
 }
 
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_last_duty_games_are_the_games_of_the_last_date_with_places_but_not_of_the_team(
-    pool: PgPool,
-) {
-    let mut reader = Reader::chosen(pool).await;
-    reader.read_good().await;
-    // Two home games of other club teams on 3 October with places of the team; no trainings.
-    let on_3_october: Vec<i64> = season_games(&reader)
-        .await
-        .into_iter()
-        .filter(|game| game["reason"] == "duty" && game["date"] == "2026-10-03")
-        .map(|game| game["id"].as_i64().unwrap())
-        .take(2)
-        .collect();
-    assert_eq!(on_3_october.len(), 2);
-    for &id in &on_3_october {
-        set_place(&reader, id, "referee", 1, Some(M16_1)).await;
-    }
-    // The away game of the team on 10 October, newer and with a driver place, is left out: a game
-    // of the team is an open item until it is checked.
-    let away = season_games(&reader)
-        .await
-        .into_iter()
-        .find(|game| game["reason"] == "team" && game["date"] == "2026-10-10")
-        .unwrap()["id"]
-        .as_i64()
-        .unwrap();
-    ok(
-        &reader,
-        "PUT",
-        &format!("{}/drivers", game_path(away)),
-        Some(json!({ "drivers": 1 })),
-    )
-    .await;
-    let answer = start(&reader).await;
-    assert_eq!(answer["last_games_season"], "2026-2027");
-    let mut ids: Vec<i64> = answer["last_games"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|item| item["event"]["game"]["id"].as_i64().unwrap())
-        .collect();
-    ids.sort_unstable();
-    let mut expected = on_3_october.clone();
-    expected.sort_unstable();
-    assert_eq!(ids, expected);
-
-    // In July the last games come from the season before.
-    reader.harness.clock.set(utc(2027, 7, 2, 12, 0));
-    reader.log_in_again().await;
-    let answer = start(&reader).await;
-    assert_eq!(answer["last_games_season"], "2026-2027");
-    assert!(!answer["last_games"].as_array().unwrap().is_empty());
-}
-
 // The players on the places (story B of duties, step 3). The games are from the real game list:
 // on Sat 3 Oct (past) and Sat 31 Oct 2026 (coming) the club plays at home in hall Bulwijk, 13:00
 // on Veld 1 (X12 1) and 14:30 on Veld 2 (X14 1); on Sat 10 Oct (past) M16 1 plays away.

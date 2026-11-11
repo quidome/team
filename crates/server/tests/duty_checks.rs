@@ -393,3 +393,22 @@ async fn in_july_the_duty_games_of_the_season_before_are_an_open_item(pool: PgPo
             .is_empty()
     );
 }
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_list_of_the_start_page_has_no_past_event(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // A past duty game that is not checked: an open item, never a row of the list.
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    let start = ok(&reader, "GET", "/api/start", None).await;
+    assert!(start.get("last_games").is_none(), "{start}");
+    let dates: Vec<&str> = start["next"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["event"]["date"].as_str().unwrap())
+        .collect();
+    assert!(dates.iter().all(|date| *date >= "2026-10-12"), "{dates:?}");
+    assert_eq!(item_games(&reader, "duty_games_not_checked").await, [id]);
+}

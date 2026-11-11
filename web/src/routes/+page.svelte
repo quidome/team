@@ -1,9 +1,9 @@
 <!--
 	The start page (story B of start page and season; the quieter start page): the header (the team
 	and today's date, in July and August with the season), what still needs the coordinator (one row
-	for each open item; an item of more games opens their list below it), the duty games of the last
-	date with duties, then the coming events of this week and next week grouped by date (each row
-	from `StartEventRow`), the messages to copy when they have something, and the links. Without a
+	for each open item; an item of more games opens their list below it; a past event shows only
+	here), then the events of today until the Sunday of next week grouped by date (each row from
+	`StartEventRow`), the messages to copy when they have something, and the links. Without a
 	club: only the choose step; in a new season without a team: the date and the choose step above
 	the parts. Not logged in: "Log in".
 -->
@@ -163,11 +163,6 @@
 		{/if}
 
 		<section aria-label="Events" data-testid="next">
-			{#if start.last_games.length > 0}
-				<div data-testid="last-games">
-					{@render days(start.last_games, start.last_games_season ?? undefined, 'last')}
-				</div>
-			{/if}
 			{#if start.next.length === 0}
 				<p class="pt-4 text-sm text-muted-foreground" data-testid="no-coming-events">
 					No coming events.

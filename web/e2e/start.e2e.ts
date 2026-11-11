@@ -181,16 +181,35 @@ test('a training not checked is an open item that opens it', async ({ page }) =>
 	await expect(page).toHaveURL(/\/training\/2026-10-06\?from=start$/);
 });
 
-test('a past training is not in the list of events, only as an open item', async ({ page }) => {
-	await page.goto('/');
-	await expect(page.getByTestId('next').getByTestId('training-row').first()).toBeVisible();
-	await expect(page.getByTestId('last-games')).toHaveCount(0);
-	const dates = await page
-		.getByTestId('next')
-		.getByTestId('training-row')
-		.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-date') ?? ''));
-	expect(dates.length).toBeGreaterThan(0);
-	expect(dates.every((date) => date >= '2026-10-12')).toBe(true);
+test('a past training or duty game is not in the list of events, only as an open item', async ({
+	page
+}) => {
+	// A past home game of another club team with a place of the team: a duty game not checked.
+	const season = await (await page.request.get('/api/season')).json();
+	const duty = season.past
+		.map((event: { game?: { id: number; reason: string } }) => event.game)
+		.find((game?: { reason: string }) => game?.reason === 'duty');
+	const places = `/api/games/2026-2027/${duty.id}/places/table/2`;
+	const origin = { headers: { Origin: 'http://localhost:4100' } };
+	await page.request.put(places, { ...origin, data: { team: 184 } });
+	try {
+		await page.goto('/');
+		await expect(page.getByTestId('next').getByTestId('training-row').first()).toBeVisible();
+		const dates = await page
+			.getByTestId('next')
+			.getByTestId('training-row')
+			.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-date') ?? ''));
+		expect(dates.length).toBeGreaterThan(0);
+		expect(dates.every((date) => date >= '2026-10-12')).toBe(true);
+		await expect(
+			page.getByTestId('next').locator(`[data-testid="game"][data-id="${duty.id}"]`)
+		).toHaveCount(0);
+		await expect(
+			page.locator('[data-testid="open-item"][data-kind="duty_games_not_checked"]')
+		).toBeVisible();
+	} finally {
+		await page.request.put(places, { ...origin, data: { team: null } });
+	}
 });
 
 test('"Next" shows the trainings of two weeks, and a tap opens one', async ({ page }) => {

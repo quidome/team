@@ -486,7 +486,7 @@ async fn a_not_played_game_warns_about_nothing_and_is_in_no_message(pool: PgPool
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_not_played_duty_game_stays_in_the_last_duty_games_and_on_season(pool: PgPool) {
+async fn a_not_played_duty_game_leaves_the_open_items_and_stays_on_season(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;
     // A past home game of another club team on Sat 3 Oct, with a referee place of the team.
@@ -507,29 +507,23 @@ async fn a_not_played_duty_game_stays_in_the_last_duty_games_and_on_season(pool:
         Some(json!({ "team": common::game_list::M16_1 })),
     )
     .await;
+    // A past duty game that is not checked is an open item, not a row of the list.
     let start = ok(&reader, "GET", "/api/start", None).await;
-    let last = start_game(&start, "last_games", id).unwrap();
-    assert_eq!(last["not_played"], false);
-    assert_eq!(last["places"]["open_places"], 1, "{last}");
-    // Its date has passed: lighter, also with an open place.
-    assert_eq!(look(&start, "last_games", id), "lighter");
+    assert!(start_game(&start, "next", id).is_none());
+    assert!(
+        start.to_string().contains(&format!("\"id\":{id}")),
+        "{start}"
+    );
 
+    // Not played: it needs no check, so it leaves the open item; "Season" shows it.
     ok(&reader, "PUT", &mark_path(id), None).await;
     let start = ok(&reader, "GET", "/api/start", None).await;
-    let last = start_game(&start, "last_games", id).unwrap();
-    assert_eq!(last["not_played"], true);
-    assert_eq!(look(&start, "last_games", id), "lighter");
-    let row = season_row(&reader, id).await.unwrap();
-    assert_eq!(row["not_played"], true);
-}
-
-/// How the row of game `id` in `part` of the start page looks.
-fn look(start: &Value, part: &str, id: i64) -> String {
-    start[part]
+    let duty_item = start["open_items"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|item| item["event"]["game"]["id"] == id)
-        .map(|item| item["look"].as_str().unwrap().to_owned())
-        .unwrap()
+        .find(|item| item["kind"] == "duty_games_not_checked");
+    assert!(duty_item.is_none(), "{start}");
+    let row = season_row(&reader, id).await.unwrap();
+    assert_eq!(row["not_played"], true);
 }

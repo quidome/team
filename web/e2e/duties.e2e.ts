@@ -393,42 +393,6 @@ test('"Next" shows a home game of another club team with places of the team', as
 	await expect(page).toHaveURL(/\/$/);
 });
 
-test('the last duty games come above the coming events, and a tap opens the game', async ({
-	page
-}) => {
-	const season = await (await page.request.get('/api/season')).json();
-	// The newest past game that is not a game of the team, as the server would give it.
-	const event = season.past.find((e: GameEvent) => e.game && e.game.reason !== 'team');
-	await page.route('**/api/start', async (route) => {
-		const start = await (await route.fetch()).json();
-		start.last_games = [{ event, look: 'lighter', side: null, opponent: null }];
-		start.last_games_season = '2026-2027';
-		await route.fulfill({ json: start });
-	});
-	await page.goto('/');
-	const list = page.getByTestId('next');
-	// The date of the last duty games first, then the coming dates.
-	await expect(list.getByTestId('day').first()).toHaveText(
-		new Intl.DateTimeFormat('en-GB', {
-			weekday: 'short',
-			day: 'numeric',
-			month: 'short',
-			timeZone: 'Europe/Amsterdam'
-		}).format(new Date(`${event.date}T12:00:00Z`))
-	);
-	const game = list
-		.getByTestId('last-games')
-		.locator(`[data-testid="game"][data-id="${event.game.id}"]`);
-	await expect(game).toHaveAttribute('data-look', 'lighter');
-	await expect(game.getByTestId('game-title')).toHaveText(
-		`${event.game.home} – ${event.game.away}`
-	);
-	await game.getByTestId('game-link').click();
-	await expect(page).toHaveURL(new RegExp(`/game/2026-2027/${event.game.id}\\?from=start$`));
-	await page.getByRole('link', { name: 'Back' }).click();
-	await expect(page).toHaveURL(/\/$/);
-});
-
 test('a change of a game with places of the team says "has duties", and a tap opens the game', async ({
 	page
 }) => {

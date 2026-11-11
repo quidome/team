@@ -7,20 +7,19 @@ use std::collections::BTreeMap;
 
 use axum::Json;
 use axum::extract::State;
-use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HomeOrAway,
     NotCheckedGame, NotCheckedGames, OpenItem, PlacesOf, PlayerId, ReadingState, ScheduleReason,
-    Season, duty_games_not_checked, event_look, games_not_checked, last_games, next_events,
-    open_item_seasons, open_items, open_places_games, schedule_not_entered, team_side,
+    Season, duty_games_not_checked, event_look, games_not_checked, next_events, open_item_seasons,
+    open_items, open_places_games, schedule_not_entered, team_side,
 };
 use utoipa::ToSchema;
 
 use super::format::{clock_time, day};
 use super::messages::{committee_offered, week_text};
 use super::season::{
-    EventView, SeasonGames, coming_view, event_view_with, games_of, places_of_season, trainings_of,
+    EventView, SeasonGames, coming_view, games_of, places_of_season, trainings_of,
 };
 use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands};
@@ -40,12 +39,6 @@ pub struct StartAnswer {
     /// the trainings from today until the Sunday of next week, in time order; when there are
     /// none, the first coming one.
     pub next: Vec<StartEvent>,
-    /// The games of the last date before today with places of the team that are not games of the
-    /// team, in time order, in the seasons of the open items (in July and August, when the
-    /// current season has none, the season before).
-    pub last_games: Vec<StartEvent>,
-    /// The season of `last_games`, for their pages; `null` when there are none.
-    pub last_games_season: Option<String>,
     /// The messages the start page offers.
     pub messages: MessagesView,
 }
@@ -82,7 +75,6 @@ fn start_event(
     view: EventView,
     places: &PlacesOf,
     games: &SeasonGames,
-    today: NaiveDate,
 ) -> StartEvent {
     let mut start = StartEvent {
         look: EventLookView::Normal,
@@ -95,7 +87,7 @@ fn start_event(
         EventKind::Game(scheduled) => places.get(&scheduled.game.source_id),
         EventKind::Training(..) => None,
     };
-    if event_look(event, game_places, checked, today) == EventLook::Lighter {
+    if event_look(event, game_places, checked) == EventLook::Lighter {
         start.look = EventLookView::Lighter;
     }
     if let (EventKind::Game(scheduled), Some(club), Some(team)) =
@@ -311,7 +303,7 @@ impl OpenItemView {
     path = "/api/start",
     operation_id = "start",
     responses(
-        (status = 200, description = "The open items, the last duty games and the next events", body = StartAnswer),
+        (status = 200, description = "The open items and the next events", body = StartAnswer),
         (status = 401, description = "Not logged in"),
     )
 )]
@@ -430,41 +422,10 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .into_iter()
         .map(|event| {
             coming_view(event, &places, &games.duties, true, now)
-                .map(|view| start_event(event, view, &places, &games, today))
+                .map(|view| start_event(event, view, &places, &games))
         })
         .collect::<Result<_, _>>()?;
 
-    // The last games with places: the current season; in July and August, when it has none
-    // yet, the season before.
-    let mut last_games_season = None;
-    let mut last_game_views: Vec<StartEvent> = last_games(&events, &places)
-        .into_iter()
-        .map(|event| {
-            event_view_with(event, &places, &games.duties)
-                .map(|view| start_event(event, view, &places, &games, today))
-        })
-        .collect::<Result<_, _>>()?;
-    if last_game_views.is_empty() {
-        for (&season, trainings) in seasons.iter().zip(&inputs).skip(1) {
-            let earlier = games_of(&state, season, current, today).await?;
-            let earlier_places = places_of_season(&earlier, now);
-            let list = trainings.list(season, today);
-            let earlier_events = trainings.events(&earlier.schedule, &list);
-            last_game_views = last_games(&earlier_events, &earlier_places)
-                .into_iter()
-                .map(|event| {
-                    event_view_with(event, &earlier_places, &earlier.duties)
-                        .map(|view| start_event(event, view, &earlier_places, &earlier, today))
-                })
-                .collect::<Result<_, _>>()?;
-            if !last_game_views.is_empty() {
-                last_games_season = Some(season);
-                break;
-            }
-        }
-    } else {
-        last_games_season = Some(current);
-    }
     let messages = MessagesView {
         week: week_text(&games, &places, today).is_some(),
         committee: committee_offered(&games, &places, today),
@@ -483,8 +444,6 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             .map(|item| OpenItemView::of(item, current, &by_id, &past, &games.duties.names))
             .collect(),
         next,
-        last_games: last_game_views,
-        last_games_season: last_games_season.map(|season| season.to_string()),
         messages,
     }))
 }

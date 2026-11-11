@@ -1,7 +1,7 @@
 ---
 title: Only today and later on the start page
 type: feature
-stage: implement
+stage: close
 closure: checks      # set by /design; only the user lowers it
 created: 2026-11-11
 ---
@@ -19,3 +19,4 @@ up. The behaviour is in the epic's `functional.md`, story 4; the architecture in
 |------|-------|------|
 | 2026-11-11 | design | created from the epic (story 4) |
 | 2026-11-11 | implement | technical.md approved: 2 steps (core and server, front end and checks); closure checks (a removal; the open items already do the job, the tests prove it; the epic ends with its acceptance review) |
+| 2026-11-11 | implement | 2 steps built on the branch only-today-and-later; closure checks: all checks pass |

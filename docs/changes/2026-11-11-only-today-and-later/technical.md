@@ -1,6 +1,6 @@
 # Technical spec: Only today and later on the start page
 
-**Status**: approved
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-11-11-only-today-and-later/
 **Date**: 2026-11-11
@@ -68,9 +68,11 @@ From the epic's `functional.md`, story 4 (`docs/changes/2026-11-11-checked-for-e
   page reads the season before once instead of twice.
 
 ## Progress
-- [ ] Step 1: core and server
-- [ ] Step 2: front end and checks
-- [ ] All checks pass
+- [x] Step 1: core and server (2026-11-11)
+- [x] Step 2: front end and checks (2026-11-11). Screenshot of the start page with two past duty
+  games not checked: they are only in the open item "2 duty games not checked" (its list opened);
+  the list of events starts at Tue 13 Oct.
+- [x] All checks pass
 
 ## Deviations
 

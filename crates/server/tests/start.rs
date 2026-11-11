@@ -23,7 +23,7 @@ async fn ok(reader: &Reader, method: &str, path: &str, body: Option<Value>) -> V
     answer
 }
 
-/// The events of `key` ("next" or "last_games") as on "Season", without how they look.
+/// The events of `key` ("next") as on "Season", without how they look.
 fn events(answer: &Value, key: &str) -> Vec<Value> {
     answer[key]
         .as_array()
@@ -330,8 +330,12 @@ async fn in_july_the_open_items_and_the_header_cover_the_season_before(pool: PgP
     assert_eq!(not_opened["first"], "2026-09-01");
     assert_eq!(item(&answer, "not_checked").unwrap()["first"], "2027-05-25");
     assert_eq!(answer["show_season"], true);
-    // No past training is shown as an event: only as an open item.
-    assert!(answer["last_games"].as_array().unwrap().is_empty());
+    // No past event is in the list: only as an open item.
+    assert!(
+        events(&answer, "next")
+            .iter()
+            .all(|event| event["date"].as_str().unwrap() >= "2027-07-01")
+    );
 
     // From September the season before is no longer covered.
     at(&mut reader, 2027, 9, 1, 10).await;

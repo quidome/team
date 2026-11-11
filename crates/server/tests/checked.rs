@@ -370,10 +370,6 @@ async fn a_past_game_of_the_season_that_is_not_checked_is_an_open_item(pool: PgP
     assert!(!not_checked_item(&reader).await.contains(&AWAY_10_OCT));
     let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
     assert_eq!(row_checked(&season["past"], AWAY_10_OCT), Some(true));
-    let start = ok(&reader, "GET", "/api/start", None).await;
-    // A game of the team is not among the last duty games of the start page: it was an open item
-    // until it was checked, and after that it is on "Season".
-    assert_eq!(row_checked(&start["last_games"], AWAY_10_OCT), None);
 
     // "Undo" brings it back; "Not played" ends it too.
     ok(&reader, "DELETE", &checked_path(AWAY_10_OCT), None).await;
