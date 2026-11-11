@@ -152,7 +152,8 @@ function details(row: Row): string[] {
 		`${value.counted} ${value.counted === 1 ? one : more}: ${value.there} there (${value.percent}%) · ` +
 		`${value.absent_valid} absent, valid (${value.percent_valid}%) · ` +
 		`${value.absent_not_valid} absent, not valid (${value.percent_not_valid}%)`;
-	const lines = [row.name];
+	// The name is on the row above, so the details do not repeat it.
+	const lines: string[] = [];
 	if (row.trainings) lines.push(share(row.trainings, 'training', 'trainings'));
 	if (row.games) lines.push(share(row.games, 'game', 'games'));
 	for (const [key, name] of [
@@ -171,12 +172,12 @@ function details(row: Row): string[] {
 		lines.push(`${name}: ${total.done} done · ${total.planned} planned`);
 		for (const [n, text] of corrections) if (n > 0) lines.push(`${n} ${text}`);
 	}
-	if (lines.length === 1) lines.push('Nothing counts yet this season.');
+	if (lines.length === 0) lines.push('Nothing counts yet this season.');
 	if (row.trainings || row.games) lines.push('Missed trainings and games');
 	return lines;
 }
 
-test('a tap on a name opens the details, a second tap closes them', async ({ page }) => {
+test('a tap on a row opens the details, a second tap closes them', async ({ page }) => {
 	const errors = watchConsole(page);
 	const answer = await report(page);
 	const [first, second] = answer.team;
@@ -197,6 +198,17 @@ test('a tap on a name opens the details, a second tap closes them', async ({ pag
 	await expect(shown.nth(1).locator('p')).toHaveText(details(second));
 
 	await name(first).click();
+	await expect(name(first)).toHaveAttribute('aria-expanded', 'false');
+	await expect(shown).toHaveCount(1);
+
+	// A tap on the numbers of a row opens and closes it too.
+	const firstRow = team
+		.getByTestId('report-row')
+		.filter({ has: page.getByRole('button', { name: first.name, exact: true }) });
+	await firstRow.locator('td').last().click();
+	await expect(name(first)).toHaveAttribute('aria-expanded', 'true');
+	await expect(shown).toHaveCount(2);
+	await firstRow.locator('td').first().click();
 	await expect(name(first)).toHaveAttribute('aria-expanded', 'false');
 	await expect(shown).toHaveCount(1);
 	await expectAccessible(page);

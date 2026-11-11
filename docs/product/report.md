@@ -22,7 +22,7 @@ the report adds no data and does not rank players.
 - On a phone 360 pixels wide the table fits without scrolling to the side, with names of 10 characters; the column headings may break with a hyphen ("Train-ings").
 
 ### The details of a player
-- A tap on a name opens the details under the row; a second tap closes them. More than one player can be open, also under "Left the team".
+- A tap on a row (the name or the numbers) opens the details under it; a second tap closes them. The details do not repeat the name. More than one player can be open, also under "Left the team".
 - "9 trainings: 6 there (67%) · 2 absent, valid (22%) · 1 absent, not valid (11%)", and the same for games; a line where nothing counts is not shown. Each percentage is rounded on its own, so the three can add up to 99 or 101; the numbers are exact.
 - For each duty kind with a duty or a correction: "Table: 2 done · 1 planned", and below it, only when not 0, the corrections after a game:
   - "1 done by another player": planned for this player, done by another player ("Someone else"); not in this player's "done";
