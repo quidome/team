@@ -21,7 +21,7 @@ pub use contribution::duties::{
     check_team, choice_players, clash_level, clashes, club_teams, display_names, driver_proposal,
     duty_rows, duty_totals, game_places, has_duty_row, has_team_places, highest_driver, kept_games,
     not_entered, offers, open_by_kind, open_places, pick_team, players_playing_on, plays_games_on,
-    required_duties, team_games, who_did, worst_clash,
+    plays_the_game, required_duties, team_games, who_did, worst_clash,
 };
 pub use contribution::game_attendance::{
     Answer, AnswerError, CheckError, CountedGame, ENOUGH_PLAYERS, GameAttendance, GameCount,

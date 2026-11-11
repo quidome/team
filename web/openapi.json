@@ -5861,7 +5861,8 @@
         "type": "object",
         "required": [
           "kind",
-          "number"
+          "number",
+          "plays"
         ],
         "properties": {
           "kind": {
@@ -5871,6 +5872,10 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          },
+          "plays": {
+            "type": "boolean",
+            "description": "The team of the place plays this game: the page warns (\"This team plays this game.\")."
           },
           "team": {
             "oneOf": [

@@ -1870,6 +1870,8 @@ export interface components {
 			kind: components['schemas']['PlaceKindView'];
 			/** Format: int32 */
 			number: number;
+			/** @description The team of the place plays this game: the page warns ("This team plays this game."). */
+			plays: boolean;
 			team?: null | components['schemas']['TeamView'];
 		};
 		/** @enum {string} */

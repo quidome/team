@@ -313,24 +313,33 @@
 				{#key saves}
 					<div class="grid grid-cols-2 gap-2">
 						{#each schedule.places as place (`${place.kind}-${place.number}`)}
-							<label class="block min-w-0 space-y-1">
-								<span class="text-sm">{placeNames[place.kind]} {place.number}</span>
-								<select
-									class={field}
-									disabled={busy}
-									value={place.team ? String(place.team.number) : ''}
-									onchange={(event) => {
-										const value = event.currentTarget.value;
-										const team = value === '' ? null : Number(value);
-										save(page, (id) => setPlace(page.season, id, place.kind, place.number, team));
-									}}
-								>
-									<option value="">—</option>
-									{#each page.club_teams as team (team.number)}
-										<option value={String(team.number)}>{team.name}</option>
-									{/each}
-								</select>
-							</label>
+							{@const warning = `place-plays-${place.kind}-${place.number}`}
+							<div class="min-w-0 space-y-1" data-testid="place">
+								<label class="block space-y-1">
+									<span class="text-sm">{placeNames[place.kind]} {place.number}</span>
+									<select
+										class={field}
+										disabled={busy}
+										aria-describedby={place.plays ? warning : undefined}
+										value={place.team ? String(place.team.number) : ''}
+										onchange={(event) => {
+											const value = event.currentTarget.value;
+											const team = value === '' ? null : Number(value);
+											save(page, (id) => setPlace(page.season, id, place.kind, place.number, team));
+										}}
+									>
+										<option value="">—</option>
+										{#each page.club_teams as team (team.number)}
+											<option value={String(team.number)}>{team.name}</option>
+										{/each}
+									</select>
+								</label>
+								{#if place.plays}
+									<p id={warning} class="text-xs text-gone" data-testid="place-plays">
+										This team plays this game.
+									</p>
+								{/if}
+							</div>
 						{/each}
 					</div>
 				{/key}

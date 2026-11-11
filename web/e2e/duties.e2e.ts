@@ -81,6 +81,23 @@ test('a home game of the club has 4 places and "Schedule entered"', async ({ pag
 	expect(errors).toEqual([]);
 });
 
+test('a place of a team that plays the game shows a warning, and can still be saved', async ({
+	page
+}) => {
+	const game = await findGame(page, otherHomeGame);
+	// The home team plays this game: the club rule says it does not get its places.
+	const home = game.home.replace(/^Blue Drakes /, '');
+	await page.goto(`/game/2026-2027/${game.id}`);
+	const before = await place(page, 'Referee 2').inputValue();
+	await place(page, 'Referee 2').selectOption({ label: home });
+	const referee2 = page.getByTestId('place').filter({ hasText: 'Referee 2' });
+	await expect(referee2.getByTestId('place-plays')).toHaveText('This team plays this game.');
+	await expect(place(page, 'Referee 2')).toHaveAccessibleDescription('This team plays this game.');
+	await expect(page.getByTestId('place-plays')).toHaveCount(1);
+	await place(page, 'Referee 2').selectOption(before);
+	await expect(page.getByTestId('place-plays')).toHaveCount(0);
+});
+
 test('an away game proposes drivers until a number is set', async ({ page }) => {
 	const errors = watchConsole(page);
 	const game = await findGame(page, awayGame);

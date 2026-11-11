@@ -6,7 +6,6 @@ Changes:
 - [Checked for every event](changes/2026-11-11-checked-for-every-event/change.md) (feature, discover)
 
 Small:
-- A place that names a club team that plays the game shows the warning "This team plays this game." The team stays in the pull-down list: the club does not always keep to the rule (coordinator, 2026-11-11).
 - Look at the report on the phone with the real names after its release: the headings that break with a hyphen ("Train-ings"), the width of the five columns, the details, and a tap on "Copy" with the text in the chat (close of the report, 2026-11-09).
 - A test that the report reads one moment: a save on another connection between two reads of `GET /api/report` must not show (decision 0033; build review R3 of the report).
 - Move the read of `player_roles` in `crates/server/src/trainings.rs` (`seasons`) to `players.rs`, so each domain owns its tables (design of not played, 2026-11-08; decision 0030 at its close).

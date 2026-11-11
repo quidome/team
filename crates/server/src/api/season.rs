@@ -15,8 +15,8 @@ use team_core::{
     ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties, StoredGame,
     Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, checked, display_names,
     game_list, game_places, game_warnings, kept_games, not_entered, open_places,
-    players_playing_on, plays_games_on, required_duties, row_count, schedule, season_events,
-    season_list, started, team_games,
+    players_playing_on, plays_games_on, plays_the_game, required_duties, row_count, schedule,
+    season_events, season_list, started, team_games,
 };
 use utoipa::ToSchema;
 
@@ -111,6 +111,8 @@ pub struct SchedulePlaceView {
     pub number: u8,
     /// `null`: empty ("—").
     pub team: Option<TeamView>,
+    /// The team of the place plays this game: the page warns ("This team plays this game.").
+    pub plays: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, ToSchema)]
@@ -199,7 +201,7 @@ impl From<&TeamRef> for TeamView {
 struct PlacesOfGame<'a> {
     duties: &'a SeasonDuties,
     assignments: &'a [Assignment],
-    date: NaiveDate,
+    game: &'a Game,
 }
 
 impl PlacesOfGame<'_> {
@@ -229,7 +231,11 @@ impl PlacesOfGame<'_> {
                 PlayerOnPlaceView {
                     id,
                     name,
-                    not_in_team: !plays_games_on(&self.duties.roles, assignment.planned, self.date),
+                    not_in_team: !plays_games_on(
+                        &self.duties.roles,
+                        assignment.planned,
+                        self.game.date,
+                    ),
                     outcome,
                     done_by,
                 }
@@ -262,6 +268,10 @@ impl PlacesOfGame<'_> {
                         kind: place.kind.into(),
                         number: place.number,
                         team: place.team.as_ref().map(TeamView::from),
+                        plays: place
+                            .team
+                            .as_ref()
+                            .is_some_and(|team| plays_the_game(self.game, team.number)),
                     })
                     .collect(),
                 entered: part.entered,
@@ -370,7 +380,7 @@ impl SeasonDuties {
         PlacesOfGame {
             duties: self,
             assignments: self.assignments_of(game.source_id),
-            date: game.date,
+            game,
         }
         .view(places)
     }
