@@ -1943,14 +1943,6 @@ export interface components {
 		/** @enum {string} */
 		SideView: 'home' | 'away';
 		StartAnswer: {
-			/**
-			 * @description The games of the last date before today with places of the team that are not games of the
-			 *     team, in time order, in the seasons of the open items (in July and August, when the
-			 *     current season has none, the season before).
-			 */
-			last_games: components['schemas']['StartEvent'][];
-			/** @description The season of `last_games`, for their pages; `null` when there are none. */
-			last_games_season?: string | null;
 			/** @description The messages the start page offers. */
 			messages: components['schemas']['MessagesView'];
 			/**
@@ -4301,7 +4293,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description The open items, the last duty games and the next events */
+			/** @description The open items and the next events */
 			200: {
 				headers: {
 					[name: string]: unknown;

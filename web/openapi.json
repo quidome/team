@@ -2256,7 +2256,7 @@
         "operationId": "start",
         "responses": {
           "200": {
-            "description": "The open items, the last duty games and the next events",
+            "description": "The open items and the next events",
             "content": {
               "application/json": {
                 "schema": {
@@ -6179,24 +6179,9 @@
           "show_season",
           "open_items",
           "next",
-          "last_games",
           "messages"
         ],
         "properties": {
-          "last_games": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StartEvent"
-            },
-            "description": "The games of the last date before today with places of the team that are not games of the\nteam, in time order, in the seasons of the open items (in July and August, when the\ncurrent season has none, the season before)."
-          },
-          "last_games_season": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The season of `last_games`, for their pages; `null` when there are none."
-          },
           "messages": {
             "$ref": "#/components/schemas/MessagesView",
             "description": "The messages the start page offers."
