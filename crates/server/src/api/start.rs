@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 use axum::Json;
 use axum::extract::State;
+use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HomeOrAway,
@@ -81,6 +82,7 @@ fn start_event(
     view: EventView,
     places: &PlacesOf,
     games: &SeasonGames,
+    today: NaiveDate,
 ) -> StartEvent {
     let mut start = StartEvent {
         look: EventLookView::Normal,
@@ -93,7 +95,7 @@ fn start_event(
         EventKind::Game(scheduled) => places.get(&scheduled.game.source_id),
         EventKind::Training(..) => None,
     };
-    if event_look(event, game_places, checked) == EventLook::Lighter {
+    if event_look(event, game_places, checked, today) == EventLook::Lighter {
         start.look = EventLookView::Lighter;
     }
     if let (EventKind::Game(scheduled), Some(club), Some(team)) =
@@ -405,7 +407,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .into_iter()
         .map(|event| {
             coming_view(event, &places, &games.duties, true, now)
-                .map(|view| start_event(event, view, &places, &games))
+                .map(|view| start_event(event, view, &places, &games, today))
         })
         .collect::<Result<_, _>>()?;
 
@@ -416,7 +418,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         .into_iter()
         .map(|event| {
             event_view_with(event, &places, &games.duties)
-                .map(|view| start_event(event, view, &places, &games))
+                .map(|view| start_event(event, view, &places, &games, today))
         })
         .collect::<Result<_, _>>()?;
     if last_game_views.is_empty() {
@@ -429,7 +431,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
                 .into_iter()
                 .map(|event| {
                     event_view_with(event, &earlier_places, &earlier.duties)
-                        .map(|view| start_event(event, view, &earlier_places, &earlier))
+                        .map(|view| start_event(event, view, &earlier_places, &earlier, today))
                 })
                 .collect::<Result<_, _>>()?;
             if !last_game_views.is_empty() {

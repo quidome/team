@@ -1,5 +1,5 @@
 <!--
-	One event of "Season" and the start page: a game (as in the schedule: start time, teams, hall
+	One event of "Season" (the start page has its own row, `StartEventRow.svelte`): a game (as in the schedule: start time, teams, hall
 	and town, the badge "Team", crossed out when no longer in the game list; its duty places and
 	what changed for them; the count of who comes, or "· Not played" instead; "· Checked"; a tap
 	opens it when
@@ -14,7 +14,6 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { countText } from '#lib/attendance.js';
 	import { placesWarnings, rowPlacesText } from '#lib/duties.js';
-	import { gameLink } from '#lib/start.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { checkedText, statusText } from '#lib/trainings.js';
 	import MapPin from '@lucide/svelte/icons/map-pin';
@@ -25,7 +24,6 @@
 		onOpen,
 		onCancel,
 		gameSeason,
-		gameFrom,
 		onGame
 	}: {
 		event: EventView;
@@ -33,8 +31,6 @@
 		onOpen: (row: TrainingRow) => void;
 		/** The season of the games: a tap on a game opens its page. No link without it. */
 		gameSeason?: string;
-		/** `start`: the page of a game returns to the start page with "Back". */
-		gameFrom?: 'start';
 		/** Called before the page of a game opens. */
 		onGame?: (game: ScheduleGame) => void;
 		/** "Cancel" on a training day that is not opened; no button without it. */
@@ -110,18 +106,14 @@
 			{/if}
 		{/snippet}
 		{#if gameSeason}
-			<!-- eslint-disable svelte/no-navigation-without-resolve -- gameLink() builds the address with resolve() -->
 			<a
-				href={gameFrom
-					? gameLink(gameSeason, game.id)
-					: resolve('/game/[season]/[id]', { season: gameSeason, id: String(game.id) })}
+				href={resolve('/game/[season]/[id]', { season: gameSeason, id: String(game.id) })}
 				onclick={() => onGame?.(game)}
 				class="flex min-w-0 flex-1 gap-3 rounded-lg"
 				data-testid="game-link"
 			>
 				{@render content()}
 			</a>
-			<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		{:else}
 			<div class="flex min-w-0 flex-1 gap-3">{@render content()}</div>
 		{/if}

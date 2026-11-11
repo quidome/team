@@ -1,5 +1,6 @@
-//! The start page through the API (story B of start page and season): the open items come from
-//! the rules of their sources, "Last" and "Next".
+//! The start page through the API (story B of start page and season, and the quieter start
+//! page): the open items come from the rules of their sources, the last duty games, and the
+//! coming events with how each looks.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

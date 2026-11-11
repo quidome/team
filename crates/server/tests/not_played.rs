@@ -510,7 +510,9 @@ async fn a_not_played_duty_game_stays_in_the_last_duty_games_and_on_season(pool:
     let start = ok(&reader, "GET", "/api/start", None).await;
     let last = start_game(&start, "last_games", id).unwrap();
     assert_eq!(last["not_played"], false);
-    assert_eq!(look(&start, "last_games", id), "normal", "an open place");
+    assert_eq!(last["places"]["open_places"], 1, "{last}");
+    // Its date has passed: lighter, also with an open place.
+    assert_eq!(look(&start, "last_games", id), "lighter");
 
     ok(&reader, "PUT", &mark_path(id), None).await;
     let start = ok(&reader, "GET", "/api/start", None).await;

@@ -828,6 +828,69 @@ async fn next_shows_a_home_game_of_another_club_team_with_a_place_of_the_team(po
     );
 }
 
+/// How the row of game `id` (or the training of `date`) in "next" of the start page looks.
+async fn look_in_next(reader: &Reader, find: impl Fn(&Value) -> bool) -> String {
+    let answer = start(reader).await;
+    answer["next"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| find(&item["event"]))
+        .map(|item| item["look"].as_str().unwrap().to_owned())
+        .unwrap()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_row_of_the_start_page_is_lighter_when_nothing_is_left_to_do(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Mon 26 Oct: the list runs until Sun 8 Nov, with the home games of 31 October.
+    reader.harness.clock.set(utc(2026, 10, 26, 12, 0));
+    reader.log_in_again().await;
+    let ours = first_game(&reader, |game| {
+        game["reason"] == "duty" && game["date"] == "2026-10-31"
+    })
+    .await;
+    let is_ours = |event: &Value| event["game"]["id"] == ours;
+    set_place(&reader, ours, "table", 1, Some(M16_1)).await;
+    assert_eq!(
+        look_in_next(&reader, is_ours).await,
+        "normal",
+        "an open place"
+    );
+    let anna = add_player(&reader, "Anna", None, "plays_games").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/assignments/table/1", game_path(ours)),
+        Some(json!({ "player": anna })),
+    )
+    .await;
+    // Filled, but the schedule of the committee is not entered yet.
+    let path = format!("{}/schedule-entered", game_path(ours));
+    ok(&reader, "DELETE", &path, None).await;
+    assert_eq!(
+        look_in_next(&reader, is_ours).await,
+        "normal",
+        "not entered"
+    );
+    ok(&reader, "PUT", &path, None).await;
+    assert_eq!(look_in_next(&reader, is_ours).await, "lighter");
+
+    // A training of today that is checked.
+    ok(
+        &reader,
+        "POST",
+        "/api/trainings",
+        Some(json!({ "date": "2026-10-26", "start": "19:00", "end": "20:00" })),
+    )
+    .await;
+    let today = |event: &Value| event["training"]["date"] == "2026-10-26";
+    assert_eq!(look_in_next(&reader, today).await, "normal");
+    ok(&reader, "PUT", "/api/trainings/2026-10-26/checked", None).await;
+    assert_eq!(look_in_next(&reader, today).await, "lighter");
+}
+
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn the_last_duty_games_are_the_games_of_the_last_date_with_places_but_not_of_the_team(
     pool: PgPool,

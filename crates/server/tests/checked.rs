@@ -382,8 +382,8 @@ async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: 
     assert_eq!(not_checked_item(&reader).await, None);
     set_check_start(&pool, "2026-10-10").await;
 
-    // "Checked" ends it, and the rows of "Season" and "Last" say so (a driver place puts the
-    // game in "Last").
+    // "Checked" ends it, and the row of "Season" says so (a driver place gives the game places of
+    // the team; a game of the team is not among the last duty games of the start page).
     ok(
         &reader,
         "PUT",

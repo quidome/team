@@ -1,6 +1,6 @@
 # Technical spec: A quieter start page
 
-**Status**: in progress
+**Status**: done
 **Size**: story
 **Change**: docs/changes/2026-11-10-quieter-start-page/
 **Date**: 2026-11-10
@@ -87,7 +87,9 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
     `pub fn event_look(event: &Event<'_>, places: Option<&GamePlaces>, game_checked: bool) -> EventLook`:
     training lighter when checked or cancelled; game of the team lighter when `game_checked` or
     not played; other game lighter when not played, or when `open_places(places) == 0` and
-    `!not_entered(places)`; a game that left the game list: normal.
+    `!not_entered(places)`; another game that left the game list: normal. (Changed at the reviews:
+    an event before today is always lighter; a gone game that is not played, or a checked gone
+    game of the team, is lighter.)
   - `messages.rs`: `pub fn week_has_duty_places(games: &[MessageGame<'_>], today: NaiveDate) -> bool`:
     true when a game of `week_games` gives `duty_lines` (the same games as the text).
   - Export the new names flat from `team_core` (the server uses only flat names).
@@ -100,8 +102,8 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
   - `team_side`: home in the club's hall; away; the team as away side against another club team
     in the club's hall gives `Home` and that team as opponent.
   - `week_has_duty_places`: true with places this week, also on a passed day; false without;
-    false for a game not played or gone; equal to "the committee text has lines" on the cases of
-    the existing committee tests.
+    false for a game not played or gone; equal to "the committee text has lines" on each of its
+    own cases (the existing committee tests do not call the rule).
   - The existing tests of the message of the week pass unchanged.
   - `cargo test -p team_core`; `crates/core/tests/domains.rs` passes (no new use between domains).
 
@@ -217,7 +219,7 @@ From `functional.md` (approved 2026-11-10, two spec reviews):
   only: the grey text carries "done". Screenshots at 390 × 844 of a quiet week (the test data)
   and a busy Saturday (real games of the test data with changed dates and places) in light and
   dark mode: all readable, nothing changed.
-- [ ] All checks pass
+- [x] All checks pass
 
 ## Deviations
 None. Design reads the spec as written; points the spec leaves to Design: a game that left the
@@ -242,3 +244,87 @@ normal text"); the header date comes from the server (`today`), so it follows th
   tests check the same with stored data.
 
 ## Review findings
+
+### Accept review (2026-11-11, `/review accept`, fresh agent)
+No extra text in the arguments. Read: `change.md`, `functional.md` (with both spec reviews),
+`docs/language.md`, `product-workflow`, the diff `main...quieter-start-page` (core, server, front
+end, tests), then this file (the Deviations last). Run: `cargo test -p team_core` (363 passed) and
+`cargo test -p team --test start --test not_played --test games --test messages` (all passed).
+Not run: the app itself and the browser tests (they share one database with other work in this
+session); the look in light and dark mode is taken from step 4 and "not checked" by this review.
+
+| # | Criterion / open point | What was built | Sort |
+|---|---|---|---|
+| A1 | Story 3: the last duty games "are lighter (the date has passed)"; this file, requirement 3, says the same | They go through `event_look`, the rule of coming events. A past duty game with a place of the team that has no player, or whose schedule was never entered, is **normal** (bold, full bar, "Schedule not entered" on the row). `crates/server/tests/not_played.rs:513` pins this: `assert_eq!(look(…, "last_games", id), "normal", "an open place")`. Not under Deviations. For a past game the reason the spec gives for "normal" does not hold: the open items "open places" and "schedule not entered" cover only coming games, so on Monday a normal-weight row from Saturday stands above the coming events with no open item behind it. Checked by a trace (`start.rs` `last_games` → `start_event` → `event_look`; `open_places_games`/`schedule_not_entered` take coming games only) and by reading that test. | **concerning deviation** |
+| A2 | Story 2: a game of the team, "the line below has the hall and town, then … the count" (example "De Trits, Baarn · 10 no answer") | Hall and town with "· Not played" / "· Checked" on one line; the count on its own line below. Checked by reading `StartEventRow.svelte`. One line more per game of the team; the content is the same. | neutral drift |
+| A3 | Story 1: each item "an orange dot, the text, and ›" | An item of more games shows "▾" / "▴" instead of "›", because a tap opens its list instead of a page. Checked by reading `+page.svelte`. | faithful adaptation |
+| A4 | Story 5: "More" → "Back" returns to the start page | As specified. Team, Players and Settings opened from "More", and the choice of club and team opened from "Settings", still go "Back" to the start page, not to "More" or "Settings". The spec says nothing about them. Checked by a search for `Back` in those routes. | neutral drift |
+| A5 | Story 4: "Duties" shows the committee message "whenever a team is chosen" | Shown with the overviews, also without a team (page says "No message: no team chosen."). The spec's premise ("as it shows no overviews") was not true; accepted by the coordinator (Deviations, step 2). Earlier season: no button, as specified. Checked by reading `duties/+page.svelte`. | faithful adaptation |
+| A6 | Story 2: a game no longer in the game list | Normal, crossed out, "no longer in the game list" below; follows "All other events have normal text". Checked in `event_look` and its test. | faithful adaptation |
+| A7 | Story 4: "Committee message ›" only in a week with table or referee places of the team | `week_has_duty_places` uses the same games as the committee text, and its test asserts both agree on each case (also a passed day, a gone game, "not played", next week). Checked by reading `messages.rs` and the run. | as meant |
+| A8 | Story 5: header, date, season in July and August, new season without a team, links | Team name and "Tuesday 10 November" (checked with `Intl` in node), season when `show_season` (`open_item_seasons(today).len() > 1`), in `team_needed` only the date above the choose step; links Season · Attendance · Duties · Report · More. Checked by reading `+page.svelte` and `start.rs`. | as meant |
+| A9 | Stories 1–3, other criteria (kinds and order of open items, "Nothing needs you.", range of events, grouping by date, bars and background, lighter rules of coming events, games of the team left out of the last duty games, taps with `?from=start`, rows at least 44 px) | Match. Checked by reading the code and the core tests of `event_look` and `last_games`; the 44 px by the class `min-h-11`. | as meant |
+
+Smaller, for Close: `EventRow.svelte` still says it is the row "of Season and the start page" and
+keeps the prop `gameFrom` that only the start page passed (search `gameFrom` in `web/src`: only
+its own declaration and use).
+- 2026-11-11: fixed with R4 (comment changed, `gameFrom` removed).
+
+**Answers (2026-11-11, Implement).**
+- A1: fixed, as the coordinator chose ("always lighter"): `event_look` takes `today`, and an event
+  before today is lighter. New core test
+  `a_past_duty_game_is_lighter_also_with_an_open_place_or_no_schedule`; `not_played.rs` now
+  expects "lighter" with an open place.
+- A2, A3, A4, A6: not changed, accepted as they are (the review says they can stay).
+- A5: accepted earlier by the coordinator.
+
+**Verdict: needs correction** (next: `/discover review:`), for A1 only. Either the build follows
+the spec (the last duty games are always lighter, and the test at `not_played.rs:513` changes), or
+the coordinator chooses that a past duty game with an empty place or a schedule not entered keeps
+normal weight, and the spec says so. The rest is accepted; A2 and A4 can stay as they are.
+
+### Build review (2026-11-11, `/review build`, fresh agent)
+No extra text in the arguments. Read: `product-workflow`, `docs/language.md`, the change folder,
+`docs/architecture.md`, decisions 0001, 0022, 0026 and 0027, `CLAUDE.md`, and the diff
+`main...quieter-start-page` (no changes outside it at the start). The accept review above was
+written while this review ran; R1 was found before reading it. Run: `cargo test -p team_core`
+(363 + 7 domains, passed), `cargo test -p team --test start --test not_played --test games
+--test messages --test checked --test game_attendance` (all passed), `cargo clippy --workspace
+--all-targets -- -D warnings` (clean), `svelte-check` (0 errors, 0 warnings). Not run: the
+browser tests, `api-types-check`, `check-sqlx`.
+
+What the checks cannot see, checked and in order: "lighter" is decided in the core
+(`event_look`), "home or away" is one rule (`team_side`) for the message of the week and the start
+page, and the committee flag reuses `week_games` and `places_of_team`, so nothing is rebuilt.
+`output` now uses `contribution::duties::open_places` and `events`: allowed by the domain map
+(and `domains.rs` passes). `EventView` and `EventRow.svelte` are unchanged for "Season". A `Kept`
+game in `last_games` is not a game of the team (`in_schedule` gave `None`), so leaving out only
+`TeamGame` is complete. Checked by reading `schedule.rs` and the diff.
+
+| # | Finding | How checked | Weight |
+|---|---|---|---|
+| R1 | **The last duty games are not always lighter.** Story 3 and requirement 3 say they are lighter (the date has passed). `start.rs` passes them through `start_event` → `event_look`, the rule for coming events, so a past duty game with a place of the team without a player, or whose schedule was not entered, is `normal`. `tests/not_played.rs:513` asserts `"normal", "an open place"`, so the test pins the difference; it is not under Deviations. The browser test of the last duty games (`duties.e2e.ts`) sets `look: 'lighter'` itself in `page.route`, so it cannot see it. Same as A1. Fix in the core (for example a `past` input to `event_look`, or a rule for the last duty games next to `last_games`) with a unit test, or the spec changes. | Trace and run of `a_not_played_duty_game_stays_in_the_last_duty_games_and_on_season` | must fix or decide |
+| R2 | **The doc comment of `event_look` is false for gone games.** It says "All else is `Normal`, also a game no longer in the game list", and Step 1 says "a game that left the game list: normal". The arms `not_played => true` and `TeamGame => game_checked` come before the `in_list` test, so a gone game marked "Not played", and a checked game of the team that later left the game list, are `Lighter` (and crossed out). Only a gone duty game is tested. Either the comment says so, or the `in_list` test comes first; then a test for each. | Reading the `match` in `start_page.rs` and its tests | small |
+| R3 | **A claim of Step 1 is wider than the test.** "`week_has_duty_places` … equal to 'the committee text has lines' on the cases of the existing committee tests": the agreement assert (`has_duty_places`) runs only in the two new tests (9 cases); the existing committee tests do not call it. The cases it has are good (passed day, gone, not played, next week, other teams, drivers). Also no API test shows `look: "lighter"` for a checked training, a checked game of the team or a filled and entered duty game: the server tests cover only "not played" (lighter) and "nothing checked" (normal); the mapping in `start_event` (`checked` from `EventView.game.checked`) is covered for those through the core tests only. | Search `has_duty_places(` in `messages.rs`; search `"look"` in `crates/server/tests` | small |
+| R4 | **Comments the diff made false.** `crates/core/src/output/start_page.rs:982` ("not in \"Last\""), `crates/server/tests/start.rs:2` ("\"Last\" and \"Next\""), `crates/server/tests/checked.rs:385-386` ("the rows of \"Season\" and \"Last\" say so (a driver place puts the game in \"Last\")": the test now asserts the game is not there). `EventRow.svelte` still says it is the row of the start page and keeps `gameFrom` (as in the accept review). Code comments and the schema cite decision 0034, which is written only at Close. | Search `"Last"\|0034\|gameFrom` in `crates` and `web/src` | small |
+| R5 | **For Close: `docs/architecture.md`** names the old start page in lines 18 (`"Open items", "Last" and "Next"`, `EventRow.svelte` "on Season and the start page", the buttons in the part "Messages", the links to `/team`, `/players`, `/settings`), 64 (`last_training`, `last_games` "all games"), 106 (`last_training` in `GET /api/start`), 107, 128 and 136 ("Last"), and 244 ("Last" in the reads done twice). Not in it yet: `home_or_away`, `event_look`, `week_has_duty_places`, `StartEvent`, `StartEventRow.svelte`, `/more`. | Search `Last\|last_training\|EventRow` in `docs/architecture.md` | for Close |
+
+**Verdict:** the structure follows the project's rules; R1 is a bug against the spec (or a choice
+the spec must state) and must be settled before Close; R2–R4 are small fixes; R5 is work for Close.
+
+**Answers (2026-11-11, Implement).**
+- R1: fixed with A1 (see above): the rule is in the core (`event_look` with `today`), with a unit
+  test and the changed server test.
+- R2: fixed. The comment of `event_look` now names every case (an event before today; a game not
+  played, also when gone; a checked game of the team, also when gone; another game that left the
+  game list: normal). New core test
+  `a_game_that_left_the_game_list_is_lighter_when_not_played_or_checked`. Step 1 above corrected.
+- R3: fixed. The claim of Step 1 is corrected. New server test
+  `a_row_of_the_start_page_is_lighter_when_nothing_is_left_to_do` (`tests/games.rs`): a duty game
+  with an open place, then filled but not entered (normal), then entered (lighter); a training of
+  today, then checked (lighter). A checked game of the team is covered by the core test only: the
+  test data has no game of the team that can be checked in the window of the list.
+- R4: fixed: the comments in `start_page.rs`, `tests/start.rs` and `tests/checked.rs` no longer
+  name "Last"; `EventRow.svelte` says it is the row of "Season" and no longer has `gameFrom`. The
+  mentions of decision 0034 stay: Close writes it.
+- R5: not fixed now: work for Close (`docs/architecture.md`).
