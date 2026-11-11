@@ -193,7 +193,7 @@ pub async fn cancel(
     Ok(())
 }
 
-/// Makes a cancelled training a normal training again ("Undo cancel"); `false` when there is no
+/// Makes a cancelled training a normal training again ("Undo" of "Cancelled"); `false` when there is no
 /// training on `date`.
 pub async fn uncancel(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<bool, StoreError> {
     let result = sqlx::query!(
@@ -205,7 +205,7 @@ pub async fn uncancel(db: impl PgExecutor<'_>, date: NaiveDate) -> Result<bool, 
     Ok(result.rows_affected() == 1)
 }
 
-/// The training on `date`, with a lock on its row for a check: another check or "Undo check" waits,
+/// The training on `date`, with a lock on its row for a check: another check or its "Undo" waits,
 /// a mark does not (`FOR NO KEY UPDATE` does not block the `FOR KEY SHARE` of an absence).
 pub async fn lock_for_check(
     tx: &mut PgConnection,

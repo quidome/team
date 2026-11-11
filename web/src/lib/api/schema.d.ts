@@ -1208,7 +1208,7 @@ export interface components {
 		GameAttendanceView: {
 			/**
 			 * @description "Answers from before the move": the answers were given for another date than the date of
-			 *     the game now; until "Answers checked" (`team_core::answers_moved`).
+			 *     the game now; until "Mark answers as checked" (`team_core::answers_moved`).
 			 */
 			answers_moved: boolean;
 			/**
@@ -1218,7 +1218,7 @@ export interface components {
 			before_release: boolean;
 			/**
 			 * @description "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
-			 *     "Undo check", and the list closed behind a tap.
+			 *     "Undo", and the list closed behind a tap.
 			 */
 			checked: boolean;
 			count: components['schemas']['CountView'];
@@ -1261,7 +1261,7 @@ export interface components {
 			/** @description The pull-down list of the places: the club teams of the season, sorted by name. */
 			club_teams: components['schemas']['TeamView'][];
 			current_season: string;
-			/** @description The switch "The drivers drove": the drives of a not played game count from its start time. */
+			/** @description "Count the drives": the drives of a not played game count from its start time. */
 			drivers_drove: boolean;
 			/** @description The game, with its duties. */
 			game: components['schemas']['ScheduleGame'];
@@ -1277,7 +1277,7 @@ export interface components {
 			season: string;
 			/**
 			 * @description The start time has passed (without a start time: the game day has begun; Dutch time): the
-			 *     page shows the switch "The drivers drove" on a not played game with driver places.
+			 *     page shows the row "The drives count" on a not played game with driver places.
 			 */
 			started: boolean;
 			/** @description The team chosen for the game's season. */
@@ -2096,7 +2096,7 @@ export interface components {
 		};
 		/** @description An opened training. */
 		TrainingView: {
-			/** @description "Checked" is offered: not checked yet, and its date is today or earlier. */
+			/** @description "Mark as checked" is offered: not checked yet, and its date is today or earlier. */
 			can_check: boolean;
 			cancelled: boolean;
 			/** @description The coordinator confirmed that the attendance is complete. */
@@ -2808,7 +2808,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description "Undo check": the settled players have no answer again; the game page */
+			/** @description "Undo" of a check: the settled players have no answer again; the game page */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -2904,7 +2904,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description "The drivers drove" on; the game page */
+			/** @description "Count the drives": the drives count; the game page */
 			200: {
 				headers: {
 					[name: string]: unknown;
@@ -2950,7 +2950,7 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description "The drivers drove" off; the game page */
+			/** @description "Undo" of "The drives count"; the game page */
 			200: {
 				headers: {
 					[name: string]: unknown;

@@ -300,7 +300,7 @@ test('a reload that was sent before a tap does not undo the tap', async ({ page 
 	expect(errors).toEqual([]);
 });
 
-test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async ({ page }) => {
+test('"Cancel training", its "Undo", "Change" and "Delete training"', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/training/2026-10-06');
 	await page.getByRole('button', { name: 'Cancel training' }).click();
@@ -308,7 +308,7 @@ test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async (
 	// A cancelled training keeps its absence and can still be marked.
 	const yara = page.getByTestId('training-player').filter({ hasText: 'Yara' });
 	await expect(yara.getByTestId('player-mark')).toHaveText('Ill');
-	await page.getByRole('button', { name: 'Undo cancel' }).click();
+	await page.getByTestId('mark-cancelled').getByRole('button', { name: 'Undo' }).click();
 	await expect(page.getByTestId('training-top')).toHaveText('1 absent');
 
 	// "Change" of the extra training of Thu 22 Oct to Wed 21 Oct.
@@ -340,15 +340,24 @@ test('"Cancel training", "Undo cancel", "Change" and "Delete training"', async (
 	expect(errors).toEqual([]);
 });
 
-test('"Checked" and "Undo check" on a training', async ({ page }) => {
+test('"Mark as checked" and "Undo" on a training, in the panel at the top', async ({ page }) => {
 	const errors = watchConsole(page);
 	await page.goto('/training/2026-10-06');
-	await page.getByRole('button', { name: 'Checked', exact: true }).click();
-	await expect(page.getByTestId('checked')).toHaveText('Checked');
-	await expect(page.getByRole('button', { name: 'Undo check' })).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	// The panel is the first thing below the heading, and its only orange is the next step.
+	const panel = page.getByTestId('administration');
+	await expect(panel).toBeVisible();
+	const row = page.getByTestId('mark-checked');
+	await expect(row).toHaveAttribute('data-done', 'false');
+	await expect(row).toHaveAttribute('data-next', 'true');
+	await expect(row).toContainText('Not checked');
+	await page.getByRole('button', { name: 'Mark as checked' }).click();
+	await expect(row).toHaveAttribute('data-done', 'true');
+	await expect(row).toHaveAttribute('data-next', 'false');
+	await expect(row).toContainText('Checked');
+	await expect(row.getByRole('button', { name: 'Undo' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toHaveCount(0);
 	await page.reload();
-	await expect(page.getByTestId('checked')).toHaveText('Checked');
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'true');
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 
@@ -362,14 +371,15 @@ test('"Checked" and "Undo check" on a training', async ({ page }) => {
 	).toHaveText(/ · Checked$/);
 
 	await page.goto('/training/2026-10-06');
-	await page.getByRole('button', { name: 'Undo check' }).click();
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
-	await expect(page.getByTestId('checked')).toHaveCount(0);
+	await page.getByTestId('mark-checked').getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'false');
 
-	// A training after today is not complete yet: no "Checked".
+	// A training after today is not complete yet: no "Checked", and no panel.
 	await page.goto('/training/2026-10-13');
 	await expect(page.getByTestId('training-top')).not.toHaveText('Not opened');
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toHaveCount(0);
+	await expect(page.getByTestId('administration')).toHaveCount(0);
 	expect(errors).toEqual([]);
 });
 
@@ -382,12 +392,12 @@ test('a check that cannot be saved shows "Not saved. Try again." and the stored 
 		await route.fulfill({ status: 500, json: { error: 'internal' } });
 	});
 	await page.goto('/training/2026-10-06');
-	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await page.getByRole('button', { name: 'Mark as checked' }).click();
 	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
-	await expect(page.getByTestId('checked')).toHaveText('Checked');
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'true');
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
-	await page.getByRole('button', { name: 'Undo check' }).click();
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+	await page.getByTestId('mark-checked').getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
 });
 
 test('a check of a training deleted on another screen says so', async ({ page }) => {
@@ -395,7 +405,7 @@ test('a check of a training deleted on another screen says so', async ({ page })
 		route.fulfill({ status: 400, json: { error: 'not_opened' } })
 	);
 	await page.goto('/training/2026-10-06');
-	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await page.getByRole('button', { name: 'Mark as checked' }).click();
 	await expect(page.getByRole('alert')).toHaveText(
 		'This training no longer exists. Load the page again.'
 	);
@@ -406,9 +416,9 @@ test('a cancelled training has no "Checked"', async ({ page }) => {
 	await page.goto('/training/2026-10-06');
 	await page.getByRole('button', { name: 'Cancel training' }).click();
 	await expect(page.getByTestId('training-top')).toHaveText('Cancelled');
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
-	await page.getByRole('button', { name: 'Undo cancel' }).click();
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toHaveCount(0);
+	await page.getByTestId('mark-cancelled').getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
 });
 
 test('no player with a role, and no reasons', async ({ page }) => {
@@ -627,7 +637,7 @@ test.describe('the overview', () => {
 		expect(errors).toEqual([]);
 	});
 
-	test('a cancelled training does not count, and counts again after "Undo cancel"', async ({
+	test('a cancelled training does not count, and counts again after its "Undo"', async ({
 		page
 	}) => {
 		const errors = watchConsole(page);
@@ -642,7 +652,7 @@ test.describe('the overview', () => {
 		);
 
 		await page.goto('/training/2026-09-01');
-		await page.getByRole('button', { name: 'Undo cancel' }).click();
+		await page.getByTestId('mark-cancelled').getByRole('button', { name: 'Undo' }).click();
 		await expect(page.getByTestId('training-top')).toHaveText('1 absent');
 		await page.goto('/attendance');
 		await expect(zane).toContainText('of 5 trainings');

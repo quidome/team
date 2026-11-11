@@ -3,9 +3,10 @@
 	"Cancelled", and the players with a role on the date, each "there" at first. A tap on a player
 	opens the reasons ("There" on top for an absent player); a tap on a reason saves at once. The
 	taps of one player are sent one after the other; a tap that fails shows the stored state again
-	with "Not saved. Try again." "Checked" (a training of today or earlier, not cancelled) confirms
-	that the attendance is complete; a checked training shows "Checked" with "Undo check". Below:
-	"Change", "Cancel training" or "Undo cancel", "Delete training". A date that is not opened shows
+	with "Not saved. Try again." "Mark as checked" (a training of today or earlier, not cancelled)
+	confirms that the attendance is complete; a checked training shows "Checked" with "Undo". Below:
+	"Change", "Cancel training", "Delete training". The marks ("Cancelled", "Checked") are rows of the
+	panel "Administration" at the top (the administration panel), each with "Undo" when set. A date that is not opened shows
 	"Open training".
 -->
 <script lang="ts">
@@ -28,7 +29,8 @@
 		type TrainingDay
 	} from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import CheckIcon from '@lucide/svelte/icons/check';
+	import AdminPanel from '#lib/components/AdminPanel.svelte';
+	import MarkRow from '#lib/components/MarkRow.svelte';
 	import { fullName } from '#lib/players.js';
 	import { formatDay } from '#lib/schedule.js';
 	import { onMount } from 'svelte';
@@ -126,7 +128,7 @@
 		return () => document.removeEventListener('visibilitychange', visible);
 	});
 
-	/** An action that does not change the marks ("Open", "Cancel training", "Undo cancel"). When a
+	/** An action that does not change the marks ("Open", "Cancel training", "Undo" of a cancel). When a
 	 * tap was made while it ran, the marks on the screen stay: the answer may be older. */
 	async function run(work: () => Promise<TrainingDay>) {
 		busy = true;
@@ -147,7 +149,7 @@
 		}
 	}
 
-	/** "Checked" or "Undo check": saved at once, as a mark. A refusal of the server (for example the
+	/** "Mark as checked" or its "Undo": saved at once, as a mark. A refusal of the server (for example the
 	 * training was deleted on another screen) shows its message; any other failure shows "Not saved.
 	 * Try again.". Both then show the stored training; a tap made meanwhile keeps the marks. */
 	async function saveCheck(work: () => Promise<TrainingDay>) {
@@ -316,45 +318,34 @@
 				</Button>
 			</div>
 		{:else}
-			{#if page.training.cancelled}
-				<div
-					class="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-xs"
-				>
-					<p class="text-sm font-medium">Cancelled</p>
-					<Button
-						variant="outline"
-						disabled={busy}
-						onclick={() => run(() => uncancelTraining(page.date))}
-					>
-						Undo cancel
-					</Button>
-				</div>
-			{/if}
-
-			{#if page.training.checked}
-				<div
-					class="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-xs"
-				>
-					<p class="flex items-center gap-2 text-sm font-medium" data-testid="checked">
-						<CheckIcon class="size-4" aria-hidden="true" />
-						Checked
-					</p>
-					<Button
-						variant="outline"
-						disabled={busy}
-						onclick={() => saveCheck(() => uncheckTraining(page.date))}
-					>
-						Undo check
-					</Button>
-				</div>
-			{:else if page.training.can_check}
-				<Button
-					class="w-full"
-					disabled={busy}
-					onclick={() => saveCheck(() => checkTraining(page.date))}
-				>
-					Checked
-				</Button>
+			{#if page.training.cancelled || page.training.checked || page.training.can_check}
+				<AdminPanel>
+					{#if page.training.cancelled}
+						<MarkRow
+							state="Cancelled"
+							done={true}
+							action="Undo"
+							{busy}
+							onclick={() => run(() => uncancelTraining(page.date))}
+							testid="mark-cancelled"
+						/>
+					{/if}
+					{#if page.training.checked || page.training.can_check}
+						{@const checked = page.training.checked}
+						<MarkRow
+							state={checked ? 'Checked' : 'Not checked'}
+							done={checked}
+							action={checked ? 'Undo' : 'Mark as checked'}
+							next={!checked}
+							{busy}
+							onclick={() =>
+								saveCheck(() => (checked ? uncheckTraining(page.date) : checkTraining(page.date)))}
+							testid="mark-checked"
+						>
+							{#snippet line()}{topLine(page, shown)}{/snippet}
+						</MarkRow>
+					{/if}
+				</AdminPanel>
 			{/if}
 
 			{#if page.players.length === 0}

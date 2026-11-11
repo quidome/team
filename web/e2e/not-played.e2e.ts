@@ -15,20 +15,22 @@ const gamePage = (id: number) => `/game/2026-2027/${id}`;
 const apiPath = (id: number, part: string) => `/api/games/2026-2027/${id}/${part}`;
 const origin = { headers: { Origin: 'http://localhost:4100' } };
 
-test('"Not played" closes the list, keeps it changeable, and "Undo" brings everything back', async ({
+test('"Mark as not played" closes the list, keeps it changeable, and "Undo" brings everything back', async ({
 	page
 }) => {
 	const errors = watchConsole(page);
 	await page.goto(gamePage(AWAY_7_NOV));
 	await expect(page.getByTestId('attendance-row').first()).toBeVisible();
-	await page.getByRole('button', { name: 'Not played' }).click();
+	// A coming away game has nothing to mark yet: no panel.
+	await expect(page.getByTestId('administration')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Mark as not played' }).click();
 
-	const mark = page.getByTestId('not-played');
+	const mark = page.getByTestId('mark-not-played');
 	await expect(mark).toContainText('Not played');
 	await expect(page.getByTestId('attendance-row')).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Not played' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Mark as not played' })).toHaveCount(0);
 	// Before the start time there is no switch.
-	await expect(page.getByTestId('drivers-drove')).toHaveCount(0);
+	await expect(page.getByTestId('mark-drives')).toHaveCount(0);
 
 	// The list opens behind a tap, and an answer can still be changed.
 	await page.getByTestId('show-list').click();
@@ -49,9 +51,9 @@ test('"Not played" closes the list, keeps it changeable, and "Undo" brings every
 	await page.goto(gamePage(AWAY_7_NOV));
 	await expect(page.getByTestId('show-list')).toBeVisible();
 	await mark.getByRole('button', { name: 'Undo' }).click();
-	await expect(page.getByTestId('not-played')).toHaveCount(0);
+	await expect(page.getByTestId('mark-not-played')).toHaveCount(0);
 	await expect(page.getByTestId('attendance-row').first()).toBeVisible();
-	await expect(page.getByRole('button', { name: 'Not played' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Mark as not played' })).toBeVisible();
 	expect(errors).toEqual([]);
 });
 
@@ -77,24 +79,33 @@ test('a game marked "Not played" says so on the start page', async ({ page }) =>
 	}
 });
 
-test('after the start time an away game has the switch "The drivers drove"', async ({ page }) => {
+test('after the start time a not played away game has the row "The drives count"', async ({
+	page
+}) => {
 	await page.request.put(apiPath(AWAY_10_OCT, 'drivers'), { ...origin, data: { drivers: 1 } });
 	await page.goto(gamePage(AWAY_10_OCT));
-	await page.getByRole('button', { name: 'Not played' }).click();
-	const drove = page.getByTestId('drivers-drove');
-	const button = drove.getByRole('button', { name: 'The drivers drove' });
-	await expect(button).toHaveAttribute('aria-pressed', 'false');
-	await expect(drove).toContainText('No drive counts.');
-	await button.click();
-	await expect(button).toHaveAttribute('aria-pressed', 'true');
-	await expect(drove).toContainText('The drives count.');
+	await page.getByRole('button', { name: 'Mark as not played' }).click();
+	const drove = page.getByTestId('mark-drives');
+	await expect(drove).toHaveAttribute('data-done', 'false');
+	// Optional, so never orange.
+	await expect(drove).toHaveAttribute('data-next', 'false');
+	await expect(drove).toContainText('No drive counts');
+	await drove.getByRole('button', { name: 'Count the drives' }).click();
+	await expect(drove).toHaveAttribute('data-done', 'true');
+	await expect(drove).toContainText('The drives count');
+	// The rows of the panel, in their order.
+	const rows = await page
+		.getByTestId('administration')
+		.locator('[data-done]')
+		.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')));
+	expect(rows).toEqual(['mark-not-played', 'mark-drives', 'mark-checked']);
 	await page.reload();
-	await expect(button).toHaveAttribute('aria-pressed', 'true');
+	await expect(drove).toHaveAttribute('data-done', 'true');
 
-	await button.click();
-	await expect(button).toHaveAttribute('aria-pressed', 'false');
-	await page.getByTestId('not-played').getByRole('button', { name: 'Undo' }).click();
-	await expect(page.getByTestId('drivers-drove')).toHaveCount(0);
+	await drove.getByRole('button', { name: 'Undo' }).click();
+	await expect(drove).toHaveAttribute('data-done', 'false');
+	await page.getByTestId('mark-not-played').getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByTestId('mark-drives')).toHaveCount(0);
 });
 
 test('a not played game shows no note of a driver who is not coming', async ({ page }) => {
@@ -113,8 +124,8 @@ test('a not played game shows no note of a driver who is not coming', async ({ p
 		await page.goto(gamePage(AWAY_7_NOV));
 		const place = page.getByTestId('place-player').first();
 		await expect(place).toContainText('· not coming');
-		await page.getByRole('button', { name: 'Not played' }).click();
-		await expect(page.getByTestId('not-played')).toBeVisible();
+		await page.getByRole('button', { name: 'Mark as not played' }).click();
+		await expect(page.getByTestId('mark-not-played')).toBeVisible();
 		await expect(place).not.toContainText('not coming');
 		await page.getByTestId('show-list').click();
 		await expect(page.getByTestId('attendance-row').first()).toBeVisible();
@@ -131,10 +142,10 @@ test('a not played game shows no note of a driver who is not coming', async ({ p
 test('a tap that fails shows "Not saved. Try again." and the stored state', async ({ page }) => {
 	await page.goto(gamePage(AWAY_7_NOV));
 	await page.route('**/not-played', (route) => route.abort());
-	await page.getByRole('button', { name: 'Not played' }).click();
+	await page.getByRole('button', { name: 'Mark as not played' }).click();
 	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
-	await expect(page.getByTestId('not-played')).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Not played' })).toBeVisible();
+	await expect(page.getByTestId('mark-not-played')).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Mark as not played' })).toBeVisible();
 });
 
 test('a not played game fits a phone and is accessible', async ({ page }) => {
@@ -142,8 +153,8 @@ test('a not played game fits a phone and is accessible', async ({ page }) => {
 	try {
 		await page.setViewportSize({ width: 320, height: 700 });
 		await page.goto(gamePage(AWAY_10_OCT));
-		await expect(page.getByTestId('not-played')).toBeVisible();
-		await expect(page.getByTestId('drivers-drove')).toBeVisible();
+		await expect(page.getByTestId('mark-not-played')).toBeVisible();
+		await expect(page.getByTestId('mark-drives')).toBeVisible();
 		await expectNoHorizontalScroll(page, 320);
 		await expectAccessible(page);
 	} finally {

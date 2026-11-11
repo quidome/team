@@ -26,7 +26,7 @@ test('a game from before the release shows its list closed, with "There" and "Ab
 	await expect(page.getByRole('button', { name: /^Coming/ })).toHaveCount(0);
 });
 
-test('"Checked" makes each "no answer" absent and "Undo check" brings them back', async ({
+test('"Mark as checked" makes each "no answer" absent and "Undo" brings them back', async ({
 	page
 }) => {
 	const errors = watchConsole(page);
@@ -36,8 +36,9 @@ test('"Checked" makes each "no answer" absent and "Undo check" brings them back'
 	expect(players).toBeGreaterThan(0);
 	await expect(page.getByTestId('attendance-count')).toContainText('no answer');
 
-	await page.getByRole('button', { name: 'Checked', exact: true }).click();
-	const checked = page.getByTestId('checked');
+	await page.getByRole('button', { name: 'Mark as checked' }).click();
+	const checked = page.getByTestId('mark-checked');
+	await expect(checked).toHaveAttribute('data-done', 'true');
 	await expect(checked).toContainText('Checked');
 	await expect(page.getByTestId('settled')).toHaveText(
 		/^\d+ players? with no answer (is|are) absent\.$/
@@ -45,7 +46,7 @@ test('"Checked" makes each "no answer" absent and "Undo check" brings them back'
 	await expect(page.getByTestId('attendance-row')).toHaveCount(0);
 	await expect(page.getByTestId('closed-count')).toHaveText(/absent/);
 	await expect(page.getByTestId('closed-count')).not.toHaveText(/no answer/);
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toHaveCount(0);
 
 	// The list opens behind a tap, with every player there or absent.
 	await page.getByTestId('show-list').click();
@@ -53,23 +54,62 @@ test('"Checked" makes each "no answer" absent and "Undo check" brings them back'
 		'No answer'
 	]);
 
-	await checked.getByRole('button', { name: 'Undo check' }).click();
-	await expect(page.getByTestId('checked')).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+	await checked.getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'false');
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
 	await page.getByTestId('show-list').click();
 	await expect(page.getByTestId('attendance-count')).toContainText('no answer');
 	expect(errors).toEqual([]);
 });
 
-test('a "Checked" that fails shows "Not saved. Try again." and the stored state', async ({
+test('a "Mark as checked" that fails shows "Not saved. Try again." and the stored state', async ({
 	page
 }) => {
 	await page.goto(gamePage);
 	await page.route('**/checked', (route) => route.abort());
-	await page.getByRole('button', { name: 'Checked', exact: true }).click();
+	await page.getByRole('button', { name: 'Mark as checked' }).click();
 	await expect(page.getByTestId('not-saved')).toHaveText('Not saved. Try again.');
-	await expect(page.getByTestId('checked')).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Checked', exact: true })).toBeVisible();
+	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'false');
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
+});
+
+test('a game without any answer warns before "Mark as checked"', async ({ page }) => {
+	// The answer of the page as for a game where nobody answered.
+	await page.route(`**/api/games/2026-2027/${AWAY_10_OCT}`, async (route) => {
+		const answer = await (await route.fetch()).json();
+		answer.attendance.count = { coming: 0, not_coming: 0, no_answer: 10 };
+		answer.attendance.checked = false;
+		await route.fulfill({ json: answer });
+	});
+	await page.goto(gamePage);
+	await expect(page.getByTestId('no-answer-warning')).toHaveText(
+		'Nobody has an answer yet: marking as checked makes all 10 players absent.'
+	);
+	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
+});
+
+test('the row "Not checked" follows the taps in the list', async ({ page }) => {
+	await page.goto(gamePage);
+	const row = page.getByTestId('mark-checked');
+	await expect(page.getByTestId('no-answer-warning')).toBeVisible();
+	await page.getByTestId('show-list').click();
+	const player = page.getByTestId('attendance-row').first();
+	await player.getByRole('button', { name: /^There/ }).click();
+	await expect(row).toContainText('1 there');
+	await expect(page.getByTestId('no-answer-warning')).toHaveCount(0);
+	// A tap on the chosen state goes back to "no answer", and the warning comes back.
+	await player.getByRole('button', { name: /^There/ }).click();
+	await expect(row).not.toContainText('there');
+	await expect(page.getByTestId('no-answer-warning')).toBeVisible();
+});
+
+test('an away game shows its drivers below "Not checked"', async ({ page }) => {
+	const drivers = `/api/games/2026-2027/${AWAY_10_OCT}/drivers`;
+	await page.request.put(drivers, { ...origin, data: { drivers: 1 } });
+	await page.goto(gamePage);
+	await expect(page.getByTestId('checked-drivers')).toHaveText(/^Drivers: /);
+	await expectNoHorizontalScroll(page, 320);
+	await expectAccessible(page);
 });
 
 test('a checked game shows "· Checked" on "Season"', async ({ page }) => {
@@ -99,7 +139,7 @@ test('a checked game fits a phone and is accessible', async ({ page }) => {
 	try {
 		await page.setViewportSize({ width: 320, height: 700 });
 		await page.goto(gamePage);
-		await expect(page.getByTestId('checked')).toBeVisible();
+		await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'true');
 		await expectNoHorizontalScroll(page, 320);
 		await expectAccessible(page);
 	} finally {

@@ -70,6 +70,14 @@ function driversText(part: DriverPart): string {
 	return `Drivers (${part.places.length}${note}): ${[...names, open].join(', ')}`;
 }
 
+/** The drivers of an away game on the line below "Not checked" (the administration panel):
+ * "Drivers: Anna, Bram", "Drivers: Anna, 1 open". */
+export function driversLine(part: DriverPart): string {
+	const names = part.places.flatMap((place) => (place.player ? [playerText(place.player)] : []));
+	const open = part.places.filter((place) => !place.filled).length;
+	return `Drivers: ${[...names, ...(open > 0 ? [`${open} open`] : [])].join(', ')}`;
+}
+
 /** The places of the team in a line, for the rows of a game. */
 export function placesText(view: PlacesView): string {
 	const parts: string[] = [];

@@ -477,7 +477,7 @@ pub async fn set_drivers(
     Ok(())
 }
 
-/// The switch "The drivers drove" of a not played game; the game must be locked.
+/// "Count the drives" (and its "Undo") of a not played game; the game must be locked.
 pub async fn set_drivers_drove(
     tx: &mut PgConnection,
     key: GameKey,

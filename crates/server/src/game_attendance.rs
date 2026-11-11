@@ -1,6 +1,6 @@
 //! Attendance at games (tables `game_attendance`, `game_answers` and `game_check_start`; stories A
 //! and C of attendance at games). An answer needs no lock (decision 0020): each tap is one write,
-//! the last tap wins. "Checked" and "Undo check" lock the row of the game in `game_attendance`.
+//! the last tap wins. "Mark as checked" and its "Undo" lock the row of the game in `game_attendance`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -56,7 +56,7 @@ fn attendance_of(
 /// Saves the answer of `player`. The first answer of the game sets `answers_for` to `date`, the
 /// date of the game now; a later answer leaves it, so it never confirms answers from before a move.
 /// An answer that "Checked" made is not a first answer: it holds only while the check holds.
-/// A tap is never settled: it clears `settled`, so "Undo check" keeps it.
+/// A tap is never settled: it clears `settled`, so the "Undo" of a check keeps it.
 pub async fn answer(
     db: &PgPool,
     key: GameKey,
@@ -147,7 +147,7 @@ pub async fn set_extra(
     Ok(())
 }
 
-/// "Answers checked": the answers hold for `date`, the date of the game now. One write; a second
+/// "Mark answers as checked": the answers hold for `date`, the date of the game now. One write; a second
 /// tap writes the same date.
 pub async fn answers_checked(
     db: impl PgExecutor<'_>,
@@ -282,7 +282,7 @@ pub async fn player_has_answers(
     Ok(found)
 }
 
-/// Locks the row of the game of `key` for "Checked" or "Undo check", inserting it first when it
+/// Locks the row of the game of `key` for a check or its "Undo", inserting it first when it
 /// is missing; gives its `checked_for`. Only inside the transaction of the write.
 async fn lock(tx: &mut PgConnection, key: GameKey) -> Result<Option<NaiveDate>, StoreError> {
     sqlx::query!(
@@ -349,7 +349,7 @@ pub async fn check(
     Ok(players.len())
 }
 
-/// "Undo check" under the lock of the game: deletes the answers that "Checked" made and that were
+/// The "Undo" of a check under the lock of the game: deletes the answers that "Checked" made and that were
 /// not tapped after that, and the check.
 pub async fn uncheck(tx: &mut PgConnection, key: GameKey) -> Result<(), StoreError> {
     lock(tx, key).await?;

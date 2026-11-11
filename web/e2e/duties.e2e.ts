@@ -41,7 +41,8 @@ test('a home game of the club has 4 places and "Schedule entered"', async ({ pag
 	for (const name of ['Referee 1', 'Referee 2', 'Table 1', 'Table 2'])
 		await expect(place(page, name)).toHaveValue('');
 	await expect(page.getByTestId('team-places')).toHaveText('No places for the team.');
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule not entered');
+	await expect(page.getByTestId('mark-entered')).toHaveAttribute('data-done', 'false');
+	await expect(page.getByTestId('mark-entered')).toHaveAttribute('data-next', 'true');
 
 	// Each choice saves at once.
 	await place(page, 'Referee 1').selectOption({ label: 'M16 1' });
@@ -61,21 +62,24 @@ test('a home game of the club has 4 places and "Schedule entered"', async ({ pag
 	await place(page, 'Referee 1').selectOption('');
 	await expect(page.getByTestId('team-places')).toHaveText('M16 1: Table 2');
 
-	// "Schedule entered", also undone with a second tap.
-	const entered = page.getByRole('button', { name: 'Schedule entered' });
-	await entered.click();
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule entered');
-	await entered.click();
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule not entered');
-	await entered.click();
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule entered');
+	// "Mark as entered", and "Undo".
+	const entered = page.getByTestId('mark-entered');
+	await entered.getByRole('button', { name: 'Mark as entered' }).click();
+	await expect(entered).toHaveAttribute('data-done', 'true');
+	await expect(entered).toContainText('Schedule entered');
+	await expect(entered).toHaveAttribute('data-next', 'false');
+	await entered.getByRole('button', { name: 'Undo' }).click();
+	await expect(entered).toHaveAttribute('data-done', 'false');
+	await expect(entered).toContainText('Schedule not entered');
+	await entered.getByRole('button', { name: 'Mark as entered' }).click();
+	await expect(entered).toHaveAttribute('data-done', 'true');
 
 	// After a reload everything is stored.
 	await page.reload();
 	await expect(place(page, 'Referee 1')).toHaveValue('');
 	await expect(place(page, 'Table 1').locator('option:checked')).toHaveText(other!);
 	await expect(page.getByTestId('team-places')).toHaveText('M16 1: Table 2');
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule entered');
+	await expect(page.getByTestId('mark-entered')).toHaveAttribute('data-done', 'true');
 	await expectAccessible(page);
 	await expectNoHorizontalScroll(page, 320);
 	expect(errors).toEqual([]);
@@ -264,8 +268,8 @@ test('the walk through "Not entered" returns with the labels and without the gam
 	await expect(page).toHaveURL(new RegExp(`/game/2026-2027/${id}$`));
 	await place(page, 'Referee 2').selectOption({ label: 'M16 1' });
 	await expect(page.getByTestId('team-places')).toHaveText('M16 1: Referee 2');
-	await page.getByRole('button', { name: 'Schedule entered' }).click();
-	await expect(page.getByTestId('schedule-state')).toHaveText('Schedule entered');
+	await page.getByRole('button', { name: 'Mark as entered' }).click();
+	await expect(page.getByTestId('mark-entered')).toHaveAttribute('data-done', 'true');
 
 	// "Back": the same labels and place, without that game.
 	await page.getByRole('link', { name: 'Back' }).click();

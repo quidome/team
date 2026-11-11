@@ -22,3 +22,11 @@ export function settledText(settled: number): string | null {
 		? '1 player with no answer is absent.'
 		: `${settled} players with no answer are absent.`;
 }
+
+/** The warning below "Not checked" of a game where nobody has an answer yet: "Mark as checked"
+ * would make every player absent (the administration panel). `null` when a player has one. */
+export function noAnswerWarning(count: CountView): string | null {
+	if (count.coming !== 0 || count.not_coming !== 0 || count.no_answer === 0) return null;
+	const players = count.no_answer === 1 ? 'the 1 player' : `all ${count.no_answer} players`;
+	return `Nobody has an answer yet: marking as checked makes ${players} absent.`;
+}

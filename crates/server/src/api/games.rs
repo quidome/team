@@ -54,10 +54,10 @@ pub struct GamePage {
     pub attendance: Option<GameAttendanceView>,
     /// "Not played" on its date now: its duties and attendance do not count.
     pub not_played: bool,
-    /// The switch "The drivers drove": the drives of a not played game count from its start time.
+    /// "Count the drives": the drives of a not played game count from its start time.
     pub drivers_drove: bool,
     /// The start time has passed (without a start time: the game day has begun; Dutch time): the
-    /// page shows the switch "The drivers drove" on a not played game with driver places.
+    /// page shows the row "The drives count" on a not played game with driver places.
     pub started: bool,
 }
 
@@ -79,10 +79,10 @@ pub struct GameAttendanceView {
     /// The number of players that is enough (7).
     pub enough_players: usize,
     /// "Answers from before the move": the answers were given for another date than the date of
-    /// the game now; until "Answers checked" (`team_core::answers_moved`).
+    /// the game now; until "Mark answers as checked" (`team_core::answers_moved`).
     pub answers_moved: bool,
     /// "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
-    /// "Undo check", and the list closed behind a tap.
+    /// "Undo", and the list closed behind a tap.
     pub checked: bool,
     /// The game is before the release of "Checked" (`game_check_start`): the list is closed behind
     /// a tap, and the game is never an open item.
@@ -1308,7 +1308,7 @@ async fn not_played(
         ("id" = String, Path, description = "The source's game id"),
     ),
     responses(
-        (status = 200, description = "\"The drivers drove\" on; the game page", body = GamePage),
+        (status = 200, description = "\"Count the drives\": the drives count; the game page", body = GamePage),
         (status = 400, description = "`invalid_season`, `invalid_game`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
@@ -1330,7 +1330,7 @@ pub async fn set_drivers_drove(
         ("id" = String, Path, description = "The source's game id"),
     ),
     responses(
-        (status = 200, description = "\"The drivers drove\" off; the game page", body = GamePage),
+        (status = 200, description = "\"Undo\" of \"The drives count\"; the game page", body = GamePage),
         (status = 400, description = "`invalid_season`, `invalid_game`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
@@ -1343,7 +1343,7 @@ pub async fn unset_drivers_drove(
     drivers_drove(state, season, id, false).await
 }
 
-/// The switch "The drivers drove" (`on`), under the row lock of the game. Accepted on any game
+/// "Count the drives" (`on`) or its "Undo", under the row lock of the game. Accepted on any game
 /// whose page opens: it has effect only on a not played game from its start time (story E).
 async fn drivers_drove(
     state: AppState,
@@ -1384,7 +1384,7 @@ pub async fn set_checked(
     check_game_checking(&found.game, in_netherlands(state.clock.now()))?;
     let date = found.game.date;
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
-    // The list is read under the lock of the game, so "Undo check" on another screen is seen.
+    // The list is read under the lock of the game, so an "Undo" of the check on another screen is seen.
     let settled = game_attendance::check(&mut tx, found.key(), date, |attendance, answers| {
         let answers = answers_in_effect(answers, attendance, date);
         to_settle(&game_list(&duties.players, &duties.roles, &answers, date))
@@ -1407,7 +1407,7 @@ pub async fn set_checked(
         ("id" = String, Path, description = "The source's game id"),
     ),
     responses(
-        (status = 200, description = "\"Undo check\": the settled players have no answer again; the game page", body = GamePage),
+        (status = 200, description = "\"Undo\" of a check: the settled players have no answer again; the game page", body = GamePage),
         (status = 400, description = "`invalid_season`, `invalid_game`, `not_a_team_game`"),
         (status = 401, description = "Not logged in"),
         (status = 404, description = "No such game of the club chosen for that season"),
