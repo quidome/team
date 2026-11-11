@@ -4,7 +4,6 @@ Open work, most important first. Changes link to their folder; small fixes are o
 
 Changes:
 - [Checked for every event](changes/2026-11-11-checked-for-every-event/change.md) (feature, implement: epic of 4 stories)
-  - Story 1: [The administration panel](changes/2026-11-11-administration-panel/change.md) (feature, close)
 
 Small:
 - Look at the report on the phone with the real names after its release: the headings that break with a hyphen ("Train-ings"), the width of the five columns, the details, and a tap on "Copy" with the text in the chat (close of the report, 2026-11-09).

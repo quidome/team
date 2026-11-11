@@ -64,7 +64,7 @@ pub struct TrainingView {
     pub cancelled: bool,
     /// The coordinator confirmed that the attendance is complete.
     pub checked: bool,
-    /// "Checked" is offered: not checked yet, and its date is today or earlier.
+    /// "Mark as checked" is offered: not checked yet, and its date is today or earlier.
     pub can_check: bool,
 }
 
@@ -391,7 +391,7 @@ pub async fn check(
 ) -> Result<Json<TrainingDay>, AppError> {
     let date = path_date(&date)?;
     let today = today_in_netherlands(state.clock.as_ref());
-    // The rule and the write in one transaction: a check or "Undo check" of another screen waits
+    // The rule and the write in one transaction: a check or its "Undo" of another screen waits
     // for the row, a mark does not (it touches no column of the lock).
     let mut tx = state.pool.begin().await.map_err(StoreError::from)?;
     check_checking(

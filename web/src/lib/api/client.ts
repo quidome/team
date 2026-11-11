@@ -631,7 +631,7 @@ export async function changeTraining(
 	);
 }
 
-/** "Undo cancel". */
+/** "Undo" of "Cancelled". */
 export async function uncancelTraining(date: string): Promise<TrainingDay> {
 	return dataOf(await api.POST('/api/trainings/{date}/uncancel', { params: { path: { date } } }));
 }
@@ -641,7 +641,7 @@ export async function checkTraining(date: string): Promise<TrainingDay> {
 	return dataOf(await api.PUT('/api/trainings/{date}/checked', { params: { path: { date } } }));
 }
 
-/** "Undo check". */
+/** "Undo" of "Checked" (a training). */
 export async function uncheckTraining(date: string): Promise<TrainingDay> {
 	return dataOf(await api.DELETE('/api/trainings/{date}/checked', { params: { path: { date } } }));
 }
@@ -700,7 +700,7 @@ export async function setExtraPlayers(
 	);
 }
 
-/** "Answers checked": the answers of the game hold for its date now. */
+/** "Mark answers as checked": the answers of the game hold for its date now. */
 export async function setAnswersChecked(season: string, id: string): Promise<AttendanceView> {
 	return dataOf(
 		await api.PUT('/api/games/{season}/{id}/answers-checked', {
@@ -724,7 +724,7 @@ export async function setNotPlayed(
 	);
 }
 
-/** The switch "The drivers drove" of the game `id`. */
+/** "Count the drives" (`on`) or its "Undo" on the game `id`. */
 export async function setDriversDrove(
 	season: string,
 	id: string,
@@ -738,7 +738,7 @@ export async function setDriversDrove(
 	);
 }
 
-/** "Checked" (`checked`) or "Undo check" on the game `id` (story C of attendance at games). */
+/** "Mark as checked" (`checked`) or its "Undo" on the game `id` (story C of attendance at games). */
 export async function setChecked(season: string, id: string): Promise<CheckedAnswer> {
 	return dataOf(
 		await api.PUT('/api/games/{season}/{id}/checked', { params: { path: { season, id } } })

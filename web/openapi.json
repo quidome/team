@@ -735,7 +735,7 @@
         ],
         "responses": {
           "200": {
-            "description": "\"Undo check\": the settled players have no answer again; the game page",
+            "description": "\"Undo\" of a check: the settled players have no answer again; the game page",
             "content": {
               "application/json": {
                 "schema": {
@@ -843,7 +843,7 @@
         ],
         "responses": {
           "200": {
-            "description": "\"The drivers drove\" on; the game page",
+            "description": "\"Count the drives\": the drives count; the game page",
             "content": {
               "application/json": {
                 "schema": {
@@ -890,7 +890,7 @@
         ],
         "responses": {
           "200": {
-            "description": "\"The drivers drove\" off; the game page",
+            "description": "\"Undo\" of \"The drives count\"; the game page",
             "content": {
               "application/json": {
                 "schema": {
@@ -3861,7 +3861,7 @@
         "properties": {
           "answers_moved": {
             "type": "boolean",
-            "description": "\"Answers from before the move\": the answers were given for another date than the date of\nthe game now; until \"Answers checked\" (`team_core::answers_moved`)."
+            "description": "\"Answers from before the move\": the answers were given for another date than the date of\nthe game now; until \"Mark answers as checked\" (`team_core::answers_moved`)."
           },
           "before_release": {
             "type": "boolean",
@@ -3869,7 +3869,7 @@
           },
           "checked": {
             "type": "boolean",
-            "description": "\"Checked\" on the date of the game now (`team_core::checked`): the page shows \"Checked\" with\n\"Undo check\", and the list closed behind a tap."
+            "description": "\"Checked\" on the date of the game now (`team_core::checked`): the page shows \"Checked\" with\n\"Undo\", and the list closed behind a tap."
           },
           "count": {
             "$ref": "#/components/schemas/CountView"
@@ -3984,7 +3984,7 @@
           },
           "drivers_drove": {
             "type": "boolean",
-            "description": "The switch \"The drivers drove\": the drives of a not played game count from its start time."
+            "description": "\"Count the drives\": the drives of a not played game count from its start time."
           },
           "game": {
             "$ref": "#/components/schemas/ScheduleGame",
@@ -4007,7 +4007,7 @@
           },
           "started": {
             "type": "boolean",
-            "description": "The start time has passed (without a start time: the game day has begun; Dutch time): the\npage shows the switch \"The drivers drove\" on a not played game with driver places."
+            "description": "The start time has passed (without a start time: the game day has begun; Dutch time): the\npage shows the row \"The drives count\" on a not played game with driver places."
           },
           "team": {
             "$ref": "#/components/schemas/TeamView",
@@ -6554,7 +6554,7 @@
         "properties": {
           "can_check": {
             "type": "boolean",
-            "description": "\"Checked\" is offered: not checked yet, and its date is today or earlier."
+            "description": "\"Mark as checked\" is offered: not checked yet, and its date is today or earlier."
           },
           "cancelled": {
             "type": "boolean"
