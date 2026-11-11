@@ -88,9 +88,6 @@ pub struct GameAttendanceView {
     /// "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
     /// "Undo", and the list closed behind a tap.
     pub checked: bool,
-    /// The game is before the release of "Checked" (`game_check_start`): the list is closed behind
-    /// a tap, and the game is never an open item.
-    pub before_release: bool,
 }
 
 /// The answer of a tap: kept small, so a tap is quick.
@@ -659,7 +656,6 @@ async fn attendance_of(
         return Ok(None);
     }
     let (list, attendance, warnings, moved) = stored_list(state, found, duties).await?;
-    let start = game_attendance::check_start(&state.pool).await?;
     Ok(Some(GameAttendanceView {
         rows: list.iter().map(|row| answer_row(row, duties)).collect(),
         reasons: reasons::all(&state.pool)
@@ -674,7 +670,6 @@ async fn attendance_of(
         enough_players: ENOUGH_PLAYERS,
         answers_moved: moved,
         checked: checked(&attendance, found.game.date),
-        before_release: found.game.date < start,
     }))
 }
 

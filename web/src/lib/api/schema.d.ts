@@ -917,11 +917,6 @@ export interface components {
 			 *     trainings or games yet.
 			 */
 			games: number;
-			/**
-			 * @description The day "Checked" for games was released, when it is in this season, for example
-			 *     "2026-11-08"; `null` in other seasons.
-			 */
-			games_from?: string | null;
 			/** @description "Left the team": roles earlier in the season, none today or later. */
 			left: components['schemas']['PlayerTotalsView'][];
 			/** @description Training days before today without a training. */
@@ -1212,11 +1207,6 @@ export interface components {
 			 */
 			answers_moved: boolean;
 			/**
-			 * @description The game is before the release of "Checked" (`game_check_start`): the list is closed behind
-			 *     a tap, and the game is never an open item.
-			 */
-			before_release: boolean;
-			/**
 			 * @description "Checked" on the date of the game now (`team_core::checked`): the page shows "Checked" with
 			 *     "Undo", and the list closed behind a tap.
 			 */
@@ -1452,17 +1442,6 @@ export interface components {
 			from: string;
 			role: components['schemas']['RoleKind'];
 		};
-		/** @description The oldest game of the open item "games not checked". */
-		NotCheckedGameView: {
-			date: string;
-			/**
-			 * Format: int64
-			 * @description The source's game id.
-			 */
-			id: number;
-			/** @description The season of the game, for example "2026-2027". */
-			season: string;
-		};
 		/**
 		 * @description Why a player cannot be chosen for a place.
 		 * @enum {string}
@@ -1552,10 +1531,14 @@ export interface components {
 					kind: 'not_checked';
 			  }
 			| {
-					count: number;
-					first: components['schemas']['NotCheckedGameView'];
+					games: components['schemas']['GameItemView'][];
 					/** @enum {string} */
 					kind: 'games_not_checked';
+			  }
+			| {
+					games: components['schemas']['GameItemView'][];
+					/** @enum {string} */
+					kind: 'duty_games_not_checked';
 			  };
 		/**
 		 * @description A correction after the game: as planned, done by `player` ("Someone else"), or not done

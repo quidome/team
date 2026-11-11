@@ -62,9 +62,9 @@ pub use output::messages::{
 pub use output::report::{ReportColumn, ReportRow, Share, percent, report_copy, report_rows};
 pub use output::season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use output::start_page::{
-    EventLook, NotCheckedGame, OpenGame, OpenItem, PlacesOf, ReadingState, event_look,
-    games_not_checked, last_games, next_events, open_item_seasons, open_items, open_places_games,
-    schedule_not_entered,
+    EventLook, NotCheckedGame, NotCheckedGames, OpenGame, OpenItem, PlacesOf, ReadingState,
+    duty_games_not_checked, event_look, games_not_checked, last_games, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered,
 };
 pub use shared::access::{Identity, may_access};
 pub use shared::mark::mark_holds;

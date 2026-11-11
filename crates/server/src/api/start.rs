@@ -11,9 +11,9 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HomeOrAway,
-    NotCheckedGame, OpenItem, PlacesOf, PlayerId, ReadingState, ScheduleReason, Season, event_look,
-    games_not_checked, last_games, next_events, open_item_seasons, open_items, open_places_games,
-    schedule_not_entered, team_side,
+    NotCheckedGame, NotCheckedGames, OpenItem, PlacesOf, PlayerId, ReadingState, ScheduleReason,
+    Season, duty_games_not_checked, event_look, games_not_checked, last_games, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered, team_side,
 };
 use utoipa::ToSchema;
 
@@ -25,7 +25,7 @@ use super::season::{
 use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands};
 use crate::error::AppError;
-use crate::{game_attendance, reading, readings};
+use crate::{reading, readings};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct StartAnswer {
@@ -149,32 +149,11 @@ pub enum OpenItemView {
     NotOpened { first: String, count: usize },
     /// Trainings before today that are neither cancelled nor checked; `first` is the oldest.
     NotChecked { first: String, count: usize },
-    /// Games of the team before today, from the day of the release, that are not checked;
-    /// `first` is the oldest, for its page.
-    GamesNotChecked {
-        first: NotCheckedGameView,
-        count: usize,
-    },
-}
-
-/// The oldest game of the open item "games not checked".
-#[derive(Debug, Serialize, ToSchema)]
-pub struct NotCheckedGameView {
-    /// The season of the game, for example "2026-2027".
-    pub season: String,
-    /// The source's game id.
-    pub id: i64,
-    pub date: String,
-}
-
-impl From<NotCheckedGame> for NotCheckedGameView {
-    fn from(game: NotCheckedGame) -> Self {
-        Self {
-            season: game.season.to_string(),
-            id: game.id,
-            date: day(game.date),
-        }
-    }
+    /// Games of the team before today that are not checked, from the start of the season, oldest
+    /// first.
+    GamesNotChecked { games: Vec<GameItemView> },
+    /// Duty games before today that are not checked, oldest first (decision 0035).
+    DutyGamesNotChecked { games: Vec<GameItemView> },
 }
 
 /// A game of an open item: enough to show it in the list below the item and to open its page.
@@ -233,13 +212,26 @@ impl GameItemView {
 }
 
 impl OpenItemView {
-    /// The view of `item`; the games of an item come from `games` (the games of `season`).
+    /// The view of `item`; the games of an item come from `games` (the games of `season`), the
+    /// games not checked from `past` (the past games of the seasons of the open items, by season
+    /// and id).
     fn of(
         item: OpenItem,
         season: Season,
         games: &BTreeMap<i64, &Game>,
+        past: &BTreeMap<(Season, i64), Game>,
         names: &BTreeMap<PlayerId, String>,
     ) -> Self {
+        let not_checked = |list: Vec<NotCheckedGame>| -> Vec<GameItemView> {
+            list.iter()
+                .filter_map(|game| {
+                    Some(GameItemView::of(
+                        game.season,
+                        past.get(&(game.season, game.id))?,
+                    ))
+                })
+                .collect()
+        };
         let item_of = |id: &i64| games.get(id).map(|game| GameItemView::of(season, game));
         match item {
             OpenItem::ReadingHeldBack => Self::ReadingHeldBack,
@@ -304,9 +296,11 @@ impl OpenItemView {
                 first: day(first),
                 count,
             },
-            OpenItem::GamesNotChecked { first, count } => Self::GamesNotChecked {
-                first: first.into(),
-                count,
+            OpenItem::GamesNotChecked { games } => Self::GamesNotChecked {
+                games: not_checked(games),
+            },
+            OpenItem::DutyGamesNotChecked { games } => Self::DutyGamesNotChecked {
+                games: not_checked(games),
             },
         }
     }
@@ -374,25 +368,51 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
             )
         })
         .collect();
-    // The past games of the team that are not checked, in the seasons of the open items, from
-    // the day of the release.
-    let from_date = game_attendance::check_start(&state.pool).await?;
+    // The past games of the team and the past duty games that are not checked, in the seasons of
+    // the open items, from the start of each season.
     let mut not_checked = games_not_checked(
         current,
         &games.schedule.past,
         &games.duties.attendance.games,
-        from_date,
         today,
     );
+    let mut duty_not_checked = duty_games_not_checked(
+        current,
+        &games.schedule.past,
+        &places,
+        &games.duties.stored,
+        today,
+    );
+    // By season and id: the key of a game (`GameKey`), so two seasons never mix.
+    let mut past: BTreeMap<(Season, i64), Game> = games
+        .schedule
+        .past
+        .iter()
+        .map(|scheduled| ((current, scheduled.game.source_id), scheduled.game.clone()))
+        .collect();
     for &season in seasons.iter().skip(1) {
         let earlier = games_of(&state, season, current, today).await?;
+        let earlier_places = places_of_season(&earlier, now);
         not_checked.extend(games_not_checked(
             season,
             &earlier.schedule.past,
             &earlier.duties.attendance.games,
-            from_date,
             today,
         ));
+        duty_not_checked.extend(duty_games_not_checked(
+            season,
+            &earlier.schedule.past,
+            &earlier_places,
+            &earlier.duties.stored,
+            today,
+        ));
+        past.extend(
+            earlier
+                .schedule
+                .past
+                .iter()
+                .map(|scheduled| ((season, scheduled.game.source_id), scheduled.game.clone())),
+        );
     }
     let items = open_items(
         &reading,
@@ -401,7 +421,10 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         open_places_games(&events, &places, today),
         &lists,
         &warnings,
-        &not_checked,
+        NotCheckedGames {
+            games: &not_checked,
+            duty_games: &duty_not_checked,
+        },
     );
     let next = next_events(&events, &places, today)
         .into_iter()
@@ -457,7 +480,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
         show_season: seasons.len() > 1,
         open_items: items
             .into_iter()
-            .map(|item| OpenItemView::of(item, current, &by_id, &games.duties.names))
+            .map(|item| OpenItemView::of(item, current, &by_id, &past, &games.duties.names))
             .collect(),
         next,
         last_games: last_game_views,

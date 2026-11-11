@@ -19,7 +19,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, today_in_netherlands};
 use crate::error::AppError;
 use crate::reasons::StoredReason;
-use crate::{game_attendance, players, reasons, trainings};
+use crate::{players, reasons, trainings};
 
 /// What a player missed: a training or a game.
 #[derive(Debug, Serialize, ToSchema)]
@@ -93,9 +93,6 @@ pub struct AttendanceOverview {
     /// The checked games of the team in the season that were played; with `trainings` 0 too: no
     /// trainings or games yet.
     pub games: usize,
-    /// The day "Checked" for games was released, when it is in this season, for example
-    /// "2026-11-08"; `null` in other seasons.
-    pub games_from: Option<String>,
     /// Training days before today without a training.
     pub not_opened: usize,
     /// The oldest of them.
@@ -209,7 +206,6 @@ pub async fn get(
     } = trainings_of(&state, season).await?;
     let reasons = reasons::all(&state.pool).await?;
     let games = games_of(&state, season, current, today).await?;
-    let release = game_attendance::check_start(&state.pool).await?;
     let overview = overview_of(
         season,
         &players,
@@ -236,7 +232,6 @@ pub async fn get(
         seasons: seasons.iter().map(ToString::to_string).collect(),
         trainings: overview.trainings,
         games: overview.games,
-        games_from: (Season::of(release) == season).then(|| day(release)),
         not_opened: overview.not_opened,
         first_not_opened: overview.first_not_opened.map(day),
         team: overview

@@ -20,7 +20,7 @@ use crate::app::AppState;
 use crate::clock::{current_season, in_netherlands, today_in_netherlands};
 use crate::db::StoreError;
 use crate::error::AppError;
-use crate::{game_attendance, games, players, reasons};
+use crate::{games, players, reasons};
 
 /// Trainings or games of a player: what counts, with the percentages (half up).
 #[derive(Debug, Serialize, ToSchema)]
@@ -172,7 +172,6 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<Report>, AppError
     let trainings = trainings_in(&mut tx, season).await?;
     let reasons = reasons::all(&mut *tx).await?;
     let games = games_in(&state, &mut tx, season, season, today).await?;
-    let release = game_attendance::check_start(&mut *tx).await?;
     let stored = match &games.club {
         Some(club) if games.team.is_some() => games::stored(&mut tx, club.number, season).await?,
         _ => Vec::new(),
@@ -202,13 +201,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<Report>, AppError
     );
 
     // Games not checked: the rule of the open item of the start page.
-    let not_checked = games_not_checked(
-        season,
-        &games.schedule.past,
-        &attendance.games,
-        release,
-        today,
-    );
+    let not_checked = games_not_checked(season, &games.schedule.past, &attendance.games, today);
     let first_not_checked = not_checked.iter().min_by_key(|game| game.date);
 
     // The names of "Duties"; without a team, of the players with a role in the season.

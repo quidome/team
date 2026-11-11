@@ -1,6 +1,6 @@
 # 0032 – "Checked" of a game
 
-**Status**: valid
+**Status**: partly replaced by 0036 (the day of the release of "Checked" for games)
 **Date**: 2026-11-08
 **Change**: [2026-11-08-after-the-game](../changes/done/2026-11-08-after-the-game/) (story C of [attendance at games](../changes/done/2026-10-31-attendance-at-games/))
 

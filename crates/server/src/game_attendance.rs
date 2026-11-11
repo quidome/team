@@ -1,5 +1,5 @@
-//! Attendance at games (tables `game_attendance`, `game_answers` and `game_check_start`; stories A
-//! and C of attendance at games). An answer needs no lock (decision 0020): each tap is one write,
+//! Attendance at games (tables `game_attendance` and `game_answers`; stories A and C of
+//! attendance at games). An answer needs no lock (decision 0020): each tap is one write,
 //! the last tap wins. "Mark as checked" and its "Undo" lock the row of the game in `game_attendance`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -372,14 +372,4 @@ pub async fn uncheck(tx: &mut PgConnection, key: GameKey) -> Result<(), StoreErr
     .execute(&mut *tx)
     .await?;
     Ok(())
-}
-
-/// The day of the release of "Checked" for games: a past game from this date on that is not
-/// checked is an open item, and its list opens at once.
-pub async fn check_start(db: impl PgExecutor<'_>) -> Result<NaiveDate, StoreError> {
-    Ok(
-        sqlx::query_scalar!("SELECT from_date FROM game_check_start")
-            .fetch_one(db)
-            .await?,
-    )
 }

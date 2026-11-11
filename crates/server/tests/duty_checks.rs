@@ -278,3 +278,118 @@ async fn a_checked_duty_game_marked_not_played_is_not_checked(pool: PgPool) {
     .await;
     assert!(checked_on_season(&reader, id).await);
 }
+
+/// The ids of the games of the open item `kind` of the start page, oldest first.
+async fn item_games(reader: &Reader, kind: &str) -> Vec<i64> {
+    let start = ok(reader, "GET", "/api/start", None).await;
+    start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == kind)
+        .map(|item| {
+            item["games"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|game| game["id"].as_i64().unwrap())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_past_duty_game_that_is_not_checked_is_an_open_item(pool: PgPool) {
+    let reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Without places of the team no game is a duty game.
+    assert!(
+        item_games(&reader, "duty_games_not_checked")
+            .await
+            .is_empty()
+    );
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    assert_eq!(item_games(&reader, "duty_games_not_checked").await, [id]);
+    // Each game of the item has what its line on the start page needs.
+    let start = ok(&reader, "GET", "/api/start", None).await;
+    let item = start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "duty_games_not_checked")
+        .unwrap()
+        .clone();
+    let game = &item["games"][0];
+    assert_eq!(game["season"], "2026-2027");
+    assert_eq!(game["date"], "2026-10-03");
+    assert!(game["home"].as_str().unwrap().starts_with("Blue Drakes"));
+    // The items come in this order, at the end.
+    let kinds: Vec<&str> = start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        &kinds[kinds.len() - 2..],
+        ["games_not_checked", "duty_games_not_checked"]
+    );
+
+    ok(&reader, "PUT", &checked_path(id), None).await;
+    assert!(
+        item_games(&reader, "duty_games_not_checked")
+            .await
+            .is_empty()
+    );
+    ok(&reader, "DELETE", &checked_path(id), None).await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/not-played", game_path(id)),
+        None,
+    )
+    .await;
+    assert!(
+        item_games(&reader, "duty_games_not_checked")
+            .await
+            .is_empty()
+    );
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn in_july_the_duty_games_of_the_season_before_are_an_open_item(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    let id = duty_game(&reader, "past", "2026-10-03").await;
+    give_place(&reader, id, M16_1).await;
+    // July 2027: the new season has no team yet; the open items also cover the season before.
+    reader
+        .harness
+        .clock
+        .set(common::game_list::utc(2027, 7, 2, 10, 0));
+    reader.log_in_again().await;
+    let start = ok(&reader, "GET", "/api/start", None).await;
+    let item = start["open_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "duty_games_not_checked")
+        .unwrap_or_else(|| panic!("{start}"))
+        .clone();
+    let games = item["games"].as_array().unwrap();
+    assert_eq!(games.len(), 1, "{item}");
+    assert_eq!(games[0]["id"], id);
+    assert_eq!(games[0]["season"], "2026-2027");
+    // From September the season before is no longer covered.
+    reader
+        .harness
+        .clock
+        .set(common::game_list::utc(2027, 9, 1, 10, 0));
+    reader.log_in_again().await;
+    assert!(
+        item_games(&reader, "duty_games_not_checked")
+            .await
+            .is_empty()
+    );
+}

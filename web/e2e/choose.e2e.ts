@@ -47,14 +47,16 @@ test('the coordinator finds the club and chooses the team', async ({ page }) => 
 	await expectAccessible(page);
 	await teams.filter({ hasText: 'M16 1' }).click();
 
-	// Choosing the team starts the first reading. The start page: only the home games of the next
-	// 4 weeks are open (schedule not entered yet; a first reading records no changes, and there are
-	// no trainings), and in "Next" the first game of the team, because the two weeks from Mon 12 Oct
-	// have none.
+	// Choosing the team starts the first reading. The start page: the home games of the next 4
+	// weeks are open (schedule not entered yet; a first reading records no changes, and there are
+	// no trainings), and the past games of the team since the start of the season are not checked;
+	// in the list of events the first game of the team, because the two weeks from Mon 12 Oct have
+	// none.
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
 	await expect(page.getByTestId('team-links').getByRole('link', { name: 'More' })).toBeVisible();
 	await expect(page.getByTestId('open-item')).toHaveText([
-		/^\d+ home games: schedule not entered$/
+		/^\d+ home games: schedule not entered$/,
+		/^\d+ games not checked$/
 	]);
 	const next = page.getByTestId('next');
 	await expect(next.getByTestId('day')).toHaveText(['Sat 31 Oct']);

@@ -111,8 +111,12 @@ async fn without_login_the_start_page_needs_a_login(pool: PgPool) {
 async fn a_held_back_reading_is_an_open_item(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;
-    // The real games have home games of the club in the next 4 weeks.
-    assert_eq!(kinds(&start(&reader).await), ["schedule_not_entered"]);
+    // The real games have home games of the club in the next 4 weeks, and past games of the team
+    // that are not checked (from the start of the season).
+    assert_eq!(
+        kinds(&start(&reader).await),
+        ["schedule_not_entered", "games_not_checked"]
+    );
 
     // A game list with no games is held back.
     let mut empty = data("games-empty.json");
@@ -123,7 +127,11 @@ async fn a_held_back_reading_is_an_open_item(pool: PgPool) {
     assert!(!reader.latest().await["held_back"].is_null());
     assert_eq!(
         kinds(&start(&reader).await),
-        ["reading_held_back", "schedule_not_entered"]
+        [
+            "reading_held_back",
+            "schedule_not_entered",
+            "games_not_checked"
+        ]
     );
 }
 
@@ -264,12 +272,6 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
     reader.read_good().await;
     at(&mut reader, 2027, 7, 1, 10).await;
     add_tuesdays(&reader, "2027-09-07", "2028-05-30").await;
-    // The games of the season before that are not checked are an open item in July: this test is
-    // about the new season, so the open item starts on the day of the clock.
-    sqlx::query("UPDATE game_check_start SET from_date = '2027-07-01'")
-        .execute(reader.pool())
-        .await
-        .unwrap();
     // A stored game of M16 1 in the new season, in the window: without a chosen team it must not
     // show.
     sqlx::query(
@@ -294,7 +296,9 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
     assert_eq!(next.len(), 1);
     assert_eq!(next[0]["date"], "2027-09-07");
     assert!(next[0]["game"].is_null());
-    assert_eq!(kinds(&answer), Vec::<&str>::new());
+    // Only the games of the season before that are not checked ask for attention in July (from
+    // the start of that season); nothing of the new season.
+    assert_eq!(kinds(&answer), ["games_not_checked"]);
 
     // With the team chosen for the new season, the same stored game is in "Next": so the check
     // above can fail.
