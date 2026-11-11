@@ -63,7 +63,7 @@ From `functional.md` (approved 2026-11-11):
 | 1 | The administration panel | `AdminPanel.svelte`, `MarkRow.svelte`; the pages of a training and a game; the warning of a team game without answers; the drivers below "Not checked"; button words; browser tests | – | done |
 | 2 | Checked for a duty game | two columns of `game_duties` (migration 0017; was planned as a table `duty_checks`), the shared rule of a check for a date, `.../checked` for both kinds, the duty game page and "Season"; decision record | 1 (the panel row) | done |
 | 3 | Open items from the start of the season | `games_not_checked` without start date, `game_check_start` removed (migration), `duty_games_not_checked` and its open item, the list of an item of more games, the report's line, the old closed list and the sentence on "Attendance"; decision record (partly replaces 0032) | 2 | done |
-| 4 | Only today and later on the start page | `last_games` removed from core, API and page; `event_look` without "before today"; product documents | 3 | to design |
+| 4 | Only today and later on the start page | `last_games` removed from core, API and page; `event_look` without "before today"; product documents | 3 | done |
 
 Each story gets its own change folder (`docs/changes/YYYY-MM-DD-<name>/`, type `feature`, stage
 `design`) and its own `/design`, with its own steps, tests and closure line. Each can be released
@@ -96,7 +96,7 @@ alone, in this order.
 - [x] Story 1: the administration panel (2026-11-11, `changes/done/2026-11-11-administration-panel/`)
 - [x] Story 2: Checked for a duty game (2026-11-11, `changes/done/2026-11-11-checked-for-a-duty-game/`, decision 0035)
 - [x] Story 3: open items from the start of the season (2026-11-11, `changes/done/2026-11-11-open-items-from-the-start-of-the-season/`, decision 0036)
-- [ ] Story 4: only today and later on the start page
+- [x] Story 4: only today and later on the start page (2026-11-11, `changes/done/2026-11-11-only-today-and-later/`)
 
 ## Deviations
 None. Design reads the spec as written.
