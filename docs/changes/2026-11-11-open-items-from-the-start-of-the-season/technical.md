@@ -1,6 +1,6 @@
 # Technical spec: Open items from the start of the season
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-11-11-open-items-from-the-start-of-the-season/
 **Date**: 2026-11-11
@@ -113,13 +113,18 @@ From the epic's `functional.md`, story 3 (`docs/changes/2026-11-11-checked-for-e
 - The first time after the release, the open items can be long (one row for each kind).
 
 ## Progress
-- [ ] Step 1: the core rules
-- [ ] Step 2: the server
-- [ ] Step 3: the front end
-- [ ] Step 4: the browser tests
-- [ ] Step 5: the look and the checks
-- [ ] All checks pass
+- [x] Step 1: the core rules (2026-11-11)
+- [x] Step 2: the server (2026-11-11)
+- [x] Step 3: the front end (2026-11-11)
+- [x] Step 4: the browser tests (2026-11-11)
+- [x] Step 5: the look and the checks (2026-11-11). Screenshots of the start page at 390 px in
+  light and dark mode with "5 games not checked" (its list of 5 games from 12 September opened)
+  and "2 duty games not checked": readable, in the order of the spec. The last duty games of Sat 3
+  Oct still show above the coming events: story 4 removes them.
+- [x] All checks pass
 
 ## Deviations
+- 2026-11-11, step 1: `open_items` takes the two lists in one struct `NotCheckedGames { games,
+  duty_games }`: with a separate argument it had 8 arguments, more than clippy allows (7).
 
 ## Review findings

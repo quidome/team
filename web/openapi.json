@@ -3095,13 +3095,6 @@
             "description": "The checked games of the team in the season that were played; with `trainings` 0 too: no\ntrainings or games yet.",
             "minimum": 0
           },
-          "games_from": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The day \"Checked\" for games was released, when it is in this season, for example\n\"2026-11-08\"; `null` in other seasons."
-          },
           "left": {
             "type": "array",
             "items": {
@@ -3873,17 +3866,12 @@
           "too_few",
           "enough_players",
           "answers_moved",
-          "checked",
-          "before_release"
+          "checked"
         ],
         "properties": {
           "answers_moved": {
             "type": "boolean",
             "description": "\"Answers from before the move\": the answers were given for another date than the date of\nthe game now; until \"Mark answers as checked\" (`team_core::answers_moved`)."
-          },
-          "before_release": {
-            "type": "boolean",
-            "description": "The game is before the release of \"Checked\" (`game_check_start`): the list is closed behind\na tap, and the game is never an open item."
           },
           "checked": {
             "type": "boolean",
@@ -4511,29 +4499,6 @@
           }
         }
       },
-      "NotCheckedGameView": {
-        "type": "object",
-        "description": "The oldest game of the open item \"games not checked\".",
-        "required": [
-          "season",
-          "id",
-          "date"
-        ],
-        "properties": {
-          "date": {
-            "type": "string"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The source's game id."
-          },
-          "season": {
-            "type": "string",
-            "description": "The season of the game, for example \"2026-2027\"."
-          }
-        }
-      },
       "NotOfferedView": {
         "type": "string",
         "description": "Why a player cannot be chosen for a place.",
@@ -4860,24 +4825,44 @@
           },
           {
             "type": "object",
-            "description": "Games of the team before today, from the day of the release, that are not checked;\n`first` is the oldest, for its page.",
+            "description": "Games of the team before today that are not checked, from the start of the season, oldest\nfirst.",
             "required": [
-              "first",
-              "count",
+              "games",
               "kind"
             ],
             "properties": {
-              "count": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "first": {
-                "$ref": "#/components/schemas/NotCheckedGameView"
+              "games": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GameItemView"
+                }
               },
               "kind": {
                 "type": "string",
                 "enum": [
                   "games_not_checked"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Duty games before today that are not checked, oldest first (decision 0035).",
+            "required": [
+              "games",
+              "kind"
+            ],
+            "properties": {
+              "games": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GameItemView"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "duty_games_not_checked"
                 ]
               }
             }

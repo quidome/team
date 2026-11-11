@@ -167,19 +167,6 @@ async fn a_not_played_or_moved_game_does_not_count(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn the_release_day_shows_only_in_its_season(pool: PgPool) {
-    let reader = Reader::chosen(pool.clone()).await;
-    reader.read_good().await;
-    sqlx::query("UPDATE game_check_start SET from_date = '2026-10-10'")
-        .execute(&pool)
-        .await
-        .unwrap();
-    assert_eq!(attendance(&reader).await["games_from"], "2026-10-10");
-    let earlier = ok(&reader, "GET", "/api/attendance?season=2025-2026", None).await;
-    assert_eq!(earlier["games_from"], Value::Null);
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn a_checked_game_that_left_the_game_list_still_counts(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;

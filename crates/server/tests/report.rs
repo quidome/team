@@ -290,11 +290,7 @@ async fn what_does_not_count_yet_is_the_same_as_on_the_start_page(pool: PgPool) 
     reader.read_good().await;
     add_tuesdays(&reader).await;
     ok(&reader, "PUT", "/api/trainings/2026-09-15/open", None).await;
-    // Games count from this day, so the past away game is not checked.
-    sqlx::query("UPDATE game_check_start SET from_date = '2026-10-01'")
-        .execute(&pool)
-        .await
-        .unwrap();
+    // Every past game of the team of the season that is not checked counts (no release day).
 
     let report = ok(&reader, "GET", "/api/report", None).await;
     let start = ok(&reader, "GET", "/api/start", None).await;
@@ -312,10 +308,11 @@ async fn what_does_not_count_yet_is_the_same_as_on_the_start_page(pool: PgPool) 
     assert_eq!(incomplete["not_opened"], not_opened["count"]);
     assert_eq!(incomplete["first_not_opened"], not_opened["first"]);
     let not_checked = item("games_not_checked");
-    assert_eq!(incomplete["not_checked"], not_checked["count"]);
+    let games = not_checked["games"].as_array().unwrap();
+    assert_eq!(incomplete["not_checked"], games.len());
     assert_eq!(
         incomplete["first_not_checked"],
-        json!({ "season": not_checked["first"]["season"], "id": not_checked["first"]["id"] })
+        json!({ "season": games[0]["season"], "id": games[0]["id"] })
     );
 }
 

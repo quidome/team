@@ -14,14 +14,7 @@
 	import type { PlayerTotals } from '#lib/api/client.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { fullName } from '#lib/players.js';
-	import {
-		countsText,
-		gamesFromText,
-		missedText,
-		notOpenedText,
-		ofGames,
-		ofTrainings
-	} from '#lib/trainings.js';
+	import { countsText, missedText, notOpenedText, ofGames, ofTrainings } from '#lib/trainings.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -147,12 +140,6 @@
 					{notOpenedText(overview.not_opened)}
 				</a>
 				<!-- eslint-enable svelte/no-navigation-without-resolve -->
-			</p>
-		{/if}
-
-		{#if overview.games_from}
-			<p class="text-sm text-muted-foreground" data-testid="games-from">
-				{gamesFromText(overview.games_from)}
 			</p>
 		{/if}
 

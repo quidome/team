@@ -205,6 +205,26 @@ test('"Next" shows the trainings of two weeks, and a tap opens one', async ({ pa
 	await expect(page).toHaveURL(/\/$/);
 });
 
+test('the past games of the team that are not checked open their list, and a tap opens one', async ({
+	page
+}) => {
+	await page.goto('/');
+	// From the start of the season: the past games of the test data are not checked.
+	const item = page.locator('[data-testid="open-item"][data-kind="games_not_checked"]');
+	await expect(item).toHaveText(/^\d+ games not checked$/);
+	await expect(item).toHaveAttribute('aria-expanded', 'false');
+	await item.click();
+	await expect(item).toHaveAttribute('aria-expanded', 'true');
+	const games = page.locator('#open-item-games_not_checked').getByTestId('open-item-game');
+	await expect(games.first()).toHaveText(/^\w{3} \d{1,2} \w{3,4} · /);
+	const count = Number((await item.textContent())?.match(/\d+/)?.[0]);
+	await expect(games).toHaveCount(count);
+	await games.first().click();
+	await expect(page).toHaveURL(/\/game\/2026-2027\/\d+\?from=start$/);
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/$/);
+});
+
 test('a start page that cannot be loaded says so', async ({ page }) => {
 	await page.route('**/api/start', (route) => route.fulfill({ status: 500, json: {} }));
 	await page.goto('/');

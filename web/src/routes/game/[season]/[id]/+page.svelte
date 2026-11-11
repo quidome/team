@@ -16,8 +16,8 @@
 	(`GameAttendance`, story A of attendance at games). A driver whose answer is "not coming" shows
 	"· not coming" at the place ("· absent" after the date) and "Not coming" in the choice of a
 	driver (story B). "Mark as not played" as the last button; a not played game shows the list of
-	who comes closed behind a tap. A checked game, and a game from before the release, show only
-	the count, and "Show the list" opens the list.
+	who comes closed behind a tap. A checked game shows only the count too, and "Show the list"
+	opens the list.
 -->
 <script lang="ts">
 	import { page as current } from '$app/state';
@@ -133,7 +133,7 @@
 		answers: Record<number, AnswerView | null>;
 	} | null>(null);
 	/** The answer of each player: from the open list, else as stored, so a closed list (checked,
-	 * not played, before the release) still gives the notes at the driver places. */
+	 * not played) still gives the notes at the driver places. */
 	const answers = $derived.by((): Record<number, AnswerView | null> => {
 		if (game && shown?.page === game) return shown.answers;
 		const stored: Record<number, AnswerView | null> = {};
@@ -343,7 +343,7 @@
 			<p class="text-sm" role="alert" data-testid="save-error">{error}</p>
 		{/if}
 
-		{#if page.attendance && (page.not_played || page.attendance.checked || page.attendance.before_release) && !listShown}
+		{#if page.attendance && (page.not_played || page.attendance.checked) && !listShown}
 			<div class="flex flex-wrap items-center gap-3" data-testid="closed-list">
 				{#if countText(page.attendance.count, page.started)}
 					<p class="text-sm font-semibold" data-testid="closed-count">

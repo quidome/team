@@ -302,26 +302,8 @@ async fn a_second_check_waits_for_a_check_on_another_screen(pool: PgPool) {
     assert_eq!(answer["settled"], 0);
 }
 
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_game_before_the_release_has_its_list_closed(pool: PgPool) {
-    let reader = Reader::chosen(pool.clone()).await;
-    reader.read_good().await;
-    sqlx::query("UPDATE game_check_start SET from_date = '2026-10-11'")
-        .execute(&pool)
-        .await
-        .unwrap();
-    let page = ok(&reader, "GET", &game_path(AWAY_10_OCT), None).await;
-    assert_eq!(page["attendance"]["before_release"], true);
-    sqlx::query("UPDATE game_check_start SET from_date = '2026-10-10'")
-        .execute(&pool)
-        .await
-        .unwrap();
-    let page = ok(&reader, "GET", &game_path(AWAY_10_OCT), None).await;
-    assert_eq!(page["attendance"]["before_release"], false);
-}
-
-/// The open item "games not checked" of the start page, as `(id of the oldest, count)`.
-async fn not_checked_item(reader: &Reader) -> Option<(i64, i64)> {
+/// The ids of the games of the open item "games not checked" of the start page, oldest first.
+async fn not_checked_item(reader: &Reader) -> Vec<i64> {
     let start = ok(reader, "GET", "/api/start", None).await;
     start["open_items"]
         .as_array()
@@ -329,20 +311,17 @@ async fn not_checked_item(reader: &Reader) -> Option<(i64, i64)> {
         .iter()
         .find(|item| item["kind"] == "games_not_checked")
         .map(|item| {
-            assert_eq!(item["first"]["season"], "2026-2027");
-            (
-                item["first"]["id"].as_i64().unwrap(),
-                item["count"].as_i64().unwrap(),
-            )
+            item["games"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|game| {
+                    assert_eq!(game["season"], "2026-2027");
+                    game["id"].as_i64().unwrap()
+                })
+                .collect()
         })
-}
-
-async fn set_check_start(pool: &PgPool, from: &str) {
-    sqlx::query("UPDATE game_check_start SET from_date = $1::date")
-        .bind(from)
-        .execute(pool)
-        .await
-        .unwrap();
+        .unwrap_or_default()
 }
 
 /// `checked` on the row of game `id` among `events`.
@@ -364,23 +343,17 @@ fn row_checked(events: &Value, id: i64) -> Option<bool> {
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: PgPool) {
+async fn a_past_game_of_the_season_that_is_not_checked_is_an_open_item(pool: PgPool) {
     let reader = Reader::chosen(pool.clone()).await;
     reader.read_good().await;
-    // The release day is 4 November 2026 (migration 0016): after the test clock.
-    assert_eq!(not_checked_item(&reader).await, None);
-    let from: chrono::NaiveDate = sqlx::query_scalar("SELECT from_date FROM game_check_start")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(from.to_string(), "2026-11-04");
-
-    set_check_start(&pool, "2026-10-10").await;
-    assert_eq!(not_checked_item(&reader).await, Some((AWAY_10_OCT, 1)));
-    // A game before the day of the release is never an open item.
-    set_check_start(&pool, "2026-10-11").await;
-    assert_eq!(not_checked_item(&reader).await, None);
-    set_check_start(&pool, "2026-10-10").await;
+    // From the start of the season: the 5 past games of the team up to 10 October (no release
+    // day any more), oldest first.
+    let open = not_checked_item(&reader).await;
+    assert_eq!(open.len(), 5, "{open:?}");
+    assert_eq!(open.last(), Some(&AWAY_10_OCT));
+    ok(&reader, "PUT", &checked_path(AWAY_10_OCT), None).await;
+    assert!(!not_checked_item(&reader).await.contains(&AWAY_10_OCT));
+    ok(&reader, "DELETE", &checked_path(AWAY_10_OCT), None).await;
 
     // "Checked" ends it, and the row of "Season" says so (a driver place gives the game places of
     // the team; a game of the team is not among the last duty games of the start page).
@@ -394,7 +367,7 @@ async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: 
     let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
     assert_eq!(row_checked(&season["past"], AWAY_10_OCT), Some(false));
     ok(&reader, "PUT", &checked_path(AWAY_10_OCT), None).await;
-    assert_eq!(not_checked_item(&reader).await, None);
+    assert!(!not_checked_item(&reader).await.contains(&AWAY_10_OCT));
     let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
     assert_eq!(row_checked(&season["past"], AWAY_10_OCT), Some(true));
     let start = ok(&reader, "GET", "/api/start", None).await;
@@ -402,21 +375,21 @@ async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: 
     // until it was checked, and after that it is on "Season".
     assert_eq!(row_checked(&start["last_games"], AWAY_10_OCT), None);
 
-    // "Undo check" brings it back; "Not played" ends it too.
+    // "Undo" brings it back; "Not played" ends it too.
     ok(&reader, "DELETE", &checked_path(AWAY_10_OCT), None).await;
-    assert_eq!(not_checked_item(&reader).await, Some((AWAY_10_OCT, 1)));
+    assert!(not_checked_item(&reader).await.contains(&AWAY_10_OCT));
     let not_played = format!("{}/not-played", game_path(AWAY_10_OCT));
     ok(&reader, "PUT", &not_played, None).await;
-    assert_eq!(not_checked_item(&reader).await, None);
+    assert!(!not_checked_item(&reader).await.contains(&AWAY_10_OCT));
     ok(&reader, "DELETE", &not_played, None).await;
-    assert_eq!(not_checked_item(&reader).await, Some((AWAY_10_OCT, 1)));
+    assert!(not_checked_item(&reader).await.contains(&AWAY_10_OCT));
 
     // A game that left the game list is not an open item.
     reader.answer(games_with(|games| {
         games.retain(|game| game["id"] != AWAY_10_OCT);
     }));
     reader.read_good().await;
-    assert_eq!(not_checked_item(&reader).await, None);
+    assert!(!not_checked_item(&reader).await.contains(&AWAY_10_OCT));
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]

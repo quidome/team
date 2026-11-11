@@ -1,25 +1,24 @@
 // "Checked" on the page of a game (story C of attendance at games). The server's clock is Monday
-// 12 October 2026 (DEV_NOW), which is also the day of the release of "Checked" in the test
-// database (`global-setup.ts`). These tests check a past game that other tests read, so they run
-// last (project `checked`), and each test undoes its check.
+// 12 October 2026 (DEV_NOW). Every past game of the team of the season that is not checked is an
+// open item. These tests check a past game that other tests read, so they run last (project
+// `checked`), and each test undoes its check.
 import { expect, test } from '@playwright/test';
 import { expectAccessible, expectNoHorizontalScroll, watchConsole } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
 
-/** The away game of the team on Saturday 10 October 2026 (past, before the release). */
+/** The away game of the team on Saturday 10 October 2026 (past). */
 const AWAY_10_OCT = 1073147;
 const gamePage = `/game/2026-2027/${AWAY_10_OCT}`;
 const checkedApi = `/api/games/2026-2027/${AWAY_10_OCT}/checked`;
 const origin = { headers: { Origin: 'http://localhost:4100' } };
 
-test('a game from before the release shows its list closed, with "There" and "Absent"', async ({
+test('a past game that is not checked shows its list open, with "There" and "Absent"', async ({
 	page
 }) => {
 	await page.goto(gamePage);
-	await expect(page.getByTestId('closed-list')).toBeVisible();
-	await expect(page.getByTestId('attendance-row')).toHaveCount(0);
-	await page.getByTestId('show-list').click();
+	// No release day any more: the list of a past game is open until it is checked.
+	await expect(page.getByTestId('closed-list')).toHaveCount(0);
 	const row = page.getByTestId('attendance-row').first();
 	await expect(row.getByRole('button', { name: /^There/ })).toBeVisible();
 	await expect(row.getByRole('button', { name: /^Absent/ })).toBeVisible();
@@ -31,7 +30,7 @@ test('"Mark as checked" makes each "no answer" absent and "Undo" brings them bac
 }) => {
 	const errors = watchConsole(page);
 	await page.goto(gamePage);
-	await page.getByTestId('show-list').click();
+	await expect(page.getByTestId('attendance-row').first()).toBeVisible();
 	const players = await page.getByTestId('attendance-row').count();
 	expect(players).toBeGreaterThan(0);
 	await expect(page.getByTestId('attendance-count')).toContainText('no answer');
@@ -57,7 +56,7 @@ test('"Mark as checked" makes each "no answer" absent and "Undo" brings them bac
 	await checked.getByRole('button', { name: 'Undo' }).click();
 	await expect(page.getByTestId('mark-checked')).toHaveAttribute('data-done', 'false');
 	await expect(page.getByRole('button', { name: 'Mark as checked' })).toBeVisible();
-	await page.getByTestId('show-list').click();
+	// The list of a past game that is not checked is open again.
 	await expect(page.getByTestId('attendance-count')).toContainText('no answer');
 	expect(errors).toEqual([]);
 });
@@ -92,7 +91,6 @@ test('the row "Not checked" follows the taps in the list', async ({ page }) => {
 	await page.goto(gamePage);
 	const row = page.getByTestId('mark-checked');
 	await expect(page.getByTestId('no-answer-warning')).toBeVisible();
-	await page.getByTestId('show-list').click();
 	const player = page.getByTestId('attendance-row').first();
 	await player.getByRole('button', { name: /^There/ }).click();
 	await expect(row).toContainText('1 there');
@@ -153,9 +151,7 @@ test('"Attendance" counts a checked game and lists it as missed', async ({ page 
 	try {
 		await page.setViewportSize({ width: 320, height: 700 });
 		await page.goto('/attendance');
-		await expect(page.getByTestId('games-from')).toHaveText(
-			'Games count once they are checked. The start page asks for games from Mon 12 Oct.'
-		);
+		await expect(page.getByTestId('games-from')).toHaveCount(0);
 		// A player who had no answer: "Checked" made the player absent, without a reason.
 		const row = page
 			.getByTestId('player-totals')

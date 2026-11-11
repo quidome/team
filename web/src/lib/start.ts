@@ -61,16 +61,24 @@ export function openItemText(item: OpenItemView): string {
 			return item.count === 1
 				? `Training ${formatDay(item.first)} not checked`
 				: `${item.count} trainings not checked`;
-		case 'games_not_checked':
-			return item.count === 1
-				? `Game ${formatDay(item.first.date)} not checked`
-				: `${item.count} games not checked`;
+		case 'games_not_checked': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? `Game ${formatDay(first.date)} not checked`
+				: `${item.games.length} games not checked`;
+		}
+		case 'duty_games_not_checked': {
+			const [first] = item.games;
+			return item.games.length === 1 && first
+				? `Duty game ${formatDay(first.date)} not checked`
+				: `${item.games.length} duty games not checked`;
+		}
 	}
 }
 
 /** Where a tap on an open item goes: the "Game list" card, the list of changes, the oldest
- * training day or training, the oldest game not checked, or the one game (with `?from=start`, so "Back" returns here). `null`
- * for an item of more games: a tap opens their list below it. */
+ * training day or training, or the one game of an item of games (with `?from=start`, so "Back"
+ * returns here). `null` for an item of more games: a tap opens their list below it. */
 export function openItemLink(item: OpenItemView): string | null {
 	switch (item.kind) {
 		case 'reading_held_back':
@@ -82,15 +90,15 @@ export function openItemLink(item: OpenItemView): string | null {
 		case 'driver_not_coming':
 		case 'answers_moved':
 		case 'schedule_not_entered':
-		case 'open_places': {
+		case 'open_places':
+		case 'games_not_checked':
+		case 'duty_games_not_checked': {
 			const [first] = item.games;
 			return item.games.length === 1 && first ? gameLink(first.season, first.id) : null;
 		}
 		case 'not_opened':
 		case 'not_checked':
 			return trainingLink(item.first);
-		case 'games_not_checked':
-			return gameLink(item.first.season, item.first.id);
 	}
 }
 
