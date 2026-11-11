@@ -25,3 +25,4 @@ lists only today and later.
 | 2026-11-11 | implement | story 2, Checked for a duty game, is done (`changes/done/2026-11-11-checked-for-a-duty-game/`): decision 0035; next: story 3, open items from the start of the season |
 | 2026-11-11 | implement | story 3, open items from the start of the season: technical.md approved (`changes/2026-11-11-open-items-from-the-start-of-the-season/`), 5 steps |
 | 2026-11-11 | implement | story 3, open items from the start of the season, is done (`changes/done/2026-11-11-open-items-from-the-start-of-the-season/`): decision 0036; next: story 4, only today and later on the start page |
+| 2026-11-11 | implement | story 4, only today and later on the start page: technical.md approved (`changes/2026-11-11-only-today-and-later/`), 2 steps |
