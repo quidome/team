@@ -2,7 +2,7 @@
 
 **Status**: done
 **Size**: story
-**Change**: docs/changes/2026-11-10-quieter-start-page/
+**Change**: docs/changes/done/2026-11-10-quieter-start-page/
 **Date**: 2026-11-10
 
 ## Objective

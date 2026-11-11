@@ -1,7 +1,7 @@
 ---
 title: A quieter start page
 type: review
-stage: close
+stage: done
 closure: review build + accept
 created: 2026-11-10
 ---
@@ -44,3 +44,4 @@ last date with duties stay; the committee message stays on the start page in wee
 | 2026-11-10 | discover | functional spec written; two spec reviews (serves – note), their notes answered with the coordinator; spec approved |
 | 2026-11-10 | design | technical spec approved: one story in 4 steps (core rules, new places, start page, check of the look); closure review build + accept (a rule moves out of the messages, the start answer changes shape, a part of decision 0026 is replaced; the reason is a feeling that only a fresh look can check) |
 | 2026-11-11 | implement | 4 steps built on the branch quieter-start-page; build and accept reviews: A1/R1 (the last duty games always lighter, as the spec says) fixed with the coordinator, R2–R4 fixed, R5 for Close |
+| 2026-11-11 | done | closed: product documents (start page, messages, choose club and team, players and team, season, trainings and attendance, weekly trainings and reasons, duties, attendance at games, schedule), architecture, decision 0034 (0026 partly replaced), ideas |

@@ -9,7 +9,7 @@ week. It is not a list for every day; it gives access to every event of the seas
 training or a game).
 
 ## Behaviour
-- The start page links to "Season", first in the line "Season · Attendance · Duties · Report · Team · Players · Settings". The page shows "Season 2026-2027".
+- The start page links to "Season", first in the line "Season · Attendance · Duties · Report · More". The page shows "Season 2026-2027".
 - **Which events.** All games of the team (home and away), all home games of other club teams, and every training day and training of the season. Away games of other club teams are not shown. The games come from the team chosen for that season; without a chosen team there are no games.
 - **Headings.** A heading per week, Monday to Sunday, with its number and dates ("Week 44 · 26 Oct – 1 Nov"), and within it per date ("Sat 31 Oct"). A week without events has no heading.
 - **Labels**, in three groups: What ("Games of the team", "Possible duty games", "Trainings"), When ("Coming", "Past") and Duties ("Entered", "Not entered", "Open places"). Labels of different groups narrow the list, labels of one group add to it, and a group with no label on shows all of that group. One tap turns a label on or off, without a new load. The page opens with "Coming" on and no label of What or Duties.

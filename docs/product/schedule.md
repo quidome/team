@@ -7,7 +7,7 @@ The coordinator sees the games that matter, from the game list, and stops keepin
 the sheet: all games of the team, and the home games of other club teams, where players of the
 team can have table and referee duties ("possible duty games"). The games show on
 [Season](season.md), together with the trainings, each with its [duty places](duties.md); the
-games of the team of the next two weeks also show in "Next" on the [start page](start-page.md).
+games of the team of the next two weeks also show in the list of events on the [start page](start-page.md).
 
 ## Behaviour
 - **Which games.** All games of the team, home and away, and the home games of other club teams. Away games of other club teams are kept, but not shown. The games of a season are those of the team chosen for that season; without a chosen team there are no games.
@@ -27,6 +27,6 @@ games of the team of the next two weeks also show in "Next" on the [start page](
 - The new games cannot be loaded after a reading: "The new games could not be loaded. Load the page again." The reading itself is not affected.
 
 ## Interface
-- Screens: [Season](season.md) (`/season`) and "Next" on the [start page](start-page.md) (`/`).
-- Server addresses (need a login): `GET /api/season` (the games with the trainings of a season) and `GET /api/start` ("Next"). Each game has its reason ("team", "duty", or "kept" for a game kept for its duties or answers), whether it is still in the game list, its places, and for a coming game of the team the count of [who comes](game-attendance.md).
+- Screens: [Season](season.md) (`/season`) and the list of events on the [start page](start-page.md) (`/`).
+- Server addresses (need a login): `GET /api/season` (the games with the trainings of a season) and `GET /api/start` (the list of events, `next`). Each game has its reason ("team", "duty", or "kept" for a game kept for its duties or answers), whether it is still in the game list, its places, and for a coming game of the team the count of [who comes](game-attendance.md).
 - The rule for which games show is `team_core::schedule`, with the games of `team_core::kept_games`.

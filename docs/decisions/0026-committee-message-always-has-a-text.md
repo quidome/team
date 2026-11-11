@@ -1,6 +1,6 @@
 # 0026 – The committee message always has a text
 
-**Status**: valid
+**Status**: partly replaced by 0034 (the button on the start page in every week)
 **Date**: 2026-10-31
 **Change**: [2026-10-18-duties](../changes/done/2026-10-18-duties/) (story [the committee message](../changes/done/2026-10-31-committee-message/))
 

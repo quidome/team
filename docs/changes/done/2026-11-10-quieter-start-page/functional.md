@@ -1,12 +1,12 @@
 # Functional spec: A quieter start page
 
 **Status**: approved
-**Change**: docs/changes/2026-11-10-quieter-start-page/
+**Change**: docs/changes/done/2026-11-10-quieter-start-page/
 **Date**: 2026-11-10
 
 ## Context
 The start page exists so that a look of a few seconds tells the coordinator whether something
-still needs them, and what comes next ([the start page](../../product/start-page.md)). Each
+still needs them, and what comes next ([the start page](../../../product/start-page.md)). Each
 earlier change added its own part to it. With a team chosen it now shows, from the top: the team
 header with "Change", "Open items", "Last" (the newest past training, also when checked, and the
 games of the newest past date with places of the team), "Next" (all events from today until the
@@ -25,7 +25,7 @@ the fast capture that both core values depend on. This change serves the purpose
 open items and the next events the only things in view.
 
 ## Current behaviour
-As in [the start page](../../product/start-page.md), "Behaviour". The parts that this change
+As in [the start page](../../../product/start-page.md), "Behaviour". The parts that this change
 touches:
 - The team header shows "Your team · 2026-2027", the team, and "Change" (to the choice of club
   and team).
@@ -67,7 +67,7 @@ touches:
 me, each as one short row, **so that** I see in a moment whether I must do something.
 
 #### Acceptance criteria
-- [ ] The open items have the same kinds, texts, order and tap targets as now ([the start page](../../product/start-page.md), "Open items").
+- [ ] The open items have the same kinds, texts, order and tap targets as now ([the start page](../../../product/start-page.md), "Open items").
 - [ ] Each item is one row: an orange dot, the text, and "›". No card around it, no heading "Open items".
 - [ ] An item with more than one game ("3 games with open places", "2 games: too few players", "5 home games: schedule not entered") opens the list of its games below it with a tap, as now; each game in that list opens its page.
 - [ ] Without open items, the page shows one grey row "Nothing needs you." (it replaces "Nothing open.").
