@@ -44,7 +44,7 @@ From `functional.md` (approved 2026-11-11):
 - **Story 1** is front end only: new components `AdminPanel.svelte` (the panel) and `MarkRow.svelte`
   (one row: state, ✓ or ○, an optional line, one button; an input `next` gives the orange), used by
   the pages of a training and a game. No server change.
-- **Story 2**: a new table `duty_checks` (the game, the date checked for, the moment), owned by
+- **Story 2**: two columns of `game_duties` (the date checked for, the moment; planned as a new table `duty_checks`, see the story), owned by
   `duties.rs` (decision 0030), written under the row lock of a game in duties (decision 0023). The
   rule "a mark holds for a date" (decision 0029) becomes one function in `contribution` that the
   check of a team game and of a duty game both use. `PUT` / `DELETE .../checked` decide by the kind
@@ -61,7 +61,7 @@ From `functional.md` (approved 2026-11-11):
 | # | Story | Scope | Depends on | Status |
 |---|---|---|---|---|
 | 1 | The administration panel | `AdminPanel.svelte`, `MarkRow.svelte`; the pages of a training and a game; the warning of a team game without answers; the drivers below "Not checked"; button words; browser tests | – | done |
-| 2 | Checked for a duty game | table `duty_checks` (migration), the shared rule of a check for a date, `.../checked` for both kinds, the duty game page and "Season"; decision record | 1 (the panel row) | to design |
+| 2 | Checked for a duty game | two columns of `game_duties` (migration 0017; was planned as a table `duty_checks`), the shared rule of a check for a date, `.../checked` for both kinds, the duty game page and "Season"; decision record | 1 (the panel row) | done |
 | 3 | Open items from the start of the season | `games_not_checked` without start date, `game_check_start` removed (migration), `duty_games_not_checked` and its open item, the list of an item of more games, the report's line, the old closed list and the sentence on "Attendance"; decision record (partly replaces 0032) | 2 | to design |
 | 4 | Only today and later on the start page | `last_games` removed from core, API and page; `event_look` without "before today"; product documents | 3 | to design |
 
@@ -72,7 +72,7 @@ alone, in this order.
 ## Decisions
 | Decision | Reason | Decision record? |
 |----------|--------|------------------|
-| The check of a duty game in a new table `duty_checks` in duties | `game_attendance` is the attendance of a team game, and its check makes players absent; each domain owns its tables (0030) | yes, at Close of story 2 |
+| The check of a duty game with the duties of the game (built as two columns of `game_duties`) | `game_attendance` is the attendance of a team game, and its check makes players absent; each domain owns its tables (0030) | yes, at Close of story 2 |
 | One rule "a mark holds for a date" for both checks | The two checks cannot drift apart (0029) | part of the record of story 2 |
 | One address `.../checked`, deciding by the kind of the game | The page and the panel call one action for every game; the server knows the kind | part of the record of story 2 |
 | No start date for "games not checked"; `game_check_start` removed | The same rule as for trainings (the seasons of the open items); nothing to keep up to date | yes, at Close of story 3 (partly replaces 0032) |
@@ -94,7 +94,7 @@ alone, in this order.
 
 ## Progress
 - [x] Story 1: the administration panel (2026-11-11, `changes/done/2026-11-11-administration-panel/`)
-- [ ] Story 2: Checked for a duty game
+- [x] Story 2: Checked for a duty game (2026-11-11, `changes/done/2026-11-11-checked-for-a-duty-game/`, decision 0035)
 - [ ] Story 3: open items from the start of the season
 - [ ] Story 4: only today and later on the start page
 
