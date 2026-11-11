@@ -11,7 +11,7 @@
 
 <MessagePage
 	title="Committee message"
-	back={resolve('/')}
+	back={data.fromDuties ? resolve('/duties') : resolve('/')}
 	empty="No message: no team chosen."
 	message={data.message}
 />

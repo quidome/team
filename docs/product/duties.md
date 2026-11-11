@@ -10,7 +10,7 @@ put players, correct them after the game, and see the duty totals of each player
 shared fairly. From them the tool makes the [messages](messages.md) to copy.
 
 ## Behaviour
-- **The page of a game** (`/game/2026-2027/<id>`) opens with a tap on a game on [Season](season.md), in "Next" or "Last" on the [start page](start-page.md), on a game of the open item "schedule not entered", or on the teams of a change in the [list of changes](list-of-changes.md). It shows the date and start time ("time not known yet" when not known), the home and away team, the hall and town, and the badge "Team" for a game of the team.
+- **The page of a game** (`/game/2026-2027/<id>`) opens with a tap on a game on [Season](season.md), in the list of events on the [start page](start-page.md) (the coming events and the last duty games), on a game of the open item "schedule not entered", or on the teams of a change in the [list of changes](list-of-changes.md). It shows the date and start time ("time not known yet" when not known), the home and away team, the hall and town, and the badge "Team" for a game of the team.
 - **"Back"** returns to the page it came from: the start page, the list of changes, or "Season" of the game's season with the same labels and the same place in the list (also with the browser's back).
 - **A home game of the club** (of any club team, also of the team; coming or past) has 4 places: Referee 1, Referee 2, Table 1, Table 2. Each has a pull-down list with "—" (empty) and the club teams of the season (each team with a game in the game list of that season, also a game that left it later, and a team that a place still names), sorted by name. A choice saves at once. One place holds one team; when two phones save the same place, the last save wins.
 - Below the places, the places of the team: "M16 1: Referee 1, Table 1, Table 2", or "No places for the team."
@@ -37,7 +37,7 @@ shared fairly. From them the tool makes the [messages](messages.md) to copy.
 - **"Delete player"** is not offered for a player with duties ([players and team](players-and-team.md)).
 
 ### The page "Duties"
-- For the current season the page has the buttons "Driving overview" and "Table and referee overview" ([messages](messages.md)).
+- For the current season the page has the buttons "Driving overview", "Table and referee overview" and "Committee message" ([messages](messages.md)).
 - **"Duties"** (`/duties`, a link on the [start page](start-page.md)) has the table "Totals" of a season: one row for each player with the role "plays games" in the season or with a duty done or planned in it (a correction alone gives no row; the same rule gives the duty numbers of [the report](report.md)), also players who left and hidden players, sorted by first name. The columns Drive, Table and Referee show "done · planned" ("3 · 1"). The numbers are the same as in the choice of a game of that season.
 - A season choice, as on "Attendance": the seasons with a chosen team, the current season and the chosen season (`?season=` in the address). A season without a team has no rows. Without any duty: "No duties yet this season."
 
@@ -47,7 +47,7 @@ shared fairly. From them the tool makes the [messages](messages.md) to copy.
 - A team that is no longer a team of the club: "This team is not a team of the club. Load the page again."
 - A game that is not a game of the chosen team's schedule (or an address that cannot be read): "This game cannot be found.", with a link to "Season".
 - The table and referee places of the club's home games are entered by hand, one game at a time; the committee's sheet is not read.
-- After another team is chosen in the middle of a season, the past table and referee places of the old team still count in the totals, but the page of the game, "Season" and "Last" show only the places of the current team (an idea in `docs/ideas.md`).
+- After another team is chosen in the middle of a season, the past table and referee places of the old team still count in the totals, but the page of the game, "Season" and the start page show only the places of the current team (an idea in `docs/ideas.md`).
 - The totals cover one season.
 - A choice that is refused says why ("This player already has a place at this game.", "This player is at another game at almost the same time.", "Driver place 3 has a player. Clear it first."); a save that fails: "Not saved. Try again." and what is stored.
 

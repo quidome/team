@@ -2,7 +2,8 @@
 	Duties (story B of duties): the table "Totals" of the chosen season (the current one by default,
 	`?season=` in the address): one row for each player with the role "plays games" in the season or
 	with a duty in it, and for Drive, Table and Referee the duties done and planned ("3 · 1"). For the
-	current season the buttons of the duty overviews (story E).
+	current season the buttons of the duty overviews (story E) and of the committee message (the
+	quieter start page, story 4; its "Back" returns here).
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -70,6 +71,9 @@
 				<Button href={resolve('/duties/driving')} variant="outline">Driving overview</Button>
 				<Button href={resolve('/duties/table-referee')} variant="outline">
 					Table and referee overview
+				</Button>
+				<Button href={resolve('/messages/committee?from=duties')} variant="outline">
+					Committee message
 				</Button>
 			</div>
 		{/if}

@@ -351,6 +351,14 @@ fn row_checked(events: &Value, id: i64) -> Option<bool> {
         .as_array()
         .unwrap()
         .iter()
+        // A row of the start page holds the event as on "Season" under "event".
+        .map(|row| {
+            if row["event"].is_null() {
+                row
+            } else {
+                &row["event"]
+            }
+        })
         .find(|event| event["game"]["id"] == id)
         .map(|event| event["game"]["checked"].as_bool().unwrap())
 }
@@ -374,8 +382,8 @@ async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: 
     assert_eq!(not_checked_item(&reader).await, None);
     set_check_start(&pool, "2026-10-10").await;
 
-    // "Checked" ends it, and the rows of "Season" and "Last" say so (a driver place puts the
-    // game in "Last").
+    // "Checked" ends it, and the row of "Season" says so (a driver place gives the game places of
+    // the team; a game of the team is not among the last duty games of the start page).
     ok(
         &reader,
         "PUT",
@@ -390,7 +398,9 @@ async fn a_past_game_from_the_release_that_is_not_checked_is_an_open_item(pool: 
     let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
     assert_eq!(row_checked(&season["past"], AWAY_10_OCT), Some(true));
     let start = ok(&reader, "GET", "/api/start", None).await;
-    assert_eq!(row_checked(&start["last_games"], AWAY_10_OCT), Some(true));
+    // A game of the team is not among the last duty games of the start page: it was an open item
+    // until it was checked, and after that it is on "Season".
+    assert_eq!(row_checked(&start["last_games"], AWAY_10_OCT), None);
 
     // "Undo check" brings it back; "Not played" ends it too.
     ok(&reader, "DELETE", &checked_path(AWAY_10_OCT), None).await;
@@ -635,8 +645,8 @@ async fn the_row_of_a_game_of_today_says_started_from_its_start_time(pool: PgPoo
             .as_array()
             .unwrap()
             .iter()
-            .find(|event| event["game"]["id"] == AWAY_10_OCT)
-            .map(|event| event["game"]["started"].as_bool().unwrap())
+            .find(|item| item["event"]["game"]["id"] == AWAY_10_OCT)
+            .map(|item| item["event"]["game"]["started"].as_bool().unwrap())
     };
     // Saturday 10 October, 15:00 in the Netherlands (13:00 UTC).
     reader.harness.clock.set(utc(2026, 10, 10, 12, 59));

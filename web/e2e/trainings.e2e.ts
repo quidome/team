@@ -26,7 +26,7 @@ test('a Tuesday weekly training is in "Next" on the start page', async ({ page }
 	const next = page.getByTestId('next');
 	await expect(next.getByTestId('day').first()).toHaveText('Tue 13 Oct');
 	await expect(next.getByTestId('training-row').first()).toHaveText(
-		/Training\s*· 19:45\s*Not opened/
+		/19:45\s*Training\s*Not opened/
 	);
 	await expect(next.getByTestId('game')).toHaveCount(0);
 	await expectAccessible(page);

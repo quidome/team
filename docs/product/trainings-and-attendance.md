@@ -15,7 +15,7 @@ at checked games ([attendance at games](game-attendance.md)), for the current or
 
 ## Behaviour
 ### The page "Attendance"
-- The start page links to "Attendance" (second in the line "Season · Attendance · Duties · Report · Team · Players · Settings").
+- The start page links to "Attendance" (second in the line "Season · Attendance · Duties · Report · More").
 - The page shows the chosen season: the current one, or an earlier one from the choice "Season" (shown when there is more than one). The season is in the address (`/attendance?season=2025-2026`), so a reload keeps it. A change of season closes the open lists of missed trainings and games.
 - From the top: the line of training days not opened, in the season 2026-2027 the line "Games count once they are checked. The start page asks for games from Wed 4 Nov.", then "Totals" (see below).
 - The training days and trainings themselves, with "Cancel" on a day that is not opened, "Show cancelled" and "Add training", are on [Season](season.md), with the games of the same weeks.
@@ -30,11 +30,11 @@ at checked games ([attendance at games](game-attendance.md)), for the current or
 - "No trainings or games yet this season." when no training and no game counts yet. "No player had a role at these events." when trainings or games count but no player counts at any of them; in the current season with "Add players in Team." and a link.
 
 ### On the start page
-- The [start page](start-page.md) shows the training days and trainings of this week and next week in "Next", the last training before today in "Last" (also when checked), and as open items the training days not opened ("Training day Thu 22 Oct not opened") and the trainings not checked ("Training Thu 22 Oct not checked"). A tap opens the training; "Back" there returns to the start page.
+- The [start page](start-page.md) shows the training days and trainings of this week and next week in its list of events (a checked or cancelled training lighter), and as open items the training days not opened ("Training day Thu 22 Oct not opened") and the trainings not checked ("Training Thu 22 Oct not checked"). A past training is not in the list; a checked one opens from [Season](season.md). A tap opens the training; "Back" there returns to the start page.
 
 ### A training
 - The top shows the date and times ("Tue 20 Oct · 19:45–21:00") and "N absent", "All there" or "Cancelled".
-- "Back" returns to the page the training was opened from: the start page ("Last", "Next" or an open item), "Attendance" (the line of training days not opened), else "Season" of the training's season. "Change" to another date keeps that.
+- "Back" returns to the page the training was opened from: the start page (the list of events or an open item), "Attendance" (the line of training days not opened), else "Season" of the training's season. "Change" to another date keeps that.
 - The players with a role on the date (also those who only train, and hidden players in the team) as large rows, sorted by first name, each "there" or the reason of the absence.
 - A tap on a player opens the reasons (hidden reasons are not offered); a tap on a reason marks the player absent with it. A tap on an absent player shows the reasons with "There" on top; "There" marks the player there again, another reason changes the reason.
 - Each tap is saved at once, with no save button. The row shows the new state at once, with "saving…" until the answer comes. When a tap cannot be saved (no network, server error, or no answer within 10 seconds), the row shows the stored state again and the page says "Not saved. Try again." A mark never looks saved when it was not.
@@ -73,5 +73,5 @@ at checked games ([attendance at games](game-attendance.md)), for the current or
 - "Add training" is only for the current season. One training per date. Logs carry dates and player ids, never names. The data exists only in the tool. A nightly encrypted copy of the database is kept on the home storage (TrueNAS), not yet outside the house.
 
 ## Interface
-- Screens: `/attendance` (with `?season=` for another season), `/attendance?player=<id>&from=report` (from the report), `/training/[date]` (with `?from=start`, `?from=attendance` or `?from=report` for "Back"), the list on `/season`; "Last", "Next", the open items and the link on the start page (`/`). The start page has the line "Season · Attendance · Duties · Report · Team · Players · Settings"; "Attendance" has no links to the other pages, except "Back" to "Report" when opened from it.
+- Screens: `/attendance` (with `?season=` for another season), `/attendance?player=<id>&from=report` (from the report), `/training/[date]` (with `?from=start`, `?from=attendance` or `?from=report` for "Back"), the list on `/season`; the list of events, the open items and the link on the start page (`/`). The start page has the line "Season · Attendance · Duties · Report · More"; "Attendance" has no links to the other pages, except "Back" to "Report" when opened from it.
 - Server addresses (all need a login): `GET /api/attendance?season=` (the totals with `games` for each player, "Left the team", the missed trainings and games with `kind` and a reason or `null`, the games of the season `games`, the release day `games_from` in its season, the training days not opened and the seasons to choose from), `GET /api/season?season=` (the list, with the games; see [Season](season.md)), `GET /api/trainings/{date}` (one training with its players), `PUT /api/trainings/{date}/open`, `POST /api/trainings` ("Add training"), `PUT /api/trainings/{date}` ("Change"), `POST /api/trainings/{date}/cancel`, `POST /api/trainings/{date}/uncancel`, `DELETE /api/trainings/{date}`, `PUT` and `DELETE /api/trainings/{date}/absences/{player}` (mark absent, mark there), `PUT` and `DELETE /api/trainings/{date}/checked` ("Checked", "Undo check").

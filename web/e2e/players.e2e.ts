@@ -11,16 +11,40 @@ async function expectClosed(row: Locator) {
 	await expect(row.getByRole('button', { expanded: true })).toHaveCount(0);
 }
 
-test('the start page links to attendance, duties, the team, players and settings', async ({
+test('the start page links to attendance, duties and "More" with the team, players and settings', async ({
 	page
 }) => {
 	await page.goto('/');
 	const links = page.getByTestId('team-links');
 	await expect(links.getByRole('link', { name: 'Attendance' })).toBeVisible();
 	await expect(links.getByRole('link', { name: 'Duties' })).toBeVisible();
-	await expect(links.getByRole('link', { name: 'Team' })).toBeVisible();
-	await expect(links.getByRole('link', { name: 'Players' })).toBeVisible();
-	await expect(links.getByRole('link', { name: 'Settings' })).toBeVisible();
+	await links.getByRole('link', { name: 'More' }).click();
+	await expect(page.getByTestId('more-links').getByRole('link')).toHaveCount(3);
+});
+
+test('"More" has the team, the players and the settings, and "Back" returns', async ({ page }) => {
+	const errors = watchConsole(page);
+	await page.goto('/more');
+	await expect(page.getByRole('heading', { name: 'More' })).toBeVisible();
+	const links = page.getByTestId('more-links');
+	await expect(links.getByRole('link')).toHaveText(['Team ›', 'Players ›', 'Settings ›']);
+	await expectAccessible(page);
+	await expectNoHorizontalScroll(page, 320);
+
+	await links.getByRole('link', { name: /Players/ }).click();
+	await expect(page.getByRole('heading', { name: 'Players' })).toBeVisible();
+	await page.goto('/more');
+	await page.getByRole('link', { name: 'Back' }).click();
+	await expect(page).toHaveURL(/\/$/);
+	expect(errors).toEqual([]);
+});
+
+test('"Change club or team" on the settings opens the choice of club and team', async ({
+	page
+}) => {
+	await page.goto('/settings');
+	await page.getByRole('link', { name: 'Change club or team' }).click();
+	await expect(page).toHaveURL(/\/choose$/);
 });
 
 test('add a player with a first name only', async ({ page }) => {

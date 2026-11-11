@@ -381,6 +381,14 @@ fn count_in(events: &Value, id: i64) -> Option<Value> {
         .as_array()
         .unwrap()
         .iter()
+        // A row of the start page holds the event as on "Season" under "event".
+        .map(|row| {
+            if row["event"].is_null() {
+                row
+            } else {
+                &row["event"]
+            }
+        })
         .find(|event| event["game"]["id"] == id)
         .map(|event| event["game"]["attendance"].clone())
 }
@@ -396,8 +404,8 @@ async fn the_rows_give_the_count_of_the_page_of_the_game(pool: PgPool) {
         .as_array()
         .unwrap()
         .iter()
-        .find(|event| event["game"]["reason"] == "team")
-        .unwrap()["game"]["id"]
+        .find(|item| item["event"]["game"]["reason"] == "team")
+        .unwrap()["event"]["game"]["id"]
         .as_i64()
         .unwrap();
 

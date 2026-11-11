@@ -269,7 +269,7 @@ fn start_game(start: &Value, part: &str, id: i64) -> Option<Value> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|event| event["game"].clone())
+        .map(|item| item["event"]["game"].clone())
         .find(|game| game["id"] == id)
 }
 
@@ -486,27 +486,50 @@ async fn a_not_played_game_warns_about_nothing_and_is_in_no_message(pool: PgPool
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn a_not_played_game_stays_in_last_and_on_season(pool: PgPool) {
+async fn a_not_played_duty_game_stays_in_the_last_duty_games_and_on_season(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;
-    let game = game_path(AWAY_10_OCT);
+    // A past home game of another club team on Sat 3 Oct, with a referee place of the team.
+    let season = ok(&reader, "GET", "/api/season?season=2026-2027", None).await;
+    let id = season["past"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|event| &event["game"])
+        .find(|game| game["reason"] == "duty" && game["date"] == "2026-10-03")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
     ok(
         &reader,
         "PUT",
-        &format!("{game}/drivers"),
-        Some(json!({ "drivers": 1 })),
+        &format!("{}/places/referee/1", game_path(id)),
+        Some(json!({ "team": common::game_list::M16_1 })),
     )
     .await;
     let start = ok(&reader, "GET", "/api/start", None).await;
-    let last = start_game(&start, "last_games", AWAY_10_OCT).unwrap();
+    let last = start_game(&start, "last_games", id).unwrap();
     assert_eq!(last["not_played"], false);
     assert_eq!(last["places"]["open_places"], 1, "{last}");
+    // Its date has passed: lighter, also with an open place.
+    assert_eq!(look(&start, "last_games", id), "lighter");
 
-    ok(&reader, "PUT", &mark_path(AWAY_10_OCT), None).await;
+    ok(&reader, "PUT", &mark_path(id), None).await;
     let start = ok(&reader, "GET", "/api/start", None).await;
-    let last = start_game(&start, "last_games", AWAY_10_OCT).unwrap();
+    let last = start_game(&start, "last_games", id).unwrap();
     assert_eq!(last["not_played"], true);
-    let row = season_row(&reader, AWAY_10_OCT).await.unwrap();
+    assert_eq!(look(&start, "last_games", id), "lighter");
+    let row = season_row(&reader, id).await.unwrap();
     assert_eq!(row["not_played"], true);
-    assert_eq!(row["places"]["open_places"], 0, "no \"Open places\": {row}");
+}
+
+/// How the row of game `id` in `part` of the start page looks.
+fn look(start: &Value, part: &str, id: i64) -> String {
+    start[part]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["event"]["game"]["id"] == id)
+        .map(|item| item["look"].as_str().unwrap().to_owned())
+        .unwrap()
 }

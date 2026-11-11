@@ -805,18 +805,20 @@ async fn next_shows_a_home_game_of_another_club_team_with_a_place_of_the_team(po
     })
     .await;
     set_place(&reader, ours, "table", 1, Some(M16_1)).await;
-    let next = start(&reader).await["next"].clone();
-    let duty_ids: Vec<i64> = next
+    let answer = start(&reader).await;
+    let next: Vec<Value> = answer["next"]
         .as_array()
         .unwrap()
+        .iter()
+        .map(|item| item["event"].clone())
+        .collect();
+    let duty_ids: Vec<i64> = next
         .iter()
         .filter(|event| event["game"]["reason"] == "duty")
         .map(|event| event["game"]["id"].as_i64().unwrap())
         .collect();
     assert_eq!(duty_ids, [ours]);
     let event = next
-        .as_array()
-        .unwrap()
         .iter()
         .find(|event| event["game"]["id"] == ours)
         .unwrap();
@@ -826,8 +828,73 @@ async fn next_shows_a_home_game_of_another_club_team_with_a_place_of_the_team(po
     );
 }
 
+/// How the row of game `id` (or the training of `date`) in "next" of the start page looks.
+async fn look_in_next(reader: &Reader, find: impl Fn(&Value) -> bool) -> String {
+    let answer = start(reader).await;
+    answer["next"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| find(&item["event"]))
+        .map(|item| item["look"].as_str().unwrap().to_owned())
+        .unwrap()
+}
+
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn last_has_all_games_of_the_last_date_with_places_also_without_a_training(pool: PgPool) {
+async fn a_row_of_the_start_page_is_lighter_when_nothing_is_left_to_do(pool: PgPool) {
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    // Mon 26 Oct: the list runs until Sun 8 Nov, with the home games of 31 October.
+    reader.harness.clock.set(utc(2026, 10, 26, 12, 0));
+    reader.log_in_again().await;
+    let ours = first_game(&reader, |game| {
+        game["reason"] == "duty" && game["date"] == "2026-10-31"
+    })
+    .await;
+    let is_ours = |event: &Value| event["game"]["id"] == ours;
+    set_place(&reader, ours, "table", 1, Some(M16_1)).await;
+    assert_eq!(
+        look_in_next(&reader, is_ours).await,
+        "normal",
+        "an open place"
+    );
+    let anna = add_player(&reader, "Anna", None, "plays_games").await;
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/assignments/table/1", game_path(ours)),
+        Some(json!({ "player": anna })),
+    )
+    .await;
+    // Filled, but the schedule of the committee is not entered yet.
+    let path = format!("{}/schedule-entered", game_path(ours));
+    ok(&reader, "DELETE", &path, None).await;
+    assert_eq!(
+        look_in_next(&reader, is_ours).await,
+        "normal",
+        "not entered"
+    );
+    ok(&reader, "PUT", &path, None).await;
+    assert_eq!(look_in_next(&reader, is_ours).await, "lighter");
+
+    // A training of today that is checked.
+    ok(
+        &reader,
+        "POST",
+        "/api/trainings",
+        Some(json!({ "date": "2026-10-26", "start": "19:00", "end": "20:00" })),
+    )
+    .await;
+    let today = |event: &Value| event["training"]["date"] == "2026-10-26";
+    assert_eq!(look_in_next(&reader, today).await, "normal");
+    ok(&reader, "PUT", "/api/trainings/2026-10-26/checked", None).await;
+    assert_eq!(look_in_next(&reader, today).await, "lighter");
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn the_last_duty_games_are_the_games_of_the_last_date_with_places_but_not_of_the_team(
+    pool: PgPool,
+) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
     // Two home games of other club teams on 3 October with places of the team; no trainings.
@@ -842,14 +909,29 @@ async fn last_has_all_games_of_the_last_date_with_places_also_without_a_training
     for &id in &on_3_october {
         set_place(&reader, id, "referee", 1, Some(M16_1)).await;
     }
+    // The away game of the team on 10 October, newer and with a driver place, is left out: a game
+    // of the team is an open item until it is checked.
+    let away = season_games(&reader)
+        .await
+        .into_iter()
+        .find(|game| game["reason"] == "team" && game["date"] == "2026-10-10")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    ok(
+        &reader,
+        "PUT",
+        &format!("{}/drivers", game_path(away)),
+        Some(json!({ "drivers": 1 })),
+    )
+    .await;
     let answer = start(&reader).await;
-    assert!(answer["last"].is_null());
     assert_eq!(answer["last_games_season"], "2026-2027");
     let mut ids: Vec<i64> = answer["last_games"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|event| event["game"]["id"].as_i64().unwrap())
+        .map(|item| item["event"]["game"]["id"].as_i64().unwrap())
         .collect();
     ids.sort_unstable();
     let mut expected = on_3_october.clone();

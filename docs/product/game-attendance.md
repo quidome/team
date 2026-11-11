@@ -10,13 +10,13 @@ During the week before a game the coordinator keeps track of who comes, from the
 - The page of a game of the team has at the top the players with the role "plays games" on the date of the game, also hidden players. Players who only train are not on it.
 - Each player is "coming", "not coming" (with or without a reason) or "no answer". A player starts as "no answer".
 - Each row has "Coming" and "Not coming". One tap saves at once. A tap on the chosen state goes back to "no answer".
-- From the start page this takes two taps: a game in "Next", then a button.
+- From the start page this takes two taps: a game in the list of events, then a button.
 - The groups are "No answer", "Coming" and "Not coming", in that order, each sorted by first name. An empty group is not shown. The rows do not move while the page stays open; a row stays in its group until the page is opened again.
 - From the start time of the game (without a start time: from the start of the game day) the words are "There" and "Absent": the buttons, the groups and the count ("8 there · 1 absent"). Everything can still be changed ([how the tool treats what is stored](principles.md)).
 
 ### The count
 - Above the list the count stays in view, for example "6 coming · 1 not coming · 2 no answer". A part with 0 is left out. "Coming" is the players coming plus the extra players.
-- The row of a coming game of the team in "Next" shows the same count, also with no answers ("9 no answer"). On "Season" it shows with at least one answer or extra player. From the start time the row says "there" and "absent". The row of a game that left the game list has no count.
+- The row of a coming game of the team on the start page shows the same count, also with no answers ("9 no answer"). On "Season" it shows with at least one answer or extra player. From the start time the row says "there" and "absent". The row of a game that left the game list has no count.
 
 ### Reasons
 - A row with "not coming" has the link "Reason", or "Reason: School" with a chosen reason. The reasons do not open by themselves. They are the same reasons as at a training ([weekly trainings and reasons](weekly-trainings-and-reasons.md)): those that are not hidden, and a hidden reason the row already has.
@@ -37,7 +37,7 @@ During the week before a game the coordinator keeps track of who comes, from the
 - **One tap** saves at once. The game then counts nothing: no duty in the totals (drive, table, referee), no open places and no "schedule not entered", no warning and no open item, no line in the messages or the duty overviews, and it blocks no player at another game ([duties](duties.md)). It does not count in the totals of "Attendance" either. Nothing stored is deleted.
 - **The page** shows "Not played" with "Undo" at the top. The list of who comes is closed behind "Show the list", with the count beside it; opened, it works as before. Answers, extra players and duty places can still be changed ([how the tool treats what is stored](principles.md)). A driver's "· not coming" is not shown. "Undo" saves at once and makes everything count as before.
 - **"The drivers drove."** From the start time (without a start time: from the start of the game day), a not played game with driver places of the team has the switch "The drivers drove", off at first, with "No drive counts." or "The drives count." When it is on, its drives count in the duty totals as at a played game (done by the player on the place); the game is still no open item and in no overview. "Undo" keeps the switch; it has effect again only after a new "Not played".
-- **The rows** on "Season", in "Next" and in "Last" show "· Not played" after the hall and town; on a game of the team it replaces the count. A not played game stays in "Next" and "Last".
+- **The rows** on "Season" and on the start page show "· Not played" after the hall and town (a game of another club team: "Not played" below its teams); on a game of the team it replaces the count, and on the start page the row is lighter. A not played game stays in the list of events and among the last duty games.
 - **A mark holds for a date** (decision 0029): the mark stores the date of the game. When the game gets another date, it is a normal game of its new date again, with its answers and duties; the mark stays stored, so a game that moves back to the marked date is "not played" again without a new tap. A new tap stores the new date.
 - Two screens: the last tap wins.
 
@@ -49,7 +49,7 @@ During the week before a game the coordinator keeps track of who comes, from the
 - **A check holds for a date** (decision 0029): it stores the date of the game. When the game moves, the check has no effect and the players it made absent are "no answer" again; when the game moves back, both hold again. A check on the new date replaces the old one. Nothing stored is deleted.
 - **The open item** "Game Sat 31 Oct not checked" ("2 games not checked") is on the [start page](start-page.md) for each game of the team before today that is not checked, not "not played", still in the game list, and on or after 4 November 2026 (release 1, from which answers were entered). Older games are never an open item, and show their list closed behind "Show the list"; they can still be marked and checked.
 - **The totals.** A checked game that was played counts on [Attendance](trainings-and-attendance.md) for each player on its list with "there" or "absent".
-- **The rows** on "Season" and in "Last" show "· Checked" after the hall and town.
+- **The rows** on "Season" and on the start page show "· Checked" after the hall and town; on the start page a checked game of the team is lighter. A past game of the team is not in the list of the start page.
 - Two screens: the last check or undo wins. A tap at the same moment as "Checked" wins over it.
 
 ## Errors and limits

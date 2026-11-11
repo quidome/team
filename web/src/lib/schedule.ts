@@ -18,6 +18,16 @@ export function filterGames<T extends Pick<ScheduleGame, 'reason'>>(
 	return games.filter((game) => game.reason === filter);
 }
 
+/** "Tuesday 10 November" for a Dutch date such as "2026-11-10". */
+export function formatLongDay(date: string): string {
+	return new Intl.DateTimeFormat('en-GB', {
+		weekday: 'long',
+		day: 'numeric',
+		month: 'long',
+		timeZone: 'Europe/Amsterdam'
+	}).format(new Date(`${date}T12:00:00Z`));
+}
+
 /** "Sat 31 Oct" for a Dutch date such as "2026-10-31". */
 export function formatDay(date: string): string {
 	return new Intl.DateTimeFormat('en-GB', {

@@ -1,5 +1,6 @@
-//! The start page through the API (story B of start page and season): the open items come from
-//! the rules of their sources, "Last" and "Next".
+//! The start page through the API (story B of start page and season, and the quieter start
+//! page): the open items come from the rules of their sources, the last duty games, and the
+//! coming events with how each looks.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -20,6 +21,16 @@ async fn ok(reader: &Reader, method: &str, path: &str, body: Option<Value>) -> V
     let (status, answer) = reader.send(method, path, body).await;
     assert_eq!(status, 200, "{method} {path}: {answer}");
     answer
+}
+
+/// The events of `key` ("next" or "last_games") as on "Season", without how they look.
+fn events(answer: &Value, key: &str) -> Vec<Value> {
+    answer[key]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["event"].clone())
+        .collect()
 }
 
 /// The open item of `kind`, if any.
@@ -191,46 +202,6 @@ async fn a_past_training_not_checked_is_an_open_item_until_it_is_checked(pool: P
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn last_is_the_newest_past_training_also_when_checked(pool: PgPool) {
-    let reader = Reader::chosen(pool).await;
-    add_tuesdays(&reader, "2026-09-01", "2027-05-25").await;
-    ok(&reader, "PUT", "/api/trainings/2026-09-29/open", None).await;
-    ok(&reader, "PUT", "/api/trainings/2026-10-06/open", None).await;
-    ok(&reader, "PUT", "/api/trainings/2026-10-06/checked", None).await;
-    // A cancelled training after it is skipped.
-    ok(
-        &reader,
-        "POST",
-        "/api/trainings",
-        Some(json!({ "date": "2026-10-08", "start": "19:00", "end": "20:00" })),
-    )
-    .await;
-    ok(&reader, "POST", "/api/trainings/2026-10-08/cancel", None).await;
-
-    let last = start(&reader).await["last"]["training"].clone();
-    assert_eq!(
-        (&last["date"], &last["checked"], &last["status"]),
-        (&json!("2026-10-06"), &json!(true), &json!("all_there"))
-    );
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn last_shows_the_absent_players_of_its_training(pool: PgPool) {
-    let reader = Reader::chosen(pool).await;
-    add_tuesdays(&reader, "2026-09-01", "2027-05-25").await;
-    let avery = add_player(&reader, "Avery", "2026-09-01").await;
-    add_player(&reader, "Blake", "2026-09-01").await;
-    ok(&reader, "PUT", "/api/trainings/2026-10-06/open", None).await;
-    absent_at(&reader, "2026-10-06", avery).await;
-
-    let last = start(&reader).await["last"]["training"].clone();
-    assert_eq!(
-        (&last["date"], &last["status"], &last["absent"]),
-        (&json!("2026-10-06"), &json!("absent"), &json!(1))
-    );
-}
-
-#[sqlx::test(migrator = "team::db::MIGRATOR")]
 async fn next_has_the_team_games_and_trainings_of_two_weeks(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     reader.read_good().await;
@@ -238,7 +209,10 @@ async fn next_has_the_team_games_and_trainings_of_two_weeks(pool: PgPool) {
     // Monday 26 October: until Sunday 8 November.
     at(&mut reader, 2026, 10, 26, 9).await;
 
-    let next = start(&reader).await["next"].as_array().unwrap().clone();
+    let answer = start(&reader).await;
+    assert_eq!(answer["today"], "2026-10-26");
+    assert_eq!(answer["show_season"], false);
+    let next = events(&answer, "next");
     let dates: Vec<&str> = next
         .iter()
         .map(|event| event["date"].as_str().unwrap())
@@ -259,6 +233,29 @@ async fn next_has_the_team_games_and_trainings_of_two_weeks(pool: PgPool) {
         .collect();
     assert!(!games.is_empty());
     assert!(games.iter().all(|event| event["game"]["reason"] == "team"));
+
+    // A game of the team says home or away and its opponent; a training has neither. Nothing is
+    // checked yet, so every row is normal.
+    for item in answer["next"].as_array().unwrap() {
+        let game = &item["event"]["game"];
+        if game.is_null() {
+            assert!(
+                item["side"].is_null() && item["opponent"].is_null(),
+                "{item}"
+            );
+        } else {
+            let side = item["side"].as_str().unwrap();
+            let opponent = item["opponent"].as_str().unwrap();
+            let (ours, theirs) = if side == "home" {
+                (&game["home"], &game["away"])
+            } else {
+                (&game["away"], &game["home"])
+            };
+            assert!(ours.as_str().unwrap().contains("M16 1"), "{item}");
+            assert_eq!(theirs.as_str().unwrap(), opponent);
+        }
+        assert_eq!(item["look"], "normal", "{item}");
+    }
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
@@ -293,7 +290,7 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
 
     let answer = start(&reader).await;
     // Nothing in two weeks: the first coming training, in September.
-    let next = answer["next"].as_array().unwrap();
+    let next = events(&answer, "next");
     assert_eq!(next.len(), 1);
     assert_eq!(next[0]["date"], "2027-09-07");
     assert!(next[0]["game"].is_null());
@@ -311,12 +308,12 @@ async fn a_new_season_without_a_team_has_trainings_only(pool: PgPool) {
     .execute(reader.pool())
     .await
     .unwrap();
-    let next = start(&reader).await["next"].as_array().unwrap().clone();
+    let next = events(&start(&reader).await, "next");
     assert_eq!(next[0]["game"]["id"], 9000001, "{next:?}");
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn in_july_the_open_items_and_last_cover_the_season_before(pool: PgPool) {
+async fn in_july_the_open_items_and_the_header_cover_the_season_before(pool: PgPool) {
     let mut reader = Reader::chosen(pool).await;
     add_tuesdays(&reader, "2026-09-01", "2027-05-25").await;
     let avery = add_player(&reader, "Avery", "2026-09-01").await;
@@ -328,17 +325,16 @@ async fn in_july_the_open_items_and_last_cover_the_season_before(pool: PgPool) {
     let not_opened = item(&answer, "not_opened").unwrap();
     assert_eq!(not_opened["first"], "2026-09-01");
     assert_eq!(item(&answer, "not_checked").unwrap()["first"], "2027-05-25");
-    assert_eq!(answer["last"]["training"]["date"], "2027-05-25");
-    // The absences come from the season of the training, not from the current season.
-    assert_eq!(answer["last"]["training"]["status"], "absent");
-    assert_eq!(answer["last"]["training"]["absent"], 1);
+    assert_eq!(answer["show_season"], true);
+    // No past training is shown as an event: only as an open item.
+    assert!(answer["last_games"].as_array().unwrap().is_empty());
 
     // From September the season before is no longer covered.
     at(&mut reader, 2027, 9, 1, 10).await;
     let answer = start(&reader).await;
     assert_eq!(item(&answer, "not_opened"), None);
     assert_eq!(item(&answer, "not_checked"), None);
-    assert_eq!(answer["last"], Value::Null);
+    assert_eq!(answer["show_season"], false);
 }
 
 // The warnings in time (story B of attendance at games).

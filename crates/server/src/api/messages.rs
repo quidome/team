@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use serde::Serialize;
 use team_core::{
     MessageGame, PlacesOf, committee_message, driving_overview, full_names, table_referee_overview,
-    week_message, week_of,
+    week_has_duty_places, week_message, week_of,
 };
 use utoipa::ToSchema;
 
@@ -81,6 +81,12 @@ pub(crate) fn committee_text(
         &team.name,
         today,
     ))
+}
+
+/// Whether the start page offers the committee message: a team is chosen and this week has table
+/// or referee places of the team (decision 0034). Its page always has a text (decision 0026).
+pub(crate) fn committee_offered(games: &SeasonGames, places: &PlacesOf, today: NaiveDate) -> bool {
+    games.team.is_some() && week_has_duty_places(&message_games(games, places, today), today)
 }
 
 /// The driving overview of the season of `games` (the current season), with the duties of

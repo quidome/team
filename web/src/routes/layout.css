@@ -30,6 +30,8 @@
 	/* Games of the team stand out with this colour. */
 	--team: oklch(0.56 0.17 40);
 	--team-soft: oklch(0.96 0.035 55);
+	/* The other games with places of the team (the start page): a thin bar. */
+	--duty: oklch(0.5 0.13 250);
 	/* Text for a game that is no longer in the game list. */
 	--gone: oklch(0.5 0.19 27);
 }
@@ -56,6 +58,7 @@
 		--ring: oklch(0.72 0.17 48);
 		--team: oklch(0.74 0.16 50);
 		--team-soft: oklch(0.27 0.045 48);
+		--duty: oklch(0.72 0.12 250);
 		--gone: oklch(0.8 0.12 25);
 	}
 }
@@ -86,6 +89,7 @@
 	--color-ring: var(--ring);
 	--color-team: var(--team);
 	--color-team-soft: var(--team-soft);
+	--color-duty: var(--duty);
 	--color-gone: var(--gone);
 }
 

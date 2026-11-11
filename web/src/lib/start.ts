@@ -1,6 +1,12 @@
 // The start page (story B of start page and season): the words and the links of the open items.
 import { resolve } from '$app/paths';
-import type { DriverGameView, OpenGame, OpenItemView, TooFewGameView } from '#lib/api/client.js';
+import type {
+	DriverGameView,
+	OpenGame,
+	OpenItemView,
+	StartEvent,
+	TooFewGameView
+} from '#lib/api/client.js';
 import { formatDay } from '#lib/schedule.js';
 
 /** "1 change not seen", "3 changes not seen". */
@@ -141,4 +147,27 @@ export function gameItemText(game: {
 /** The training of `date`, opened from the start page: "Back" returns here. */
 export function trainingLink(date: string): string {
 	return `${resolve('/training/[date]', { date })}?from=start`;
+}
+
+/** The events of the start page grouped by date; the order of the server stays. */
+export function groupStartByDate(events: StartEvent[]): { date: string; events: StartEvent[] }[] {
+	const days: { date: string; events: StartEvent[] }[] = [];
+	for (const item of events) {
+		const last = days.at(-1);
+		if (last?.date === item.event.date) last.events.push(item);
+		else days.push({ date: item.event.date, events: [item] });
+	}
+	return days;
+}
+
+/** The first line of a game on the start page: "Home game against …" or "Away game at …" for a
+ * game of the team, else the two teams. */
+export function gameTitle(item: StartEvent): string {
+	const game = item.event.game;
+	if (!game) return '';
+	if (item.side && item.opponent)
+		return item.side === 'home'
+			? `Home game against ${item.opponent}`
+			: `Away game at ${item.opponent}`;
+	return `${game.home} – ${game.away}`;
 }

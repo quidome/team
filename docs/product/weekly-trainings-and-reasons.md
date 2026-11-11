@@ -34,5 +34,5 @@ marking attendance are in [trainings and attendance](trainings-and-attendance.md
 - Weekly trainings, training days and "today" are in Dutch local time, as the games.
 
 ## Interface
-- Screen: `/settings`, linked from the start page.
+- Screen: `/settings`, linked from the page "More" (`/more`) of the start page. Settings also has "Change club or team" ([choose club and team](choose-club-and-team.md)).
 - Server addresses (all need a login): `GET /api/weekly-trainings`, `GET /api/weekly-trainings/proposal?weekday=` (the proposed window, 1 = Monday), `POST /api/weekly-trainings`, `PUT /api/weekly-trainings/{id}`, `DELETE /api/weekly-trainings/{id}`; `GET /api/reasons`, `POST /api/reasons`, `PUT /api/reasons/{id}`.

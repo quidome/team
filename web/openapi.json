@@ -2238,7 +2238,7 @@
         "operationId": "start",
         "responses": {
           "200": {
-            "description": "The open items, the last training and the next events",
+            "description": "The open items, the last duty games and the next events",
             "content": {
               "application/json": {
                 "schema": {
@@ -3774,6 +3774,13 @@
           "source_format"
         ]
       },
+      "EventLookView": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "lighter"
+        ]
+      },
       "EventView": {
         "type": "object",
         "description": "One event: a game or a training (or a training day not opened). Exactly one of `game` and\n`training` is set.",
@@ -4375,7 +4382,7 @@
         "properties": {
           "committee": {
             "type": "boolean",
-            "description": "\"Committee message\": the same rule as `GET /api/messages/committee`."
+            "description": "\"Committee message\": this week has table or referee places of the team (decision 0034)."
           },
           "week": {
             "type": "boolean",
@@ -6143,32 +6150,30 @@
           }
         }
       },
+      "SideView": {
+        "type": "string",
+        "enum": [
+          "home",
+          "away"
+        ]
+      },
       "StartAnswer": {
         "type": "object",
         "required": [
+          "today",
+          "show_season",
           "open_items",
           "next",
           "last_games",
           "messages"
         ],
         "properties": {
-          "last": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/EventView",
-                "description": "The last training before today that is not cancelled, as an event; `null` when there is\nnone."
-              }
-            ]
-          },
           "last_games": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/EventView"
+              "$ref": "#/components/schemas/StartEvent"
             },
-            "description": "The games of the last date before today with places of the team, in time order, in the\nseasons of the open items (in July and August also the season before)."
+            "description": "The games of the last date before today with places of the team that are not games of the\nteam, in time order, in the seasons of the open items (in July and August, when the\ncurrent season has none, the season before)."
           },
           "last_games_season": {
             "type": [
@@ -6184,7 +6189,7 @@
           "next": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/EventView"
+              "$ref": "#/components/schemas/StartEvent"
             },
             "description": "The games of the team, the home games of other club teams with places of the team, and\nthe trainings from today until the Sunday of next week, in time order; when there are\nnone, the first coming one."
           },
@@ -6194,6 +6199,49 @@
               "$ref": "#/components/schemas/OpenItemView"
             },
             "description": "What still needs the coordinator, in the order of the start page."
+          },
+          "show_season": {
+            "type": "boolean",
+            "description": "The header shows the season: in July and August, when the open items also cover the\nseason before."
+          },
+          "today": {
+            "type": "string",
+            "description": "Today, the Dutch date, for example \"2026-11-10\"."
+          }
+        }
+      },
+      "StartEvent": {
+        "type": "object",
+        "description": "One event of the start page: the event as on \"Season\", and how its row looks.",
+        "required": [
+          "event",
+          "look"
+        ],
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/EventView"
+          },
+          "look": {
+            "$ref": "#/components/schemas/EventLookView",
+            "description": "`lighter`: nothing is left to do (`team_core::event_look`)."
+          },
+          "opponent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The other team; only for a game of the team."
+          },
+          "side": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SideView",
+                "description": "Home or away; only for a game of the team."
+              }
+            ]
           }
         }
       },

@@ -55,14 +55,23 @@ test('"Not played" closes the list, keeps it changeable, and "Undo" brings every
 	expect(errors).toEqual([]);
 });
 
-test('"Last" on the start page shows "· Not played"', async ({ page }) => {
-	// Driver places make the past away game a game with places of the team, so it is in "Last".
-	await page.request.put(apiPath(AWAY_10_OCT, 'drivers'), { ...origin, data: { drivers: 1 } });
+test('a game marked "Not played" says so on the start page', async ({ page }) => {
 	await page.request.put(apiPath(AWAY_10_OCT, 'not-played'), origin);
 	try {
+		// The game as the server gives it now, shown as a coming game of the team (the clock has no
+		// game of the team in the two weeks of the list).
+		const season = await (await page.request.get('/api/season')).json();
+		const event = season.past.find((e: { game?: { id: number } }) => e.game?.id === AWAY_10_OCT);
+		await page.route('**/api/start', async (route) => {
+			const start = await (await route.fetch()).json();
+			start.next = [{ event, look: 'lighter', side: 'away', opponent: 'De Dunckers M16 3' }];
+			await route.fulfill({ json: start });
+		});
 		await page.goto('/');
-		const row = page.getByTestId('last').locator(`[data-testid="game"][data-id="${AWAY_10_OCT}"]`);
-		await expect(row.getByTestId('game-not-played')).toHaveText('· Not played');
+		const row = page.getByTestId('next').locator(`[data-testid="game"][data-id="${AWAY_10_OCT}"]`);
+		await expect(row).toHaveAttribute('data-look', 'lighter');
+		await expect(row.getByTestId('game-title')).toHaveText('Away game at De Dunckers M16 3');
+		await expect(row.getByTestId('game-not-played')).toHaveText('Not played');
 	} finally {
 		await page.request.delete(apiPath(AWAY_10_OCT, 'not-played'), origin);
 	}

@@ -3,6 +3,8 @@ import type { PageLoad } from './$types';
 
 export const load: PageLoad = async (event) => {
 	const { me } = await event.parent();
-	if (!me) return { message: null };
-	return { message: await loadCommitteeMessage(event.fetch) };
+	// "Back" returns to the page the message was opened from: "Duties" or the start page.
+	const fromDuties = event.url.searchParams.get('from') === 'duties';
+	if (!me) return { message: null, fromDuties };
+	return { message: await loadCommitteeMessage(event.fetch), fromDuties };
 };

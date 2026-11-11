@@ -9,7 +9,7 @@ week, for the team and the parents, and the committee message, for the referee c
 duty overviews show all coming duties of one group, for the team and the parents.
 
 ## Behaviour
-- **Where.** The [start page](start-page.md) has a part "Messages" below "Next" whenever a team is chosen for the current season, because the button "Committee message" is always in it. The button "Message of the week" is there when this week (Monday to Sunday, Dutch time) has something to announce: a game of the team today or later, or table or referee places of the team. A past place that stayed open does not count for this.
+- **Where.** The [start page](start-page.md) has the links below its list of events, when a team is chosen for the current season. "Message of the week ›" is there when this week (Monday to Sunday, Dutch time) has something to announce: a game of the team today or later, or table or referee places of the team. A past place that stayed open does not count for this. "Committee message ›" is there when this week has table or referee places of the team that count, also on a day that has passed (the same games as its text; decision 0034). The page "Duties" always has the button "Committee message" for the current season.
 - **The page** (`/messages/week`) shows the text, made from what is stored at that moment, and "Copy". "Copy" puts the text on the clipboard and says "Copied". When the browser refuses, the text stays shown with "Select the text and copy it."; a tap on the text selects all of it ([the report](report.md) copies its columns the same way). "Back" returns to the start page. Opened without a message (for example from an old link): "No message this week."
 - **The text**, for example:
 
@@ -35,7 +35,7 @@ duty overviews show all coming duties of one group, for the team and the parents
   - Only places that count are in it ([duties](duties.md)): a coming game that left the game list, or that is no longer a home game of the club, is not. A past game keeps what is stored. A game marked "Not played" is in no message: no block "Wedstrijd:", no drivers and no places ([attendance at games](game-attendance.md)).
   - Two players with the same first name show the first letter of the last name ("Anna B.", "Anna V."), as on the other pages.
   - Without a game of the team from today to Sunday the text has the heading and the places; without places it has no second part.
-- **The committee message** is the second button in "Messages", whenever a team is chosen for the current season, also in a week without places. The page (`/messages/committee`) works the same, with "Copy" and "Back"; without a team it says "No message: no team chosen." The text covers the same week:
+- **The committee message** is a link on the start page in a week with table or referee places of the team, and a button on "Duties" next to the duty overviews, for the current season, also in a week without places and without a chosen team. The page (`/messages/committee`) works the same, with "Copy" and "Back" to the page it was opened from (the start page, or "Duties" with `?from=duties`); without a team it says "No message: no team chosen." The text covers the same week:
 
   ```
   Tafel en scheidsrechters Blue Drakes M16 1, week 26 oktober – 1 november
@@ -51,7 +51,7 @@ duty overviews show all coming duties of one group, for the team and the parents
 
   The games and the lines follow the same rules as "Tafel en scheidsrechter:" above, with first and last names (the first name only when there is no last name). A past place that stayed open shows "niemand", also when nothing else is in the week. Without places: the heading and "Geen tafel- of scheidsrechtersdiensten deze week."
 
-- **The duty overviews** are two buttons on the page "Duties", "Driving overview" and "Table and referee overview", for the current season only; for an earlier season they are not shown. They also show without a chosen team: the page then says "No overview: no team chosen." The pages (`/duties/driving`, `/duties/table-referee`) work as the other messages, with "Copy", and "Back" to "Duties". The texts show all coming duties of the season, from today, so they grow with each new schedule. They have no counts.
+- **The duty overviews** are two buttons on the page "Duties", "Driving overview" and "Table and referee overview", next to "Committee message", for the current season only; for an earlier season they are not shown. They also show without a chosen team: the page then says "No overview: no team chosen." The pages (`/duties/driving`, `/duties/table-referee`) work as the other messages, with "Copy", and "Back" to "Duties". The texts show all coming duties of the season, from today, so they grow with each new schedule. They have no counts.
 
   ```
   Rijden Blue Drakes M16 1
@@ -89,6 +89,6 @@ duty overviews show all coming duties of one group, for the team and the parents
 
 ## Interface
 - Screens: `/messages/week`, `/messages/committee`, `/duties/driving`, `/duties/table-referee`.
-- Server address (needs a login): `GET /api/messages/week`: `{ "text": "…" }`, or `{ "text": null }` when there is no message. `GET /api/start` has `messages.week` from the same rule. `GET /api/messages/committee`: the same form, `null` only without a chosen team; `messages.committee` from the same rule.
+- Server address (needs a login): `GET /api/messages/week`: `{ "text": "…" }`, or `{ "text": null }` when there is no message. `GET /api/start` has `messages.week` from the same rule. `GET /api/messages/committee`: the same form, `null` only without a chosen team; `messages.committee` of `GET /api/start` is true when this week has table or referee places of the team (`team_core::week_has_duty_places`).
 - `GET /api/messages/driving` and `GET /api/messages/table-referee` (need a login): the same form, `null` only without a chosen team.
 - The rules are `team_core::week_message` (with `week_of`), `team_core::committee_message` (with `full_names`), `team_core::driving_overview` and `team_core::table_referee_overview`; the server calls each in one place (`api::messages::week_text`, `committee_text`). Decisions 0024, 0025 and 0026 record the choices.

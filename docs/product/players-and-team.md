@@ -10,8 +10,9 @@ the player's **role** in the team of a season: "Plays games" or "Only trains". B
 training. The roles of a player, one after the other, are the player's history.
 
 Two pages: **Players** (every player the coordinator ever entered) and **Team** (the team of the
-current season). The start page links to both, to [attendance](trainings-and-attendance.md) and to
-the settings ("Season · Attendance · Duties · Report · Team · Players · Settings").
+current season). The start page links to [attendance](trainings-and-attendance.md) and to "More"
+("Season · Attendance · Duties · Report · More"); "More" (`/more`) links to Team, Players and
+Settings.
 
 ## Behaviour
 ### Players
@@ -55,5 +56,5 @@ the settings ("Season · Attendance · Duties · Report · Team · Players · Se
 - The data exists only in the tool. A nightly encrypted copy of the database is kept on the home storage (TrueNAS), not yet outside the house.
 
 ## Interface
-- Screens: `/players`, `/players/[id]`, `/team`; the links on the start page (`/`).
+- Screens: `/players`, `/players/[id]`, `/team`; the links on the page "More" (`/more`).
 - Server addresses (all need a login): `GET /api/players` (all players with the role today), `POST /api/players` (add, with an optional role), `GET /api/players/{id}` (the player with the history), `PUT /api/players/{id}` (name and hidden), `DELETE /api/players/{id}`, `PUT /api/players/{id}/roles/{role}` ("Correct"), `GET /api/team` (the team page), `POST /api/players/{id}/roles` ("Add player" from the list, "Add to the team"), `POST /api/players/{id}/role-change` ("Change role"), `POST /api/players/{id}/team-leave` ("Remove from the team", with the confirmed roles), `POST /api/players/{id}/team-undo` ("Undo"), `POST /api/players/carry` ("Add all", with a date).

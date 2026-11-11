@@ -52,7 +52,7 @@ test('the coordinator finds the club and chooses the team', async ({ page }) => 
 	// no trainings), and in "Next" the first game of the team, because the two weeks from Mon 12 Oct
 	// have none.
 	await expect(page.getByTestId('chosen-team')).toHaveText('Blue Drakes M16 1');
-	await expect(page.getByRole('link', { name: 'Change' })).toBeVisible();
+	await expect(page.getByTestId('team-links').getByRole('link', { name: 'More' })).toBeVisible();
 	await expect(page.getByTestId('open-item')).toHaveText([
 		/^\d+ home games: schedule not entered$/
 	]);
@@ -256,8 +256,8 @@ test.describe('the open items of changes', () => {
 });
 
 test('the coordinator changes the team later', async ({ page }) => {
-	await page.goto('/');
-	await page.getByRole('link', { name: 'Change' }).click();
+	await page.goto('/settings');
+	await page.getByRole('link', { name: 'Change club or team' }).click();
 	await expect(page).toHaveURL('/choose');
 	await expect(page.getByRole('heading', { name: 'Blue Drakes' })).toBeVisible();
 	await page.getByTestId('team-choice').filter({ hasText: 'M16 2' }).click();
