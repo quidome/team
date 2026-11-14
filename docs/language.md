@@ -6,7 +6,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | Term | Meaning | Use / do not use |
 |------|---------|------------------|
 | coordinator | The one person who uses the tool and changes its data. Runs one team in each season. | Not "admin", not "user" when the coordinator is meant. |
-| team | The youth team the coordinator runs in one season: the team chosen from the game list for that season. Each season has its own team, often with the same players. | Say "other club team" for the club's other teams. |
+| team | The youth team the coordinator runs in one season: the team chosen from the game list for that season. Each season has its own team, often with the same players. | Say "other club team" for the club's other teams. In a count or a list of several teams on a screen, "teams" may mean club teams, for example "second half: 3 of 4 teams known". |
 | club | The sports club the team belongs to. It has the players and the teams of each season. | |
 | season | The year of the club's competitions: from 1 July until 30 June, as the federation counts it. | "2026-2027". |
 | half season | The first half (1 July until 31 December) or the second half (1 January until 30 June) of a season: the period of one schedule of the referee committee, for the home games of all club teams. | "The second half". Not for a competition: a senior team has no halves. |
