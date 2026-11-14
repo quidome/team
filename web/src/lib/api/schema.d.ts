@@ -1512,6 +1512,7 @@ export interface components {
 					games: components['schemas']['GameItemView'][];
 					/** @enum {string} */
 					kind: 'schedule_not_entered';
+					second_half?: null | components['schemas']['SecondHalfView'];
 			  }
 			| {
 					games: components['schemas']['OpenGameView'][];
@@ -1885,6 +1886,14 @@ export interface components {
 			team?: null | components['schemas']['TeamView'];
 			/** @description Dutch date: events of today and later are coming. */
 			today: string;
+		};
+		/**
+		 * @description The club teams known for the second half of the season (a competition that starts in it), of
+		 *     the known and the waiting club teams (games in the first half, none in the second).
+		 */
+		SecondHalfView: {
+			known: number;
+			of: number;
 		};
 		SeenAnswer: {
 			/**

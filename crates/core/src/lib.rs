@@ -36,6 +36,7 @@ pub use events::club::{Club, ClubNumber, search_clubs};
 pub use events::game::{
     Game, Place, PlaceNumber, Side, TeamNumber, start_time_from_source, started,
 };
+pub use events::half_season::{HalfCount, HalfSeasons, half_seasons};
 pub use events::schedule::{
     Schedule, ScheduleReason, ScheduledGame, StoredGame, in_schedule, schedule,
 };
@@ -62,13 +63,13 @@ pub use output::messages::{
 pub use output::report::{ReportColumn, ReportRow, Share, percent, report_copy, report_rows};
 pub use output::season_view::{Event, EventKind, SeasonEvents, season_events};
 pub use output::start_page::{
-    EventLook, NotCheckedGame, NotCheckedGames, OpenGame, OpenItem, PlacesOf, ReadingState,
-    duty_games_not_checked, event_look, games_not_checked, next_events, open_item_seasons,
-    open_items, open_places_games, schedule_not_entered,
+    EventLook, NotCheckedGame, NotCheckedGames, NotEntered, OpenGame, OpenItem, PlacesOf,
+    ReadingState, duty_games_not_checked, event_look, games_not_checked, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered,
 };
 pub use shared::access::{Identity, may_access};
 pub use shared::mark::mark_holds;
-pub use shared::season::{Season, SeasonError};
+pub use shared::season::{Half, Season, SeasonError};
 pub use team::players::{
     Group, Member, Placement, Player, PlayerError, PlayerId, PlayerRole, Removal, Role, RoleChange,
     RoleDates, RoleId, TeamPage, change_role, check_change, check_role, clean_name, place,

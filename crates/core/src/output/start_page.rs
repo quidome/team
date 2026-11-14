@@ -12,10 +12,11 @@ use crate::contribution::duties::{
     not_entered, open_by_kind, open_places,
 };
 use crate::contribution::game_attendance::{GameAttendance, GameCount, GameWarnings, checked};
+use crate::events::half_season::{HalfCount, HalfSeasons};
 use crate::events::schedule::{ScheduleReason, ScheduledGame};
 use crate::events::training::{SeasonList, not_checked, not_opened};
 use crate::output::season_view::{Event, EventKind, SeasonEvents};
-use crate::shared::season::Season;
+use crate::shared::season::{Half, Season};
 use crate::team::players::PlayerId;
 
 /// The state of the game list for the open items (Dutch dates).
@@ -51,10 +52,12 @@ pub enum OpenItem {
     AnswersMoved {
         games: Vec<i64>,
     },
-    /// Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time
-    /// order (by source id).
+    /// Coming home games of the club of the half seasons that are ready, whose schedule is not
+    /// entered, in time order (by source id), with the count of the second half when one of them
+    /// is in it (`schedule_not_entered`, decision 0037).
     ScheduleNotEntered {
         games: Vec<i64>,
+        second_half: Option<HalfCount>,
     },
     /// Coming games with places of the team without a player (`open_places_games`), in time
     /// order.
@@ -189,30 +192,44 @@ pub struct OpenGame {
 /// The duty places of the games of a season, by source id (`duties::game_places`).
 pub type PlacesOf = BTreeMap<i64, GamePlaces>;
 
-/// The days a duty open item covers: today and the next 27 days (4 weeks).
+/// The days the open item of open table and referee places covers: today and the next 27 days
+/// (4 weeks).
 const DUTY_DAYS: u64 = 27;
 
-/// The home games of the club from today to 4 weeks ahead whose schedule is not entered and whose
-/// places count (in the game list, still a home game of the club), in time order. A past game is
-/// never in it.
+/// The open item "schedule not entered": its games, and the count of the second half when one of
+/// them is in that half.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NotEntered {
+    pub games: Vec<i64>,
+    pub second_half: Option<HalfCount>,
+}
+
+/// The coming home games of the club whose schedule is not entered and whose places count (in the
+/// game list, still a home game of the club, not "not played"), in time order, of the half seasons
+/// that are ready (`halves`), with no date limit (decision 0037). A past game is never in it.
 pub fn schedule_not_entered(
     events: &SeasonEvents<'_>,
     places: &PlacesOf,
-    today: NaiveDate,
-) -> Vec<i64> {
-    let until = today
-        .checked_add_days(Days::new(DUTY_DAYS))
-        .unwrap_or(today);
-    events
+    halves: &HalfSeasons,
+) -> NotEntered {
+    let games: Vec<(NaiveDate, i64)> = events
         .coming
         .iter()
-        .filter(|event| event.date <= until)
+        .filter(|event| halves.ready(Half::of(event.date)))
         .filter_map(|event| match event.kind {
-            EventKind::Game(scheduled) => Some(scheduled.game.source_id),
+            EventKind::Game(scheduled) => Some((event.date, scheduled.game.source_id)),
             EventKind::Training(..) => None,
         })
-        .filter(|id| places.get(id).is_some_and(not_entered))
-        .collect()
+        .filter(|(_, id)| places.get(id).is_some_and(not_entered))
+        .collect();
+    let second_half = games
+        .iter()
+        .any(|&(date, _)| Half::of(date) == Half::Second)
+        .then_some(halves.second);
+    NotEntered {
+        games: games.into_iter().map(|(_, id)| id).collect(),
+        second_half,
+    }
 }
 
 /// The coming games with places of the team that count and have no player, in time order: the
@@ -257,7 +274,7 @@ pub fn open_places_games(
 pub fn open_items(
     reading: &ReadingState,
     unseen: u32,
-    schedule_not_entered: Vec<i64>,
+    schedule_not_entered: NotEntered,
     open_places: Vec<OpenGame>,
     lists: &[SeasonList<'_>],
     warnings: &[(i64, GameWarnings)],
@@ -300,9 +317,10 @@ pub fn open_items(
     if !moved.is_empty() {
         items.push(OpenItem::AnswersMoved { games: moved });
     }
-    if !schedule_not_entered.is_empty() {
+    if !schedule_not_entered.games.is_empty() {
         items.push(OpenItem::ScheduleNotEntered {
-            games: schedule_not_entered,
+            games: schedule_not_entered.games,
+            second_half: schedule_not_entered.second_half,
         });
     }
     if !open_places.is_empty() {
@@ -533,7 +551,7 @@ mod tests {
             open_items(
                 &reading,
                 4,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[list],
                 &[],
@@ -567,7 +585,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[one],
                 &[],
@@ -590,7 +608,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[three],
                 &[],
@@ -614,7 +632,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[this, before],
                 &[],
@@ -639,7 +657,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[list],
                 &[],
@@ -661,7 +679,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[list],
                 &[],
@@ -830,8 +848,24 @@ mod tests {
         .expect("places")
     }
 
+    /// Half seasons with 3 club teams known (ready) or none (not ready); the second half has
+    /// `waiting` club teams waiting.
+    fn halves(first: bool, second: bool, waiting: usize) -> HalfSeasons {
+        let known = |ready: bool| if ready { 3 } else { 0 };
+        HalfSeasons {
+            first: HalfCount {
+                known: known(first),
+                waiting: 0,
+            },
+            second: HalfCount {
+                known: known(second),
+                waiting,
+            },
+        }
+    }
+
     #[test]
-    fn schedule_not_entered_covers_the_home_games_of_the_next_4_weeks() {
+    fn schedule_not_entered_covers_the_coming_home_games_of_a_ready_half() {
         let mut gone = scheduled(3, date(2026, 10, 31), ScheduleReason::DutyGame);
         gone.in_list = false;
         let games = [
@@ -854,11 +888,88 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        // Mon 26 Oct: until Sun 22 Nov (today + 27 days). Gone, entered and swapped games are
-        // left out; a home game of the team is in it.
+        // The first half is ready: no date limit, so game 4 (23 Nov, past the old 27 days) is in
+        // it. Gone, entered and swapped games are left out; a home game of the team is in it.
         assert_eq!(
-            schedule_not_entered(&events, &places, date(2026, 10, 26)),
-            [1, 2]
+            schedule_not_entered(&events, &places, &halves(true, false, 0)),
+            NotEntered {
+                games: vec![1, 2, 4],
+                second_half: None
+            }
+        );
+    }
+
+    #[test]
+    fn a_half_that_is_not_ready_gives_no_schedule_not_entered() {
+        // Mon 26 Oct: a home game 10 days ahead, but only 2 club teams count for the first half.
+        let games = [scheduled(1, date(2026, 11, 5), ScheduleReason::DutyGame)];
+        let events = coming(&games, &[]);
+        let places: PlacesOf = [(1, home_places(false, false, true, true, false))]
+            .into_iter()
+            .collect();
+        let mut two = halves(false, false, 0);
+        two.first.known = 2;
+        assert_eq!(
+            schedule_not_entered(&events, &places, &two),
+            NotEntered::default()
+        );
+        assert!(
+            open_items(
+                &ReadingState::default(),
+                0,
+                schedule_not_entered(&events, &places, &two),
+                Vec::new(),
+                &[],
+                &[],
+                NotCheckedGames {
+                    games: &[],
+                    duty_games: &[]
+                }
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn the_count_of_the_second_half_comes_with_a_home_game_of_the_second_half() {
+        let games = [
+            scheduled(1, date(2026, 12, 19), ScheduleReason::DutyGame),
+            scheduled(2, date(2027, 1, 9), ScheduleReason::DutyGame),
+            scheduled(3, date(2027, 3, 20), ScheduleReason::DutyGame),
+        ];
+        let events = coming(&games, &[]);
+        let places: PlacesOf = (1..=3)
+            .map(|id| (id, home_places(false, false, true, true, false)))
+            .collect();
+        // Only the first half is ready: its game, without a count.
+        assert_eq!(
+            schedule_not_entered(&events, &places, &halves(true, false, 1)),
+            NotEntered {
+                games: vec![1],
+                second_half: None
+            }
+        );
+        // Only the second half is ready: its games, with its count.
+        assert_eq!(
+            schedule_not_entered(&events, &places, &halves(false, true, 1)),
+            NotEntered {
+                games: vec![2, 3],
+                second_half: Some(HalfCount {
+                    known: 3,
+                    waiting: 1
+                })
+            }
+        );
+        // Both are ready: the games of both, with the count of the second half.
+        assert_eq!(
+            schedule_not_entered(&events, &places, &halves(true, true, 1)),
+            NotEntered {
+                games: vec![1, 2, 3],
+                second_half: Some(HalfCount {
+                    known: 3,
+                    waiting: 1
+                })
+            }
         );
     }
 
@@ -869,7 +980,10 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 2,
-                vec![7, 8],
+                NotEntered {
+                    games: vec![7, 8],
+                    second_half: None
+                },
                 Vec::new(),
                 &[list],
                 &[],
@@ -880,7 +994,10 @@ mod tests {
             ),
             [
                 OpenItem::ChangesNotSeen { count: 2 },
-                OpenItem::ScheduleNotEntered { games: vec![7, 8] },
+                OpenItem::ScheduleNotEntered {
+                    games: vec![7, 8],
+                    second_half: None
+                },
                 OpenItem::NotOpened {
                     first: date(2026, 10, 6),
                     count: 1
@@ -981,7 +1098,10 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                vec![7],
+                NotEntered {
+                    games: vec![7],
+                    second_half: None
+                },
                 open.clone(),
                 &[list],
                 &[],
@@ -991,7 +1111,10 @@ mod tests {
                 }
             ),
             [
-                OpenItem::ScheduleNotEntered { games: vec![7] },
+                OpenItem::ScheduleNotEntered {
+                    games: vec![7],
+                    second_half: None
+                },
                 OpenItem::OpenPlaces { games: open },
                 OpenItem::NotOpened {
                     first: date(2026, 10, 6),
@@ -1060,7 +1183,10 @@ mod tests {
             open_items(
                 &reading,
                 4,
-                vec![7],
+                NotEntered {
+                    games: vec![7],
+                    second_half: None
+                },
                 open.clone(),
                 &[list],
                 &warnings,
@@ -1082,7 +1208,10 @@ mod tests {
                     games: vec![(5, vec![PlayerId(3)])]
                 },
                 OpenItem::AnswersMoved { games: vec![5] },
-                OpenItem::ScheduleNotEntered { games: vec![7] },
+                OpenItem::ScheduleNotEntered {
+                    games: vec![7],
+                    second_half: None
+                },
                 OpenItem::OpenPlaces { games: open },
                 OpenItem::NotOpened {
                     first: date(2026, 9, 29),
@@ -1108,7 +1237,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[],
                 &warnings,
@@ -1138,7 +1267,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[],
                 &line_only,
@@ -1193,7 +1322,11 @@ mod tests {
         let events = coming(&games, &[]);
         let places: PlacesOf = [(1, not_played_places(false))].into_iter().collect();
         let today = date(2026, 10, 26);
-        assert!(schedule_not_entered(&events, &places, today).is_empty());
+        assert!(
+            schedule_not_entered(&events, &places, &halves(true, true, 0))
+                .games
+                .is_empty()
+        );
         assert!(open_places_games(&events, &places, today).is_empty());
         assert_eq!(
             dates(&next_events(&events, &places, today)),
@@ -1283,7 +1416,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[list],
                 &[],
@@ -1401,7 +1534,7 @@ mod tests {
             open_items(
                 &ReadingState::default(),
                 0,
-                Vec::new(),
+                NotEntered::default(),
                 Vec::new(),
                 &[],
                 &[],

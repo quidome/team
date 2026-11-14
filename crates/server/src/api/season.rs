@@ -11,12 +11,12 @@ use serde::Serialize;
 use team_core::{
     Absence, Assignment, Club, ClubNumber, DriverPart, DutyKind, DutyPlace, Event, EventKind,
     FollowedTeam, Game, GameAttendance, GameCount, GameDuties, GameMoment, GamePlaces,
-    GameWarnings, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole, Schedule,
-    ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties, StoredGame,
-    Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, check_kind,
-    display_names, game_checked, game_list, game_places, game_warnings, kept_games, not_entered,
-    open_places, players_playing_on, plays_games_on, plays_the_game, required_duties, row_count,
-    schedule, season_events, season_list, started, team_games,
+    GameWarnings, HalfSeasons, ListRow, Outcome, PlaceKind, PlacesOf, Player, PlayerId, PlayerRole,
+    Schedule, ScheduleReason, ScheduledGame, Season, SeasonEvents, SeasonList, StoredDuties,
+    StoredGame, Team, TeamNumber, TeamRef, Training, WeeklyTraining, answers_in_effect, check_kind,
+    display_names, game_checked, game_list, game_places, game_warnings, half_seasons, kept_games,
+    not_entered, open_places, players_playing_on, plays_games_on, plays_the_game, required_duties,
+    row_count, schedule, season_events, season_list, started, team_games,
 };
 use utoipa::ToSchema;
 
@@ -725,6 +725,9 @@ pub(crate) struct SeasonGames {
     pub unseen_changes: u32,
     /// The stored duties and the roles of the season; empty without a chosen team.
     pub duties: SeasonDuties,
+    /// The club teams known and waiting for each half season, from all stored games of the club
+    /// in the season (decision 0037); no half is ready without a chosen team.
+    pub halves: HalfSeasons,
 }
 
 /// The duties of the games of `games` (the schedule of a season), by source id; empty without a
@@ -791,6 +794,7 @@ pub(crate) async fn games_in(
             schedule: Schedule::default(),
             unseen_changes: 0,
             duties: SeasonDuties::default(),
+            halves: HalfSeasons::default(),
         });
     };
     let stored = games::stored(&mut *db, club.number, season).await?;
@@ -803,6 +807,7 @@ pub(crate) async fn games_in(
     let unseen_changes = u32::try_from(changes.len())
         .map_err(|_| StoreError::Invalid(format!("{} changes", changes.len())))?;
     let duties = load_duties(state, &mut *db, club.number, season).await?;
+    let halves = half_seasons(club.number, &stored);
     let schedule = schedule(
         stored,
         club.number,
@@ -818,6 +823,7 @@ pub(crate) async fn games_in(
         schedule,
         unseen_changes,
         duties,
+        halves,
     })
 }
 

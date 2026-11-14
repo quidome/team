@@ -1,6 +1,6 @@
 # Technical spec: Schedule not entered for each half season
 
-**Status**: approved
+**Status**: in progress
 **Size**: story
 **Change**: docs/changes/2026-11-14-schedule-per-half-season
 **Date**: 2026-11-14
@@ -231,13 +231,19 @@ Examples that the tests follow (real game lists in `crates/server/tests/data/gam
   season).
 
 ## Progress
-- [ ] Step 1
-- [ ] Step 2
+- [x] Step 1 (2026-11-14: `Half::of`, `events/half_season.rs`; 11 unit tests)
+- [x] Step 2 (2026-11-14: `schedule_not_entered` with `HalfSeasons` and `NotEntered`, `SeasonGames.halves`, `SecondHalfView`; 2 core tests added and 1 rewritten, 2 server tests on the real game lists; test 12 fails when every half is ready)
 - [ ] Step 3
 - [ ] All checks pass
 
 ## Deviations
-None. The design reads "the club teams" of story 1 as the sides of the games still in the game
+- 2026-11-14 (Implement, step 2): the test plan missed one existing test of the 27-day limit,
+  `schedule_not_entered_lists_the_home_games_of_4_weeks_and_shrinks` in
+  `crates/server/tests/games.rs`. Renamed to `..._of_the_ready_half_and_shrinks`; it now expects
+  the coming home games of the first half until 31 December, with the home games of 14 November,
+  and no count of the second half. No change of behaviour.
+
+The design reads "the club teams" of story 1 as the sides of the games still in the game
 list whose club is the club of the choice; that is the criterion of the spec (spec review S5).
 
 ## Review findings

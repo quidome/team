@@ -9,10 +9,10 @@ use axum::Json;
 use axum::extract::State;
 use serde::Serialize;
 use team_core::{
-    DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HomeOrAway,
-    NotCheckedGame, NotCheckedGames, OpenItem, PlacesOf, PlayerId, ReadingState, ScheduleReason,
-    Season, duty_games_not_checked, event_look, games_not_checked, next_events, open_item_seasons,
-    open_items, open_places_games, schedule_not_entered, team_side,
+    DutyKind, ENOUGH_PLAYERS, Event, EventKind, EventLook, Game, GameWarnings, HalfCount,
+    HomeOrAway, NotCheckedGame, NotCheckedGames, OpenItem, PlacesOf, PlayerId, ReadingState,
+    ScheduleReason, Season, duty_games_not_checked, event_look, games_not_checked, next_events,
+    open_item_seasons, open_items, open_places_games, schedule_not_entered, team_side,
 };
 use utoipa::ToSchema;
 
@@ -131,9 +131,13 @@ pub enum OpenItemView {
     DriverNotComing { games: Vec<DriverGameView> },
     /// Games of the team in their warning period with answers from before a move.
     AnswersMoved { games: Vec<GameItemView> },
-    /// Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time
-    /// order.
-    ScheduleNotEntered { games: Vec<GameItemView> },
+    /// Coming home games of the club whose schedule is not entered, of the half seasons that are
+    /// ready (more than 2 club teams have a competition that starts in it), in time order; with
+    /// the count of the second half when one of them is in it (decision 0037).
+    ScheduleNotEntered {
+        games: Vec<GameItemView>,
+        second_half: Option<SecondHalfView>,
+    },
     /// Coming games with places of the team without a player, in time order: table and referee
     /// places from today to 4 weeks ahead, driver places from today until the Sunday of next week.
     OpenPlaces { games: Vec<OpenGameView> },
@@ -146,6 +150,23 @@ pub enum OpenItemView {
     GamesNotChecked { games: Vec<GameItemView> },
     /// Duty games before today that are not checked, oldest first (decision 0035).
     DutyGamesNotChecked { games: Vec<GameItemView> },
+}
+
+/// The club teams known for the second half of the season (a competition that starts in it), of
+/// the known and the waiting club teams (games in the first half, none in the second).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SecondHalfView {
+    pub known: usize,
+    pub of: usize,
+}
+
+impl From<HalfCount> for SecondHalfView {
+    fn from(count: HalfCount) -> Self {
+        Self {
+            known: count.known,
+            of: count.known + count.waiting,
+        }
+    }
 }
 
 /// A game of an open item: enough to show it in the list below the item and to open its page.
@@ -259,12 +280,16 @@ impl OpenItemView {
             OpenItem::AnswersMoved { games: moved } => Self::AnswersMoved {
                 games: moved.iter().filter_map(item_of).collect(),
             },
-            OpenItem::ScheduleNotEntered { games: ids } => Self::ScheduleNotEntered {
+            OpenItem::ScheduleNotEntered {
+                games: ids,
+                second_half,
+            } => Self::ScheduleNotEntered {
                 games: ids
                     .iter()
                     .filter_map(|id| games.get(id))
                     .map(|game| GameItemView::of(season, game))
                     .collect(),
+                second_half: second_half.map(SecondHalfView::from),
             },
             OpenItem::OpenPlaces { games: open } => Self::OpenPlaces {
                 games: open
@@ -409,7 +434,7 @@ pub async fn get(State(state): State<AppState>) -> Result<Json<StartAnswer>, App
     let items = open_items(
         &reading,
         games.unseen_changes,
-        schedule_not_entered(&events, &places, today),
+        schedule_not_entered(&events, &places, &games.halves),
         open_places_games(&events, &places, today),
         &lists,
         &warnings,

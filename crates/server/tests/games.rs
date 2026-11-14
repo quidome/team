@@ -750,7 +750,7 @@ async fn a_team_that_leaves_the_game_list_keeps_its_name_on_the_place(pool: PgPo
 }
 
 #[sqlx::test(migrator = "team::db::MIGRATOR")]
-async fn schedule_not_entered_lists_the_home_games_of_4_weeks_and_shrinks(pool: PgPool) {
+async fn schedule_not_entered_lists_the_home_games_of_the_ready_half_and_shrinks(pool: PgPool) {
     let reader = Reader::chosen(pool).await;
     reader.read_good().await;
     let answer = start(&reader).await;
@@ -762,7 +762,8 @@ async fn schedule_not_entered_lists_the_home_games_of_4_weeks_and_shrinks(pool: 
         .unwrap()
         .clone();
     let games = item["games"].as_array().unwrap();
-    // Mon 12 Oct: from today until Sun 8 Nov (today + 27 days), in time order.
+    // Mon 12 Oct: the first half is ready (6 club teams), the second is not (only MSE 1, decision
+    // 0037): the coming home games of the first half, with no 27-day limit, in time order.
     let dates: Vec<&str> = games
         .iter()
         .map(|game| game["date"].as_str().unwrap())
@@ -774,11 +775,12 @@ async fn schedule_not_entered_lists_the_home_games_of_4_weeks_and_shrinks(pool: 
     assert!(
         dates
             .iter()
-            .all(|&date| ("2026-10-12"..="2026-11-08").contains(&date))
+            .all(|&date| ("2026-10-12"..="2026-12-31").contains(&date))
     );
     assert!(games.iter().all(|game| game["season"] == "2026-2027"));
-    // The home games of 14 November are 33 days ahead: not in it.
-    assert!(!dates.contains(&"2026-11-14"));
+    // The home games of 14 November are 33 days ahead: in it.
+    assert!(dates.contains(&"2026-11-14"));
+    assert!(item["second_half"].is_null());
 
     let first = games[0]["id"].as_i64().unwrap();
     ok(

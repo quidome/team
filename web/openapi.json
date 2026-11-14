@@ -4733,7 +4733,7 @@
           },
           {
             "type": "object",
-            "description": "Home games of the club from today to 4 weeks ahead whose schedule is not entered, in time\norder.",
+            "description": "Coming home games of the club whose schedule is not entered, of the half seasons that are\nready (more than 2 club teams have a competition that starts in it), in time order; with\nthe count of the second half when one of them is in it (decision 0037).",
             "required": [
               "games",
               "kind"
@@ -4749,6 +4749,16 @@
                 "type": "string",
                 "enum": [
                   "schedule_not_entered"
+                ]
+              },
+              "second_half": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SecondHalfView"
+                  }
                 ]
               }
             }
@@ -5984,6 +5994,24 @@
           "today": {
             "type": "string",
             "description": "Dutch date: events of today and later are coming."
+          }
+        }
+      },
+      "SecondHalfView": {
+        "type": "object",
+        "description": "The club teams known for the second half of the season (a competition that starts in it), of\nthe known and the waiting club teams (games in the first half, none in the second).",
+        "required": [
+          "known",
+          "of"
+        ],
+        "properties": {
+          "known": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "of": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },

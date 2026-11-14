@@ -1,5 +1,5 @@
 //! The season: a season starts on 1 July (as the NBB, the Dutch basketball federation, counts it)
-//! and is written as "2026-2027".
+//! and is written as "2026-2027". Its half seasons split on 1 January.
 
 use std::fmt;
 use std::str::FromStr;
@@ -57,6 +57,25 @@ impl Season {
     }
 }
 
+/// The half of a season: the first half from 1 July until 31 December, the second half from
+/// 1 January until 30 June. The period of one schedule of the referee committee.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Half {
+    First,
+    Second,
+}
+
+impl Half {
+    /// The half of the season of a date (Dutch date).
+    pub fn of(date: NaiveDate) -> Half {
+        if date.month() >= FIRST_MONTH {
+            Half::First
+        } else {
+            Half::Second
+        }
+    }
+}
+
 impl fmt::Display for Season {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}-{}", self.start_year, self.start_year + 1)
@@ -88,6 +107,14 @@ mod tests {
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).expect("valid date")
+    }
+
+    #[test]
+    fn the_second_half_runs_from_1_january_until_30_june() {
+        assert_eq!(Half::of(date(2026, 7, 1)), Half::First);
+        assert_eq!(Half::of(date(2026, 12, 31)), Half::First);
+        assert_eq!(Half::of(date(2027, 1, 1)), Half::Second);
+        assert_eq!(Half::of(date(2027, 6, 30)), Half::Second);
     }
 
     #[test]

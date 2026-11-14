@@ -605,3 +605,79 @@ async fn a_game_that_left_the_game_list_gives_no_warning(pool: PgPool) {
         None
     );
 }
+
+/// The dates of the games of the open item "schedule not entered", and its count of the second
+/// half (`null` without it).
+fn not_entered(answer: &Value) -> (Vec<String>, Value) {
+    match item(answer, "schedule_not_entered") {
+        None => (Vec::new(), Value::Null),
+        Some(item) => (
+            item["games"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|game| game["date"].as_str().unwrap().to_owned())
+                .collect(),
+            item["second_half"].clone(),
+        ),
+    }
+}
+
+/// The home games of the club in a game list of the source.
+fn home_game_dates(body: &Value) -> Vec<String> {
+    body["wedstrijden"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|game| game["thuis_club_id"] == DRAKES)
+        .map(|game| game["datum"].as_str().unwrap()[..10].to_owned())
+        .collect()
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_second_half_with_only_a_senior_team_gives_no_schedule_not_entered(pool: PgPool) {
+    // 2026-2027: only MSE 1 has games after 1 January, in its competition from September, so no
+    // club team counts for the second half (decision 0037).
+    let mut reader = Reader::chosen(pool).await;
+    reader.read_good().await;
+    at(&mut reader, 2026, 12, 20, 10).await;
+    // The home game of 9 January 2027 is within 27 days of 20 December: the old rule had it.
+    assert!(home_game_dates(&data("games-37-2026-2027.json")).contains(&"2027-01-09".to_owned()));
+
+    let (dates, second_half) = not_entered(&start(&reader).await);
+    assert!(
+        dates.iter().all(|date| date.as_str() < "2027-01-01"),
+        "{dates:?}"
+    );
+    assert_eq!(second_half, Value::Null);
+}
+
+#[sqlx::test(migrator = "team::db::MIGRATOR")]
+async fn a_second_half_with_the_youth_teams_lists_all_its_home_games(pool: PgPool) {
+    // 2025-2026 on 20 December 2025: M16 1, M18 1, X12 1 and X14 1 have a competition from
+    // 17 January 2026; MSE 1 and VSE 1 play one competition for the season.
+    let mut reader = Reader::chosen(pool).await;
+    at(&mut reader, 2025, 12, 20, 10).await;
+    let games = data("games-37-2025-2026.json");
+    reader.answer(games.clone());
+    reader.choose(M16_1).await;
+    reader.read_good().await;
+
+    let (dates, second_half) = not_entered(&start(&reader).await);
+    let coming: Vec<String> = home_game_dates(&games)
+        .into_iter()
+        .filter(|date| date.as_str() >= "2025-12-20")
+        .collect();
+    let second: Vec<&String> = coming
+        .iter()
+        .filter(|date| date.as_str() >= "2026-01-01")
+        .collect();
+    // Every coming home game of both halves (none has a schedule yet), also those months away.
+    assert!(second.len() > 4, "{second:?}");
+    assert_eq!(dates.len(), coming.len(), "{dates:?}");
+    assert!(
+        dates.iter().any(|date| date.as_str() > "2026-04-01"),
+        "{dates:?}"
+    );
+    assert_eq!(second_half, json!({ "known": 4, "of": 4 }));
+}
