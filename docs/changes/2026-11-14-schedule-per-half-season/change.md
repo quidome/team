@@ -1,8 +1,8 @@
 ---
 title: Schedule not entered for each half season
 type: feature
-stage: design
-closure: checks      # set by /design
+stage: implement
+closure: review build   # set by /design: the change can hide reminders without anyone seeing it
 created: 2026-11-14
 ---
 
@@ -19,3 +19,4 @@ only the next 27 days. A club team counts for a half season when one of its comp
 | 2026-11-14 | idea | created by /vision from the ideas list (lines of 2026-11-14 about the half season and the list for each club team) |
 | 2026-11-14 | discover | idea ready for discovery; needed before about 13 December 2026, when the 27-day window reaches the January home games of MSE 1 |
 | 2026-11-14 | design | functional spec approved after two spec reviews (serves, with notes); rule: a club team counts for a half season when one of its competitions has its first game in that half; text "· second half: 3 of 4 teams known" |
+| 2026-11-14 | implement | technical spec approved: a story in 3 steps; closure review build (a wrong rule hides reminders silently) |
