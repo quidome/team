@@ -3,6 +3,8 @@
 Open work, most important first. Changes link to their folder; small fixes are one line.
 
 Changes:
+- [Schedule not entered for each half season](changes/2026-11-14-schedule-per-half-season/change.md) (feature, discover; before about 5 December 2026)
+- [Review of the page "Season"](changes/2026-11-14-review-of-season/change.md) (review, discover; after the change above)
 
 Small:
 - Look at the report on the phone with the real names after its release: the headings that break with a hyphen ("Train-ings"), the width of the five columns, the details, and a tap on "Copy" with the text in the chat (close of the report, 2026-11-09).

@@ -8,9 +8,9 @@ share of the duties.
 One coordinator runs one youth team in a club. Each week the same work comes back: which games
 are there, who is at training, who drives to away games, and which players cover the table and
 referee places that the referee committee gives to the team. The team talks in a WhatsApp group; the coordinator
-keeps the record. Today the record is a Google Sheet, because the first version of this tool was
-not good enough. Keeping it up to date by hand, and writing the same kinds of messages again and
-again, costs time.
+keeps the record. Until this tool, the record was a Google Sheet, because the first version of the
+tool was not good enough. Keeping it up to date by hand, and writing the same kinds of messages
+again and again, cost time.
 
 Three groups read what the coordinator produces:
 - **The team and the parents**: when their child plays, when they must drive or do table or referee duty, and whether the work is shared equally.
@@ -35,9 +35,8 @@ Both values need fast capture and correct data. For example, attendance at train
 
 ## Where we are
 - **Fair duties: reached.** The games come in from the game list, the coordinator gives the duty places to players, the duty totals show the split, and the messages and duty overviews come from the tool.
-- **Effort: reached in the tool.** Attendance at training and at games is recorded with the reason for each absence, and the report shows the attendance and the duties of each player side by side, with the details behind the numbers. Whether it replaces the sheet shows in real use.
-- **The sheet is still in use.**
-- The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it.
+- **Effort: reached.** Attendance at training and at games is recorded with the reason for each absence, and the report shows the attendance and the duties of each player side by side, with the details behind the numbers.
+- **The sheet is no longer in use** (since about 31 October 2026). The product is successful when the coordinator sees the effort of each player and shares the duties fairly from the tool, and no longer needs the sheet for it: that is reached.
 
 What each release brought is in `docs/releases.md`; what each feature does is in `docs/product/`.
 
@@ -49,9 +48,12 @@ correct the first time. No one questions whether the duties are shared fairly, b
 see it.
 
 ## Where we are going
-First the games come in from the club's game list, so the coordinator never types a schedule.
-Then attendance at training. Then a start page that shows what comes next and what is still open, and a page with the whole season, so each later part has a place to show its open items (built). Then duties and the messages built on them, with their own open items on the start page. Then the duty overviews and attendance at games, then the report of what each player did (built). Each step must be good
-enough to replace that part of the sheet.
+The parts that replace the sheet are built: the games from the game list, attendance at training
+and at games, the start page and the page "Season", duties with their messages and duty overviews,
+and the report of what each player did. Now the tool must take less of the coordinator's time:
+it asks for attention only when there is something to do, and each page shows only what that work
+needs. Real use will show many small improvements, and maybe new features; each one must serve
+the purpose.
 
 ## Longer horizon
 Not for now:
@@ -90,10 +92,8 @@ These stay ideas until real use shows the need.
 - **Small and correct beats complete.** Add a feature only when it replaces work that is done now.
 
 ## Open questions
-The first design answered the questions about logging in, the backend language, data storage
-and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from the spec of
-`docs/changes/done/2026-10-10-games-from-game-list/`:
-- The word list calls the game list "the federation's list", but the source appears to be a private site built on the federation's data. Must the meaning change?
+None now. The first design answered the questions about logging in, the backend language, data
+storage and the phone screens (see `docs/decisions/`).
 
 ## Change log
 | Date | Change |
@@ -117,3 +117,4 @@ and the phone screens (see `docs/decisions/`). Open for a next `/vision`, from t
 | 2026-11-09 | Journey 8: the report is one page with a table (attendance as percentages, duties done and planned) and the details of a player on a tap (valid and not valid absences, duties taken over), for the current season, used now and then to steer a conversation; a part can be copied to show an imbalance. Word report: one or more tables |
 | 2026-11-09 | The report is built: "Where we are" says effort is reached in the tool (the sheet still to be replaced in real use); "Where we are going" and priority 7 say built |
 | 2026-11-11 | Words team game (a game the team plays; its only duty is drive, at an away game) and duty game (a home game of another club team where the team has table or referee places); "checked" means an event is done in the administration and no longer asks for attention, for every event, also a duty game (was: only attendance is checked). Answers the open question about a word for these games. From `/vision` of "every past event that is not done is an open item" |
+| 2026-11-14 | The sheet is no longer in use (since about 31 October): "Where we are" says the purpose is reached, and the problem space speaks of the sheet in the past. "Where we are going": less of the coordinator's time, attention only when there is something to do, and small improvements from real use. The open question about the game list closes: the word stays, its meaning says the list comes from the federation's data. New words season, half season and competition |

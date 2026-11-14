@@ -8,6 +8,9 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | coordinator | The one person who uses the tool and changes its data. Runs one team in each season. | Not "admin", not "user" when the coordinator is meant. |
 | team | The youth team the coordinator runs in one season: the team chosen from the game list for that season. Each season has its own team, often with the same players. | Say "other club team" for the club's other teams. |
 | club | The sports club the team belongs to. It has the players and the teams of each season. | |
+| season | The year of the club's competitions: from 1 July until 30 June, as the federation counts it. | "2026-2027". |
+| half season | The first half (1 July until 31 December) or the second half (1 January until 30 June) of a season: the period of one schedule of the referee committee, for the home games of all club teams. | "The second half". Not for a competition: a senior team has no halves. |
+| competition | What a club team plays in the game list. A youth team has one competition for each half season, often in another division in the second half; a senior team has one competition for the whole season. | |
 | player | A person of the club that the coordinator keeps in the tool. Has a first name, and usually a last name. Is in the team of a season through a role, or is not in the team. | Not "member", not "child" in the product. |
 | role | What a player is in the team of a season: plays games, or only trains. Has a start date, and an end date when the player leaves or changes role. A player's roles, one after the other, are the player's history. | "Plays games" / "Only trains". Not "position", not "membership". |
 | hidden | A player or a reason that the tool no longer offers as a choice. Its history and totals stay. | Not "deleted", not "archived". |
@@ -15,7 +18,7 @@ stage adds, changes or removes words. Define meaning, not mechanics: no flags, p
 | team game | A game the team plays: a home game or an away game. The only duty of the team at a team game is drive, at an away game: the team never has the table or referee places of its own game (a club rule). | "Team game". Not "own game". |
 | home game / away game | A team game in the club's own hall / at another club. | Only for team games: a home game of another club team is a duty game, or just a game. |
 | duty game | A home game of another club team where the team has table or referee places. It does not depend on a team game: the team may play that weekend or not. | "Duty game". Not "possible duty game" when the team has places. |
-| game list | The federation's list of all games of the club, read by the tool. | Not "feed" in user-facing text. |
+| game list | The list of all games of the club, from the federation's data, that the tool reads. | Not "feed" in user-facing text. |
 | event | A training or a game. A duty is not an event; it belongs to a game. | "The next events". Not "activity", not "item". |
 | training | A training session of the team on a date. It exists, and counts, only when the coordinator opens a training day or adds a training. | |
 | weekly training | A day of the week with a start and an end time, from a date until a date, on which the team trains. It suggests a training day on each of its days. | Not "schedule" (that is for the games), not "training day". |
