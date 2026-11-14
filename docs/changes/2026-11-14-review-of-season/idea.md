@@ -59,7 +59,9 @@ home games with "Schedule not entered". The page opens at today with the events 
   and trainings together)?
 - What does "Duty games" show: only the games with places of the team (the word "duty game"), or
   every home game of another club team? Where do the home games of other club teams without places
-  of the team show, and is "possible duty games" still needed as a word?
+  of the team show, and is "possible duty games" still needed as a word? And "schedule entered"
+  (the mark that the committee's schedule of a home game is entered): a word for the word list
+  (ideas list 2026-10-27)?
 - "Earlier weeks": all of the past at once, or a few weeks for each tap? Does a return from a past
   event keep the place?
 - Past home games show "Schedule not entered" for ever (ideas list 2026-10-27): still on the row?
